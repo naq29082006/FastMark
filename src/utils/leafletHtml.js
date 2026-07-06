@@ -211,6 +211,10 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         map.fitBounds(bounds, { padding: [48, 48], maxZoom: 18, animate: true });
       }
 
+      function recenterMap(latLng) {
+        map.flyTo(latLng, 18, { duration: 1.2, easeLinearity: 0.22 });
+      }
+
       function drawCurrentLocation(location, options) {
         if (!hasLocation(location)) {
           return;
@@ -382,7 +386,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           }
 
           hideAccuracyCircle();
-          map.setView(latLng, 18, { animate: false });
+          recenterMap(latLng);
         }
 
         if (command.type === 'showRestaurants') {

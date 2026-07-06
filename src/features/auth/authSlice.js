@@ -14,6 +14,7 @@ import { getAuthConfigError } from '../../services/env';
 import { readUserProfile, upsertUserProfile, makeProfileFromAuthUser } from '../../services/profileService';
 import { readCachedProfile, writeCachedProfile } from '../../services/profileCache';
 import { toReadableAuthError } from './authErrors';
+import { clearGoogleSignInSession } from './clearGoogleSignInSession';
 import { authLogger as log } from '../../utils/logger';
 
 const initialState = {
@@ -177,6 +178,7 @@ export const logoutUser = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       log.info('logoutUser:start');
+      await clearGoogleSignInSession();
       await logoutCurrentUser();
       log.ok('logoutUser:success');
     } catch (error) {

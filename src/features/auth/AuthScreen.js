@@ -20,7 +20,6 @@ import {
 } from './authSelectors';
 import { clearAuthFeedback, loginUser, registerUser } from './authSlice';
 import GoogleSignInButton from './GoogleSignInButton';
-import NetworkDiagnosticsPanel from './NetworkDiagnosticsPanel';
 import { getGoogleAuthSetupError } from './googleAuthConfig';
 
 // Required for Expo OAuth redirect handling
@@ -218,7 +217,6 @@ export default function AuthScreen() {
               onError={setLocalError}
             />
           )}
-          <NetworkDiagnosticsPanel />
         </View>
 
         <Text style={styles.footerNote}>

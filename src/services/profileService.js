@@ -1,9 +1,14 @@
-import { doc, getDoc, getFirestore, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 import { createLogger } from '../utils/logger';
-import { ensureFirebaseApp } from './firebaseApp';
 import { getCurrentUserIdToken } from './authService';
 import { getNodeApiUrl } from './env';
+import {
+  getFirestoreDb,
+  isFirestoreOfflineError,
+  reconnectFirestore,
+} from './firestoreDb';
+import { readCachedProfile, writeCachedProfile } from './profileCache';
 
 const log = createLogger('ProfileService');
 
@@ -64,7 +69,7 @@ function mergeProfile(authUser, baseProfile, updates = {}) {
 }
 
 function getProfilesCollection() {
-  return getFirestore(ensureFirebaseApp());
+  return getFirestoreDb();
 }
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = NODE_FETCH_TIMEOUT_MS) {
@@ -86,9 +91,24 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = NODE_FETCH_TIMEOU
 async function readFirebaseProfile(uid) {
   log.step('[PROFILE] firestore read START', { uid });
   const db = getProfilesCollection();
-  const snapshot = await getDoc(doc(db, PROFILE_COLLECTION, uid));
-  log.step('[PROFILE] firestore read DONE', { uid, exists: snapshot.exists() });
-  return snapshot.exists() ? snapshot.data() : null;
+  const profileRef = doc(db, PROFILE_COLLECTION, uid);
+
+  try {
+    const snapshot = await getDoc(profileRef);
+    log.step('[PROFILE] firestore read DONE', { uid, exists: snapshot.exists() });
+    return snapshot.exists() ? snapshot.data() : null;
+  } catch (error) {
+    if (!isFirestoreOfflineError(error)) {
+      throw error;
+    }
+
+    log.warn('readFirebaseProfile:offline-retry', { uid });
+    await reconnectFirestore();
+
+    const snapshot = await getDoc(profileRef);
+    log.step('[PROFILE] firestore read DONE (retry)', { uid, exists: snapshot.exists() });
+    return snapshot.exists() ? snapshot.data() : null;
+  }
 }
 
 async function saveFirebaseProfile(profile) {
@@ -165,15 +185,30 @@ function syncNodeProfileInBackground(profile) {
 export async function readUserProfile(authUser) {
   log.info('readUserProfile:start', { uid: authUser.uid });
 
+  const cachedProfile = await readCachedProfile(authUser.uid);
+  if (cachedProfile) {
+    log.ok('readUserProfile:cache', { uid: authUser.uid });
+    return mergeProfile(authUser, cachedProfile, null);
+  }
+
   try {
     const firebaseProfile = await readFirebaseProfile(authUser.uid);
     if (firebaseProfile) {
+      const profile = mergeProfile(authUser, firebaseProfile, null);
+      await writeCachedProfile(profile);
       log.ok('readUserProfile:firestore', { uid: authUser.uid });
-      return mergeProfile(authUser, firebaseProfile, null);
+      return profile;
     }
     log.warn('readUserProfile:firestore-empty', { uid: authUser.uid });
   } catch (error) {
-    log.fail('readUserProfile:firestore-failed', error);
+    if (isFirestoreOfflineError(error)) {
+      log.warn('readUserProfile:firestore-offline', {
+        uid: authUser.uid,
+        message: error?.message || 'offline',
+      });
+    } else {
+      log.fail('readUserProfile:firestore-failed', error);
+    }
   }
 
   if (hasNodeApi()) {
@@ -206,9 +241,18 @@ export async function upsertUserProfile(authUser, updates = {}, options = {}) {
 
   try {
     await saveFirebaseProfile(profile);
+    await writeCachedProfile(profile);
     log.ok('upsertUserProfile:firestore-saved', { uid: authUser.uid });
   } catch (error) {
-    log.fail('upsertUserProfile:firestore-failed', error);
+    if (isFirestoreOfflineError(error)) {
+      log.warn('upsertUserProfile:firestore-offline', {
+        uid: authUser.uid,
+        message: error?.message || 'offline',
+      });
+      await writeCachedProfile(profile);
+    } else {
+      log.fail('upsertUserProfile:firestore-failed', error);
+    }
   }
 
   syncNodeProfileInBackground(profile);

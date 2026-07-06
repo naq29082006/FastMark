@@ -6,6 +6,7 @@ import { statusCodes } from '@react-native-google-signin/google-signin/lib/modul
 import { googleOAuthConfig } from '../../services/env';
 import { googleLogger as log } from '../../utils/logger';
 import { describeNativeGoogleError, getGoogleAuthSetupError } from './googleAuthConfig';
+import { clearGoogleSignInSession } from './clearGoogleSignInSession';
 import { socialLogin } from './authSlice';
 import { GoogleSignInPressable } from './googleSignInShared';
 
@@ -36,6 +37,7 @@ export default function GoogleSignInNativeImpl({ disabled, onError }) {
     }
 
     try {
+      await clearGoogleSignInSession();
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
 

@@ -58,7 +58,7 @@ export default function GoogleSignInBrowserButton({ disabled, onError }) {
       return;
     }
 
-    promptGoogle();
+    promptGoogle({ extraParams: { prompt: 'select_account' } });
   }
 
   return (
