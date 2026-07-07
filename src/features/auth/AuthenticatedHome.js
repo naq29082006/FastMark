@@ -11,14 +11,23 @@ const TABS = [
 
 export default function AuthenticatedHome() {
   const [activeTab, setActiveTab] = useState('map');
+  const [mapFocusRequest, setMapFocusRequest] = useState(null);
+
+  function handleOpenStoreFromProfile(storeId) {
+    setMapFocusRequest({
+      storeId: String(storeId),
+      at: Date.now(),
+    });
+    setActiveTab('map');
+  }
 
   return (
     <View style={styles.root}>
       <View style={styles.content}>
         {activeTab === 'map' ? (
-          <MapScreen />
+          <MapScreen focusStoreRequest={mapFocusRequest} />
         ) : (
-          <ProfilePanel />
+          <ProfilePanel onOpenStore={handleOpenStoreFromProfile} />
         )}
       </View>
 
