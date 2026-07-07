@@ -15,14 +15,22 @@ export async function fetchApiHealth() {
 
   const startedAt = Date.now();
   const response = await apiRequest(API_ENDPOINTS.root, { method: 'GET' });
-  const message = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+  let message = '';
+
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    message = data.service || data.ok ? 'Fastmark API online' : JSON.stringify(data);
+  } else {
+    message = (await response.text()).trim() || '(empty response)';
+  }
 
   return {
     configured: true,
     online: response.ok,
     statusCode: response.status,
     latencyMs: Date.now() - startedAt,
-    message: message.trim() || '(empty response)',
+    message,
     baseUrl: getApiBaseUrl(),
   };
 }

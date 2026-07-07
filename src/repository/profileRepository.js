@@ -2,10 +2,7 @@ import { createLogger } from '../core/utils/logger';
 import {
   fetchNodeProfile,
   hasProfileNodeApi,
-  isFirestoreOfflineError,
-  readFirebaseProfile,
-  saveFirebaseProfile,
-  syncNodeProfileInBackground,
+  saveNodeProfile,
 } from '../api/profileApi';
 import { readCachedProfile, writeCachedProfile } from '../api/profileCacheApi';
 import { mergeProfile } from '../model/profileModel';
@@ -23,32 +20,14 @@ export async function readUserProfile(authUser) {
     return mergeProfile(authUser, cachedProfile, null);
   }
 
-  try {
-    const firebaseProfile = await readFirebaseProfile(authUser.uid);
-    if (firebaseProfile) {
-      const profile = mergeProfile(authUser, firebaseProfile, null);
-      await writeCachedProfile(profile);
-      log.ok('readUserProfile:firestore', { uid: authUser.uid });
-      return profile;
-    }
-    log.warn('readUserProfile:firestore-empty', { uid: authUser.uid });
-  } catch (error) {
-    if (isFirestoreOfflineError(error)) {
-      log.warn('readUserProfile:firestore-offline', {
-        uid: authUser.uid,
-        message: error?.message || 'offline',
-      });
-    } else {
-      log.fail('readUserProfile:firestore-failed', error);
-    }
-  }
-
   if (hasProfileNodeApi()) {
     try {
       const nodeProfile = await fetchNodeProfile();
       if (nodeProfile) {
+        const profile = mergeProfile(authUser, nodeProfile, null);
+        await writeCachedProfile(profile);
         log.ok('readUserProfile:node-api', { uid: authUser.uid });
-        return mergeProfile(authUser, nodeProfile, null);
+        return profile;
       }
       log.warn('readUserProfile:node-api-empty', { uid: authUser.uid });
     } catch (error) {
@@ -70,25 +49,22 @@ export async function upsertUserProfile(authUser, updates = {}, options = {}) {
   }
 
   const profile = mergeProfile(authUser, currentProfile, updates);
+  await writeCachedProfile(profile);
 
-  try {
-    await saveFirebaseProfile(profile);
-    await writeCachedProfile(profile);
-    log.ok('upsertUserProfile:firestore-saved', { uid: authUser.uid });
-  } catch (error) {
-    if (isFirestoreOfflineError(error)) {
-      log.warn('upsertUserProfile:firestore-offline', {
-        uid: authUser.uid,
-        message: error?.message || 'offline',
-      });
-      await writeCachedProfile(profile);
-    } else {
-      log.fail('upsertUserProfile:firestore-failed', error);
+  if (hasProfileNodeApi()) {
+    try {
+      const saved = await saveNodeProfile(profile);
+      if (saved) {
+        await writeCachedProfile(saved);
+        log.ok('upsertUserProfile:node-api-saved', { uid: authUser.uid });
+        return saved;
+      }
+    } catch (error) {
+      log.fail('upsertUserProfile:node-api-failed', error);
     }
   }
 
-  syncNodeProfileInBackground(profile);
-
+  log.ok('upsertUserProfile:local-cache', { uid: authUser.uid });
   return profile;
 }
 
