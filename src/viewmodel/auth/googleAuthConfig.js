@@ -2,6 +2,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri, ResponseType } from 'expo-auth-session';
 
 import { googleOAuthConfig } from '../../core/config/env';
+import { validateGoogleOAuthSetup } from '../../core/utils/authDiagnostics';
 
 export function isExpoGoClient() {
   return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -36,6 +37,14 @@ export function getGoogleAuthSetupError() {
 
   if (!webClientId) {
     return 'Thiếu EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID trong .env (lấy từ Firebase → Authentication → Google).';
+  }
+
+  const oauthIssues = validateGoogleOAuthSetup().filter(
+    (issue) => issue.includes('Client ID in .env does not match google-services.json')
+  );
+
+  if (oauthIssues.length > 0) {
+    return 'Client ID Google trong .env không khớp google-services.json. Web = client_type 3, Android = client_type 1. Tải lại file từ Firebase rồi cập nhật .env.';
   }
 
   return null;
@@ -83,8 +92,13 @@ export function describeNativeGoogleError(error) {
   const message = error.message || '';
 
   if (message.includes('DEVELOPER_ERROR') || error.code === '10') {
+    const setupHint = getGoogleAuthSetupError();
+    if (setupHint) {
+      return setupHint;
+    }
+
     return (
-      'Cấu hình Google chưa khớp. Thêm SHA-1 vào Firebase, tải lại google-services.json, rồi rebuild: npx expo run:android.'
+      'Cấu hình Google chưa khớp. Kiểm tra EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (loại Web, client_type 3) và SHA-1 trong Firebase, tải lại google-services.json, rồi rebuild: npx expo run:android.'
     );
   }
 

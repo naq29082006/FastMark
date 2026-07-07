@@ -1,49 +1,49 @@
 {
   "project_info": {
-    "project_number": "356316104950",
-    "project_id": "fastmark-11cd7",
-    "storage_bucket": "fastmark-11cd7.firebasestorage.app"
+    "project_number": "3127291193",
+    "project_id": "fastmark-e881d",
+    "storage_bucket": "fastmark-e881d.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:356316104950:android:88c50b8de9cf90c53384d7",
+        "mobilesdk_app_id": "1:3127291193:android:5b041b398d1668e1f3cce8",
         "android_client_info": {
           "package_name": "com.nduy17.fastmark"
         }
       },
       "oauth_client": [
         {
-          "client_id": "356316104950-02l8hmosnbvd97knh60qcjo80ob81ker.apps.googleusercontent.com",
+          "client_id": "3127291193-94001sfai3r77epe21kd2ngu5qmrrul2.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.nduy17.fastmark",
-            "certificate_hash": "f09f9d5ccf7de6c486d869c21b5a0d310bb9381d"
+            "certificate_hash": "0007fba345a0431099605c14498518c5bd6f2617"
           }
         },
         {
-          "client_id": "356316104950-m36vptachsd6jb2blns3si067u1qlgol.apps.googleusercontent.com",
+          "client_id": "3127291193-bmrf9aho80qviaoo5nm0h73v4nj1ju8u.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.nduy17.fastmark",
-            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+            "certificate_hash": "6952c32c4b67ce5a6e33c93080b71b2466aee3a4"
           }
         },
         {
-          "client_id": "356316104950-799dkpvcf6br1e8drjvbeukvfu1ovcsu.apps.googleusercontent.com",
+          "client_id": "3127291193-vapc6989v56ove18gbib336mpf8aruk4.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBXEVywMc6Ej_qgt3RvKeaPzI29pYhpVEk"
+          "current_key": "AIzaSyBPPyf9f_tKM4HO4CsH2N8QSJkKf19Ybsc"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "356316104950-799dkpvcf6br1e8drjvbeukvfu1ovcsu.apps.googleusercontent.com",
+              "client_id": "3127291193-vapc6989v56ove18gbib336mpf8aruk4.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
