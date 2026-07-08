@@ -141,6 +141,7 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#f1f5f9',
+    minHeight: 0,
   },
   header: {
     flexDirection: 'row',
@@ -194,6 +195,7 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
+    minHeight: 0,
   },
   bodyContent: {
     padding: 16,

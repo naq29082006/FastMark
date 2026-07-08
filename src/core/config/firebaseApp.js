@@ -10,21 +10,20 @@ const log = createLogger('FirebaseApp');
 const requiredConfigKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
 
 export function getResolvedFirebaseConfig() {
-  if (Platform.OS !== 'android') {
-    return { ...firebaseConfig };
-  }
-
   const androidConfig = getAndroidFirebaseConfigFromGoogleServices();
 
-  return {
-    ...firebaseConfig,
-    apiKey: androidConfig.apiKey || firebaseConfig.apiKey,
-    appId: androidConfig.appId || firebaseConfig.appId,
-    projectId: androidConfig.projectId || firebaseConfig.projectId,
-    authDomain: androidConfig.authDomain || firebaseConfig.authDomain,
-    messagingSenderId: firebaseConfig.messagingSenderId || androidConfig.messagingSenderId,
-    storageBucket: firebaseConfig.storageBucket || androidConfig.storageBucket,
-  };
+  if (Platform.OS === 'android' && androidConfig.apiKey) {
+    return {
+      apiKey: androidConfig.apiKey,
+      appId: androidConfig.appId || firebaseConfig.appId,
+      projectId: androidConfig.projectId || firebaseConfig.projectId,
+      authDomain: androidConfig.authDomain || firebaseConfig.authDomain,
+      messagingSenderId: androidConfig.messagingSenderId || firebaseConfig.messagingSenderId,
+      storageBucket: androidConfig.storageBucket || firebaseConfig.storageBucket,
+    };
+  }
+
+  return { ...firebaseConfig };
 }
 
 export function getResolvedFirebaseConfigSummary() {

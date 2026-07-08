@@ -1,4 +1,5 @@
 import {
+  getAndroidFirebaseConfigFromGoogleServices,
   getAndroidOAuthClientIdFromGoogleServices,
   getWebOAuthClientIdFromGoogleServices,
 } from './googleServicesConfig';
@@ -7,14 +8,19 @@ import { createLogger } from '../utils/logger';
 const log = createLogger('Env');
 
 const env = process.env || {};
+const googleServicesFirebase = getAndroidFirebaseConfigFromGoogleServices();
 
 export const firebaseConfig = {
-  apiKey: env.EXPO_PUBLIC_FIREBASE_API_KEY,
-  authDomain: env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  apiKey: env.EXPO_PUBLIC_FIREBASE_API_KEY || googleServicesFirebase.apiKey,
+  authDomain:
+    env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || googleServicesFirebase.authDomain,
+  projectId: env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || googleServicesFirebase.projectId,
+  storageBucket:
+    env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || googleServicesFirebase.storageBucket,
+  messagingSenderId:
+    env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ||
+    googleServicesFirebase.messagingSenderId,
+  appId: env.EXPO_PUBLIC_FIREBASE_APP_ID || googleServicesFirebase.appId,
 };
 
 export const nodeApiUrl = env.EXPO_PUBLIC_NODE_API_URL || '';

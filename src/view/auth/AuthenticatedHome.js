@@ -26,13 +26,15 @@ export default function AuthenticatedHome() {
   return (
     <View style={styles.root}>
       <View style={styles.content}>
-        {activeTab === 'map' ? (
+        <View style={[styles.tabPane, activeTab !== 'map' && styles.tabHidden]}>
           <MapScreen focusStoreRequest={mapFocusRequest} />
-        ) : activeTab === 'api' ? (
+        </View>
+        <View style={[styles.tabPane, activeTab !== 'api' && styles.tabHidden]}>
           <ApiScreen />
-        ) : (
+        </View>
+        <View style={[styles.tabPane, activeTab !== 'profile' && styles.tabHidden]}>
           <ProfilePanel onOpenStore={handleOpenStoreFromProfile} />
-        )}
+        </View>
       </View>
 
       <View style={styles.tabBar}>
@@ -70,6 +72,12 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  tabPane: {
+    flex: 1,
+  },
+  tabHidden: {
+    display: 'none',
   },
   tabBar: {
     flexDirection: 'row',
