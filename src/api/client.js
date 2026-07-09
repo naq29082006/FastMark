@@ -4,9 +4,38 @@ import { createLogger } from '../core/utils/logger';
 const log = createLogger('ApiClient');
 
 const DEFAULT_TIMEOUT_MS = 8000;
+const AUTH_TIMEOUT_MS = 45000;
+
+function toReadableNetworkError(error, url) {
+  const message = String(error?.message || error || '');
+
+  if (
+    error?.name === 'AbortError' ||
+    /cancell?ed/i.test(message)
+  ) {
+    return new Error(
+      `Kết nối backend quá thời gian chờ hoặc bị hủy (${url}). Đảm bảo backend đang chạy và thử lại.`
+    );
+  }
+
+  if (
+    message.includes('NoRouteToHost') ||
+    message.includes('Host unreachable') ||
+    message.includes('Network request failed') ||
+    message.includes('Failed to connect')
+  ) {
+    return new Error(
+      `Không kết nối được backend (${url}). Kiểm tra backend đang chạy (cd backend && npm run dev) và EXPO_PUBLIC_NODE_API_URL khớp PORT trong backend/.env (hiện tại thường là :5000). Emulator Android: http://10.0.2.2:<port>.`
+    );
+  }
+
+  return error;
+}
+
+export { AUTH_TIMEOUT_MS };
 
 export function getApiBaseUrl() {
-  return getNodeApiUrl().replace(/\/$/, '');
+  return getNodeApiUrl();
 }
 
 export function hasApiBaseUrl() {
@@ -33,10 +62,7 @@ export async function apiRequest(path, options = {}, timeoutMs = DEFAULT_TIMEOUT
     });
     return response;
   } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new Error('API timeout — máy chủ không phản hồi kịp thời.');
-    }
-    throw error;
+    throw toReadableNetworkError(error, url);
   } finally {
     clearTimeout(timeoutId);
   }

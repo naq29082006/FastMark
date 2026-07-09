@@ -45,7 +45,7 @@ export default function GoogleSignInBrowserButton({ disabled, onError }) {
     }
 
     log.ok('browserResponse:id-token-received');
-    dispatch(socialLogin({ token: idToken }));
+    dispatch(socialLogin({ token: idToken, fullName: '' }));
   }, [googleResponse, dispatch, onError]);
 
   function handlePress() {

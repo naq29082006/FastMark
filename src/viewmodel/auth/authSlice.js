@@ -3,13 +3,26 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import {
   changeCurrentUserPassword,
   getCurrentFirebaseUser,
-  loginWithEmail,
+  getCurrentUserIdToken,
   logoutCurrentUser,
-  registerWithEmail,
   serializeAuthUser,
-  signInWithGoogleCredential,
+  signInWithCustomTokenFromBackend,
   updateCurrentUserProfile,
 } from '../../repository/authRepository';
+import {
+  confirmEmailVerification,
+  fetchBackendUser,
+  loginAccount,
+  registerAccount,
+  requestEmailVerification,
+  syncGoogleAccount,
+} from '../../repository/authBackendRepository';
+import { hasApiBaseUrl } from '../../api/client';
+import {
+  updateProfileOnBackend,
+  uploadAvatarOnBackend,
+} from '../../api/authBackendApi';
+import { mapBackendUserToProfile } from '../../model/profileModel';
 import { getFirebaseInitConfigError } from '../../core/config/firebaseApp';
 import {
   makeProfileFromAuthUser,
@@ -31,6 +44,8 @@ const initialState = {
   error: null,
   successMessage: null,
   configError: null,
+  pendingGoogle: null,
+  emailVerification: null,
 };
 
 function rejectWithReadableError(error, rejectWithValue) {
@@ -72,6 +87,22 @@ export const loadUserProfile = createAsyncThunk(
     }
 
     log.info('loadUserProfile:start', { uid: user.uid });
+
+    if (hasApiBaseUrl()) {
+      try {
+        const idToken = await getCurrentUserIdToken();
+        if (idToken) {
+          const backendData = await fetchBackendUser(idToken);
+          const profile = mapBackendUserToProfile(backendData.user, user);
+          await writeCachedProfile(profile);
+          log.ok('loadUserProfile:backend', { uid: user.uid });
+          return { profile };
+        }
+      } catch (error) {
+        log.fail('loadUserProfile:backend-failed', error);
+      }
+    }
+
     const cached = await readCachedProfile(user.uid);
     if (cached) {
       log.ok('loadUserProfile:cache-hit', { uid: user.uid });
@@ -93,7 +124,7 @@ export const loadUserProfile = createAsyncThunk(
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (payload, { rejectWithValue }) => {
-    log.step('[AUTH] registerUser START', { email: payload.email });
+    log.step('[AUTH] registerUser START', { email: payload.email, userName: payload.userName });
 
     try {
       const configError = getFirebaseInitConfigError();
@@ -101,46 +132,26 @@ export const registerUser = createAsyncThunk(
         throw new Error(configError);
       }
 
-      const user = await registerWithEmail(payload);
+      await registerAccount({
+        email: payload.email.trim(),
+        password: payload.password,
+        userName: payload.userName.trim(),
+        fullName: payload.fullName.trim(),
+      });
 
-      log.step('[PROFILE] upsertUserProfile START (register)', { uid: user.uid });
-      let profile;
-      try {
-        profile = await upsertUserProfile(user, {
-          fullName: payload.fullName,
-          phone: payload.phone,
-          photoUrl: payload.photoUrl,
-        });
-        log.step('[PROFILE] upsertUserProfile SUCCESS (register)', { uid: user.uid });
-      } catch (profileError) {
-        log.fail('[PROFILE] upsertUserProfile FAILED (non-fatal — auth succeeded)', profileError);
-        profile = makeProfileFromAuthUser(user, {
-          fullName: payload.fullName,
-          phone: payload.phone,
-          photoUrl: payload.photoUrl,
-        });
-      }
+      const loginData = await loginAccount({
+        login: payload.email.trim(),
+        password: payload.password,
+      });
+
+      const user = await signInWithCustomTokenFromBackend(loginData.tokens.customToken);
+      const profile = mapBackendUserToProfile(loginData.user, user);
+      await writeCachedProfile(profile);
 
       log.step('[AUTH] registerUser SUCCESS', { uid: user.uid });
       return { user, profile, message: 'Đăng ký thành công.' };
     } catch (error) {
       log.fail('[AUTH] registerUser FAILED', error);
-
-      const existingUser = getCurrentFirebaseUser();
-      if (existingUser?.email === payload.email?.trim()) {
-        log.warn('[AUTH] registerUser RECOVERED — Firebase user exists despite error', {
-          uid: existingUser.uid,
-          originalError: error?.code || error?.message,
-        });
-        const user = serializeAuthUser(existingUser);
-        const profile = makeProfileFromAuthUser(user, {
-          fullName: payload.fullName,
-          phone: payload.phone,
-          photoUrl: payload.photoUrl,
-        });
-        return { user, profile, message: 'Đăng ký thành công.' };
-      }
-
       return rejectWithReadableError(error, rejectWithValue);
     }
   }
@@ -149,7 +160,8 @@ export const registerUser = createAsyncThunk(
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (payload, { rejectWithValue }) => {
-    log.step('[AUTH] loginUser START', { email: payload.email });
+    const login = payload.login?.trim() || payload.email?.trim();
+    log.step('[AUTH] loginUser START', { login });
 
     try {
       const configError = getFirebaseInitConfigError();
@@ -157,17 +169,14 @@ export const loginUser = createAsyncThunk(
         throw new Error(configError);
       }
 
-      const user = await loginWithEmail(payload);
+      const loginData = await loginAccount({
+        login,
+        password: payload.password,
+      });
 
-      log.step('[PROFILE] upsertUserProfile START (login)', { uid: user.uid });
-      let profile;
-      try {
-        profile = await upsertUserProfile(user);
-        log.step('[PROFILE] upsertUserProfile SUCCESS (login)', { uid: user.uid });
-      } catch (profileError) {
-        log.fail('[PROFILE] upsertUserProfile FAILED (non-fatal — auth succeeded)', profileError);
-        profile = makeProfileFromAuthUser(user);
-      }
+      const user = await signInWithCustomTokenFromBackend(loginData.tokens.customToken);
+      const profile = mapBackendUserToProfile(loginData.user, user);
+      await writeCachedProfile(profile);
 
       log.step('[AUTH] loginUser SUCCESS', { uid: user.uid });
       return { user, profile, message: 'Đăng nhập thành công.' };
@@ -219,6 +228,23 @@ export const updateUserProfile = createAsyncThunk(
       log.fail('updateUserProfile:firebase-auth', error);
     }
 
+    if (hasApiBaseUrl()) {
+      try {
+        const idToken = await getCurrentUserIdToken();
+        const backendData = await updateProfileOnBackend({
+          idToken,
+          fullName: updates.fullName,
+          phone: updates.phone,
+        });
+        const profile = mapBackendUserToProfile(backendData.user, authUser);
+        await writeCachedProfile(profile);
+        log.ok('updateUserProfile:backend-sync', { uid: authUser.uid });
+        return;
+      } catch (error) {
+        log.fail('updateUserProfile:backend-sync', error);
+      }
+    }
+
     try {
       const profile = await upsertUserProfile(
         authUser,
@@ -229,6 +255,55 @@ export const updateUserProfile = createAsyncThunk(
       log.ok('updateUserProfile:success', { uid: authUser.uid });
     } catch (error) {
       log.fail('updateUserProfile:remote-sync', error);
+    }
+  }
+);
+
+export const uploadUserAvatar = createAsyncThunk(
+  'auth/uploadAvatar',
+  async ({ imageBase64, mimeType }, { getState, rejectWithValue }) => {
+    const authUser = getState().auth.user;
+
+    if (!authUser) {
+      return rejectWithValue('Vui lòng đăng nhập lại.');
+    }
+
+    if (!imageBase64) {
+      return rejectWithValue('Không đọc được dữ liệu ảnh. Vui lòng chọn lại.');
+    }
+
+    if (!hasApiBaseUrl()) {
+      return rejectWithValue('Chưa cấu hình backend API.');
+    }
+
+    try {
+      log.info('uploadUserAvatar:start', {
+        uid: authUser.uid,
+        mimeType: mimeType || 'image/jpeg',
+        base64Length: imageBase64.length,
+      });
+
+      const idToken = await getCurrentUserIdToken();
+      const data = await uploadAvatarOnBackend({ idToken, imageBase64, mimeType });
+      const profile = mapBackendUserToProfile(data.user, authUser);
+
+      try {
+        await updateCurrentUserProfile({
+          photoUrl: profile.photoUrl,
+        });
+      } catch (error) {
+        log.fail('uploadUserAvatar:firebase-auth', error);
+      }
+
+      await writeCachedProfile(profile);
+      log.ok('uploadUserAvatar:success', { uid: authUser.uid });
+
+      return {
+        profile,
+        message: 'Cập nhật ảnh đại diện thành công.',
+      };
+    } catch (error) {
+      return rejectWithValue(toReadableAuthError(error));
     }
   }
 );
@@ -250,26 +325,128 @@ export const changePassword = createAsyncThunk(
 
 export const socialLogin = createAsyncThunk(
   'auth/socialLogin',
-  async ({ token }, { rejectWithValue }) => {
+  async ({ token, fullName }, { rejectWithValue }) => {
     try {
       log.info('socialLogin:start');
       const configError = getFirebaseInitConfigError();
       if (configError) throw new Error(configError);
 
-      const user = await signInWithGoogleCredential(token);
+      const data = await syncGoogleAccount({
+        idToken: token,
+        fullName: fullName?.trim() || '',
+      });
 
-      let profile;
-      try {
-        profile = await upsertUserProfile(user);
-      } catch (profileError) {
-        log.fail('socialLogin:profile-sync', profileError);
-        profile = makeProfileFromAuthUser(user);
+      if (data?.needsUsername) {
+        log.info('socialLogin:needs-username');
+        return {
+          needsUsername: true,
+          pendingGoogle: {
+            idToken: token,
+            fullName: data.suggestedFullName || fullName || '',
+            email: data.email || '',
+            picture: data.picture || '',
+          },
+        };
       }
 
+      const user = await signInWithCustomTokenFromBackend(data.customToken);
+      const profile = mapBackendUserToProfile(data.user, user);
+      await writeCachedProfile(profile);
+
       log.ok('socialLogin:success', { uid: user.uid });
-      return { user, profile, message: 'Đăng nhập thành công.' };
+      return {
+        needsUsername: false,
+        user,
+        profile,
+        message: data.isNew ? 'Đăng ký Google thành công.' : 'Đăng nhập thành công.',
+      };
     } catch (error) {
       log.fail('socialLogin', error);
+      return rejectWithReadableError(error, rejectWithValue);
+    }
+  },
+  {
+    condition: (_, { getState }) => getState().auth.actionStatus !== 'loading',
+  }
+);
+
+export const completeGoogleProfile = createAsyncThunk(
+  'auth/completeGoogleProfile',
+  async ({ userName, fullName }, { getState, rejectWithValue }) => {
+    const pendingGoogle = getState().auth.pendingGoogle;
+
+    if (!pendingGoogle?.idToken) {
+      return rejectWithValue('Phiên Google đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    try {
+      const data = await syncGoogleAccount({
+        idToken: pendingGoogle.idToken,
+        userName: userName.trim(),
+        fullName: fullName.trim(),
+      });
+
+      if (data?.needsUsername) {
+        throw new Error('Không thể hoàn tất đăng ký Google. Thử lại.');
+      }
+
+      const user = await signInWithCustomTokenFromBackend(data.customToken);
+      const profile = mapBackendUserToProfile(data.user, user);
+      await writeCachedProfile(profile);
+
+      return {
+        user,
+        profile,
+        message: 'Đăng ký Google thành công.',
+      };
+    } catch (error) {
+      return rejectWithReadableError(error, rejectWithValue);
+    }
+  }
+);
+
+export const requestEmailVerificationCode = createAsyncThunk(
+  'auth/requestEmailVerification',
+  async (_, { rejectWithValue }) => {
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        throw new Error('Phiên đăng nhập đã hết hạn.');
+      }
+
+      const data = await requestEmailVerification(idToken);
+      return {
+        email: data.email,
+        expiresAt: data.expiresAt,
+        expiresInSeconds: data.expiresInSeconds,
+        devCode: data.devCode,
+      };
+    } catch (error) {
+      return rejectWithReadableError(error, rejectWithValue);
+    }
+  }
+);
+
+export const confirmEmailVerificationCode = createAsyncThunk(
+  'auth/confirmEmailVerification',
+  async ({ code }, { getState, rejectWithValue }) => {
+    try {
+      const { user } = getState().auth;
+      const idToken = await getCurrentUserIdToken();
+
+      if (!user || !idToken) {
+        throw new Error('Phiên đăng nhập đã hết hạn.');
+      }
+
+      const data = await confirmEmailVerification({ idToken, code });
+      const profile = mapBackendUserToProfile(data.user, user);
+      await writeCachedProfile(profile);
+
+      return {
+        profile,
+        message: 'Xác minh email thành công.',
+      };
+    } catch (error) {
       return rejectWithReadableError(error, rejectWithValue);
     }
   }
@@ -341,6 +518,8 @@ const authSlice = createSlice({
       state.actionStatus = 'idle';
       state.error = null;
       state.successMessage = null;
+      state.pendingGoogle = null;
+      state.emailVerification = null;
     },
     setConfigError(state, action) {
       state.status = 'unauthenticated';
@@ -351,6 +530,11 @@ const authSlice = createSlice({
     clearAuthFeedback(state) {
       state.error = null;
       state.successMessage = null;
+    },
+    clearPendingGoogle(state) {
+      state.pendingGoogle = null;
+      state.error = null;
+      state.actionStatus = 'idle';
     },
     resetActionStatus(state) {
       state.actionStatus = 'idle';
@@ -400,11 +584,54 @@ const authSlice = createSlice({
         state.profile = null;
         state.error = null;
         state.successMessage = null;
+        state.pendingGoogle = null;
+        state.emailVerification = null;
       })
       .addCase(changePassword.fulfilled, (state, action) => {
         state.actionStatus = 'idle';
         state.error = null;
         state.successMessage = action.payload.message;
+      })
+      .addCase(confirmEmailVerificationCode.fulfilled, (state, action) => {
+        state.actionStatus = 'idle';
+        state.profile = action.payload.profile;
+        state.emailVerification = null;
+        state.error = null;
+        state.successMessage = action.payload.message;
+      })
+      .addCase(requestEmailVerificationCode.fulfilled, (state, action) => {
+        state.actionStatus = 'idle';
+        state.emailVerification = action.payload;
+        state.error = null;
+      })
+      .addCase(completeGoogleProfile.fulfilled, (state, action) => {
+        state.status = 'authenticated';
+        state.actionStatus = 'idle';
+        state.user = action.payload.user;
+        state.profile = action.payload.profile;
+        state.pendingGoogle = null;
+        state.error = null;
+        state.successMessage = action.payload.message;
+      })
+      .addCase(uploadUserAvatar.pending, (state) => {
+        state.actionStatus = 'loading';
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(uploadUserAvatar.fulfilled, (state, action) => {
+        state.actionStatus = 'idle';
+        state.profile = action.payload.profile;
+        state.user = {
+          ...state.user,
+          photoURL: action.payload.profile?.photoUrl || state.user?.photoURL || '',
+        };
+        state.error = null;
+        state.successMessage = action.payload.message;
+      })
+      .addCase(uploadUserAvatar.rejected, (state, action) => {
+        state.actionStatus = 'idle';
+        state.error = action.payload;
+        state.successMessage = null;
       })
       .addMatcher(
         (action) =>
@@ -414,6 +641,9 @@ const authSlice = createSlice({
             logoutUser.pending.type,
             changePassword.pending.type,
             socialLogin.pending.type,
+            completeGoogleProfile.pending.type,
+            requestEmailVerificationCode.pending.type,
+            confirmEmailVerificationCode.pending.type,
           ].includes(action.type),
         (state) => {
           state.actionStatus = 'loading';
@@ -426,13 +656,32 @@ const authSlice = createSlice({
           [
             registerUser.fulfilled.type,
             loginUser.fulfilled.type,
-            socialLogin.fulfilled.type,
           ].includes(action.type),
         (state, action) => {
           state.status = 'authenticated';
           state.actionStatus = 'idle';
           state.user = action.payload.user;
           state.profile = action.payload.profile;
+          state.error = null;
+          state.successMessage = action.payload.message;
+        }
+      )
+      .addMatcher(
+        (action) => action.type === socialLogin.fulfilled.type,
+        (state, action) => {
+          state.actionStatus = 'idle';
+
+          if (action.payload.needsUsername) {
+            state.pendingGoogle = action.payload.pendingGoogle;
+            state.error = null;
+            state.successMessage = null;
+            return;
+          }
+
+          state.status = 'authenticated';
+          state.user = action.payload.user;
+          state.profile = action.payload.profile;
+          state.pendingGoogle = null;
           state.error = null;
           state.successMessage = action.payload.message;
         }
@@ -445,11 +694,20 @@ const authSlice = createSlice({
             logoutUser.rejected.type,
             changePassword.rejected.type,
             socialLogin.rejected.type,
+            completeGoogleProfile.rejected.type,
+            requestEmailVerificationCode.rejected.type,
+            confirmEmailVerificationCode.rejected.type,
           ].includes(action.type),
         (state, action) => {
           state.actionStatus = 'idle';
-          // Do not overwrite authenticated session if auth listener already signed in.
-          if (state.status !== 'authenticated') {
+          const showWhileAuthenticated = [
+            confirmEmailVerificationCode.rejected.type,
+            requestEmailVerificationCode.rejected.type,
+            completeGoogleProfile.rejected.type,
+            socialLogin.rejected.type,
+          ].includes(action.type);
+
+          if (state.status !== 'authenticated' || showWhileAuthenticated) {
             state.error = action.payload;
           } else {
             log.warn('[AUTH] rejected thunk ignored — user already authenticated', {
@@ -466,6 +724,7 @@ const authSlice = createSlice({
 export const {
   applyProfileLocally,
   clearAuthFeedback,
+  clearPendingGoogle,
   resetActionStatus,
   setAuthChecking,
   setAuthUser,

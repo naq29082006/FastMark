@@ -5,7 +5,14 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import AuthenticatedHome from '../view/auth/AuthenticatedHome';
 import AuthScreen from '../view/auth/AuthScreen';
-import { selectAuthStatus } from '../viewmodel/auth/authSelectors';
+import EmailVerificationScreen from '../view/auth/EmailVerificationScreen';
+import GoogleUsernameSetupScreen from '../view/auth/GoogleUsernameSetupScreen';
+import {
+  selectAuthProfileStatus,
+  selectAuthStatus,
+  selectNeedsEmailVerification,
+  selectPendingGoogle,
+} from '../viewmodel/auth/authSelectors';
 import {
   loadUserProfile,
   setAuthChecking,
@@ -25,6 +32,9 @@ import { authLogger as log } from '../core/utils/logger';
 export default function FastmarkApp() {
   const dispatch = useDispatch();
   const status = useSelector(selectAuthStatus);
+  const profileStatus = useSelector(selectAuthProfileStatus);
+  const pendingGoogle = useSelector(selectPendingGoogle);
+  const needsEmailVerification = useSelector(selectNeedsEmailVerification);
 
   useEffect(() => {
     log.info('startup');
@@ -87,6 +97,34 @@ export default function FastmarkApp() {
         <ActivityIndicator size="large" color="#0f766e" />
         <Text style={styles.loadingText}>Đang kiểm tra đăng nhập...</Text>
       </View>
+    );
+  }
+
+  if (pendingGoogle) {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <GoogleUsernameSetupScreen />
+      </>
+    );
+  }
+
+  if (status === 'authenticated' && profileStatus === 'loading') {
+    return (
+      <View style={styles.loadingScreen}>
+        <StatusBar style="dark" />
+        <ActivityIndicator size="large" color="#0f766e" />
+        <Text style={styles.loadingText}>Đang tải hồ sơ...</Text>
+      </View>
+    );
+  }
+
+  if (needsEmailVerification) {
+    return (
+      <>
+        <StatusBar style="dark" />
+        <EmailVerificationScreen />
+      </>
     );
   }
 

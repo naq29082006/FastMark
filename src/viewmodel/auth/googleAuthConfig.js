@@ -1,10 +1,16 @@
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { makeRedirectUri, ResponseType } from 'expo-auth-session';
 
 import { googleOAuthConfig } from '../../core/config/env';
+import { getWebOAuthClientIdFromGoogleServices } from '../../core/config/googleServicesConfig';
+import { validateGoogleOAuthSetup } from '../../core/utils/authDiagnostics';
+import {
+  hasGoogleSigninNativeBinary,
+  isExpoGoRuntime,
+  isNativeGoogleSignInAvailable,
+} from './googleSignInModule';
 
 export function isExpoGoClient() {
-  return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+  return isExpoGoRuntime();
 }
 
 export function getGoogleBrowserRedirectUri() {
@@ -14,8 +20,12 @@ export function getGoogleBrowserRedirectUri() {
   });
 }
 
+export function getGoogleNativeWebClientId() {
+  return getWebOAuthClientIdFromGoogleServices() || googleOAuthConfig.webClientId || '';
+}
+
 export function getGoogleBrowserAuthRequestConfig() {
-  const { webClientId } = googleOAuthConfig;
+  const webClientId = getGoogleNativeWebClientId();
 
   return {
     webClientId,
@@ -28,17 +38,33 @@ export function getGoogleBrowserAuthRequestConfig() {
 }
 
 export function getGoogleAuthSetupError() {
-  if (isExpoGoClient()) {
-    return 'Google Sign-In không chạy trên Expo Go. Chạy: npx expo run:android';
+  if (isExpoGoRuntime()) {
+    return 'Bạn đang mở app bằng Expo Go. Hãy mở app FastMark đã cài sau khi chạy npx expo run:android.';
   }
 
-  const { webClientId } = googleOAuthConfig;
-
-  if (!webClientId) {
-    return 'Thiếu EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID trong .env (lấy từ Firebase → Authentication → Google).';
+  if (!hasGoogleSigninNativeBinary()) {
+    return 'Google Sign-In chưa sẵn sàng trên bản build này. Chạy lại: npx expo run:android';
   }
 
-  return null;
+  if (isNativeGoogleSignInAvailable()) {
+    if (!getGoogleNativeWebClientId()) {
+      return 'Thiếu Web Client ID Google (client_type 3 trong google-services.json).';
+    }
+
+    const oauthIssues = validateGoogleOAuthSetup().filter(
+      (issue) =>
+        issue.includes('does not match google-services.json') ||
+        issue.includes('Client ID in .env does not match google-services.json')
+    );
+
+    if (oauthIssues.length > 0) {
+      return 'Client ID Google trong .env không khớp google-services.json. Web = client_type 3, Android = client_type 1. Tải lại file từ Firebase rồi cập nhật .env.';
+    }
+
+    return null;
+  }
+
+  return 'Google Sign-In chưa sẵn sàng trên bản build này. Chạy lại: npx expo run:android';
 }
 
 export function describeGoogleOAuthError(response) {
@@ -62,13 +88,11 @@ export function describeGoogleOAuthError(response) {
     description.includes('400')
   ) {
     if (isExpoGoClient()) {
-      return (
-        'Expo Go không hỗ trợ Google Sign-In (redirect exp://). Chạy bản native: npx expo run:android'
-      );
+      return 'Expo Go không hỗ trợ Google Sign-In. Mở app FastMark đã build bằng npx expo run:android.';
     }
 
     return (
-      `Google từ chối OAuth (400). Thêm redirect URI vào Web client trên Google Cloud: ${redirectUri} — rồi chạy lại npx expo run:android.`
+      `Google từ chối OAuth (400). Thêm redirect URI vào Web client trên Google Cloud: ${redirectUri}`
     );
   }
 
@@ -83,8 +107,23 @@ export function describeNativeGoogleError(error) {
   const message = error.message || '';
 
   if (message.includes('DEVELOPER_ERROR') || error.code === '10') {
+    const setupHint = getGoogleAuthSetupError();
+    if (setupHint) {
+      return setupHint;
+    }
+
     return (
-      'Cấu hình Google chưa khớp. Thêm SHA-1 vào Firebase, tải lại google-services.json, rồi rebuild: npx expo run:android.'
+      'Cấu hình Google chưa khớp (DEVELOPER_ERROR). Thêm SHA-1 debug vào Firebase → tải lại google-services.json → chạy: npx expo run:android. Xem SHA-1 bằng: npm run android:sha1'
+    );
+  }
+
+  if (
+    error.code === '12500' ||
+    String(error.code) === '12500' ||
+    message.includes('non-recoverable sign in failure')
+  ) {
+    return (
+      'Google Sign-In thất bại (12500). SHA-1 máy bạn chưa có trong Firebase. Vào Firebase → Project settings → Android app → Add fingerprint → dán SHA-1 từ lệnh npm run android:sha1 → tải lại google-services.json → npx expo run:android.'
     );
   }
 
@@ -93,7 +132,11 @@ export function describeNativeGoogleError(error) {
     message.includes('Native module') ||
     message.includes('TurboModule')
   ) {
-    return 'App chưa rebuild native. Google Sign-In cần chạy: npx expo run:android (không dùng Expo Go).';
+    if (isExpoGoClient()) {
+      return 'Bạn đang dùng Expo Go. Mở app FastMark đã cài sau khi chạy npx expo run:android.';
+    }
+
+    return 'Native Google Sign-In chưa được tích hợp. Chạy lại: npx expo run:android';
   }
 
   if (message.includes('NETWORK_ERROR')) {

@@ -20,14 +20,14 @@ export function GoogleSignInPressable({ disabled, onPress }) {
 
 const styles = StyleSheet.create({
   button: {
-    height: 50,
+    minHeight: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
     backgroundColor: '#ffffff',
   },
   buttonPressed: {

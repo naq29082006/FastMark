@@ -2,12 +2,18 @@ const appJson = require('./app.json');
 const googleServices = require('./google-services.json');
 
 function getAndroidOAuthClientId() {
-  return (
-    process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
-    googleServices?.client?.[0]?.oauth_client?.find((client) => client.client_type === 1)
-      ?.client_id ||
-    ''
-  );
+  const envId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || '';
+  const clients = googleServices?.client?.[0]?.oauth_client || [];
+  const androidIds = clients
+    .filter((client) => client.client_type === 1)
+    .map((client) => client.client_id)
+    .filter(Boolean);
+
+  if (envId && androidIds.includes(envId)) {
+    return envId;
+  }
+
+  return androidIds[0] || '';
 }
 
 function reverseGoogleClientIdScheme(clientId) {

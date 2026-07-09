@@ -8,6 +8,16 @@ function formatMessage(scope, level, args) {
   return [`[${formatTime()}][Fastmark:${scope}][${level}]`, ...args];
 }
 
+export function isRequestCanceled(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    error?.name === 'AbortError' ||
+    message.includes('canceled') ||
+    message.includes('cancelled') ||
+    message.includes('aborted')
+  );
+}
+
 export function logErrorDetails(scope, label, error) {
   const prefix = `[${formatTime()}][Fastmark:${scope}][ERROR] ${label}`;
   console.error(prefix, {
@@ -39,6 +49,10 @@ export function createLogger(scope) {
       this.info(message, details ?? '');
     },
     fail(message, error) {
+      if (isRequestCanceled(error)) {
+        this.debug(message, 'request canceled');
+        return;
+      }
       logErrorDetails(scope, message, error);
     },
     step(message, details) {

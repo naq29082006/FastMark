@@ -5,6 +5,7 @@ export {
   loginWithEmail,
   logoutCurrentUser,
   registerWithEmail,
+  signInWithCustomTokenFromBackend,
   signInWithGoogleCredential,
   subscribeToAuthChanges,
   updateCurrentUserProfile,

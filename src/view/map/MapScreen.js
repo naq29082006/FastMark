@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 
 import LeafletMap from '../shared/components/LeafletMap';
+import { MOCK_STORES } from '../../model/mock/storeMockData';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import StoreDetailScreen from '../store/StoreDetailScreen';
 import { calculateDistanceMeters, hasValidLocation, normalizeExpoLocation } from '../../core/utils/geo';
@@ -16,7 +17,7 @@ const TYPE_EMOJI = {
   snack: '🍿',
 };
 
-export default function MapScreen({ children }) {
+export default function MapScreen({ children, focusStoreRequest }) {
   const watcherRef = useRef(null);
   const mountedRef = useRef(false);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -168,6 +169,31 @@ export default function MapScreen({ children }) {
       isCurrent = false;
     };
   }, [selectedCategory]);
+
+  useEffect(() => {
+    const targetStoreId = focusStoreRequest?.storeId;
+    if (!targetStoreId) {
+      return;
+    }
+
+    const targetStore = MOCK_STORES.find((store) => String(store.id) === String(targetStoreId));
+    if (!targetStore?.latitude || !targetStore?.longitude) {
+      return;
+    }
+
+    setMenuVisible(false);
+    setSelectedCategory('all');
+    setSelectedRadius(null);
+    setStoreNav(null);
+    setRecenterRequest({
+      location: {
+        latitude: targetStore.latitude,
+        longitude: targetStore.longitude,
+      },
+      at: focusStoreRequest.at || Date.now(),
+    });
+    log.info('focusStoreRequest', { storeId: targetStoreId });
+  }, [focusStoreRequest]);
 
   const visibleRestaurants = useMemo(() => {
     if (!hasValidLocation(currentLocation) || restaurants.length === 0) {

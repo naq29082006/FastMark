@@ -1,51 +1,99 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import InboxScreen from '../inbox/InboxScreen';
+import PostScreen from '../home/PostScreen';
+import ProductsScreen from '../home/ProductsScreen';
 import MapScreen from '../map/MapScreen';
-import ApiScreen from '../api/ApiScreen';
+import {
+  ChatTabIcon,
+  CompassTabIcon,
+  HomeTabIcon,
+  PersonTabIcon,
+  PlusTabIcon,
+} from '../shared/components/TabBarIcons';
 import ProfilePanel from './ProfilePanel';
 
+const ACTIVE_COLOR = '#3a7d74';
+const INACTIVE_COLOR = '#9aa8b2';
+
 const TABS = [
-  { key: 'map', label: 'Bản đồ', icon: '🗺️' },
-  { key: 'api', label: 'API', icon: '🔌' },
-  { key: 'profile', label: 'Hồ sơ', icon: '👤' },
+  { key: 'home', label: 'Trang chủ', Icon: HomeTabIcon },
+  { key: 'products', label: 'Sản phẩm', Icon: CompassTabIcon },
+  { key: 'post', label: 'Đăng tin', Icon: PlusTabIcon, highlight: true },
+  { key: 'inbox', label: 'Inbox', Icon: ChatTabIcon, badge: true },
+  { key: 'profile', label: 'Tài khoản', Icon: PersonTabIcon },
 ];
 
+function getTabColor(tab, isActive) {
+  if (tab.highlight) {
+    return ACTIVE_COLOR;
+  }
+
+  return isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+}
+
+function TabIcon({ tab, isActive, color }) {
+  const IconComponent = tab.Icon;
+  const size = tab.highlight ? 28 : 24;
+
+  return (
+    <View style={styles.iconWrap}>
+      <IconComponent color={color} size={size} filled={isActive && !tab.highlight} />
+      {tab.badge ? <View style={styles.badge} /> : null}
+    </View>
+  );
+}
+
 export default function AuthenticatedHome() {
-  const [activeTab, setActiveTab] = useState('map');
+  const [activeTab, setActiveTab] = useState('home');
+  const [mapFocusRequest, setMapFocusRequest] = useState(null);
+
+  function handleOpenStoreFromProfile(storeId) {
+    setMapFocusRequest({
+      storeId: String(storeId),
+      at: Date.now(),
+    });
+    setActiveTab('home');
+  }
 
   return (
     <View style={styles.root}>
       <View style={styles.content}>
-        {activeTab === 'map' ? (
-          <MapScreen />
-        ) : activeTab === 'api' ? (
-          <ApiScreen />
-        ) : (
-          <ProfilePanel />
-        )}
+        <View style={[styles.tabPane, activeTab !== 'home' && styles.tabHidden]}>
+          <MapScreen focusStoreRequest={mapFocusRequest} />
+        </View>
+        <View style={[styles.tabPane, activeTab !== 'products' && styles.tabHidden]}>
+          <ProductsScreen />
+        </View>
+        <View style={[styles.tabPane, activeTab !== 'post' && styles.tabHidden]}>
+          <PostScreen />
+        </View>
+        <View style={[styles.tabPane, activeTab !== 'inbox' && styles.tabHidden]}>
+          <InboxScreen />
+        </View>
+        <View style={[styles.tabPane, activeTab !== 'profile' && styles.tabHidden]}>
+          <ProfilePanel onOpenStore={handleOpenStoreFromProfile} />
+        </View>
       </View>
 
       <View style={styles.tabBar}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
+          const color = getTabColor(tab, isActive);
+
           return (
             <Pressable
               key={tab.key}
-              style={({ pressed }) => [
-                styles.tabItem,
-                pressed && styles.tabItemPressed,
-              ]}
+              style={({ pressed }) => [styles.tabItem, pressed && styles.tabItemPressed]}
               onPress={() => setActiveTab(tab.key)}
               accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
             >
-              <Text style={[styles.tabIcon, isActive && styles.tabIconActive]}>
-                {tab.icon}
-              </Text>
-              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+              <TabIcon tab={tab} isActive={isActive} color={color} />
+              <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
                 {tab.label}
               </Text>
-              {isActive && <View style={styles.tabIndicator} />}
             </Pressable>
           );
         })}
@@ -57,58 +105,56 @@ export default function AuthenticatedHome() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#f8fafb',
   },
   content: {
     flex: 1,
   },
+  tabPane: {
+    flex: 1,
+  },
+  tabHidden: {
+    display: 'none',
+  },
   tabBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#d7e0e6',
+    paddingTop: 10,
+    paddingBottom: 20,
+    paddingHorizontal: 2,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 10,
-    paddingBottom: 24,
-    position: 'relative',
+    gap: 5,
+    minHeight: 56,
   },
   tabItemPressed: {
-    opacity: 0.7,
+    opacity: 0.72,
   },
-  tabIcon: {
-    fontSize: 24,
-    marginBottom: 4,
-    opacity: 0.45,
-  },
-  tabIconActive: {
-    opacity: 1,
+  iconWrap: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#94a3b8',
+    fontWeight: '500',
+    letterSpacing: 0.1,
   },
-  tabLabelActive: {
-    color: '#0f766e',
-    fontWeight: '900',
-  },
-  tabIndicator: {
+  badge: {
     position: 'absolute',
     top: 0,
-    left: '20%',
-    right: '20%',
-    height: 3,
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
-    backgroundColor: '#0f766e',
+    right: -1,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#e53935',
   },
 });

@@ -5,6 +5,7 @@ import {
   onAuthStateChanged,
   reauthenticateWithCredential,
   signInWithCredential,
+  signInWithCustomToken,
   signInWithEmailAndPassword,
   signOut,
   updatePassword,
@@ -124,6 +125,14 @@ export async function getCurrentUserIdToken(forceRefresh = false) {
   }
 
   return user.getIdToken(forceRefresh);
+}
+
+export async function signInWithCustomTokenFromBackend(customToken) {
+  log.step('[AUTH] signInWithCustomToken START');
+  const auth = ensureFirebaseAuth();
+  const result = await signInWithCustomToken(auth, customToken);
+  log.step('[AUTH] signInWithCustomToken SUCCESS', { uid: result.user.uid });
+  return serializeAuthUser(result.user);
 }
 
 export async function signInWithGoogleCredential(idToken) {

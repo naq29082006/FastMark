@@ -4,15 +4,33 @@ function readAndroidClient() {
   return googleServices?.client?.[0] || null;
 }
 
+function readOAuthClients() {
+  return readAndroidClient()?.oauth_client || [];
+}
+
 function readOAuthClientId(clientType) {
-  const oauthClients = readAndroidClient()?.oauth_client || [];
-  const match = oauthClients.find((client) => client.client_type === clientType);
+  const match = readOAuthClients().find((client) => client.client_type === clientType);
   return match?.client_id || '';
+}
+
+export function getAndroidOAuthClientIdsFromGoogleServices() {
+  return readOAuthClients()
+    .filter((client) => client.client_type === 1)
+    .map((client) => client.client_id)
+    .filter(Boolean);
+}
+
+export function resolveAndroidOAuthClientId(preferredId = '') {
+  const androidIds = getAndroidOAuthClientIdsFromGoogleServices();
+  if (preferredId && androidIds.includes(preferredId)) {
+    return preferredId;
+  }
+  return androidIds[0] || '';
 }
 
 // client_type: 1 = Android, 3 = Web
 export function getAndroidOAuthClientIdFromGoogleServices() {
-  return readOAuthClientId(1);
+  return resolveAndroidOAuthClientId();
 }
 
 export function getWebOAuthClientIdFromGoogleServices() {

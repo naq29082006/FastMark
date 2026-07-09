@@ -1,39 +1,22 @@
-import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
-import { googleOAuthConfig } from '../../core/config/env';
 import { googleLogger as log } from '../../core/utils/logger';
-import { describeNativeGoogleError, getGoogleAuthSetupError } from '../../viewmodel/auth/googleAuthConfig';
+import { describeNativeGoogleError, getGoogleAuthSetupError, getGoogleNativeWebClientId } from '../../viewmodel/auth/googleAuthConfig';
+import { getNativeGoogleSignInModule } from '../../viewmodel/auth/googleSignInModule';
+import { selectAuthActionStatus } from '../../viewmodel/auth/authSelectors';
 import { clearGoogleSignInSession } from '../../viewmodel/auth/clearGoogleSignInSession';
 import { socialLogin } from '../../viewmodel/auth/authSlice';
 import { GoogleSignInPressable } from './googleSignInShared';
 
-let googleSignInModule = undefined;
-
-function getGoogleSignInModule() {
-  if (googleSignInModule !== undefined) {
-    return googleSignInModule;
-  }
-
-  try {
-    const { GoogleSignin } = require('@react-native-google-signin/google-signin/lib/module/signIn/GoogleSignin');
-    const { statusCodes } = require('@react-native-google-signin/google-signin/lib/module/errors/errorCodes');
-    googleSignInModule = { GoogleSignin, statusCodes };
-  } catch (error) {
-    log.warn('native-module-unavailable', error?.message || error);
-    googleSignInModule = null;
-  }
-
-  return googleSignInModule;
-}
-
 export default function GoogleSignInNativeImpl({ disabled, onError }) {
   const dispatch = useDispatch();
+  const actionStatus = useSelector(selectAuthActionStatus);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const setupError = getGoogleAuthSetupError();
-  const nativeModule = getGoogleSignInModule();
-  const moduleError = nativeModule
-    ? ''
-    : 'Google Sign-In chưa sẵn sàng. Chạy: npx expo run:android';
+  const nativeModule = getNativeGoogleSignInModule();
+  const moduleError = nativeModule ? '' : getGoogleAuthSetupError();
+  const isBusy = isSigningIn || actionStatus === 'loading';
 
   useEffect(() => {
     if (setupError || !nativeModule) {
@@ -44,13 +27,17 @@ export default function GoogleSignInNativeImpl({ disabled, onError }) {
     }
 
     nativeModule.GoogleSignin.configure({
-      webClientId: googleOAuthConfig.webClientId,
+      webClientId: getGoogleNativeWebClientId(),
       offlineAccess: false,
     });
     log.info('configure:success');
   }, [setupError, nativeModule]);
 
   async function handlePress() {
+    if (isBusy) {
+      return;
+    }
+
     onError?.('');
     log.info('signIn:pressed');
 
@@ -60,7 +47,7 @@ export default function GoogleSignInNativeImpl({ disabled, onError }) {
     }
 
     if (!nativeModule) {
-      onError?.(moduleError);
+      onError?.(moduleError || 'Google Sign-In chưa sẵn sàng.');
       return;
     }
 
@@ -91,9 +78,18 @@ export default function GoogleSignInNativeImpl({ disabled, onError }) {
       }
 
       log.ok('signIn:id-token-received');
-      dispatch(socialLogin({ token: idToken }));
+      const fullName = userData?.user?.name || userData?.name || '';
+      setIsSigningIn(true);
+
+      try {
+        await dispatch(socialLogin({ token: idToken, fullName })).unwrap();
+      } catch (error) {
+        onError?.(error || 'Đăng nhập Google thất bại.');
+      } finally {
+        setIsSigningIn(false);
+      }
     } catch (error) {
-      if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
+      if (error?.code === statusCodes?.SIGN_IN_CANCELLED) {
         log.info('signIn:cancelled');
         return;
       }
@@ -105,7 +101,7 @@ export default function GoogleSignInNativeImpl({ disabled, onError }) {
 
   return (
     <GoogleSignInPressable
-      disabled={disabled || Boolean(setupError || moduleError)}
+      disabled={disabled || isBusy || Boolean(setupError || moduleError)}
       onPress={handlePress}
     />
   );

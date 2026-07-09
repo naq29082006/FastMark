@@ -1,12 +1,14 @@
 import { getMockProductById, getMockProductsByStoreId } from '../model/mock/storeMockData';
 import { createLogger } from '../core/utils/logger';
 import {
-  fetchProductFromFirestore,
-  fetchProductsFromFirestore,
-} from '../api/productApi';
+  fetchProductFromNode,
+  fetchProductsFromNode,
+  hasStoreNodeApi,
+} from '../api/storeNodeApi';
 import {
   getFallbackProductById,
   makeFallbackProducts,
+  normalizeProduct,
 } from '../model/productModel';
 
 const log = createLogger('ProductRepository');
@@ -14,17 +16,17 @@ const log = createLogger('ProductRepository');
 export async function fetchProductsByStoreId(storeId) {
   log.info('fetchProductsByStoreId:start', { storeId });
 
-  try {
-    const products = await fetchProductsFromFirestore(storeId);
-
-    if (products.length > 0) {
-      log.ok('fetchProductsByStoreId:firestore', { storeId, count: products.length });
-      return products;
+  if (hasStoreNodeApi()) {
+    try {
+      const products = await fetchProductsFromNode(storeId);
+      if (products.length > 0) {
+        log.ok('fetchProductsByStoreId:node-api', { storeId, count: products.length });
+        return products.map(normalizeProduct);
+      }
+      log.warn('fetchProductsByStoreId:node-api-empty', { storeId });
+    } catch (error) {
+      log.fail('fetchProductsByStoreId:node-api-failed', error);
     }
-
-    log.warn('fetchProductsByStoreId:empty-firestore', { storeId });
-  } catch (error) {
-    log.fail('fetchProductsByStoreId:firestore-failed', error);
   }
 
   const mockProducts = getMockProductsByStoreId(storeId);
@@ -47,15 +49,17 @@ export async function fetchProductById(productId) {
     return fallbackProduct;
   }
 
-  try {
-    const product = await fetchProductFromFirestore(productId);
-    if (product) {
-      return product;
+  if (hasStoreNodeApi()) {
+    try {
+      const product = await fetchProductFromNode(productId);
+      if (product) {
+        log.ok('fetchProductById:node-api', { productId });
+        return normalizeProduct(product);
+      }
+      log.warn('fetchProductById:node-api-not-found', { productId });
+    } catch (error) {
+      log.fail('fetchProductById:node-api-failed', error);
     }
-
-    log.warn('fetchProductById:not-found-firestore', { productId });
-  } catch (error) {
-    log.fail('fetchProductById:firestore-failed', error);
   }
 
   const mockProduct = getMockProductById(productId);

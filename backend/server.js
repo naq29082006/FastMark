@@ -1,23 +1,13 @@
-require("dotenv").config();
-console.log("MONGO_URI =", process.env.MONGO_URI);
-const express = require("express");
-const cors = require("cors");
+require('./config/env');
 
-const connectDB = require("./config/db");
+const app = require('./app');
+const connectDB = require('./config/database');
+const { port } = require('./config/env');
 
-const app = express();
+require('./config/firebaseAdmin');
 
 connectDB();
 
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-    res.send("FastMark Backend Running");
-});
-
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
 });

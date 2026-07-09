@@ -1,3 +1,15 @@
+export const ROLE_BUYER = 1;
+export const ROLE_SELLER = 2;
+
+export function normalizeRole(role) {
+  const value = Number(role);
+  return Number.isFinite(value) ? value : ROLE_BUYER;
+}
+
+export function isSellerRole(role) {
+  return normalizeRole(role) === ROLE_SELLER;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -14,8 +26,12 @@ export function makeProfileFromAuthUser(authUser, updates = {}) {
     id: authUser.uid,
     email: authUser.email || '',
     fullName: cleanText(patch.fullName) || authUser.displayName || '',
+    userName: cleanText(patch.userName),
     phone: cleanText(patch.phone),
     photoUrl: cleanText(patch.photoUrl) || authUser.photoURL || '',
+    verifyAccount: Boolean(patch.verifyAccount),
+    authProvider: cleanText(patch.authProvider),
+    role: normalizeRole(patch.role ?? ROLE_BUYER),
     createdAt: patch.createdAt || timestamp,
     updatedAt: timestamp,
   };
@@ -41,6 +57,34 @@ export function mergeProfile(authUser, baseProfile, updates = {}) {
       patch.photoUrl !== undefined
         ? cleanText(patch.photoUrl)
         : baseProfile?.photoUrl || fallback.photoUrl,
+    userName:
+      patch.userName !== undefined
+        ? cleanText(patch.userName)
+        : baseProfile?.userName || fallback.userName,
+    verifyAccount:
+      patch.verifyAccount !== undefined
+        ? Boolean(patch.verifyAccount)
+        : Boolean(baseProfile?.verifyAccount),
+    authProvider:
+      patch.authProvider !== undefined
+        ? cleanText(patch.authProvider)
+        : baseProfile?.authProvider || fallback.authProvider || '',
+    role:
+      patch.role !== undefined
+        ? normalizeRole(patch.role)
+        : normalizeRole(baseProfile?.role ?? fallback.role),
     updatedAt: nowIso(),
   };
+}
+
+export function mapBackendUserToProfile(backendUser, authUser) {
+  return mergeProfile(authUser, null, {
+    fullName: backendUser?.fullName,
+    phone: backendUser?.phone,
+    photoUrl: backendUser?.avatar,
+    userName: backendUser?.userName,
+    verifyAccount: Boolean(backendUser?.verifyAccount),
+    authProvider: backendUser?.authProvider || '',
+    role: backendUser?.role,
+  });
 }
