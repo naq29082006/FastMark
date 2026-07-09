@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -29,10 +29,22 @@ import AuthBrand from './components/AuthBrand';
 import AuthInput from './components/AuthInput';
 import { AUTH_COLORS, AUTH_RADIUS } from './components/authTheme';
 
+const CODE_TTL_SECONDS = 5 * 60;
+const RESEND_COOLDOWN_SECONDS = 3 * 60;
+
 function formatCountdown(secondsLeft) {
-  const minutes = Math.floor(secondsLeft / 60);
-  const seconds = secondsLeft % 60;
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  const safeSeconds = Math.max(0, Number(secondsLeft) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function normalizeCodeInput(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 6);
+}
+
+function isSixDigitCode(value) {
+  return /^\d{6}$/.test(normalizeCodeInput(value));
 }
 
 export default function EmailVerificationScreen() {
@@ -46,56 +58,137 @@ export default function EmailVerificationScreen() {
 
   const [code, setCode] = useState('');
   const [localError, setLocalError] = useState('');
-  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [codeSecondsLeft, setCodeSecondsLeft] = useState(CODE_TTL_SECONDS);
+  const [resendSecondsLeft, setResendSecondsLeft] = useState(0);
+  const [codeExpiresAtMs, setCodeExpiresAtMs] = useState(0);
+  const [resendAvailableAtMs, setResendAvailableAtMs] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const requestedInitialCodeRef = useRef(false);
 
   const isLoading = actionStatus === 'loading';
   const displayError = localError || error;
-  const email = profile?.email || user?.email || '';
-
-  const expiresAtMs = useMemo(() => {
-    if (!emailVerification?.expiresAt) {
-      return 0;
-    }
-
-    return new Date(emailVerification.expiresAt).getTime();
-  }, [emailVerification?.expiresAt]);
+  const email = emailVerification?.email || profile?.email || user?.email || '';
+  const normalizedCode = normalizeCodeInput(code);
+  const isCodeComplete = isSixDigitCode(normalizedCode);
+  const canSubmit = isCodeComplete && !isSubmitting;
+  const canResend = !isResending && resendSecondsLeft <= 0;
+  const showResendCooldown = resendSecondsLeft > 0;
 
   useEffect(() => {
     dispatch(clearAuthFeedback());
-    dispatch(requestEmailVerificationCode());
-  }, [dispatch]);
+
+    if (emailVerification || requestedInitialCodeRef.current) {
+      return;
+    }
+
+    requestedInitialCodeRef.current = true;
+    setIsResending(true);
+    dispatch(requestEmailVerificationCode({ isResend: false }))
+      .unwrap()
+      .catch(() => {})
+      .finally(() => {
+        setIsResending(false);
+      });
+  }, [dispatch, emailVerification]);
 
   useEffect(() => {
-    if (!expiresAtMs) {
-      setSecondsLeft(0);
+    if (!emailVerification) {
+      return;
+    }
+
+    const now = Date.now();
+    const ttl = Number(emailVerification.expiresInSeconds) || CODE_TTL_SECONDS;
+    setCodeExpiresAtMs(now + ttl * 1000);
+
+    if (emailVerification.isResend && emailVerification.resendAvailableAt) {
+      const resendMs = new Date(emailVerification.resendAvailableAt).getTime();
+      if (Number.isFinite(resendMs) && resendMs > now) {
+        setResendAvailableAtMs(resendMs);
+      }
+    }
+  }, [emailVerification]);
+
+  useEffect(() => {
+    if (!codeExpiresAtMs) {
       return undefined;
     }
 
-    function tick() {
-      const next = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
-      setSecondsLeft(next);
+    function tickCodeTimer() {
+      setCodeSecondsLeft(Math.max(0, Math.floor((codeExpiresAtMs - Date.now()) / 1000)));
     }
 
-    tick();
-    const timerId = setInterval(tick, 1000);
+    tickCodeTimer();
+    const timerId = setInterval(tickCodeTimer, 1000);
     return () => clearInterval(timerId);
-  }, [expiresAtMs]);
+  }, [codeExpiresAtMs]);
 
-  function handleSubmit() {
-    const validationError = validateEmailVerificationForm({ code });
+  useEffect(() => {
+    if (!resendAvailableAtMs) {
+      setResendSecondsLeft(0);
+      return undefined;
+    }
+
+    function tickResendTimer() {
+      setResendSecondsLeft(Math.max(0, Math.floor((resendAvailableAtMs - Date.now()) / 1000)));
+    }
+
+    tickResendTimer();
+    const timerId = setInterval(tickResendTimer, 1000);
+    return () => clearInterval(timerId);
+  }, [resendAvailableAtMs]);
+
+  async function handleSubmit() {
+    const validationError = validateEmailVerificationForm({ code: normalizedCode });
     if (validationError) {
       setLocalError(validationError);
       return;
     }
 
+    if (codeSecondsLeft <= 0) {
+      setLocalError('Mã đã hết hạn. Vui lòng gửi lại mã mới.');
+      return;
+    }
+
     setLocalError('');
-    dispatch(confirmEmailVerificationCode({ code: code.trim() }));
+    setIsSubmitting(true);
+
+    try {
+      await dispatch(confirmEmailVerificationCode({ code: normalizedCode })).unwrap();
+    } catch (submitError) {
+      setLocalError(
+        typeof submitError === 'string'
+          ? submitError
+          : submitError?.message || 'Không xác minh được email.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function handleResend() {
+  async function handleResend() {
+    if (!canResend) {
+      return;
+    }
+
     setLocalError('');
     setCode('');
-    dispatch(requestEmailVerificationCode());
+    setIsResending(true);
+
+    try {
+      await dispatch(requestEmailVerificationCode({ isResend: true })).unwrap();
+      const now = Date.now();
+      setCodeExpiresAtMs(now + CODE_TTL_SECONDS * 1000);
+      setResendAvailableAtMs(now + RESEND_COOLDOWN_SECONDS * 1000);
+    } catch (resendError) {
+      setLocalError(
+        typeof resendError === 'string'
+          ? resendError
+          : resendError?.message || 'Không gửi lại được mã xác minh.'
+      );
+    } finally {
+      setIsResending(false);
+    }
   }
 
   function handleLogout() {
@@ -123,7 +216,7 @@ export default function EmailVerificationScreen() {
             <Text style={styles.emailValue}>{email}</Text>
           </View>
 
-          {isLoading && !emailVerification ? (
+          {isResending && !emailVerification ? (
             <View style={styles.hintBox}>
               <Text style={styles.hintText}>Đang gửi mã xác minh...</Text>
             </View>
@@ -140,19 +233,36 @@ export default function EmailVerificationScreen() {
             icon="🔢"
             value={code}
             onChangeText={(value) => {
-              setCode(value.replace(/\D/g, '').slice(0, 6));
+              setCode(normalizeCodeInput(value));
               setLocalError('');
             }}
             keyboardType="number-pad"
             autoComplete="one-time-code"
             placeholder="123456"
+            maxLength={6}
           />
 
-          <Text style={styles.timerText}>
-            {secondsLeft > 0
-              ? `Mã còn hiệu lực: ${formatCountdown(secondsLeft)}`
-              : 'Mã đã hết hạn. Nhấn gửi lại mã để nhận mã mới.'}
-          </Text>
+          <View style={styles.timerBox}>
+            <Text style={styles.timerLabel}>Thời gian còn lại của mã</Text>
+            <Text style={[styles.timerValue, codeSecondsLeft <= 0 && styles.timerExpired]}>
+              {formatCountdown(codeSecondsLeft)}
+            </Text>
+            <Text style={styles.timerHint}>
+              {codeSecondsLeft > 0
+                ? 'Mã hết hạn sau thời gian trên'
+                : 'Mã đã hết hạn. Gửi lại mã để nhận mã mới.'}
+            </Text>
+          </View>
+
+          {showResendCooldown ? (
+            <View style={styles.timerBox}>
+              <Text style={styles.timerLabel}>Gửi lại mã sau</Text>
+              <Text style={[styles.timerValue, styles.timerCooldown]}>
+                {formatCountdown(resendSecondsLeft)}
+              </Text>
+              <Text style={styles.timerHint}>Vui lòng đợi hết thời gian trước khi gửi lại</Text>
+            </View>
+          ) : null}
 
           {displayError ? (
             <View style={styles.alertBox}>
@@ -167,33 +277,39 @@ export default function EmailVerificationScreen() {
           ) : null}
 
           <Pressable
-            disabled={isLoading || secondsLeft <= 0}
+            disabled={!canSubmit}
             onPress={handleSubmit}
             style={({ pressed }) => [
               styles.primaryButton,
-              (pressed || isLoading) && styles.primaryButtonPressed,
-              (isLoading || secondsLeft <= 0) && styles.primaryButtonDisabled,
+              canSubmit && pressed && styles.primaryButtonPressed,
+              !canSubmit && styles.primaryButtonDisabled,
             ]}
           >
             <Text style={styles.primaryButtonText}>
-              {isLoading ? 'Đang xác minh...' : 'Xác minh email'}
+              {isSubmitting
+                ? 'Đang xác minh...'
+                : isCodeComplete
+                  ? 'Xác minh email'
+                  : 'Nhập đủ 6 chữ số để xác minh'}
             </Text>
           </Pressable>
 
-          <Pressable disabled={isLoading} onPress={handleResend} style={styles.resendButton}>
-            <Text style={styles.resendText}>
-              {isLoading ? 'Đang gửi lại...' : 'Gửi lại mã xác minh'}
+          <Pressable disabled={!canResend} onPress={handleResend} style={styles.resendButton}>
+            <Text style={[styles.resendText, !canResend && styles.resendTextDisabled]}>
+              {isResending
+                ? 'Đang gửi lại mã...'
+                : showResendCooldown
+                  ? `Gửi lại sau ${formatCountdown(resendSecondsLeft)}`
+                  : 'Gửi lại mã xác minh'}
             </Text>
           </Pressable>
 
           <Pressable
-            disabled={isLoading}
+            disabled={isSubmitting || isResending || isLoading}
             onPress={handleLogout}
             style={styles.logoutButton}
           >
-            <Text style={styles.logoutText}>
-              {isLoading ? 'Đang xử lý...' : 'Đăng xuất'}
-            </Text>
+            <Text style={styles.logoutText}>Đăng xuất</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -252,10 +368,38 @@ const styles = StyleSheet.create({
     color: '#0f766e',
     fontWeight: '600',
   },
-  timerText: {
-    fontSize: 13,
+  timerBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: AUTH_COLORS.border,
+  },
+  timerLabel: {
+    fontSize: 12,
     color: AUTH_COLORS.textMuted,
-    marginBottom: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  timerValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0f766e',
+    fontVariant: ['tabular-nums'],
+  },
+  timerExpired: {
+    color: '#dc2626',
+  },
+  timerCooldown: {
+    color: '#b45309',
+  },
+  timerHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: AUTH_COLORS.textMuted,
     fontWeight: '600',
   },
   alertBox: {
@@ -287,12 +431,14 @@ const styles = StyleSheet.create({
     backgroundColor: AUTH_COLORS.primaryDark,
   },
   primaryButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.55,
   },
   primaryButtonText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '800',
+    textAlign: 'center',
+    paddingHorizontal: 12,
   },
   resendButton: {
     marginTop: 14,
@@ -303,6 +449,9 @@ const styles = StyleSheet.create({
     color: AUTH_COLORS.primary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  resendTextDisabled: {
+    color: AUTH_COLORS.textMuted,
   },
   logoutButton: {
     marginTop: 8,

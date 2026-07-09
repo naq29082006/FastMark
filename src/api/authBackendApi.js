@@ -91,7 +91,7 @@ export async function getMeOnBackend(idToken) {
   return payload.data;
 }
 
-export async function requestEmailVerificationOnBackend(idToken) {
+export async function requestEmailVerificationOnBackend(idToken, { isResend = false } = {}) {
   ensureBackendApiConfigured();
 
   const response = await apiRequest(API_ENDPOINTS.authVerifyEmailRequest, {
@@ -100,7 +100,7 @@ export async function requestEmailVerificationOnBackend(idToken) {
       Authorization: `Bearer ${idToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ isResend }),
   });
 
   const payload = await parseApiResponse(response);
@@ -152,6 +152,33 @@ export async function uploadAvatarOnBackend({ idToken, imageBase64, mimeType = '
 
   const response = await apiRequest(
     API_ENDPOINTS.authUploadAvatar,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        imageBase64,
+        mimeType,
+      }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+
+  const payload = await parseApiResponse(response);
+  return payload.data;
+}
+
+export async function uploadCoverOnBackend({ idToken, imageBase64, mimeType = 'image/jpeg' }) {
+  ensureBackendApiConfigured();
+
+  if (!imageBase64) {
+    throw new Error('Thiếu dữ liệu ảnh để upload.');
+  }
+
+  const response = await apiRequest(
+    API_ENDPOINTS.authUploadCover,
     {
       method: 'POST',
       headers: {

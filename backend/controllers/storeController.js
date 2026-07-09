@@ -1,5 +1,5 @@
 const Restaurant = require('../models/Restaurant');
-const Product = require('../models/Product');
+const DemoProduct = require('../models/DemoProduct');
 const Review = require('../models/Review');
 
 async function listRestaurants(req, res) {
@@ -37,12 +37,12 @@ async function getRestaurant(req, res) {
 
 async function listProductsByStore(req, res) {
   const storeId = req.params.id;
-  const rows = await Product.find({ store_id: storeId }).sort({ name: 1 });
+  const rows = await DemoProduct.find({ store_id: storeId }).sort({ name: 1 });
   return res.json({ products: rows.map((row) => row.toClientProduct()) });
 }
 
 async function getProduct(req, res) {
-  const row = await Product.findOne({ externalId: req.params.productId });
+  const row = await DemoProduct.findOne({ externalId: req.params.productId });
 
   if (!row) {
     return res.status(404).json({ error: 'Không tìm thấy sản phẩm.' });

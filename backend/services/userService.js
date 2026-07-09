@@ -41,11 +41,21 @@ async function updateUserProfile(user, updates = {}) {
       error.statusCode = 400;
       throw error;
     }
+    const previousPhone = String(user.Phone || "").trim();
+    if (phone !== previousPhone) {
+      user.SellerPhoneVerified = false;
+      user.SellerPhoneVerifyCode = null;
+      user.SellerPhoneVerifyCodeExpiresAt = null;
+    }
     user.Phone = phone;
   }
 
   if (updates.avatar !== undefined) {
     user.Avatar = String(updates.avatar).trim();
+  }
+
+  if (updates.coverImage !== undefined || updates.anhBia !== undefined) {
+    user.AnhBia = String(updates.coverImage ?? updates.anhBia ?? "").trim();
   }
 
   await user.save();

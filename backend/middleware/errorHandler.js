@@ -19,6 +19,15 @@ function errorHandler(error, req, res, next) {
 
   if (error?.code === 11000) {
     const field = Object.keys(error.keyPattern || {})[0] || 'dữ liệu';
+    const duplicateValue = error.keyValue?.[field];
+
+    if (field === 'externalId' && (duplicateValue == null || duplicateValue === '')) {
+      return res.status(409).json({
+        success: false,
+        message:
+          'Lỗi index cũ trên collection products (externalId). Khởi động lại backend để tự dọn index, hoặc chạy: node scripts/migrateProductIndexes.js',
+      });
+    }
 
     return res.status(409).json({
       success: false,

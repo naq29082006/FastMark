@@ -1,48 +1,103 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-} from 'firebase/firestore';
+import { apiRequest, AUTH_TIMEOUT_MS, SELLER_UPLOAD_TIMEOUT_MS } from './client';
+import { API_ENDPOINTS } from './endpoints';
 
-import { createLogger } from '../core/utils/logger';
-import { getFirestoreDb } from '../core/config/firestoreDb';
-import { normalizeProduct } from '../model/productModel';
+async function parseApiResponse(response) {
+  const payload = await response.json().catch(() => ({}));
 
-const log = createLogger('ProductApi');
-const PRODUCTS_COLLECTION = 'products';
-
-export async function fetchProductsFromFirestore(storeId) {
-  log.info('fetchProductsFromFirestore:start', { storeId });
-
-  const db = getFirestoreDb();
-  const snapshot = await getDocs(
-    query(collection(db, PRODUCTS_COLLECTION), where('store_id', '==', String(storeId)))
-  );
-
-  if (snapshot.empty) {
-    return [];
+  if (!response.ok || payload.success === false) {
+    const error = new Error(payload.message || 'Yêu cầu API thất bại.');
+    error.statusCode = response.status;
+    throw error;
   }
 
-  return snapshot.docs
-    .map((docSnap) => normalizeProduct({ id: docSnap.id, ...docSnap.data() }))
-    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  return payload;
 }
 
-export async function fetchProductFromFirestore(productId) {
-  log.info('fetchProductFromFirestore:start', { productId });
+async function authHeaders(idToken) {
+  return {
+    Authorization: `Bearer ${idToken}`,
+    'Content-Type': 'application/json',
+  };
+}
 
-  const db = getFirestoreDb();
-  const snapshot = await getDoc(doc(db, PRODUCTS_COLLECTION, String(productId)));
+export async function getProductCategoriesOnBackend() {
+  const response = await apiRequest(
+    API_ENDPOINTS.productCategories,
+    { method: 'GET' },
+    AUTH_TIMEOUT_MS
+  );
 
-  if (!snapshot.exists()) {
-    log.warn('fetchProductFromFirestore:not-found', { productId });
-    return null;
-  }
+  const payload = await parseApiResponse(response);
+  return payload.data?.categories || [];
+}
 
-  const product = normalizeProduct({ id: snapshot.id, ...snapshot.data() });
-  log.ok('fetchProductFromFirestore:success', { productId, name: product.name });
-  return product;
+export async function getMyProductsOnBackend(idToken) {
+  const response = await apiRequest(
+    API_ENDPOINTS.products,
+    {
+      method: 'GET',
+      headers: await authHeaders(idToken),
+    },
+    AUTH_TIMEOUT_MS
+  );
+
+  const parsed = await parseApiResponse(response);
+  return parsed.data?.products || [];
+}
+
+export async function getMyProductOnBackend(idToken, productId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.myProductById(productId),
+    {
+      method: 'GET',
+      headers: await authHeaders(idToken),
+    },
+    AUTH_TIMEOUT_MS
+  );
+
+  const parsed = await parseApiResponse(response);
+  return parsed.data?.product;
+}
+
+export async function createProductOnBackend({ idToken, payload }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.products,
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify(payload),
+    },
+    SELLER_UPLOAD_TIMEOUT_MS
+  );
+
+  const parsed = await parseApiResponse(response);
+  return parsed.data;
+}
+
+export async function updateProductOnBackend({ idToken, productId, payload }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.productById(productId),
+    {
+      method: 'PUT',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify(payload),
+    },
+    SELLER_UPLOAD_TIMEOUT_MS
+  );
+
+  const parsed = await parseApiResponse(response);
+  return parsed.data?.product;
+}
+
+export async function deleteProductOnBackend(idToken, productId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.productById(productId),
+    {
+      method: 'DELETE',
+      headers: await authHeaders(idToken),
+    },
+    AUTH_TIMEOUT_MS
+  );
+
+  return parseApiResponse(response);
 }

@@ -1,42 +1,81 @@
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 
 import {
   selectAuthProfile,
   selectAuthUser,
+  selectIsSeller,
 } from '../../viewmodel/auth/authSelectors';
-import { loadUserProfile, logoutUser } from '../../viewmodel/auth/authSlice';
+import {
+  applyShopSettingsToProfile,
+  loadUserProfile,
+  logoutUser,
+  syncSellerAccess,
+} from '../../viewmodel/auth/authSlice';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
+import { getSellerShopSettingsOnBackend } from '../../api/sellerOpsApi';
+import { getMySellerVerificationOnBackend } from '../../api/sellerApi';
+import AccountProfileScreen from '../profile/AccountProfileScreen';
 import EditAccountScreen from '../profile/EditAccountScreen';
 import PurchasedProductsScreen from '../profile/PurchasedProductsScreen';
 import ReservationHistoryScreen from '../profile/ReservationHistoryScreen';
 import VisitedStoresScreen from '../profile/VisitedStoresScreen';
+import SellerPhoneSetupScreen from '../seller/SellerPhoneSetupScreen';
+import SellerPhoneVerifyScreen from '../seller/SellerPhoneVerifyScreen';
+import SellerRegistrationScreen from '../seller/SellerRegistrationScreen';
+import SellerProductDetailScreen from '../seller/SellerProductDetailScreen';
+import SellerShopSettingsScreen from '../seller/SellerShopSettingsScreen';
+import SellerOrdersScreen from '../seller/SellerOrdersScreen';
+import SellerOrderDetailScreen from '../seller/SellerOrderDetailScreen';
+import SellerStatsScreen from '../seller/SellerStatsScreen';
+import { getSellerRegistrationStep } from '../seller/sellerRegistrationFlow';
 
-const ACTIVITY_ITEMS = [
-  {
-    key: 'reservation-history',
-    label: 'Lịch sử giữ hàng',
-    icon: '🕐',
-  },
-  {
-    key: 'visited-stores',
-    label: 'Gian hàng đã ghé',
-    icon: '🏪',
-  },
-  {
-    key: 'purchased-products',
-    label: 'Sản phẩm đã từng mua',
-    icon: '📦',
-  },
-];
-
-export default function ProfilePanel({ onOpenStore }) {
+export default function ProfilePanel({
+  onOpenStore,
+  sellerRegisterRequest = 0,
+  isProfileVisible = false,
+  productDetailId = null,
+  productRefreshKey = 0,
+  onOpenProductDetail,
+  onProductChanged,
+}) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
   const user = useSelector(selectAuthUser);
+  const isSeller = useSelector(selectIsSeller);
   const [profileNav, setProfileNav] = useState(null);
+  const [sellerStep, setSellerStep] = useState(null);
+  const [sellerPhone, setSellerPhone] = useState('');
+  const [sellerVerification, setSellerVerification] = useState(null);
+  const [selectedReservationId, setSelectedReservationId] = useState(null);
+  const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
+  const [phoneChangeReturn, setPhoneChangeReturn] = useState(null);
+  const [shopContactRefreshKey, setShopContactRefreshKey] = useState(0);
+  const [shopSettings, setShopSettings] = useState(null);
 
-  const displayName = profile?.fullName || user?.displayName || 'Fastmark user';
+  const loadShopSettings = useCallback(async () => {
+    if (!isProfileVisible || !isSeller) {
+      return;
+    }
+
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        return;
+      }
+
+      const shop = await getSellerShopSettingsOnBackend(idToken);
+      setShopSettings(shop);
+      dispatch(applyShopSettingsToProfile(shop));
+    } catch {
+      // Keep the last known shop settings on transient failures.
+    }
+  }, [dispatch, isProfileVisible, isSeller]);
+
+  useEffect(() => {
+    loadShopSettings();
+  }, [loadShopSettings, shopContactRefreshKey]);
 
   useEffect(() => {
     if (!user || profile) {
@@ -44,6 +83,147 @@ export default function ProfilePanel({ onOpenStore }) {
     }
     dispatch(loadUserProfile());
   }, [dispatch, user, profile]);
+
+  async function startSellerRegistration() {
+    if (isSeller) {
+      return;
+    }
+
+    try {
+      const result = await dispatch(loadUserProfile()).unwrap();
+      const latestProfile = result?.profile || profile;
+      const idToken = await getCurrentUserIdToken();
+      let verification = null;
+
+      if (idToken) {
+        const verificationData = await getMySellerVerificationOnBackend(idToken);
+        verification = verificationData?.verification || null;
+      }
+
+      const nextStep = getSellerRegistrationStep(latestProfile);
+      setSellerPhone(latestProfile?.phone || '');
+      setSellerVerification(verification);
+      setSellerStep(nextStep);
+    } catch {
+      const nextStep = getSellerRegistrationStep(profile);
+      setSellerPhone(profile?.phone || '');
+      setSellerVerification(null);
+      setSellerStep(nextStep);
+    }
+  }
+
+  useEffect(() => {
+    if (!sellerRegisterRequest) {
+      return;
+    }
+    startSellerRegistration();
+  }, [sellerRegisterRequest]);
+
+  if (sellerStep === 'phone') {
+    return (
+      <SellerPhoneSetupScreen
+        mode={phoneChangeReturn ? 'change' : 'register'}
+        onBack={() => {
+          const returnNav = phoneChangeReturn;
+          setPhoneChangeReturn(null);
+          setSellerStep(null);
+          if (returnNav) {
+            setProfileNav(returnNav);
+          }
+        }}
+        onContinue={async (phone) => {
+          setSellerPhone(phone);
+          setSellerStep('verify');
+        }}
+      />
+    );
+  }
+
+  if (sellerStep === 'verify') {
+    return (
+      <SellerPhoneVerifyScreen
+        phone={sellerPhone || profile?.phone || ''}
+        onBack={() => setSellerStep('phone')}
+        onNeedPhone={() => setSellerStep('phone')}
+        onVerified={async () => {
+          if (phoneChangeReturn) {
+            await dispatch(syncSellerAccess());
+            const returnNav = phoneChangeReturn;
+            setPhoneChangeReturn(null);
+            setSellerStep(null);
+            setShopContactRefreshKey((value) => value + 1);
+            setProfileNav(returnNav);
+            return;
+          }
+          setSellerStep('register');
+        }}
+      />
+    );
+  }
+
+  if (sellerStep === 'register') {
+    return (
+      <SellerRegistrationScreen
+        initialVerification={sellerVerification}
+        onBack={() => setSellerStep(null)}
+        onSubmitted={async () => {
+          await dispatch(loadUserProfile());
+          setSellerVerification(null);
+          setSellerStep(null);
+        }}
+      />
+    );
+  }
+
+  if (profileNav === 'seller-shop-settings') {
+    return (
+      <SellerShopSettingsScreen
+        onBack={() => {
+          setShopContactRefreshKey((value) => value + 1);
+          setProfileNav(null);
+        }}
+        onSaved={(shop) => {
+          if (shop) {
+            setShopSettings(shop);
+          }
+          setShopContactRefreshKey((value) => value + 1);
+        }}
+        onChangePhone={() => {
+          setPhoneChangeReturn('seller-shop-settings');
+          setProfileNav(null);
+          setSellerPhone(profile?.phone || '');
+          setSellerStep('phone');
+        }}
+      />
+    );
+  }
+
+  if (profileNav === 'seller-orders') {
+    return (
+      <SellerOrdersScreen
+        onBack={() => setProfileNav(null)}
+        onRefreshKey={ordersRefreshKey}
+        onOpenReservation={(reservationId) => {
+          setSelectedReservationId(reservationId);
+          setProfileNav('seller-order-detail');
+        }}
+      />
+    );
+  }
+
+  if (profileNav === 'seller-order-detail' && selectedReservationId) {
+    return (
+      <SellerOrderDetailScreen
+        reservationId={selectedReservationId}
+        onBack={() => setProfileNav('seller-orders')}
+        onChanged={() => setOrdersRefreshKey((value) => value + 1)}
+      />
+    );
+  }
+
+  if (profileNav === 'seller-stats') {
+    return <SellerStatsScreen onBack={() => setProfileNav(null)} />;
+  }
 
   if (profileNav === 'edit-account') {
     return <EditAccountScreen onBack={() => setProfileNav(null)} />;
@@ -76,63 +256,32 @@ export default function ProfilePanel({ onOpenStore }) {
     );
   }
 
+  if (productDetailId) {
+    return (
+      <SellerProductDetailScreen
+        productId={productDetailId}
+        onBack={() => onOpenProductDetail?.(null)}
+        onChanged={onProductChanged}
+      />
+    );
+  }
+
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>
-            {displayName.charAt(0).toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerName} numberOfLines={1}>{displayName}</Text>
-          <Text style={styles.headerEmail} numberOfLines={1}>{user?.email}</Text>
-        </View>
-        <Pressable
-          style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
-          onPress={() => dispatch(logoutUser())}
-        >
-          <Text style={styles.logoutText}>Đăng xuất</Text>
-        </Pressable>
-      </View>
-
-      <ScrollView
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Pressable
-          style={({ pressed }) => [styles.menuCard, pressed && styles.menuCardPressed]}
-          onPress={() => setProfileNav('edit-account')}
-        >
-          <Text style={styles.menuIcon}>👤</Text>
-          <Text style={styles.menuLabel}>Sửa thông tin tài khoản</Text>
-          <Text style={styles.menuChevron}>›</Text>
-        </Pressable>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionIcon}>🛒</Text>
-          <Text style={styles.sectionTitle}>HOẠT ĐỘNG CỦA TÔI</Text>
-        </View>
-
-        <View style={styles.activityCard}>
-          {ACTIVITY_ITEMS.map((item, index) => (
-            <Pressable
-              key={item.key}
-              style={({ pressed }) => [
-                styles.activityItem,
-                index < ACTIVITY_ITEMS.length - 1 && styles.activityItemBorder,
-                pressed && styles.menuCardPressed,
-              ]}
-              onPress={() => setProfileNav(item.key)}
-            >
-              <Text style={styles.menuIcon}>{item.icon}</Text>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Text style={styles.menuChevron}>›</Text>
-            </Pressable>
-          ))}
-        </View>
-      </ScrollView>
+      <AccountProfileScreen
+        isProfileVisible={isProfileVisible}
+        productRefreshKey={productRefreshKey}
+        shopContactRefreshKey={shopContactRefreshKey}
+        shopSettings={shopSettings}
+        onOpenProduct={(productId) => onOpenProductDetail?.(productId)}
+        onEditAccount={() => setProfileNav('edit-account')}
+        onOpenActivity={() => setProfileNav('reservation-history')}
+        onOpenSellerShopSettings={() => setProfileNav('seller-shop-settings')}
+        onOpenSellerOrders={() => setProfileNav('seller-orders')}
+        onOpenSellerStats={() => setProfileNav('seller-stats')}
+        onStartSellerRegister={startSellerRegistration}
+        onLogout={() => dispatch(logoutUser())}
+      />
     </View>
   );
 }
@@ -140,127 +289,7 @@ export default function ProfilePanel({ onOpenStore }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#f4f7f6',
     minHeight: 0,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 56,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    backgroundColor: '#0f766e',
-  },
-  avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  headerInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  headerName: {
-    color: '#ffffff',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  headerEmail: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  logoutButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  logoutButtonPressed: {
-    opacity: 0.7,
-  },
-  logoutText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  body: {
-    flex: 1,
-    minHeight: 0,
-  },
-  bodyContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  menuCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  menuCardPressed: {
-    opacity: 0.75,
-  },
-  menuIcon: {
-    fontSize: 20,
-    width: 28,
-  },
-  menuLabel: {
-    flex: 1,
-    color: '#0f172a',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  menuChevron: {
-    color: '#94a3b8',
-    fontSize: 22,
-    fontWeight: '400',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 10,
-    paddingHorizontal: 4,
-  },
-  sectionIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  sectionTitle: {
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  activityCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    overflow: 'hidden',
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  activityItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
   },
 });

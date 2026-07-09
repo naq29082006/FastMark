@@ -50,7 +50,6 @@ const userSchema = new mongoose.Schema({
 
   AnhBia: { type: String, default: "" },
   Avatar: { type: String, default: "" },
-  Bio: { type: String, default: "" },
 
   Role: { type: Number, default: 1 },
   Status: { type: Number, default: 1 },
@@ -65,6 +64,11 @@ const userSchema = new mongoose.Schema({
 
   EmailVerifyCode: { type: String, default: null },
   EmailVerifyCodeExpiresAt: { type: Date, default: null },
+  EmailVerifyResendAt: { type: Date, default: null },
+
+  SellerPhoneVerified: { type: Boolean, default: false },
+  SellerPhoneVerifyCode: { type: String, default: null },
+  SellerPhoneVerifyCodeExpiresAt: { type: Date, default: null },
 
   CreatedAt: { type: Date, default: Date.now },
   UpdatedAt: { type: Date, default: Date.now },
@@ -84,9 +88,11 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     phone: this.Phone || "",
     authProvider: this.AuthProvider,
     avatar: this.Avatar || "",
+    coverImage: this.AnhBia || "",
     role: this.Role,
     status: this.Status,
     verifyAccount: this.VerifyAccount,
+    sellerPhoneVerified: Boolean(this.SellerPhoneVerified),
     createdAt: this.CreatedAt,
     updatedAt: this.UpdatedAt,
   };

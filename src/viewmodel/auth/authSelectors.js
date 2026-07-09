@@ -7,7 +7,11 @@ export const selectAuthUser = (state) => state.auth.user;
 export const selectAuthProfile = (state) => state.auth.profile;
 export const selectAuthProfileStatus = (state) => state.auth.profileStatus;
 export const selectUserRole = (state) => state.auth.profile?.role ?? 1;
-export const selectIsSeller = (state) => (state.auth.profile?.role ?? 1) === 2;
+export const selectIsSeller = (state) => Number(state.auth.profile?.role ?? 1) === 2;
+export const selectCanPostProducts = (state) => Number(state.auth.profile?.role ?? 1) === 2;
+export const selectSellerVerification = (state) => state.auth.sellerVerification;
+export const selectSellerAccessStatus = (state) => state.auth.sellerAccessStatus;
+export const selectSellerAccessSyncedAt = (state) => state.auth.sellerAccessSyncedAt;
 export const selectPendingGoogle = (state) => state.auth.pendingGoogle;
 export const selectEmailVerification = (state) => state.auth.emailVerification;
 export const selectNeedsEmailVerification = (state) => {

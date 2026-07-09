@@ -5,6 +5,7 @@ const log = createLogger('ApiClient');
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const AUTH_TIMEOUT_MS = 45000;
+const SELLER_UPLOAD_TIMEOUT_MS = 120000;
 
 function toReadableNetworkError(error, url) {
   const message = String(error?.message || error || '');
@@ -14,7 +15,7 @@ function toReadableNetworkError(error, url) {
     /cancell?ed/i.test(message)
   ) {
     return new Error(
-      `Kết nối backend quá thời gian chờ hoặc bị hủy (${url}). Đảm bảo backend đang chạy và thử lại.`
+      `Kết nối backend quá thời gian chờ hoặc bị hủy (${url}). Kiểm tra backend đang chạy (cd backend && npm run dev) và EXPO_PUBLIC_NODE_API_URL trỏ đúng IP máy tính trên cùng Wi-Fi (hiện tại trong .env).`
     );
   }
 
@@ -32,7 +33,7 @@ function toReadableNetworkError(error, url) {
   return error;
 }
 
-export { AUTH_TIMEOUT_MS };
+export { AUTH_TIMEOUT_MS, SELLER_UPLOAD_TIMEOUT_MS };
 
 export function getApiBaseUrl() {
   return getNodeApiUrl();

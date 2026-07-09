@@ -1,0 +1,16 @@
+const SELLER_VERIFICATION_STATUS = {
+  PENDING: 0,
+  APPROVED: 1,
+  REJECTED: 2,
+};
+
+const USER_ROLE = {
+  BUYER: 1,
+  SELLER: 2,
+  ADMIN: 3,
+};
+
+module.exports = {
+  SELLER_VERIFICATION_STATUS,
+  USER_ROLE,
+};

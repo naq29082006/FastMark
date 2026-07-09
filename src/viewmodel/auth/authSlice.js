@@ -21,8 +21,15 @@ import { hasApiBaseUrl } from '../../api/client';
 import {
   updateProfileOnBackend,
   uploadAvatarOnBackend,
+  uploadCoverOnBackend,
 } from '../../api/authBackendApi';
-import { mapBackendUserToProfile } from '../../model/profileModel';
+import {
+  mapBackendUserToProfile,
+  mapShopSettingsToProfilePatch,
+  mergeProfile,
+  normalizeRole,
+} from '../../model/profileModel';
+import { getMySellerVerificationOnBackend } from '../../api/sellerApi';
 import { getFirebaseInitConfigError } from '../../core/config/firebaseApp';
 import {
   makeProfileFromAuthUser,
@@ -46,7 +53,54 @@ const initialState = {
   configError: null,
   pendingGoogle: null,
   emailVerification: null,
+  sellerVerification: null,
+  sellerAccessStatus: 'idle',
+  sellerAccessSyncedAt: null,
 };
+
+const EMAIL_CODE_TTL_SECONDS = 5 * 60;
+const EMAIL_RESEND_COOLDOWN_SECONDS = 3 * 60;
+
+function normalizeEmailVerification(payload, fallbackEmail = '', { isResend = false } = {}) {
+  if (!payload) {
+    return null;
+  }
+
+  const now = Date.now();
+  const expiresInSeconds = Number(payload.expiresInSeconds) || EMAIL_CODE_TTL_SECONDS;
+
+  let codeExpiresAtMs = payload.codeExpiresAt
+    ? new Date(payload.codeExpiresAt).getTime()
+    : payload.expiresAt
+      ? new Date(payload.expiresAt).getTime()
+      : 0;
+
+  if (!Number.isFinite(codeExpiresAtMs) || codeExpiresAtMs <= now) {
+    codeExpiresAtMs = now + expiresInSeconds * 1000;
+  }
+
+  let resendAvailableAt = null;
+  if (isResend) {
+    const resendMs = payload.resendAvailableAt
+      ? new Date(payload.resendAvailableAt).getTime()
+      : now + EMAIL_RESEND_COOLDOWN_SECONDS * 1000;
+    if (Number.isFinite(resendMs) && resendMs > now) {
+      resendAvailableAt = new Date(resendMs).toISOString();
+    }
+  }
+
+  return {
+    email: payload.email || fallbackEmail,
+    expiresAt: new Date(codeExpiresAtMs).toISOString(),
+    codeExpiresAt: new Date(codeExpiresAtMs).toISOString(),
+    expiresInSeconds,
+    resendAvailableAt,
+    resendCooldownSeconds: resendAvailableAt
+      ? Math.max(0, Math.floor((new Date(resendAvailableAt).getTime() - now) / 1000))
+      : 0,
+    isResend,
+  };
+}
 
 function rejectWithReadableError(error, rejectWithValue) {
   return rejectWithValue(toReadableAuthError(error));
@@ -121,6 +175,51 @@ export const loadUserProfile = createAsyncThunk(
   }
 );
 
+export const syncSellerAccess = createAsyncThunk(
+  'auth/syncSellerAccess',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const { user } = getState().auth;
+      if (!user) {
+        return {
+          profile: null,
+          verification: null,
+          role: 1,
+        };
+      }
+
+      if (!hasApiBaseUrl()) {
+        return rejectWithValue('Chưa cấu hình backend API.');
+      }
+
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        return rejectWithValue('Phiên đăng nhập đã hết hạn.');
+      }
+
+      const [verificationData, backendData] = await Promise.all([
+        getMySellerVerificationOnBackend(idToken),
+        fetchBackendUser(idToken),
+      ]);
+
+      const freshRole = normalizeRole(
+        verificationData?.role ?? backendData?.user?.role ?? backendData?.role ?? 1
+      );
+      const profile = mapBackendUserToProfile(backendData.user || backendData, user);
+      profile.role = freshRole;
+      await writeCachedProfile(profile);
+
+      return {
+        profile,
+        verification: verificationData?.verification || null,
+        role: freshRole,
+      };
+    } catch (error) {
+      return rejectWithValue(toReadableAuthError(error));
+    }
+  }
+);
+
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (payload, { rejectWithValue }) => {
@@ -132,7 +231,7 @@ export const registerUser = createAsyncThunk(
         throw new Error(configError);
       }
 
-      await registerAccount({
+      const registerResponse = await registerAccount({
         email: payload.email.trim(),
         password: payload.password,
         userName: payload.userName.trim(),
@@ -148,8 +247,15 @@ export const registerUser = createAsyncThunk(
       const profile = mapBackendUserToProfile(loginData.user, user);
       await writeCachedProfile(profile);
 
+      const verification = registerResponse?.data?.verification;
+
       log.step('[AUTH] registerUser SUCCESS', { uid: user.uid });
-      return { user, profile, message: 'Đăng ký thành công.' };
+      return {
+        user,
+        profile,
+        message: 'Đăng ký thành công. Kiểm tra email để lấy mã xác minh.',
+        emailVerification: normalizeEmailVerification(verification, payload.email.trim()),
+      };
     } catch (error) {
       log.fail('[AUTH] registerUser FAILED', error);
       return rejectWithReadableError(error, rejectWithValue);
@@ -204,13 +310,13 @@ export const logoutUser = createAsyncThunk(
 
 export const updateUserProfile = createAsyncThunk(
   'auth/updateProfile',
-  async (payload, { getState }) => {
+  async (payload, { getState, rejectWithValue }) => {
     const state = getState();
     const authUser = state.auth.user;
     const currentProfile = state.auth.profile;
 
     if (!authUser) {
-      return;
+      return rejectWithValue('Vui lòng đăng nhập lại.');
     }
 
     const updates = {
@@ -231,6 +337,10 @@ export const updateUserProfile = createAsyncThunk(
     if (hasApiBaseUrl()) {
       try {
         const idToken = await getCurrentUserIdToken();
+        if (!idToken) {
+          return rejectWithValue('Phiên đăng nhập đã hết hạn.');
+        }
+
         const backendData = await updateProfileOnBackend({
           idToken,
           fullName: updates.fullName,
@@ -239,9 +349,10 @@ export const updateUserProfile = createAsyncThunk(
         const profile = mapBackendUserToProfile(backendData.user, authUser);
         await writeCachedProfile(profile);
         log.ok('updateUserProfile:backend-sync', { uid: authUser.uid });
-        return;
+        return { profile };
       } catch (error) {
         log.fail('updateUserProfile:backend-sync', error);
+        return rejectWithValue(toReadableAuthError(error));
       }
     }
 
@@ -253,8 +364,10 @@ export const updateUserProfile = createAsyncThunk(
       );
       await writeCachedProfile(profile);
       log.ok('updateUserProfile:success', { uid: authUser.uid });
+      return { profile };
     } catch (error) {
       log.fail('updateUserProfile:remote-sync', error);
+      return rejectWithValue(toReadableAuthError(error));
     }
   }
 );
@@ -301,6 +414,39 @@ export const uploadUserAvatar = createAsyncThunk(
       return {
         profile,
         message: 'Cập nhật ảnh đại diện thành công.',
+      };
+    } catch (error) {
+      return rejectWithValue(toReadableAuthError(error));
+    }
+  }
+);
+
+export const uploadUserCover = createAsyncThunk(
+  'auth/uploadCover',
+  async ({ imageBase64, mimeType }, { getState, rejectWithValue }) => {
+    const authUser = getState().auth.user;
+
+    if (!authUser) {
+      return rejectWithValue('Vui lòng đăng nhập lại.');
+    }
+
+    if (!imageBase64) {
+      return rejectWithValue('Không đọc được dữ liệu ảnh. Vui lòng chọn lại.');
+    }
+
+    if (!hasApiBaseUrl()) {
+      return rejectWithValue('Chưa cấu hình backend API.');
+    }
+
+    try {
+      const idToken = await getCurrentUserIdToken();
+      const data = await uploadCoverOnBackend({ idToken, imageBase64, mimeType });
+      const profile = mapBackendUserToProfile(data.user, authUser);
+      await writeCachedProfile(profile);
+
+      return {
+        profile,
+        message: 'Cập nhật ảnh bìa thành công.',
       };
     } catch (error) {
       return rejectWithValue(toReadableAuthError(error));
@@ -407,19 +553,26 @@ export const completeGoogleProfile = createAsyncThunk(
 
 export const requestEmailVerificationCode = createAsyncThunk(
   'auth/requestEmailVerification',
-  async (_, { rejectWithValue }) => {
+  async ({ isResend = false } = {}, { getState, rejectWithValue }) => {
     try {
       const idToken = await getCurrentUserIdToken();
       if (!idToken) {
         throw new Error('Phiên đăng nhập đã hết hạn.');
       }
 
-      const data = await requestEmailVerification(idToken);
-      return {
-        email: data.email,
-        expiresAt: data.expiresAt,
-        expiresInSeconds: data.expiresInSeconds,
-      };
+      const data = await requestEmailVerification(idToken, { isResend });
+      const { user, profile } = getState().auth;
+      return normalizeEmailVerification(
+        {
+          email: data.email,
+          expiresAt: data.expiresAt,
+          expiresInSeconds: data.expiresInSeconds,
+          resendAvailableAt: data.resendAvailableAt,
+          resendCooldownSeconds: data.resendCooldownSeconds,
+        },
+        profile?.email || user?.email || data.email || '',
+        { isResend }
+      );
     } catch (error) {
       return rejectWithReadableError(error, rejectWithValue);
     }
@@ -509,6 +662,15 @@ const authSlice = createSlice({
       state.error = null;
       state.successMessage = 'Đã lưu.';
     },
+    applyShopSettingsToProfile(state, action) {
+      if (!state.user) {
+        return;
+      }
+
+      const patch = mapShopSettingsToProfilePatch(action.payload);
+      state.profile = mergeProfile(state.user, state.profile, patch);
+      state.profileStatus = 'succeeded';
+    },
     setUnauthenticated(state) {
       state.status = 'unauthenticated';
       state.user = null;
@@ -563,7 +725,9 @@ const authSlice = createSlice({
         state.error = action.payload;
       })
       .addCase(loadUserProfile.pending, (state) => {
-        state.profileStatus = 'loading';
+        if (!state.profile) {
+          state.profileStatus = 'loading';
+        }
         state.error = null;
       })
       .addCase(loadUserProfile.fulfilled, (state, action) => {
@@ -575,6 +739,22 @@ const authSlice = createSlice({
         state.profileStatus = 'failed';
         state.error = action.payload;
       })
+      .addCase(syncSellerAccess.pending, (state) => {
+        state.sellerAccessStatus = 'loading';
+      })
+      .addCase(syncSellerAccess.fulfilled, (state, action) => {
+        state.sellerAccessStatus = 'succeeded';
+        state.sellerAccessSyncedAt = Date.now();
+        state.sellerVerification = action.payload.verification;
+        if (action.payload.profile) {
+          state.profile = action.payload.profile;
+          state.profileStatus = 'succeeded';
+        }
+        state.error = null;
+      })
+      .addCase(syncSellerAccess.rejected, (state) => {
+        state.sellerAccessStatus = 'failed';
+      })
       .addCase(logoutUser.fulfilled, (state) => {
         state.status = 'unauthenticated';
         state.actionStatus = 'idle';
@@ -585,6 +765,9 @@ const authSlice = createSlice({
         state.successMessage = null;
         state.pendingGoogle = null;
         state.emailVerification = null;
+        state.sellerVerification = null;
+        state.sellerAccessStatus = 'idle';
+        state.sellerAccessSyncedAt = null;
       })
       .addCase(changePassword.fulfilled, (state, action) => {
         state.actionStatus = 'idle';
@@ -602,6 +785,7 @@ const authSlice = createSlice({
         state.actionStatus = 'idle';
         state.emailVerification = action.payload;
         state.error = null;
+        state.successMessage = 'Đã gửi mã xác minh tới email của bạn.';
       })
       .addCase(completeGoogleProfile.fulfilled, (state, action) => {
         state.status = 'authenticated';
@@ -611,6 +795,27 @@ const authSlice = createSlice({
         state.pendingGoogle = null;
         state.error = null;
         state.successMessage = action.payload.message;
+      })
+      .addCase(updateUserProfile.pending, (state) => {
+        state.actionStatus = 'loading';
+        state.error = null;
+      })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.actionStatus = 'idle';
+        if (action.payload?.profile) {
+          state.profile = action.payload.profile;
+          state.user = {
+            ...state.user,
+            displayName: action.payload.profile.fullName || state.user.displayName,
+            photoURL: action.payload.profile.photoUrl || state.user.photoURL,
+          };
+        }
+        state.error = null;
+        state.successMessage = 'Đã lưu.';
+      })
+      .addCase(updateUserProfile.rejected, (state, action) => {
+        state.actionStatus = 'idle';
+        state.error = action.payload;
       })
       .addCase(uploadUserAvatar.pending, (state) => {
         state.actionStatus = 'loading';
@@ -632,6 +837,39 @@ const authSlice = createSlice({
         state.error = action.payload;
         state.successMessage = null;
       })
+      .addCase(uploadUserCover.pending, (state) => {
+        state.actionStatus = 'loading';
+        state.error = null;
+        state.successMessage = null;
+      })
+      .addCase(uploadUserCover.fulfilled, (state, action) => {
+        state.actionStatus = 'idle';
+        state.profile = action.payload.profile;
+        state.error = null;
+        state.successMessage = action.payload.message;
+      })
+      .addCase(uploadUserCover.rejected, (state, action) => {
+        state.actionStatus = 'idle';
+        state.error = action.payload;
+        state.successMessage = null;
+      })
+      .addCase(registerUser.fulfilled, (state, action) => {
+        state.status = 'authenticated';
+        state.actionStatus = 'idle';
+        state.user = action.payload.user;
+        state.profile = action.payload.profile;
+        state.emailVerification = action.payload.emailVerification || null;
+        state.error = null;
+        state.successMessage = action.payload.message;
+      })
+      .addCase(loginUser.fulfilled, (state, action) => {
+        state.status = 'authenticated';
+        state.actionStatus = 'idle';
+        state.user = action.payload.user;
+        state.profile = action.payload.profile;
+        state.error = null;
+        state.successMessage = action.payload.message;
+      })
       .addMatcher(
         (action) =>
           [
@@ -648,21 +886,6 @@ const authSlice = createSlice({
           state.actionStatus = 'loading';
           state.error = null;
           state.successMessage = null;
-        }
-      )
-      .addMatcher(
-        (action) =>
-          [
-            registerUser.fulfilled.type,
-            loginUser.fulfilled.type,
-          ].includes(action.type),
-        (state, action) => {
-          state.status = 'authenticated';
-          state.actionStatus = 'idle';
-          state.user = action.payload.user;
-          state.profile = action.payload.profile;
-          state.error = null;
-          state.successMessage = action.payload.message;
         }
       )
       .addMatcher(
@@ -722,6 +945,7 @@ const authSlice = createSlice({
 
 export const {
   applyProfileLocally,
+  applyShopSettingsToProfile,
   clearAuthFeedback,
   clearPendingGoogle,
   resetActionStatus,

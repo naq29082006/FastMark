@@ -1,26 +1,28 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const productSchema = new mongoose.Schema(
-  {
-    externalId: { type: String, required: true, unique: true, index: true },
-    store_id: { type: String, required: true, index: true },
-    name: { type: String, required: true },
-    price: { type: Number, required: true },
-    description: { type: String, default: '' },
-    image_emoji: { type: String, default: '📦' },
-  },
-  { timestamps: true, versionKey: false }
-);
+const ProductSchema = new mongoose.Schema({
+  ShopId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopProfile", required: true, index: true },
+  CategoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true, index: true },
 
-productSchema.methods.toClientProduct = function toClientProduct() {
-  return {
-    id: this.externalId,
-    store_id: this.store_id,
-    name: this.name,
-    price: this.price,
-    description: this.description,
-    image_emoji: this.image_emoji,
-  };
-};
+  ProductName: { type: String, required: true, trim: true },
+  Description: { type: String, default: "" },
+  DonVi: { type: String, default: "", trim: true },
 
-module.exports = mongoose.model('Product', productSchema);
+  Thumbnail: { type: String, default: "" },
+  ViewCount: { type: Number, default: 0 },
+  LikeCount: { type: Number, default: 0 },
+  SoldCount: { type: Number, default: 0 },
+  Status: { type: Number, default: 1, index: true },
+
+  MinPrice: { type: Number, default: 0 },
+  MaxPrice: { type: Number, default: 0 },
+
+  CreatedAt: { type: Date, default: Date.now },
+  UpdatedAt: { type: Date, default: Date.now },
+});
+
+ProductSchema.pre("save", function saveHook() {
+  this.UpdatedAt = new Date();
+});
+
+module.exports = mongoose.model("Product", ProductSchema);

@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useDispatch } from 'react-redux';
+
+import { syncSellerAccess } from '../../viewmodel/auth/authSlice';
+import { useSellerAccessSync } from '../../hooks/useSellerAccessSync';
 
 import InboxScreen from '../inbox/InboxScreen';
 import PostScreen from '../home/PostScreen';
@@ -46,8 +50,21 @@ function TabIcon({ tab, isActive, color }) {
 }
 
 export default function AuthenticatedHome() {
+  const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState('home');
   const [mapFocusRequest, setMapFocusRequest] = useState(null);
+  const [sellerRegisterRequest, setSellerRegisterRequest] = useState(0);
+  const [productDetailId, setProductDetailId] = useState(null);
+  const [productRefreshKey, setProductRefreshKey] = useState(0);
+
+  useSellerAccessSync({
+    enabled: true,
+    pollIntervalMs: 5000,
+  });
+
+  useEffect(() => {
+    dispatch(syncSellerAccess());
+  }, [dispatch]);
 
   function handleOpenStoreFromProfile(storeId) {
     setMapFocusRequest({
@@ -55,6 +72,22 @@ export default function AuthenticatedHome() {
       at: Date.now(),
     });
     setActiveTab('home');
+  }
+
+  function handleProductChanged() {
+    setProductRefreshKey(Date.now());
+  }
+
+  function handleOpenProductDetail(productId) {
+    setProductDetailId(productId || null);
+    if (productId) {
+      setActiveTab('profile');
+    }
+  }
+
+  function handleStartSellerRegister() {
+    setSellerRegisterRequest(Date.now());
+    setActiveTab('profile');
   }
 
   return (
@@ -67,13 +100,24 @@ export default function AuthenticatedHome() {
           <ProductsScreen />
         </View>
         <View style={[styles.tabPane, activeTab !== 'post' && styles.tabHidden]}>
-          <PostScreen />
+          <PostScreen
+            onStartSellerRegister={handleStartSellerRegister}
+            onProductCreated={handleOpenProductDetail}
+          />
         </View>
         <View style={[styles.tabPane, activeTab !== 'inbox' && styles.tabHidden]}>
           <InboxScreen />
         </View>
         <View style={[styles.tabPane, activeTab !== 'profile' && styles.tabHidden]}>
-          <ProfilePanel onOpenStore={handleOpenStoreFromProfile} />
+          <ProfilePanel
+            onOpenStore={handleOpenStoreFromProfile}
+            sellerRegisterRequest={sellerRegisterRequest}
+            isProfileVisible={activeTab === 'profile'}
+            productDetailId={productDetailId}
+            productRefreshKey={productRefreshKey}
+            onOpenProductDetail={handleOpenProductDetail}
+            onProductChanged={handleProductChanged}
+          />
         </View>
       </View>
 
@@ -86,7 +130,12 @@ export default function AuthenticatedHome() {
             <Pressable
               key={tab.key}
               style={({ pressed }) => [styles.tabItem, pressed && styles.tabItemPressed]}
-              onPress={() => setActiveTab(tab.key)}
+              onPress={() => {
+                if (tab.key === 'post' || tab.key === 'profile') {
+                  dispatch(syncSellerAccess());
+                }
+                setActiveTab(tab.key);
+              }}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
             >

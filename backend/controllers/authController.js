@@ -1,5 +1,6 @@
 const authService = require("../services/authService");
 const userService = require("../services/userService");
+const { buildPublicUserProfile } = require("../services/profileService");
 const {
   resolveFileExtension,
   uploadImageToSupabase,
@@ -89,6 +90,8 @@ exports.registerEmail = async (req, res) => {
       verification: {
         expiresAt: result.verification.expiresAt,
         expiresInSeconds: result.verification.expiresInSeconds,
+        resendAvailableAt: result.verification.resendAvailableAt,
+        resendCooldownSeconds: result.verification.resendCooldownSeconds,
       },
     },
   });
@@ -106,11 +109,12 @@ exports.loginEmail = async (req, res) => {
   }
 
   const result = await authService.loginWithEmail({ login, password });
+  const publicUser = await buildPublicUserProfile(result.user);
 
   return success(res, {
     message: "Đăng nhập email thành công.",
     data: {
-      user: result.user.toPublicJSON(),
+      user: publicUser,
       tokens: result.tokens,
     },
   });
@@ -171,7 +175,7 @@ exports.registerOrLoginGoogle = async (req, res) => {
       : "Đăng nhập Google thành công.",
     data: {
       needsUsername: false,
-      user: result.user.toPublicJSON(),
+      user: await buildPublicUserProfile(result.user),
       firebaseUid: result.firebaseUid,
       isNew: result.isNew,
       customToken: result.customToken,
@@ -180,7 +184,10 @@ exports.registerOrLoginGoogle = async (req, res) => {
 };
 
 exports.requestEmailVerification = async (req, res) => {
-  const result = await authService.requestEmailVerification(req.currentUser.FirebaseUID);
+  const isResend = Boolean(req.body?.isResend);
+  const result = await authService.requestEmailVerification(req.currentUser.FirebaseUID, {
+    isResend,
+  });
 
   return success(res, {
     message: "Đã tạo mã xác minh mới.",
@@ -188,6 +195,8 @@ exports.requestEmailVerification = async (req, res) => {
       email: result.user.Email,
       expiresAt: result.verification.expiresAt,
       expiresInSeconds: result.verification.expiresInSeconds,
+      resendAvailableAt: result.verification.resendAvailableAt,
+      resendCooldownSeconds: result.verification.resendCooldownSeconds,
     },
   });
 };
@@ -206,19 +215,22 @@ exports.confirmEmailVerification = async (req, res) => {
     firebaseUid: req.currentUser.FirebaseUID,
     code,
   });
+  const publicUser = await buildPublicUserProfile(user);
 
   return success(res, {
     message: "Xác minh email thành công.",
     data: {
-      user: user.toPublicJSON(),
+      user: publicUser,
     },
   });
 };
 
 exports.getMe = async (req, res) => {
+  const user = await buildPublicUserProfile(req.currentUser);
+
   return success(res, {
     data: {
-      user: req.currentUser.toPublicJSON(),
+      user,
     },
   });
 };
@@ -253,11 +265,12 @@ exports.updateMe = async (req, res) => {
   }
 
   const user = await userService.updateUserProfile(req.currentUser, updates);
+  const publicUser = await buildPublicUserProfile(user);
 
   return success(res, {
     message: "Cập nhật hồ sơ thành công.",
     data: {
-      user: user.toPublicJSON(),
+      user: publicUser,
     },
   });
 };
@@ -324,12 +337,48 @@ exports.uploadAvatar = async (req, res) => {
   const user = await userService.updateUserProfile(req.currentUser, {
     avatar: uploadResult.publicUrl,
   });
+  const publicUser = await buildPublicUserProfile(user);
 
   return success(res, {
     message: "Upload ảnh đại diện thành công.",
     data: {
-      user: user.toPublicJSON(),
+      user: publicUser,
       avatarUrl: uploadResult.publicUrl,
+      storagePath: uploadResult.path,
+    },
+  });
+};
+
+exports.uploadCover = async (req, res) => {
+  const coverPayload = readAvatarPayload(req);
+
+  if (!coverPayload) {
+    return fail(res, {
+      status: 400,
+      message: "Thiếu file ảnh bìa.",
+    });
+  }
+
+  const extension = resolveFileExtension(coverPayload.mimeType, coverPayload.originalName);
+  const fileName = `${req.currentUser.FirebaseUID}-cover-${Date.now()}.${extension}`;
+
+  const uploadResult = await uploadImageToSupabase({
+    buffer: coverPayload.buffer,
+    mimeType: coverPayload.mimeType,
+    folder: "covers",
+    fileName,
+  });
+
+  const user = await userService.updateUserProfile(req.currentUser, {
+    coverImage: uploadResult.publicUrl,
+  });
+  const publicUser = await buildPublicUserProfile(user);
+
+  return success(res, {
+    message: "Upload ảnh bìa thành công.",
+    data: {
+      user: publicUser,
+      coverImageUrl: uploadResult.publicUrl,
       storagePath: uploadResult.path,
     },
   });

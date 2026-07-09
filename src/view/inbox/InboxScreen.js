@@ -1,94 +1,68 @@
-import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSelector } from 'react-redux';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
+import { getSellerConversationsOnBackend } from '../../api/sellerOpsApi';
+import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
+import SellerChatScreen from '../seller/SellerChatScreen';
 
 const INBOX_TABS = [
   { key: 'messages', label: 'Tin nhắn' },
   { key: 'notifications', label: 'Thông báo' },
 ];
 
-const MOCK_MESSAGES = [
-  { id: '1', name: 'Cửa hàng ABC', preview: 'Sản phẩm còn hàng không ạ?', time: '10:30', unread: true },
-  { id: '2', name: 'Nguyễn Văn A', preview: 'Giao hàng trong ngày được không?', time: 'Hôm qua', unread: false },
-];
-
 const MOCK_NOTIFICATIONS = [
-  { id: '1', title: 'Đơn hàng mới', body: 'Bạn có 1 tin nhắn mới từ khách hàng.', time: '5 phút', unread: true },
+  { id: '1', title: 'Đơn hàng mới', body: 'Bạn có tin nhắn mới từ khách hàng.', time: '5 phút', unread: true },
   { id: '2', title: 'Khuyến mãi', body: 'Giảm 10% phí đăng tin tuần này.', time: '1 giờ', unread: false },
 ];
 
-function MessagesList() {
-  return (
-    <FlatList
-      data={MOCK_MESSAGES}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.listContent}
-      ListEmptyComponent={
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyIcon}>💬</Text>
-          <Text style={styles.emptyTitle}>Chưa có tin nhắn</Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <Pressable style={styles.listItem}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
-          </View>
-          <View style={styles.listBody}>
-            <View style={styles.listTopRow}>
-              <Text style={styles.listTitle}>{item.name}</Text>
-              <Text style={styles.listTime}>{item.time}</Text>
-            </View>
-            <Text style={styles.listPreview} numberOfLines={1}>
-              {item.preview}
-            </Text>
-          </View>
-          {item.unread ? <View style={styles.unreadDot} /> : null}
-        </Pressable>
-      )}
-    />
-  );
-}
-
-function NotificationsList() {
-  return (
-    <FlatList
-      data={MOCK_NOTIFICATIONS}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.listContent}
-      ListEmptyComponent={
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyIcon}>🔔</Text>
-          <Text style={styles.emptyTitle}>Chưa có thông báo</Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <Pressable style={styles.listItem}>
-          <View style={[styles.avatar, styles.notifyAvatar]}>
-            <Text style={styles.avatarText}>🔔</Text>
-          </View>
-          <View style={styles.listBody}>
-            <View style={styles.listTopRow}>
-              <Text style={styles.listTitle}>{item.title}</Text>
-              <Text style={styles.listTime}>{item.time}</Text>
-            </View>
-            <Text style={styles.listPreview} numberOfLines={2}>
-              {item.body}
-            </Text>
-          </View>
-          {item.unread ? <View style={styles.unreadDot} /> : null}
-        </Pressable>
-      )}
-    />
-  );
-}
-
 export default function InboxScreen() {
+  const isSeller = useSelector(selectIsSeller);
   const [activeTab, setActiveTab] = useState('messages');
+  const [conversations, setConversations] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedChat, setSelectedChat] = useState(null);
+
+  const loadConversations = useCallback(async () => {
+    if (!isSeller) {
+      setConversations([]);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const idToken = await getCurrentUserIdToken();
+      const data = await getSellerConversationsOnBackend(idToken);
+      setConversations(data);
+    } catch {
+      setConversations([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isSeller]);
+
+  useEffect(() => {
+    if (activeTab === 'messages') {
+      loadConversations();
+    }
+  }, [activeTab, loadConversations]);
+
+  if (selectedChat) {
+    return (
+      <SellerChatScreen
+        conversationId={selectedChat.id}
+        buyerName={selectedChat.buyerName}
+        onBack={() => setSelectedChat(null)}
+      />
+    );
+  }
 
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Inbox</Text>
+        <Text style={styles.subtitle}>
+          {isSeller ? 'Tin nhắn khách hàng' : 'Tin nhắn và thông báo'}
+        </Text>
       </View>
 
       <View style={styles.tabRow}>
@@ -97,128 +71,139 @@ export default function InboxScreen() {
           return (
             <Pressable
               key={tab.key}
-              style={[styles.tabButton, isActive && styles.tabButtonActive]}
               onPress={() => setActiveTab(tab.key)}
+              style={[styles.tabItem, isActive && styles.tabItemActive]}
             >
-              <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
-                {tab.label}
-              </Text>
+              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      <View style={styles.panel}>
-        {activeTab === 'messages' ? <MessagesList /> : <NotificationsList />}
-      </View>
+      {activeTab === 'messages' ? (
+        isLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color="#0d7377" />
+          </View>
+        ) : (
+          <FlatList
+            data={conversations}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyIcon}>💬</Text>
+                <Text style={styles.emptyTitle}>Chưa có tin nhắn</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                style={styles.listItem}
+                onPress={() =>
+                  setSelectedChat({
+                    id: item.id,
+                    buyerName: item.buyer?.fullName || item.buyer?.userName || 'Khách hàng',
+                  })
+                }
+              >
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {(item.buyer?.fullName || 'K').charAt(0)}
+                  </Text>
+                </View>
+                <View style={styles.listBody}>
+                  <View style={styles.listTopRow}>
+                    <Text style={styles.listTitle}>{item.buyer?.fullName || 'Khách hàng'}</Text>
+                    <Text style={styles.listTime}>{item.timeLabel}</Text>
+                  </View>
+                  <Text style={styles.listPreview} numberOfLines={1}>
+                    {item.lastMessage || 'Chưa có tin nhắn'}
+                  </Text>
+                </View>
+                {item.unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
+              </Pressable>
+            )}
+          />
+        )
+      ) : (
+        <FlatList
+          data={MOCK_NOTIFICATIONS}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <Pressable style={styles.listItem}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>🔔</Text>
+              </View>
+              <View style={styles.listBody}>
+                <View style={styles.listTopRow}>
+                  <Text style={styles.listTitle}>{item.title}</Text>
+                  <Text style={styles.listTime}>{item.time}</Text>
+                </View>
+                <Text style={styles.listPreview} numberOfLines={2}>
+                  {item.body}
+                </Text>
+              </View>
+              {item.unread ? <View style={styles.unreadDot} /> : null}
+            </Pressable>
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#f4f7f6',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 52,
-    paddingBottom: 16,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#1f2937',
-  },
+  screen: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { paddingTop: 56, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: '#ffffff' },
+  title: { fontSize: 24, fontWeight: '900', color: '#0f172a' },
+  subtitle: { color: '#64748b', marginTop: 4, fontWeight: '600' },
   tabRow: {
     flexDirection: 'row',
-    marginHorizontal: 20,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 12,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 11,
-    alignItems: 'center',
-  },
-  tabButtonActive: {
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     backgroundColor: '#ffffff',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  tabButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6b7280',
-  },
-  tabButtonTextActive: {
-    color: '#0d7377',
-  },
-  panel: {
+  tabItem: {
     flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
   },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
+  tabItemActive: { backgroundColor: '#e8f3f1' },
+  tabText: { fontWeight: '700', color: '#64748b' },
+  tabTextActive: { color: '#0d7377' },
+  listContent: { padding: 16, paddingBottom: 32 },
   listItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 14,
+    padding: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#e2e8f0',
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#ccfbf1',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#e8f3f1',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  notifyAvatar: {
-    backgroundColor: '#fef3c7',
-  },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0d7377',
-  },
-  listBody: {
-    flex: 1,
-  },
-  listTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-    gap: 8,
-  },
-  listTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#1f2937',
-  },
-  listTime: {
-    fontSize: 12,
-    color: '#9ca3af',
-    fontWeight: '600',
-  },
-  listPreview: {
-    fontSize: 13,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
+  avatarText: { fontSize: 18, fontWeight: '800', color: '#0d7377' },
+  listBody: { flex: 1, minWidth: 0 },
+  listTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  listTitle: { fontSize: 15, fontWeight: '800', color: '#0f172a', flex: 1 },
+  listTime: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
+  listPreview: { color: '#64748b', marginTop: 4, fontSize: 13 },
   unreadDot: {
     width: 10,
     height: 10,
@@ -226,17 +211,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
     marginLeft: 8,
   },
-  emptyBox: {
-    alignItems: 'center',
-    paddingTop: 60,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#6b7280',
-  },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyBox: { alignItems: 'center', paddingVertical: 60 },
+  emptyIcon: { fontSize: 40, marginBottom: 8 },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#64748b' },
 });

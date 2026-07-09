@@ -1,0 +1,192 @@
+import { apiRequest, AUTH_TIMEOUT_MS } from './client';
+import { API_ENDPOINTS } from './endpoints';
+
+async function parseApiResponse(response) {
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok || payload.success === false) {
+    const error = new Error(payload.message || 'Yêu cầu API thất bại.');
+    error.statusCode = response.status;
+    throw error;
+  }
+
+  return payload;
+}
+
+async function authHeaders(idToken) {
+  return {
+    Authorization: `Bearer ${idToken}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+export async function getSellerShopSettingsOnBackend(idToken) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerShop,
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.shop;
+}
+
+export async function updateSellerShopSettingsOnBackend({ idToken, payload }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerShop,
+    {
+      method: 'PUT',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify(payload),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const parsed = await parseApiResponse(response);
+  return parsed.data?.shop;
+}
+
+export async function getSellerOrdersOnBackend({ idToken, tab }) {
+  const response = await apiRequest(
+    `${API_ENDPOINTS.sellerOrders}?tab=${encodeURIComponent(tab)}`,
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data;
+}
+
+export async function getSellerReservationDetailOnBackend(idToken, reservationId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservation(reservationId),
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation;
+}
+
+export async function confirmSellerReservationOnBackend(idToken, reservationId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservationConfirm(reservationId),
+    { method: 'POST', headers: await authHeaders(idToken), body: '{}' },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation;
+}
+
+export async function rejectSellerReservationOnBackend({ idToken, reservationId, reason }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservationReject(reservationId),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ reason }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation;
+}
+
+export async function cancelSellerReservationOnBackend({ idToken, reservationId, reason }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservationCancel(reservationId),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ reason }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation;
+}
+
+export async function completeSellerReservationOnBackend(idToken, reservationId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservationComplete(reservationId),
+    { method: 'POST', headers: await authHeaders(idToken), body: '{}' },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation;
+}
+
+export async function acceptSellerDealOnBackend(idToken, dealId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerDealAccept(dealId),
+    { method: 'POST', headers: await authHeaders(idToken), body: '{}' },
+    AUTH_TIMEOUT_MS
+  );
+  return parseApiResponse(response);
+}
+
+export async function rejectSellerDealOnBackend({ idToken, dealId, reason }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerDealReject(dealId),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ reason }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  return parseApiResponse(response);
+}
+
+export async function counterSellerDealOnBackend({ idToken, dealId, counterPrice, note }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerDealCounter(dealId),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ counterPrice, note }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  return parseApiResponse(response);
+}
+
+export async function getSellerConversationsOnBackend(idToken) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerConversations,
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.conversations || [];
+}
+
+export async function getSellerMessagesOnBackend(idToken, conversationId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerConversationMessages(conversationId),
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.messages || [];
+}
+
+export async function sendSellerMessageOnBackend({ idToken, conversationId, content }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerConversationMessages(conversationId),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ content }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.message;
+}
+
+export async function getSellerStatsOnBackend(idToken) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerStats,
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.stats;
+}

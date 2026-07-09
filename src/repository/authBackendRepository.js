@@ -24,8 +24,8 @@ export async function fetchBackendUser(idToken) {
   return getMeOnBackend(idToken);
 }
 
-export async function requestEmailVerification(idToken) {
-  return requestEmailVerificationOnBackend(idToken);
+export async function requestEmailVerification(idToken, options = {}) {
+  return requestEmailVerificationOnBackend(idToken, options);
 }
 
 export async function confirmEmailVerification({ idToken, code }) {

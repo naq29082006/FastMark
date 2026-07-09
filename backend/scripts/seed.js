@@ -2,7 +2,8 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 
 const mongoose = require('mongoose');
 const Restaurant = require('../models/Restaurant');
-const Product = require('../models/Product');
+const DemoProduct = require('../models/DemoProduct');
+const Category = require('../models/Category');
 const Review = require('../models/Review');
 const MOCK_STORES = [
   {
@@ -112,6 +113,14 @@ const MOCK_STORES = [
   },
 ];
 
+const MOCK_CATEGORIES = [
+  { categoryName: 'Trái cây', description: 'Trái cây tươi các loại' },
+  { categoryName: 'Rau củ', description: 'Rau củ quả sạch' },
+  { categoryName: 'Thịt cá', description: 'Thịt, cá, hải sản' },
+  { categoryName: 'Gia vị', description: 'Gia vị, nước chấm' },
+  { categoryName: 'Đồ khô', description: 'Đồ khô, đặc sản' },
+];
+
 const MOCK_PRODUCTS = [
   {
     externalId: 'p-1-1',
@@ -176,16 +185,19 @@ async function seed() {
 
   await Promise.all([
     Restaurant.deleteMany({}),
-    Product.deleteMany({}),
+    DemoProduct.deleteMany({}),
     Review.deleteMany({}),
+    Category.deleteMany({}),
   ]);
 
   await Restaurant.insertMany(MOCK_STORES);
-  await Product.insertMany(MOCK_PRODUCTS);
+  await Category.insertMany(MOCK_CATEGORIES);
+  await DemoProduct.insertMany(MOCK_PRODUCTS);
   await Review.insertMany(MOCK_REVIEWS);
 
   console.log('Seeded:', {
     restaurants: MOCK_STORES.length,
+    categories: MOCK_CATEGORIES.length,
     products: MOCK_PRODUCTS.length,
     reviews: MOCK_REVIEWS.length,
   });

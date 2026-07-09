@@ -30,4 +30,11 @@ router.post(
   asyncHandler(authController.uploadAvatar)
 );
 
+router.post(
+  "/cover",
+  verifyFirebaseToken,
+  optionalMultipartAvatar,
+  asyncHandler(authController.uploadCover)
+);
+
 module.exports = router;

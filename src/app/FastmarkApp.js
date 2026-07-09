@@ -8,6 +8,7 @@ import AuthScreen from '../view/auth/AuthScreen';
 import EmailVerificationScreen from '../view/auth/EmailVerificationScreen';
 import GoogleUsernameSetupScreen from '../view/auth/GoogleUsernameSetupScreen';
 import {
+  selectAuthProfile,
   selectAuthProfileStatus,
   selectAuthStatus,
   selectNeedsEmailVerification,
@@ -32,6 +33,7 @@ import { authLogger as log } from '../core/utils/logger';
 export default function FastmarkApp() {
   const dispatch = useDispatch();
   const status = useSelector(selectAuthStatus);
+  const profile = useSelector(selectAuthProfile);
   const profileStatus = useSelector(selectAuthProfileStatus);
   const pendingGoogle = useSelector(selectPendingGoogle);
   const needsEmailVerification = useSelector(selectNeedsEmailVerification);
@@ -109,7 +111,7 @@ export default function FastmarkApp() {
     );
   }
 
-  if (status === 'authenticated' && profileStatus === 'loading') {
+  if (status === 'authenticated' && profileStatus === 'loading' && !profile) {
     return (
       <View style={styles.loadingScreen}>
         <StatusBar style="dark" />

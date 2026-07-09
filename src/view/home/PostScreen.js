@@ -1,32 +1,77 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSelector } from 'react-redux';
 
-import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
+import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
+import { ROLE_SELLER } from '../../model/profileModel';
+import {
+  selectSellerAccessSyncedAt,
+  selectSellerVerification,
+  selectUserRole,
+} from '../../viewmodel/auth/authSelectors';
 import { LockIcon } from '../shared/components/LockIcon';
+import SellerPostForm from './SellerPostForm';
 
-function SellerPostScreen() {
+function PendingPostScreen({ onViewProfile }) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Đăng tin</Text>
-        <Text style={styles.subtitle}>Đăng sản phẩm hoặc quảng bá gian hàng của bạn</Text>
+        <Text style={styles.subtitle}>Hồ sơ người bán đang chờ duyệt</Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardIcon}>📸</Text>
-        <Text style={styles.cardTitle}>Tạo tin đăng mới</Text>
-        <Text style={styles.cardText}>
-          Thêm ảnh, mô tả, giá và địa điểm để người mua dễ tìm thấy bạn trên bản đồ.
+      <View style={[styles.card, styles.lockedCard]}>
+        <View style={styles.statusBadgePending}>
+          <Text style={styles.statusBadgeText}>Đang chờ duyệt</Text>
+        </View>
+        <View style={styles.lockIconWrap}>
+          <LockIcon color="#3a7d74" size={88} />
+        </View>
+        <Text style={styles.lockedTitle}>Chưa thể đăng tin</Text>
+        <Text style={styles.lockedText}>
+          Hồ sơ đăng ký người bán của bạn đang được admin xem xét. Sau khi được duyệt và cấp quyền người bán, bạn mới có thể đăng tin.
         </Text>
-        <Pressable style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
-          <Text style={styles.buttonText}>Bắt đầu đăng tin</Text>
+        <Pressable
+          onPress={onViewProfile}
+          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+        >
+          <Text style={styles.buttonText}>Xem và chỉnh sửa hồ sơ</Text>
         </Pressable>
       </View>
     </View>
   );
 }
 
-function LockedPostScreen() {
+function RejectedPostScreen({ reason, onViewProfile }) {
+  return (
+    <View style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Đăng tin</Text>
+        <Text style={styles.subtitle}>Hồ sơ người bán bị từ chối</Text>
+      </View>
+
+      <View style={[styles.card, styles.lockedCard]}>
+        <View style={styles.statusBadgeRejected}>
+          <Text style={styles.statusBadgeText}>Bị từ chối</Text>
+        </View>
+        <View style={styles.lockIconWrap}>
+          <LockIcon color="#3a7d74" size={88} />
+        </View>
+        <Text style={styles.lockedTitle}>Chưa thể đăng tin</Text>
+        <Text style={styles.lockedText}>
+          {reason || 'Hồ sơ đăng ký người bán chưa đạt yêu cầu. Vui lòng chỉnh sửa và gửi lại.'}
+        </Text>
+        <Pressable
+          onPress={onViewProfile}
+          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+        >
+          <Text style={styles.buttonText}>Chỉnh sửa và gửi lại hồ sơ</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function LockedPostScreen({ onStartSellerRegister }) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
@@ -40,9 +85,12 @@ function LockedPostScreen() {
         </View>
         <Text style={styles.lockedTitle}>Tính năng đang khóa</Text>
         <Text style={styles.lockedText}>
-          Bạn cần đăng ký người bán hàng để mở khóa tính năng này.
+          Bạn cần đăng ký người bán và được admin duyệt để mở khóa tính năng đăng tin.
         </Text>
-        <Pressable style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
+        <Pressable
+          onPress={onStartSellerRegister}
+          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+        >
           <Text style={styles.buttonText}>Đăng ký người bán hàng</Text>
         </Pressable>
       </View>
@@ -50,14 +98,37 @@ function LockedPostScreen() {
   );
 }
 
-export default function PostScreen() {
-  const isSeller = useSelector(selectIsSeller);
+export default function PostScreen({ onStartSellerRegister, onProductCreated }) {
+  const role = useSelector(selectUserRole);
+  const verification = useSelector(selectSellerVerification);
+  const syncedAt = useSelector(selectSellerAccessSyncedAt);
 
-  if (!isSeller) {
-    return <LockedPostScreen />;
+  if (!syncedAt) {
+    return (
+      <View style={styles.screen}>
+        <Text style={styles.loadingText}>Đang kiểm tra quyền đăng tin...</Text>
+      </View>
+    );
   }
 
-  return <SellerPostScreen />;
+  if (Number(role) === ROLE_SELLER) {
+    return <SellerPostForm onProductCreated={onProductCreated} />;
+  }
+
+  if (verification?.status === SELLER_VERIFICATION_STATUS.PENDING) {
+    return <PendingPostScreen onViewProfile={onStartSellerRegister} />;
+  }
+
+  if (verification?.status === SELLER_VERIFICATION_STATUS.REJECTED) {
+    return (
+      <RejectedPostScreen
+        reason={verification.lyDoTuChoi}
+        onViewProfile={onStartSellerRegister}
+      />
+    );
+  }
+
+  return <LockedPostScreen onStartSellerRegister={onStartSellerRegister} />;
 }
 
 const styles = StyleSheet.create({
@@ -82,6 +153,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 22,
   },
+  loadingText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
@@ -93,6 +169,27 @@ const styles = StyleSheet.create({
   lockedCard: {
     paddingTop: 32,
     paddingBottom: 28,
+  },
+  statusBadgePending: {
+    alignSelf: 'center',
+    backgroundColor: '#fef3c7',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  statusBadgeRejected: {
+    alignSelf: 'center',
+    backgroundColor: '#fee2e2',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  statusBadgeText: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '800',
   },
   lockIconWrap: {
     width: 112,

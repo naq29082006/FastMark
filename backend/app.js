@@ -5,6 +5,9 @@ const mongoose = require('mongoose');
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const storeRoutes = require('./routes/storeRoutes');
+const sellerRoutes = require('./routes/sellerRoutes');
+const productRoutes = require('./routes/productRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -28,6 +31,9 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/profile', profileRoutes);
+app.use('/api/seller', sellerRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api', storeRoutes);
 
 app.use((req, res) => {

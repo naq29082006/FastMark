@@ -20,11 +20,68 @@ function generateEmailVerifyCode() {
 }
 
 const EMAIL_VERIFY_TTL_MS = 5 * 60 * 1000;
+const EMAIL_RESEND_COOLDOWN_MS = 3 * 60 * 1000;
 
-async function assignEmailVerificationCode(user) {
+function buildVerificationMeta(user) {
+  const expiresAt = user.EmailVerifyCodeExpiresAt;
+  const expiresInSeconds = expiresAt
+    ? Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
+    : 0;
+
+  let resendAvailableAt = null;
+  let resendCooldownSeconds = 0;
+
+  if (user.EmailVerifyResendAt) {
+    resendAvailableAt = new Date(user.EmailVerifyResendAt.getTime() + EMAIL_RESEND_COOLDOWN_MS);
+    resendCooldownSeconds = Math.max(
+      0,
+      Math.floor((resendAvailableAt.getTime() - Date.now()) / 1000)
+    );
+  }
+
+  return {
+    expiresAt,
+    expiresInSeconds: expiresInSeconds || Math.floor(EMAIL_VERIFY_TTL_MS / 1000),
+    resendAvailableAt,
+    resendCooldownSeconds,
+  };
+}
+
+function assertResendCooldown(user) {
+  if (!user.EmailVerifyResendAt) {
+    return;
+  }
+
+  const resendAvailableAt = user.EmailVerifyResendAt.getTime() + EMAIL_RESEND_COOLDOWN_MS;
+  const waitMs = resendAvailableAt - Date.now();
+
+  if (waitMs > 0) {
+    const waitSeconds = Math.ceil(waitMs / 1000);
+    const error = new Error(
+      `Vui lòng đợi ${Math.ceil(waitSeconds / 60)} phút trước khi gửi lại mã.`
+    );
+    error.statusCode = 429;
+    error.retryAfterSeconds = waitSeconds;
+    throw error;
+  }
+}
+
+async function assignEmailVerificationCode(
+  user,
+  { enforceResendCooldown = false, trackResendCooldown = false } = {}
+) {
+  if (enforceResendCooldown) {
+    assertResendCooldown(user);
+  }
+
   const code = generateEmailVerifyCode();
   user.EmailVerifyCode = code;
   user.EmailVerifyCodeExpiresAt = new Date(Date.now() + EMAIL_VERIFY_TTL_MS);
+
+  if (trackResendCooldown) {
+    user.EmailVerifyResendAt = new Date();
+  }
+
   await user.save();
 
   await sendVerificationEmail({
@@ -33,10 +90,7 @@ async function assignEmailVerificationCode(user) {
     expiresInMinutes: EMAIL_VERIFY_TTL_MS / 60000,
   });
 
-  return {
-    expiresAt: user.EmailVerifyCodeExpiresAt,
-    expiresInSeconds: EMAIL_VERIFY_TTL_MS / 1000,
-  };
+  return buildVerificationMeta(user);
 }
 
 function normalizeUserName(userName) {
@@ -313,7 +367,7 @@ async function getUserFromToken(idToken) {
   return user;
 }
 
-async function requestEmailVerification(firebaseUid) {
+async function requestEmailVerification(firebaseUid, { isResend = false } = {}) {
   const user = await findUserByFirebaseUid(firebaseUid);
 
   if (!user) {
@@ -334,7 +388,10 @@ async function requestEmailVerification(firebaseUid) {
     throw error;
   }
 
-  const verification = await assignEmailVerificationCode(user);
+  const verification = await assignEmailVerificationCode(user, {
+    enforceResendCooldown: isResend,
+    trackResendCooldown: isResend,
+  });
 
   return {
     user,

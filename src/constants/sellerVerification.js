@@ -1,0 +1,5 @@
+export const SELLER_VERIFICATION_STATUS = {
+  PENDING: 0,
+  APPROVED: 1,
+  REJECTED: 2,
+};

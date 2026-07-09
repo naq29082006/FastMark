@@ -30,7 +30,9 @@
     "android": "expo run:android",
     "android:sha1": "powershell -ExecutionPolicy Bypass -File ./scripts/print-android-sha1.ps1",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "admin": "npm run dev --prefix web",
+    "admin:build": "npm run build --prefix web"
   },
   "private": true
 }
