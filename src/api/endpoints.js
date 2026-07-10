@@ -37,4 +37,8 @@ export const API_ENDPOINTS = {
   sellerConversations: '/api/seller/conversations',
   sellerConversationMessages: (id) => `/api/seller/conversations/${id}/messages`,
   sellerStats: '/api/seller/stats',
+  shopsNearby: '/api/shops/nearby',
+  shopById: (id) => `/api/shops/${id}`,
+  shopProducts: (id) => `/api/shops/${id}/products`,
+  shopReviews: (id) => `/api/shops/${id}/reviews`,
 };

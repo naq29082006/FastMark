@@ -14,6 +14,13 @@
           "locationWhenInUsePermission": "Allow Fastmark to use your location for maps and distance measuring."
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Fastmark cần truy cập thư viện ảnh để tải ảnh giấy tờ đăng ký gian hàng.",
+          "cameraPermission": "Fastmark cần truy cập camera để chụp ảnh giấy tờ đăng ký gian hàng."
+        }
+      ],
       "expo-web-browser",
       "@react-native-google-signin/google-signin"
     ],

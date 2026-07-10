@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 import {
@@ -85,25 +86,56 @@ export function getMissingFirebaseEnv() {
     .map(([envKey]) => envKey);
 }
 
-function resolveAndroidApiHost(configuredUrl) {
-  const portMatch = configuredUrl.match(/:(\d+)(?:\/|$)/);
-  const port = portMatch?.[1] || '5000';
-  return `http://10.0.2.2:${port}`;
+function getExpoDevHost() {
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.expoGoConfig?.debuggerHost ||
+    Constants.manifest2?.extra?.expoGo?.debuggerHost ||
+    Constants.manifest?.debuggerHost ||
+    '';
+
+  if (!hostUri) {
+    return '';
+  }
+
+  return String(hostUri).split(':')[0].trim();
+}
+
+function resolveBackendPort(configuredUrl) {
+  const portMatch = String(configuredUrl || '').match(/:(\d+)(?:\/|$)/);
+  return portMatch?.[1] || '5000';
 }
 
 export function getNodeApiUrl() {
   const configured = String(nodeApiUrl || '').trim().replace(/\/$/, '');
+  const port = resolveBackendPort(configured);
+
+  // Android emulator không truy cập được IP LAN — dùng 10.0.2.2
+  if (Platform.OS === 'android' && Constants.isDevice === false) {
+    const url = `http://10.0.2.2:${port}`;
+    log.debug('nodeApiUrl:android-emulator', url);
+    return url;
+  }
+
+  // Dev: tự lấy IP từ Metro/Expo (tránh .env cũ khi đổi Wi-Fi)
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    const expoHost = getExpoDevHost();
+    if (expoHost && expoHost !== 'localhost' && expoHost !== '127.0.0.1') {
+      const url = `http://${expoHost}:${port}`;
+      log.debug('nodeApiUrl:expo-dev-host', url);
+      return url;
+    }
+  }
 
   if (!configured) {
     return '';
   }
 
-  // Android: localhost/127.0.0.1 trên máy ảo không trỏ về máy host — dùng 10.0.2.2
   if (
     Platform.OS === 'android' &&
     /:\/\/(localhost|127\.0\.0\.1)(?=[:/]|$)/i.test(configured)
   ) {
-    return resolveAndroidApiHost(configured);
+    return `http://10.0.2.2:${port}`;
   }
 
   return configured;

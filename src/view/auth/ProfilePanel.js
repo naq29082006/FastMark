@@ -15,7 +15,6 @@ import {
 } from '../../viewmodel/auth/authSlice';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { getSellerShopSettingsOnBackend } from '../../api/sellerOpsApi';
-import { getMySellerVerificationOnBackend } from '../../api/sellerApi';
 import AccountProfileScreen from '../profile/AccountProfileScreen';
 import EditAccountScreen from '../profile/EditAccountScreen';
 import PurchasedProductsScreen from '../profile/PurchasedProductsScreen';
@@ -24,14 +23,17 @@ import VisitedStoresScreen from '../profile/VisitedStoresScreen';
 import SellerPhoneSetupScreen from '../seller/SellerPhoneSetupScreen';
 import SellerPhoneVerifyScreen from '../seller/SellerPhoneVerifyScreen';
 import SellerRegistrationScreen from '../seller/SellerRegistrationScreen';
+import SellerVerificationStatusScreen from '../seller/SellerVerificationStatusScreen';
 import SellerProductDetailScreen from '../seller/SellerProductDetailScreen';
 import SellerShopSettingsScreen from '../seller/SellerShopSettingsScreen';
 import SellerOrdersScreen from '../seller/SellerOrdersScreen';
 import SellerOrderDetailScreen from '../seller/SellerOrderDetailScreen';
 import SellerStatsScreen from '../seller/SellerStatsScreen';
 import { getSellerRegistrationStep } from '../seller/sellerRegistrationFlow';
+import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
 
 export default function ProfilePanel({
+  profileMode = 'buyer',
   onOpenStore,
   sellerRegisterRequest = 0,
   isProfileVisible = false,
@@ -39,6 +41,9 @@ export default function ProfilePanel({
   productRefreshKey = 0,
   onOpenProductDetail,
   onProductChanged,
+  onSwitchToSellerMode,
+  onSwitchToBuyerMode,
+  canSwitchToSeller = false,
 }) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
@@ -90,22 +95,15 @@ export default function ProfilePanel({
     }
 
     try {
-      const result = await dispatch(loadUserProfile()).unwrap();
+      const result = await dispatch(syncSellerAccess()).unwrap();
       const latestProfile = result?.profile || profile;
-      const idToken = await getCurrentUserIdToken();
-      let verification = null;
-
-      if (idToken) {
-        const verificationData = await getMySellerVerificationOnBackend(idToken);
-        verification = verificationData?.verification || null;
-      }
-
-      const nextStep = getSellerRegistrationStep(latestProfile);
+      const verification = result?.verification || null;
+      const nextStep = getSellerRegistrationStep(latestProfile, verification);
       setSellerPhone(latestProfile?.phone || '');
       setSellerVerification(verification);
       setSellerStep(nextStep);
     } catch {
-      const nextStep = getSellerRegistrationStep(profile);
+      const nextStep = getSellerRegistrationStep(profile, null);
       setSellerPhone(profile?.phone || '');
       setSellerVerification(null);
       setSellerStep(nextStep);
@@ -155,8 +153,24 @@ export default function ProfilePanel({
             setProfileNav(returnNav);
             return;
           }
+          try {
+            const result = await dispatch(syncSellerAccess()).unwrap();
+            setSellerVerification(result?.verification || null);
+          } catch {
+            setSellerVerification(null);
+          }
           setSellerStep('register');
         }}
+      />
+    );
+  }
+
+  if (sellerStep === 'pending') {
+    return (
+      <SellerVerificationStatusScreen
+        verification={sellerVerification}
+        onBack={() => setSellerStep(null)}
+        onEdit={() => setSellerStep('register')}
       />
     );
   }
@@ -165,11 +179,28 @@ export default function ProfilePanel({
     return (
       <SellerRegistrationScreen
         initialVerification={sellerVerification}
-        onBack={() => setSellerStep(null)}
-        onSubmitted={async () => {
-          await dispatch(loadUserProfile());
-          setSellerVerification(null);
+        onBack={() => {
+          if (
+            sellerVerification?.status === SELLER_VERIFICATION_STATUS.PENDING ||
+            sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED
+          ) {
+            setSellerStep('pending');
+            return;
+          }
           setSellerStep(null);
+        }}
+        onSubmitted={async (verification) => {
+          let latestVerification = verification || sellerVerification;
+
+          try {
+            const result = await dispatch(syncSellerAccess()).unwrap();
+            latestVerification = verification || result?.verification || sellerVerification;
+          } catch {
+            // Giữ verification từ response submit nếu sync thất bại tạm thời.
+          }
+
+          setSellerVerification(latestVerification);
+          setSellerStep('pending');
         }}
       />
     );
@@ -269,6 +300,7 @@ export default function ProfilePanel({
   return (
     <View style={styles.screen}>
       <AccountProfileScreen
+        profileMode={profileMode}
         isProfileVisible={isProfileVisible}
         productRefreshKey={productRefreshKey}
         shopContactRefreshKey={shopContactRefreshKey}
@@ -280,6 +312,9 @@ export default function ProfilePanel({
         onOpenSellerOrders={() => setProfileNav('seller-orders')}
         onOpenSellerStats={() => setProfileNav('seller-stats')}
         onStartSellerRegister={startSellerRegistration}
+        onSwitchToSellerMode={onSwitchToSellerMode}
+        onSwitchToBuyerMode={onSwitchToBuyerMode}
+        canSwitchToSeller={canSwitchToSeller}
         onLogout={() => dispatch(logoutUser())}
       />
     </View>

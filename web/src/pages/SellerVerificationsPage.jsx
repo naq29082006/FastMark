@@ -20,12 +20,14 @@ export default function SellerVerificationsPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [actionId, setActionId] = useState('');
   const [rejectReasons, setRejectReasons] = useState({});
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError('');
+    setSuccessMessage('');
 
     try {
       const token = await getIdToken();
@@ -48,10 +50,12 @@ export default function SellerVerificationsPage() {
   async function handleApprove(verificationId) {
     setActionId(verificationId);
     setError('');
+    setSuccessMessage('');
 
     try {
       const token = await getIdToken();
       await approveVerification(token, verificationId);
+      setSuccessMessage('Đã duyệt hồ sơ người bán.');
       await loadItems();
     } catch (approveError) {
       setError(approveError.message || 'Không duyệt được hồ sơ.');
@@ -69,11 +73,13 @@ export default function SellerVerificationsPage() {
 
     setActionId(verificationId);
     setError('');
+    setSuccessMessage('');
 
     try {
       const token = await getIdToken();
       await rejectVerification(token, verificationId, lyDoTuChoi);
       setRejectReasons((current) => ({ ...current, [verificationId]: '' }));
+      setSuccessMessage('Đã từ chối hồ sơ người bán.');
       await loadItems();
     } catch (rejectError) {
       setError(rejectError.message || 'Không từ chối được hồ sơ.');
@@ -95,6 +101,7 @@ export default function SellerVerificationsPage() {
       </header>
 
       {error ? <p className="error-banner">{error}</p> : null}
+      {successMessage ? <p className="success-banner">{successMessage}</p> : null}
 
       {loading && items.length === 0 ? <p>Đang tải...</p> : null}
 
@@ -107,15 +114,31 @@ export default function SellerVerificationsPage() {
           <article key={item.id} className="verification-card">
             <div className="verification-header">
               <div>
-                <h2>{item.user?.fullName || 'Người dùng'}</h2>
+                <h2>{item.shopName || item.user?.fullName || 'Người dùng'}</h2>
                 <p>
-                  {item.user?.email || '—'} • {item.user?.phone || '—'}
+                  {item.user?.fullName || '—'} • {item.user?.email || '—'} •{' '}
+                  {item.user?.phone || '—'}
                 </p>
+                {item.shopUsername ? (
+                  <p className="shop-username">@{item.shopUsername}</p>
+                ) : null}
               </div>
               <span className="status-pill">Chờ duyệt</span>
             </div>
 
             <div className="verification-grid">
+              <div>
+                <strong>Danh mục kinh doanh</strong>
+                <p>{item.categoryName || '—'}</p>
+              </div>
+              <div>
+                <strong>Gửi lúc</strong>
+                <p>{formatDate(item.submittedAt)}</p>
+              </div>
+              <div className="verification-span-2">
+                <strong>Giới thiệu shop</strong>
+                <p>{item.shopDescription || '—'}</p>
+              </div>
               <div>
                 <strong>Địa chỉ</strong>
                 <p>{item.address || '—'}</p>
@@ -125,12 +148,12 @@ export default function SellerVerificationsPage() {
                 <p>{item.DiaChiHeThong || '—'}</p>
               </div>
               <div>
-                <strong>Ghi chú</strong>
-                <p>{item.note || '—'}</p>
-              </div>
-              <div>
-                <strong>Gửi lúc</strong>
-                <p>{formatDate(item.submittedAt)}</p>
+                <strong>Tọa độ</strong>
+                <p>
+                  {Number.isFinite(item.latitude) && Number.isFinite(item.longitude)
+                    ? `${item.latitude}, ${item.longitude}`
+                    : '—'}
+                </p>
               </div>
             </div>
 

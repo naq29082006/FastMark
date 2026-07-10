@@ -239,6 +239,16 @@ a {
   margin-bottom: 16px;
 }
 
+.verification-span-2 {
+  grid-column: span 2;
+}
+
+.shop-username {
+  margin-top: 4px !important;
+  color: #0f766e !important;
+  font-weight: 700;
+}
+
 .image-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

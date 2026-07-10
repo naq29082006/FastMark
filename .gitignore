@@ -31,9 +31,11 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (chỉ 1 file .env ở thư mục gốc)
 .env
 .env*.local
+**/.env
+**/.env*.local
 
 # typescript
 *.tsbuildinfo

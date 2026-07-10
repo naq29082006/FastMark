@@ -7,9 +7,14 @@ const {
   getProduct,
   listReviewsByStore,
 } = require('../controllers/storeController');
+const shopDiscoveryController = require('../controllers/shopDiscoveryController');
 
 const router = express.Router();
 
+router.get('/shops/nearby', asyncHandler(shopDiscoveryController.listNearbyShops));
+router.get('/shops/:id', asyncHandler(shopDiscoveryController.getShop));
+router.get('/shops/:id/products', asyncHandler(shopDiscoveryController.listShopProducts));
+router.get('/shops/:id/reviews', asyncHandler(shopDiscoveryController.listShopReviews));
 router.get('/restaurants', asyncHandler(listRestaurants));
 router.get('/restaurants/:id', asyncHandler(getRestaurant));
 router.get('/restaurants/:id/products', asyncHandler(listProductsByStore));

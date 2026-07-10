@@ -7,7 +7,7 @@ import AddressSearchBar from './AddressSearchBar';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import StoreDetailScreen from '../store/StoreDetailScreen';
 import { calculateDistanceMeters, hasValidLocation, normalizeExpoLocation } from '../../core/utils/geo';
-import { loadRestaurants } from '../../viewmodel/map/mapViewModel';
+import { loadRestaurants, loadNearbyRegisteredShops } from '../../viewmodel/map/mapViewModel';
 import { loadStoreById } from '../../viewmodel/store/storeViewModel';
 import { mapLogger as log } from '../../core/utils/logger';
 
@@ -16,6 +16,7 @@ const TYPE_EMOJI = {
   food: '🍜',
   milktea: '🧋',
   snack: '🍿',
+  shop: '🏪',
 };
 
 export default function MapScreen({ children, focusStoreRequest }) {
@@ -28,6 +29,7 @@ export default function MapScreen({ children, focusStoreRequest }) {
   const [selectedRadius, setSelectedRadius] = useState(2000);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [restaurants, setRestaurants] = useState([]);
+  const [registeredShops, setRegisteredShops] = useState([]);
   const [storeNav, setStoreNav] = useState(null);
   const lastAcceptedRef = useRef(null);
 
@@ -150,9 +152,9 @@ export default function MapScreen({ children, focusStoreRequest }) {
   }, [startLocationTracking]);
 
   useEffect(() => {
-    if (selectedCategory === 'none') {
+    if (selectedCategory === 'none' || selectedCategory === 'shop') {
       setRestaurants([]);
-      return;
+      return undefined;
     }
 
     let isCurrent = true;
@@ -172,7 +174,61 @@ export default function MapScreen({ children, focusStoreRequest }) {
   }, [selectedCategory]);
 
   useEffect(() => {
+    if (selectedCategory === 'none') {
+      setRegisteredShops([]);
+      return undefined;
+    }
+
+    if (!hasValidLocation(currentLocation)) {
+      return undefined;
+    }
+
+    let isCurrent = true;
+    const effectiveRadius = selectedRadius ?? 20000;
+
+    log.info('fetchRegisteredShops:map', {
+      lat: currentLocation.latitude,
+      lng: currentLocation.longitude,
+      radiusMeters: effectiveRadius,
+    });
+
+    loadNearbyRegisteredShops({
+      latitude: currentLocation.latitude,
+      longitude: currentLocation.longitude,
+      radiusMeters: effectiveRadius,
+    })
+      .then((data) => {
+        if (isCurrent) {
+          log.ok('fetchRegisteredShops:map-loaded', { count: data.length });
+          setRegisteredShops(data);
+        }
+      })
+      .catch((error) => {
+        log.fail('fetchRegisteredShops:map-failed', error);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentLocation, selectedRadius, selectedCategory]);
+
+  useEffect(() => {
     const targetStoreId = focusStoreRequest?.storeId;
+    const targetLocation = focusStoreRequest?.location;
+
+    if (targetLocation?.latitude && targetLocation?.longitude) {
+      setMenuVisible(false);
+      setRecenterRequest({
+        location: {
+          latitude: targetLocation.latitude,
+          longitude: targetLocation.longitude,
+        },
+        at: focusStoreRequest.at || Date.now(),
+      });
+      log.info('focusLocationRequest', targetLocation);
+      return undefined;
+    }
+
     if (!targetStoreId) {
       return undefined;
     }
@@ -198,7 +254,7 @@ export default function MapScreen({ children, focusStoreRequest }) {
       log.info('focusStoreRequest', { storeId: targetStoreId });
     }
 
-    const cachedStore = restaurants.find(
+    const cachedStore = [...restaurants, ...registeredShops].find(
       (store) => String(store.id) === String(targetStoreId)
     );
 
@@ -216,16 +272,34 @@ export default function MapScreen({ children, focusStoreRequest }) {
     return () => {
       isCurrent = false;
     };
-  }, [focusStoreRequest, restaurants]);
+  }, [focusStoreRequest, restaurants, registeredShops]);
+
+  const mapItems = useMemo(() => {
+    if (selectedCategory === 'none') {
+      return [];
+    }
+
+    if (selectedCategory === 'shop') {
+      return registeredShops;
+    }
+
+    if (selectedCategory === 'all') {
+      const registeredIds = new Set(registeredShops.map((shop) => String(shop.id)));
+      const demoItems = restaurants.filter((item) => !registeredIds.has(String(item.id)));
+      return [...registeredShops, ...demoItems];
+    }
+
+    return restaurants;
+  }, [restaurants, registeredShops, selectedCategory]);
 
   const visibleRestaurants = useMemo(() => {
-    if (!hasValidLocation(currentLocation) || restaurants.length === 0) {
-      return restaurants;
+    if (!hasValidLocation(currentLocation) || mapItems.length === 0) {
+      return mapItems;
     }
     if (!selectedRadius) {
-      return restaurants;
+      return mapItems;
     }
-    return restaurants.filter((r) => {
+    return mapItems.filter((r) => {
       if (!r.latitude || !r.longitude) return false;
       const dist = calculateDistanceMeters(currentLocation, {
         latitude: r.latitude,
@@ -233,7 +307,7 @@ export default function MapScreen({ children, focusStoreRequest }) {
       });
       return dist !== null && dist <= selectedRadius;
     });
-  }, [restaurants, currentLocation, selectedRadius]);
+  }, [mapItems, currentLocation, selectedRadius]);
 
   const radiusCircleProp =
     selectedRadius && hasValidLocation(currentLocation)
@@ -327,7 +401,8 @@ export default function MapScreen({ children, focusStoreRequest }) {
 
   const restaurantCategories = [
     { key: 'none', label: '🚫 Ẩn tất cả' },
-    { key: 'all', label: '🌐 Tất cả quán' },
+    { key: 'all', label: '🌐 Tất cả' },
+    { key: 'shop', label: '🏪 Gian hàng đăng ký' },
     { key: 'cafe', label: '☕ Cà phê' },
     { key: 'food', label: '🍜 Quán ăn' },
     { key: 'milktea', label: '🧋 Trà sữa' },
@@ -424,7 +499,7 @@ export default function MapScreen({ children, focusStoreRequest }) {
 
               <View style={styles.divider} />
 
-              <Text style={styles.menuSubHeader}>Loại quán</Text>
+              <Text style={styles.menuSubHeader}>Loại hiển thị</Text>
               {restaurantCategories.map((cat) => {
                 const isSelected = selectedCategory === cat.key;
                 return (
@@ -463,10 +538,12 @@ export default function MapScreen({ children, focusStoreRequest }) {
       <View style={styles.nearbyPanel}>
         <Text style={styles.nearbyTitle}>
           {showNearbyPanel
-            ? `${visibleRestaurants.length} quán trong ${selectedRadiusLabel} — chạm để xem`
+            ? `${visibleRestaurants.length} điểm trong ${selectedRadiusLabel} — chạm để xem`
             : selectedCategory === 'none'
-              ? 'Chọn loại quán để xem danh sách'
-              : `Không có quán trong bán kính ${selectedRadiusLabel}`}
+              ? 'Chọn loại hiển thị để xem danh sách'
+              : !hasValidLocation(currentLocation)
+                ? 'Đang lấy vị trí để quét gian hàng gần bạn...'
+                : `Không có điểm nào trong bán kính ${selectedRadiusLabel}`}
         </Text>
         {showNearbyPanel ? (
           <FlatList

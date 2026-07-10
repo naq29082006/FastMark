@@ -26,7 +26,7 @@ function toReadableNetworkError(error, url) {
     message.includes('Failed to connect')
   ) {
     return new Error(
-      `Không kết nối được backend (${url}). Kiểm tra backend đang chạy (cd backend && npm run dev) và EXPO_PUBLIC_NODE_API_URL khớp PORT trong backend/.env (hiện tại thường là :5000). Emulator Android: http://10.0.2.2:<port>.`
+      `Không kết nối được backend (${url}). Kiểm tra backend đang chạy (cd backend && npm run dev) và EXPO_PUBLIC_NODE_API_URL khớp PORT trong .env gốc (hiện tại thường là :5000). Emulator Android: http://10.0.2.2:<port>.`
     );
   }
 

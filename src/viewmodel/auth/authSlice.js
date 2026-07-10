@@ -25,6 +25,7 @@ import {
 } from '../../api/authBackendApi';
 import {
   mapBackendUserToProfile,
+  mapSellerVerificationToProfilePatch,
   mapShopSettingsToProfilePatch,
   mergeProfile,
   normalizeRole,
@@ -205,13 +206,19 @@ export const syncSellerAccess = createAsyncThunk(
       const freshRole = normalizeRole(
         verificationData?.role ?? backendData?.user?.role ?? backendData?.role ?? 1
       );
-      const profile = mapBackendUserToProfile(backendData.user || backendData, user);
+      const verification = verificationData?.verification || null;
+      let profile = mapBackendUserToProfile(backendData.user || backendData, user);
       profile.role = freshRole;
+
+      if (verification) {
+        profile = mergeProfile(user, profile, mapSellerVerificationToProfilePatch(verification));
+      }
+
       await writeCachedProfile(profile);
 
       return {
         profile,
-        verification: verificationData?.verification || null,
+        verification,
         role: freshRole,
       };
     } catch (error) {

@@ -14,7 +14,7 @@ function StatCard({ label, value, highlight }) {
   );
 }
 
-export default function SellerStatsScreen({ onBack }) {
+export default function SellerStatsScreen({ onBack, embedded = false }) {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -39,7 +39,7 @@ export default function SellerStatsScreen({ onBack }) {
 
   if (isLoading) {
     return (
-      <ProfileSubScreen title="Thống kê" onBack={onBack}>
+      <ProfileSubScreen title={embedded ? 'Tổng quan' : 'Thống kê'} onBack={onBack} embedded={embedded}>
         <View style={styles.centered}>
           <ActivityIndicator color="#0d7377" size="large" />
         </View>
@@ -49,14 +49,14 @@ export default function SellerStatsScreen({ onBack }) {
 
   if (!stats) {
     return (
-      <ProfileSubScreen title="Thống kê" onBack={onBack}>
+      <ProfileSubScreen title={embedded ? 'Tổng quan' : 'Thống kê'} onBack={onBack} embedded={embedded}>
         <Text style={styles.errorText}>{error || 'Không có dữ liệu.'}</Text>
       </ProfileSubScreen>
     );
   }
 
   return (
-    <ProfileSubScreen title="Thống kê" onBack={onBack}>
+    <ProfileSubScreen title={embedded ? 'Tổng quan' : 'Thống kê'} onBack={onBack} embedded={embedded}>
       <Text style={styles.groupTitle}>Doanh thu</Text>
       <View style={styles.grid}>
         <StatCard label="Hôm nay" value={formatPrice(stats.dailyRevenue)} highlight />

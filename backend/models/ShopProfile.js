@@ -10,6 +10,10 @@ const ShopProfileSchema = new mongoose.Schema({
   latitude: Number,
   longitude: Number,
 
+  shopUsername: { type: String, trim: true, lowercase: true, sparse: true, unique: true },
+  shopName: String,
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
+
   phone: String,
 
   openTime: String,

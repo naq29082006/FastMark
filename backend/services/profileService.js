@@ -1,10 +1,16 @@
 const ShopProfile = require("../models/ShopProfile");
 
 async function getShopStatsForUser(userId) {
-  const shop = await ShopProfile.findOne({ userId }).sort({ CreatedAt: -1 });
+  const shop = await ShopProfile.findOne({ userId })
+    .populate("categoryId", "categoryName")
+    .sort({ CreatedAt: -1 });
 
   if (!shop) {
     return {
+      shopName: '',
+      shopUsername: '',
+      categoryId: '',
+      categoryName: '',
       totalProducts: 0,
       likesCount: 0,
       soldCount: 0,
@@ -22,6 +28,14 @@ async function getShopStatsForUser(userId) {
   }
 
   return {
+    shopName: shop.shopName || '',
+    shopUsername: shop.shopUsername || '',
+    categoryId: shop.categoryId?._id
+      ? String(shop.categoryId._id)
+      : shop.categoryId
+        ? String(shop.categoryId)
+        : '',
+    categoryName: shop.categoryId?.categoryName || '',
     totalProducts: shop.totalProducts || 0,
     likesCount: shop.totalLikes || 0,
     soldCount: shop.soldCount || 0,

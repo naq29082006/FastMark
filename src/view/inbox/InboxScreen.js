@@ -16,15 +16,16 @@ const MOCK_NOTIFICATIONS = [
   { id: '2', title: 'Khuyến mãi', body: 'Giảm 10% phí đăng tin tuần này.', time: '1 giờ', unread: false },
 ];
 
-export default function InboxScreen() {
+export default function InboxScreen({ buyerView = false }) {
   const isSeller = useSelector(selectIsSeller);
+  const showSellerInbox = isSeller && !buyerView;
   const [activeTab, setActiveTab] = useState('messages');
   const [conversations, setConversations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
 
   const loadConversations = useCallback(async () => {
-    if (!isSeller) {
+    if (!showSellerInbox) {
       setConversations([]);
       return;
     }
@@ -38,7 +39,7 @@ export default function InboxScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [isSeller]);
+  }, [showSellerInbox]);
 
   useEffect(() => {
     if (activeTab === 'messages') {
@@ -61,7 +62,7 @@ export default function InboxScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Inbox</Text>
         <Text style={styles.subtitle}>
-          {isSeller ? 'Tin nhắn khách hàng' : 'Tin nhắn và thông báo'}
+          {showSellerInbox ? 'Tin nhắn khách hàng' : 'Tin nhắn và thông báo'}
         </Text>
       </View>
 

@@ -1,16 +1,20 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-export default function ProfileSubScreen({ title, onBack, children }) {
+export default function ProfileSubScreen({ title, onBack, embedded = false, children }) {
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable
-          onPress={onBack}
-          style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-          accessibilityRole="button"
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </Pressable>
+      <View style={[styles.topBar, embedded && styles.topBarEmbedded]}>
+        {embedded ? (
+          <View style={styles.topBarSpacer} />
+        ) : (
+          <Pressable
+            onPress={onBack}
+            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+            accessibilityRole="button"
+          >
+            <Text style={styles.backButtonText}>←</Text>
+          </Pressable>
+        )}
         <Text style={styles.title} numberOfLines={1}>
           {title}
         </Text>
@@ -39,6 +43,9 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
+  },
+  topBarEmbedded: {
+    paddingTop: 52,
   },
   backButton: {
     width: 36,

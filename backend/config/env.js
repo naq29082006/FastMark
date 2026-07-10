@@ -1,7 +1,11 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
+const rootEnvPath = path.join(__dirname, "..", "..", ".env");
+const legacyEnvPath = path.join(__dirname, "..", ".env");
+
+dotenv.config({ path: rootEnvPath });
+dotenv.config({ path: legacyEnvPath, override: false });
 
 function readEnv(name, { required = false, fallback = "" } = {}) {
   const value = process.env[name];
@@ -9,7 +13,7 @@ function readEnv(name, { required = false, fallback = "" } = {}) {
   if (value === undefined || String(value).trim() === "") {
     if (required) {
       throw new Error(
-        `Thiếu biến môi trường ${name}. Thêm vào backend/.env`
+        `Thiếu biến môi trường ${name}. Thêm vào .env ở thư mục gốc dự án`
       );
     }
 

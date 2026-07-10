@@ -1,30 +1,50 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
-import { syncSellerAccess } from '../../viewmodel/auth/authSlice';
+import { APP_MODE_BUYER, APP_MODE_SELLER, useAppMode } from '../../hooks/useAppMode';
 import { useSellerAccessSync } from '../../hooks/useSellerAccessSync';
+import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
+import { syncSellerAccess } from '../../viewmodel/auth/authSlice';
 
-import InboxScreen from '../inbox/InboxScreen';
-import PostScreen from '../home/PostScreen';
+import BuyerOrdersScreen from '../buyer/BuyerOrdersScreen';
+import SearchScreen from '../buyer/SearchScreen';
 import ProductsScreen from '../home/ProductsScreen';
+import InboxScreen from '../inbox/InboxScreen';
 import MapScreen from '../map/MapScreen';
+import ProfilePanel from './ProfilePanel';
+import SellerOverviewScreen from '../seller/SellerOverviewScreen';
+import SellerProductsTabScreen from '../seller/SellerProductsTabScreen';
+import SellerOrdersTabScreen from '../seller/SellerOrdersTabScreen';
 import {
+  BagTabIcon,
+  ChartTabIcon,
   ChatTabIcon,
-  CompassTabIcon,
   HomeTabIcon,
+  OrdersTabIcon,
   PersonTabIcon,
+  SearchTabIcon,
   PlusTabIcon,
 } from '../shared/components/TabBarIcons';
-import ProfilePanel from './ProfilePanel';
+import SellerPostTabScreen from '../seller/SellerPostTabScreen';
 
 const ACTIVE_COLOR = '#3a7d74';
 const INACTIVE_COLOR = '#9aa8b2';
 
-const TABS = [
+const BUYER_TABS = [
   { key: 'home', label: 'Trang chủ', Icon: HomeTabIcon },
-  { key: 'products', label: 'Sản phẩm', Icon: CompassTabIcon },
+  { key: 'search', label: 'Tìm kiếm', Icon: SearchTabIcon },
+  { key: 'products', label: 'Sản phẩm', Icon: BagTabIcon },
+  { key: 'orders', label: 'Đơn hàng', Icon: OrdersTabIcon },
+  { key: 'inbox', label: 'Inbox', Icon: ChatTabIcon, badge: true },
+  { key: 'profile', label: 'Tài khoản', Icon: PersonTabIcon },
+];
+
+const SELLER_TABS = [
+  { key: 'overview', label: 'Tổng quan', Icon: ChartTabIcon },
+  { key: 'products', label: 'Sản phẩm', Icon: BagTabIcon },
   { key: 'post', label: 'Đăng tin', Icon: PlusTabIcon, highlight: true },
+  { key: 'orders', label: 'Đơn hàng', Icon: OrdersTabIcon },
   { key: 'inbox', label: 'Inbox', Icon: ChatTabIcon, badge: true },
   { key: 'profile', label: 'Tài khoản', Icon: PersonTabIcon },
 ];
@@ -39,7 +59,7 @@ function getTabColor(tab, isActive) {
 
 function TabIcon({ tab, isActive, color }) {
   const IconComponent = tab.Icon;
-  const size = tab.highlight ? 28 : 24;
+  const size = tab.highlight ? 26 : 22;
 
   return (
     <View style={styles.iconWrap}>
@@ -51,7 +71,11 @@ function TabIcon({ tab, isActive, color }) {
 
 export default function AuthenticatedHome() {
   const dispatch = useDispatch();
-  const [activeTab, setActiveTab] = useState('home');
+  const isSeller = useSelector(selectIsSeller);
+  const { appMode, setAppMode, isReady, isBuyerMode, isSellerMode } = useAppMode(isSeller);
+
+  const tabs = isSellerMode ? SELLER_TABS : BUYER_TABS;
+  const [activeTab, setActiveTab] = useState(BUYER_TABS[0].key);
   const [mapFocusRequest, setMapFocusRequest] = useState(null);
   const [sellerRegisterRequest, setSellerRegisterRequest] = useState(0);
   const [productDetailId, setProductDetailId] = useState(null);
@@ -66,11 +90,39 @@ export default function AuthenticatedHome() {
     dispatch(syncSellerAccess());
   }, [dispatch]);
 
+  useEffect(() => {
+    if (!isReady) {
+      return;
+    }
+    const defaultTab = isSellerMode ? SELLER_TABS[0].key : BUYER_TABS[0].key;
+    setActiveTab(defaultTab);
+    setProductDetailId(null);
+  }, [appMode, isReady, isSellerMode]);
+
+  const profileMode = isSellerMode ? 'seller' : 'buyer';
+
   function handleOpenStoreFromProfile(storeId) {
     setMapFocusRequest({
       storeId: String(storeId),
       at: Date.now(),
     });
+    setAppMode(APP_MODE_BUYER);
+    setActiveTab('home');
+  }
+
+  function handleSearchSelect(result) {
+    if (!result?.latitude || !result?.longitude) {
+      return;
+    }
+
+    setMapFocusRequest({
+      location: {
+        latitude: result.latitude,
+        longitude: result.longitude,
+      },
+      at: Date.now(),
+    });
+    setAppMode(APP_MODE_BUYER);
     setActiveTab('home');
   }
 
@@ -87,29 +139,33 @@ export default function AuthenticatedHome() {
 
   function handleStartSellerRegister() {
     setSellerRegisterRequest(Date.now());
+    setAppMode(APP_MODE_BUYER);
     setActiveTab('profile');
   }
 
-  return (
-    <View style={styles.root}>
-      <View style={styles.content}>
-        <View style={[styles.tabPane, activeTab !== 'home' && styles.tabHidden]}>
-          <MapScreen focusStoreRequest={mapFocusRequest} />
-        </View>
-        <View style={[styles.tabPane, activeTab !== 'products' && styles.tabHidden]}>
-          <ProductsScreen />
-        </View>
-        <View style={[styles.tabPane, activeTab !== 'post' && styles.tabHidden]}>
-          <PostScreen
-            onStartSellerRegister={handleStartSellerRegister}
-            onProductCreated={handleOpenProductDetail}
-          />
-        </View>
-        <View style={[styles.tabPane, activeTab !== 'inbox' && styles.tabHidden]}>
-          <InboxScreen />
-        </View>
-        <View style={[styles.tabPane, activeTab !== 'profile' && styles.tabHidden]}>
+  async function handleSwitchToSellerMode() {
+    if (!isSeller) {
+      handleStartSellerRegister();
+      return;
+    }
+    await setAppMode(APP_MODE_SELLER);
+  }
+
+  async function handleSwitchToBuyerMode() {
+    await setAppMode(APP_MODE_BUYER);
+  }
+
+  const tabPanes = useMemo(() => {
+    if (isBuyerMode) {
+      return {
+        home: <MapScreen focusStoreRequest={mapFocusRequest} />,
+        search: <SearchScreen onSelectLocation={handleSearchSelect} />,
+        products: <ProductsScreen />,
+        orders: <BuyerOrdersScreen onOpenStore={handleOpenStoreFromProfile} />,
+        inbox: <InboxScreen buyerView />,
+        profile: (
           <ProfilePanel
+            profileMode="buyer"
             onOpenStore={handleOpenStoreFromProfile}
             sellerRegisterRequest={sellerRegisterRequest}
             isProfileVisible={activeTab === 'profile'}
@@ -117,12 +173,76 @@ export default function AuthenticatedHome() {
             productRefreshKey={productRefreshKey}
             onOpenProductDetail={handleOpenProductDetail}
             onProductChanged={handleProductChanged}
+            onSwitchToSellerMode={handleSwitchToSellerMode}
+            canSwitchToSeller={isSeller}
           />
-        </View>
+        ),
+      };
+    }
+
+    return {
+      overview: <SellerOverviewScreen />,
+      products: (
+        <SellerProductsTabScreen
+          productRefreshKey={productRefreshKey}
+          onOpenProductDetail={handleOpenProductDetail}
+        />
+      ),
+      post: (
+        <SellerPostTabScreen
+          onProductCreated={handleOpenProductDetail}
+          onProductChanged={handleProductChanged}
+        />
+      ),
+      orders: <SellerOrdersTabScreen />,
+      inbox: <InboxScreen />,
+      profile: (
+        <ProfilePanel
+          profileMode="seller"
+          onOpenStore={handleOpenStoreFromProfile}
+          sellerRegisterRequest={sellerRegisterRequest}
+          isProfileVisible={activeTab === 'profile'}
+          productDetailId={productDetailId}
+          productRefreshKey={productRefreshKey}
+          onOpenProductDetail={handleOpenProductDetail}
+          onProductChanged={handleProductChanged}
+          onSwitchToBuyerMode={handleSwitchToBuyerMode}
+        />
+      ),
+    };
+  }, [
+    activeTab,
+    handleOpenStoreFromProfile,
+    handleSearchSelect,
+    handleSwitchToBuyerMode,
+    handleSwitchToSellerMode,
+    isBuyerMode,
+    isSeller,
+    mapFocusRequest,
+    productDetailId,
+    productRefreshKey,
+    sellerRegisterRequest,
+  ]);
+
+  if (!isReady) {
+    return <View style={styles.root} />;
+  }
+
+  return (
+    <View style={styles.root}>
+      <View style={styles.content}>
+        {tabs.map((tab) => (
+          <View
+            key={tab.key}
+            style={[styles.tabPane, activeTab !== tab.key && styles.tabHidden]}
+          >
+            {tabPanes[tab.key]}
+          </View>
+        ))}
       </View>
 
       <View style={styles.tabBar}>
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
           const color = getTabColor(tab, isActive);
 
@@ -131,7 +251,7 @@ export default function AuthenticatedHome() {
               key={tab.key}
               style={({ pressed }) => [styles.tabItem, pressed && styles.tabItemPressed]}
               onPress={() => {
-                if (tab.key === 'post' || tab.key === 'profile') {
+                if (tab.key === 'profile' || tab.key === 'products' || tab.key === 'post') {
                   dispatch(syncSellerAccess());
                 }
                 setActiveTab(tab.key);
@@ -171,30 +291,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#d7e0e6',
-    paddingTop: 10,
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 18,
     paddingHorizontal: 2,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    minHeight: 56,
+    gap: 4,
+    minHeight: 52,
   },
   tabItemPressed: {
     opacity: 0.72,
   },
   iconWrap: {
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 10,
+    fontWeight: '600',
     letterSpacing: 0.1,
   },
   badge: {
