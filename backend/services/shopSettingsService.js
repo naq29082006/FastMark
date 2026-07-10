@@ -13,8 +13,18 @@ function pickString(value) {
 }
 
 function toPublicShopSettings(shop, user) {
+  const categoryId = shop.categoryId?._id
+    ? String(shop.categoryId._id)
+    : shop.categoryId
+      ? String(shop.categoryId)
+      : "";
+
   return {
     shopId: shop._id,
+    shopUsername: shop.shopUsername || "",
+    shopName: shop.shopName || "",
+    categoryId,
+    categoryName: shop.categoryId?.categoryName || "",
     description: shop.description || "",
     shopDescription: shop.description || "",
     address: shop.address || "",
@@ -31,7 +41,9 @@ function toPublicShopSettings(shop, user) {
 }
 
 async function getShopForSeller(user) {
-  const shop = await ShopProfile.findOne({ userId: user._id }).sort({ CreatedAt: -1 });
+  const shop = await ShopProfile.findOne({ userId: user._id })
+    .populate("categoryId", "categoryName")
+    .sort({ CreatedAt: -1 });
   if (!shop) {
     throw createServiceError("Chưa có gian hàng.", 404);
   }
@@ -59,8 +71,11 @@ async function updateShopSettings(user, payload) {
   const shop = await getShopForSeller(user);
   const freshUser = await User.findById(user._id);
 
-  if (payload.description !== undefined) {
-    shop.description = pickString(payload.description);
+  if (payload.shopName !== undefined) {
+    shop.shopName = pickString(payload.shopName);
+  }
+  if (payload.description !== undefined || payload.shopDescription !== undefined) {
+    shop.description = pickString(payload.description ?? payload.shopDescription);
   }
   if (payload.address !== undefined) {
     shop.address = pickString(payload.address);

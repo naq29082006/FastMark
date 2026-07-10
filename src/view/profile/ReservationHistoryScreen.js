@@ -32,7 +32,6 @@ const STATUS_COLORS = {
   picked_up: { bg: '#e0e7ff', text: '#4338ca' },
   expired: { bg: '#fee2e2', text: '#b91c1c' },
 };
-
 function ReservationList({ onOpenOrderDetail, onOpenStore, onReviewStore, reviewedOrderCodes }) {
   return MOCK_RESERVATIONS.map((item) => {
     const statusStyle = STATUS_COLORS[item.status] || STATUS_COLORS.active;
@@ -167,8 +166,7 @@ export default function ReservationHistoryScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
+const styles = StyleSheet.create({  card: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,

@@ -32,7 +32,7 @@ function mapFirebaseRestError(error) {
 
   const mapped = new Error(
     message.includes("API key not valid") || message.includes("API_KEY_INVALID")
-      ? "FIREBASE_API_KEY không hợp lệ. Kiểm tra backend/.env (chỉ 1 dấu =) và dùng Web API Key đúng project."
+      ? "FIREBASE_API_KEY không hợp lệ. Kiểm tra .env gốc (chỉ 1 dấu =) và dùng Web API Key đúng project."
       : message.includes("INVALID_PASSWORD") || message.includes("EMAIL_NOT_FOUND")
       ? "Email hoặc mật khẩu không đúng."
       : message.includes("USER_DISABLED")

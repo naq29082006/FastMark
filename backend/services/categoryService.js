@@ -1,5 +1,6 @@
 const Category = require("../models/Category");
 const Product = require("../models/Product");
+const { normalizeCategoryId, isValidCategoryId } = require("../utils/categoryId");
 const { PRODUCT_STATUS } = require("../constants/productStatus");
 
 function createServiceError(message, statusCode = 400) {
@@ -14,7 +15,7 @@ function pickString(value) {
 
 function toPublicCategory(category) {
   return {
-    id: category._id,
+    id: String(category._id),
     categoryName: category.categoryName,
     description: category.description || "",
     createdAt: category.CreatedAt,
@@ -25,6 +26,33 @@ function toPublicCategory(category) {
 async function listCategories() {
   const categories = await Category.find().sort({ categoryName: 1 });
   return categories.map(toPublicCategory);
+}
+
+async function assertCategoryExists(categoryId) {
+  const id = normalizeCategoryId(categoryId);
+  if (!isValidCategoryId(id)) {
+    throw createServiceError("Vui lòng chọn danh mục kinh doanh.");
+  }
+
+  const category = await Category.findById(id).lean();
+  if (!category) {
+    throw createServiceError("Danh mục kinh doanh không hợp lệ hoặc đã bị xóa.");
+  }
+
+  return category;
+}
+
+async function getCategoryNameMap(categoryIds = []) {
+  const uniqueIds = [...new Set(categoryIds.filter(Boolean).map((id) => String(id)))];
+  if (uniqueIds.length === 0) {
+    return new Map();
+  }
+
+  const categories = await Category.find({ _id: { $in: uniqueIds } })
+    .select("categoryName")
+    .lean();
+
+  return new Map(categories.map((category) => [String(category._id), category.categoryName || ""]));
 }
 
 async function createCategory({ categoryName, description }) {
@@ -99,6 +127,8 @@ async function deleteCategory(categoryId) {
 
 module.exports = {
   listCategories,
+  assertCategoryExists,
+  getCategoryNameMap,
   createCategory,
   updateCategory,
   deleteCategory,

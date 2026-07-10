@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -11,17 +13,35 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
-import { useDispatch } from 'react-redux';
-
 import { getCurrentUserIdToken } from '../../repository/authRepository';
-import { submitSellerVerificationOnBackend } from '../../api/sellerApi';
+import { getProductCategoriesOnBackend } from '../../api/productApi';
+import { isValidCategoryId, normalizeCategoryId } from '../../core/utils/categoryId';
+import {
+  getMySellerVerificationOnBackend,
+  submitSellerVerificationOnBackend,
+} from '../../api/sellerApi';
+import { resolveErrorMessage } from '../../core/utils/resolveErrorMessage';
+import { logErrorDetails } from '../../core/utils/logger';
 import { reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
-import { loadUserProfile } from '../../viewmodel/auth/authSlice';
 import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
 import ProfileSubScreen from '../profile/ProfileSubScreen';
+import { CategoryCombobox } from './SellerProductFormFields';
 import SellerLocationPickerScreen from './SellerLocationPickerScreen';
 
-async function pickImage() {
+function parseImageAsset(result) {
+  if (result.canceled || !result.assets?.[0]) {
+    return null;
+  }
+
+  const asset = result.assets[0];
+  return {
+    base64: asset.base64,
+    mimeType: asset.mimeType || 'image/jpeg',
+    uri: asset.uri,
+  };
+}
+
+async function pickImageFromLibrary() {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
     throw new Error('Cần quyền truy cập thư viện ảnh.');
@@ -34,16 +54,51 @@ async function pickImage() {
     base64: true,
   });
 
-  if (result.canceled || !result.assets?.[0]?.base64) {
-    return null;
+  return parseImageAsset(result);
+}
+
+async function takePhotoWithCamera() {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error('Cần quyền truy cập camera.');
   }
 
-  const asset = result.assets[0];
-  return {
-    base64: asset.base64,
-    mimeType: asset.mimeType || 'image/jpeg',
-    uri: asset.uri,
-  };
+  const result = await ImagePicker.launchCameraAsync({
+    allowsEditing: true,
+    quality: 0.7,
+    base64: true,
+  });
+
+  return parseImageAsset(result);
+}
+
+function chooseImageSource() {
+  if (Platform.OS === 'web') {
+    return pickImageFromLibrary();
+  }
+
+  return new Promise((resolve, reject) => {
+    Alert.alert(
+      'Chọn ảnh',
+      'Bạn muốn chụp ảnh bằng camera hay chọn từ thư viện?',
+      [
+        { text: 'Huỷ', style: 'cancel', onPress: () => resolve(null) },
+        {
+          text: 'Chụp ảnh',
+          onPress: () => {
+            takePhotoWithCamera().then(resolve).catch(reject);
+          },
+        },
+        {
+          text: 'Thư viện ảnh',
+          onPress: () => {
+            pickImageFromLibrary().then(resolve).catch(reject);
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: () => resolve(null) }
+    );
+  });
 }
 
 function ImagePickerField({ label, value, onPick }) {
@@ -58,14 +113,49 @@ function ImagePickerField({ label, value, onPick }) {
         </View>
       )}
       <Pressable onPress={onPick} style={({ pressed }) => [styles.pickButton, pressed && styles.pickButtonPressed]}>
-        <Text style={styles.pickButtonText}>Chọn ảnh</Text>
+        <Text style={styles.pickButtonText}>Chọn ảnh / Chụp camera</Text>
       </Pressable>
     </View>
   );
 }
 
+function resolveRemoteImageUrl(image, fallbackUrl = '') {
+  if (image?.uri && String(image.uri).startsWith('http')) {
+    return image.uri;
+  }
+
+  return fallbackUrl || null;
+}
+
+function hasUsableVerificationImage(image, fallbackUrl = '') {
+  return Boolean(image?.base64 || resolveRemoteImageUrl(image, fallbackUrl));
+}
+
+function buildVerificationImagePayload(image, fallbackUrl = '') {
+  const remoteUrl = resolveRemoteImageUrl(image, fallbackUrl);
+
+  return {
+    base64: image?.base64 || null,
+    mimeType: image?.mimeType || 'image/jpeg',
+    existingUrl: image?.base64 ? null : remoteUrl,
+  };
+}
+
+async function recoverSubmittedVerification(idToken) {
+  const latest = await getMySellerVerificationOnBackend(idToken);
+  const verification = latest?.verification || null;
+
+  if (
+    verification?.status === SELLER_VERIFICATION_STATUS.PENDING ||
+    verification?.status === SELLER_VERIFICATION_STATUS.REJECTED
+  ) {
+    return verification;
+  }
+
+  return null;
+}
+
 export default function SellerRegistrationScreen({ onBack, onSubmitted, initialVerification = null }) {
-  const dispatch = useDispatch();
   const [cccdFront, setCccdFront] = useState(null);
   const [cccdBack, setCccdBack] = useState(null);
   const [selfie, setSelfie] = useState(null);
@@ -73,7 +163,12 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
   const [systemAddress, setSystemAddress] = useState('');
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
-  const [note, setNote] = useState('');
+  const [shopName, setShopName] = useState('');
+  const [shopUsername, setShopUsername] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [shopDescription, setShopDescription] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,7 +185,36 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
   const isRejected = initialVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED;
 
   useEffect(() => {
-    if (!initialVerification) {
+    let isMounted = true;
+
+    async function loadCategories() {
+      setIsLoadingCategories(true);
+      try {
+        const items = await getProductCategoriesOnBackend();
+        if (isMounted) {
+          setCategories(items);
+        }
+      } catch (loadError) {
+        if (isMounted) {
+          setError(loadError.message || 'Không tải được danh mục kinh doanh.');
+          setCategories([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingCategories(false);
+        }
+      }
+    }
+
+    loadCategories();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!initialVerification?.id) {
       return;
     }
 
@@ -106,7 +230,12 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
         ? Number(initialVerification.longitude)
         : null
     );
-    setNote(initialVerification.note || '');
+    setShopName(initialVerification.shopName || '');
+    setShopUsername(initialVerification.shopUsername || '');
+    setCategoryId((current) =>
+      current || normalizeCategoryId(initialVerification.categoryId)
+    );
+    setShopDescription(initialVerification.shopDescription || '');
 
     if (initialVerification.cccdFrontImage) {
       setCccdFront({ uri: initialVerification.cccdFrontImage });
@@ -117,12 +246,12 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
     if (initialVerification.selfieImage) {
       setSelfie({ uri: initialVerification.selfieImage });
     }
-  }, [initialVerification]);
+  }, [initialVerification?.id]);
 
   async function handlePickImage(setter) {
     try {
       setError('');
-      const image = await pickImage();
+      const image = await chooseImageSource();
       if (image) {
         setter(image);
       }
@@ -173,8 +302,40 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
       return;
     }
 
+    if (
+      !hasUsableVerificationImage(cccdFront, initialVerification?.cccdFrontImage) ||
+      !hasUsableVerificationImage(cccdBack, initialVerification?.cccdBackImage) ||
+      !hasUsableVerificationImage(selfie, initialVerification?.selfieImage)
+    ) {
+      setError('Không đọc được ảnh. Vui lòng chọn lại ảnh trước khi gửi.');
+      return;
+    }
+
     if (!address.trim()) {
       setError('Vui lòng nhập địa chỉ.');
+      return;
+    }
+
+    const normalizedShopName = shopName.trim().replace(/\s+/g, ' ');
+    if (normalizedShopName.length < 2 || normalizedShopName.length > 80) {
+      setError('Tên gian hàng phải từ 2-80 ký tự.');
+      return;
+    }
+
+    const normalizedShopUsername = shopUsername.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,30}$/.test(normalizedShopUsername)) {
+      setError('Tên shop phải từ 3-30 ký tự, chỉ chữ thường, số và dấu gạch dưới.');
+      return;
+    }
+
+    const normalizedCategoryId = normalizeCategoryId(categoryId);
+    if (!isValidCategoryId(normalizedCategoryId)) {
+      setError('Vui lòng chọn danh mục kinh doanh.');
+      return;
+    }
+
+    if (!shopDescription.trim()) {
+      setError('Vui lòng nhập giới thiệu shop.');
       return;
     }
 
@@ -187,38 +348,83 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
     setSuccessMessage('');
     setIsSubmitting(true);
 
+    let idToken = null;
+
     try {
-      const idToken = await getCurrentUserIdToken();
+      idToken = await getCurrentUserIdToken();
       if (!idToken) {
         throw new Error('Phiên đăng nhập đã hết hạn.');
       }
 
-      await submitSellerVerificationOnBackend({
-        idToken,
-        payload: {
-          cccdFrontImageBase64: cccdFront.base64 || null,
-          cccdFrontMimeType: cccdFront.mimeType,
-          cccdBackImageBase64: cccdBack.base64 || null,
-          cccdBackMimeType: cccdBack.mimeType,
-          selfieImageBase64: selfie.base64 || null,
-          selfieMimeType: selfie.mimeType,
-          address: address.trim(),
-          systemAddress: systemAddress.trim(),
-          latitude,
-          longitude,
-          note: note.trim(),
-        },
-      });
+      const frontImage = buildVerificationImagePayload(
+        cccdFront,
+        initialVerification?.cccdFrontImage
+      );
+      const backImage = buildVerificationImagePayload(
+        cccdBack,
+        initialVerification?.cccdBackImage
+      );
+      const selfieImage = buildVerificationImagePayload(
+        selfie,
+        initialVerification?.selfieImage
+      );
 
-      await dispatch(loadUserProfile()).unwrap();
+      let verification = null;
+
+      try {
+        const response = await submitSellerVerificationOnBackend({
+          idToken,
+          payload: {
+            cccdFrontImageBase64: frontImage.base64,
+            cccdFrontMimeType: frontImage.mimeType,
+            cccdFrontImageUrl: frontImage.existingUrl,
+            cccdBackImageBase64: backImage.base64,
+            cccdBackMimeType: backImage.mimeType,
+            cccdBackImageUrl: backImage.existingUrl,
+            selfieImageBase64: selfieImage.base64,
+            selfieMimeType: selfieImage.mimeType,
+            selfieImageUrl: selfieImage.existingUrl,
+            address: address.trim(),
+            systemAddress: systemAddress.trim(),
+            shopName: normalizedShopName,
+            shopUsername: normalizedShopUsername,
+            categoryId: normalizedCategoryId,
+            shopDescription: shopDescription.trim(),
+            latitude,
+            longitude,
+          },
+        });
+
+        verification = response?.verification || null;
+      } catch (submitError) {
+        const statusCode = Number(submitError?.statusCode) || 0;
+        const shouldRecover = statusCode >= 500 || !statusCode;
+
+        if (shouldRecover) {
+          verification = await recoverSubmittedVerification(idToken);
+        }
+
+        if (!verification) {
+          throw submitError;
+        }
+      }
+
       setSuccessMessage(
         isEditing
           ? 'Đã cập nhật hồ sơ. Vui lòng chờ admin duyệt.'
           : 'Đã gửi hồ sơ đăng ký. Vui lòng chờ admin duyệt.'
       );
-      onSubmitted?.();
+
+      try {
+        await onSubmitted?.(verification);
+      } catch (navigationError) {
+        logErrorDetails('SellerRegistration', 'onSubmitted failed', navigationError);
+      }
     } catch (submitError) {
-      setError(submitError.message || 'Không gửi được hồ sơ đăng ký.');
+      logErrorDetails('SellerRegistration', 'submit failed', submitError);
+      setError(
+        resolveErrorMessage(submitError, 'Không gửi được hồ sơ đăng ký.')
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -276,6 +482,72 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
         />
 
         <View style={styles.field}>
+          <Text style={styles.label}>Tên cụ thể gian hàng</Text>
+          <TextInput
+            value={shopName}
+            onChangeText={setShopName}
+            placeholder="vd: Nông sản Vy, Bánh mì Huỳnh Hoa..."
+            placeholderTextColor="#94a3b8"
+            style={styles.input}
+          />
+          <Text style={styles.fieldHint}>Tên hiển thị công khai của gian hàng (2-80 ký tự).</Text>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Username shop</Text>
+          <TextInput
+            value={shopUsername}
+            onChangeText={(value) => setShopUsername(value.toLowerCase())}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="vd: shop_rau_sach"
+            placeholderTextColor="#94a3b8"
+            style={styles.input}
+          />
+          <Text style={styles.fieldHint}>Chỉ dùng chữ thường, số và dấu gạch dưới (3-30 ký tự).</Text>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Danh mục kinh doanh</Text>
+          {isLoadingCategories ? (
+            <View style={styles.categoryLoading}>
+              <ActivityIndicator color="#0d7377" />
+              <Text style={styles.fieldHint}>Đang tải danh mục...</Text>
+            </View>
+          ) : categories.length === 0 ? (
+            <Text style={styles.fieldHint}>Chưa có danh mục. Vui lòng liên hệ admin.</Text>
+          ) : (
+            <>
+              <CategoryCombobox
+                categories={categories}
+                value={categoryId}
+                onChange={(value) => {
+                  setCategoryId(normalizeCategoryId(value));
+                  setError('');
+                }}
+              />
+              {isValidCategoryId(categoryId) ? (
+                <Text style={styles.fieldHint}>
+                  Đã chọn: {categories.find((item) => item.id === categoryId)?.categoryName || 'Danh mục'}
+                </Text>
+              ) : null}
+            </>
+          )}
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Giới thiệu shop</Text>
+          <TextInput
+            value={shopDescription}
+            onChangeText={setShopDescription}
+            placeholder="Mô tả ngắn về gian hàng, sản phẩm chính, phong cách bán hàng..."
+            placeholderTextColor="#94a3b8"
+            style={[styles.input, styles.noteInput]}
+            multiline
+          />
+        </View>
+
+        <View style={styles.field}>
           <Text style={styles.label}>Địa chỉ cụ thể</Text>
           <TextInput
             value={address}
@@ -329,18 +601,6 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
               <Text style={styles.pickButtonText}>🗺️ Chọn trên bản đồ</Text>
             </Pressable>
           </View>
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Ghi chú</Text>
-          <TextInput
-            value={note}
-            onChangeText={setNote}
-            placeholder="Thông tin thêm (tuỳ chọn)"
-            placeholderTextColor="#94a3b8"
-            style={[styles.input, styles.noteInput]}
-            multiline
-          />
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -418,6 +678,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#334155',
     marginBottom: 8,
+  },
+  fieldHint: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  categoryLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
   },
   previewImage: {
     width: '100%',

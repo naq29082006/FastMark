@@ -30,7 +30,7 @@ module.exports = () => {
 
   expo.android = {
     ...expo.android,
-    permissions: ['INTERNET', 'ACCESS_NETWORK_STATE'],
+    permissions: ['INTERNET', 'ACCESS_NETWORK_STATE', 'CAMERA'],
     ...(googleScheme
       ? {
           intentFilters: [
@@ -52,6 +52,11 @@ module.exports = () => {
   expo.ios = {
     ...expo.ios,
     infoPlist: {
+      ...(expo.ios?.infoPlist || {}),
+      NSCameraUsageDescription:
+        'Fastmark cần truy cập camera để chụp ảnh giấy tờ đăng ký gian hàng.',
+      NSPhotoLibraryUsageDescription:
+        'Fastmark cần truy cập thư viện ảnh để tải ảnh giấy tờ đăng ký gian hàng.',
       CFBundleURLTypes: [
         { CFBundleURLSchemes: ['fastmark'] },
         ...(googleScheme ? [{ CFBundleURLSchemes: [googleScheme] }] : []),

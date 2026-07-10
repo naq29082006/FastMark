@@ -18,38 +18,79 @@ import {
 import ContactActions from './components/ContactActions';
 import StarRating from './components/StarRating';
 import ReportSheet from '../shared/components/ReportSheet';
+import { formatPriceRange } from '../../core/utils/productFormat';
 import { storeLogger as log } from '../../core/utils/logger';
-
 const TABS = [
   { key: 'products', label: 'Sản phẩm' },
   { key: 'reviews', label: 'Đánh giá' },
-  { key: 'intro', label: 'Giới thiệu' },
 ];
-
-const STORE_TYPE_EMOJI = {
-  cafe: '☕',
-  food: '🍜',
-  milktea: '🧋',
-  snack: '🍿',
-};
-
-function formatPrice(price) {
-  return `${Number(price).toLocaleString('vi-VN')}đ`;
-}
 
 function formatDate(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('vi-VN');
 }
 
-export default function StoreDetailScreen({ storeId, onBack, onProductPress, onOpenChat }) {
-  const [store, setStore] = useState(null);
+function formatCount(value) {
+  const count = Number(value) || 0;
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1)}M`;
+  }
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}K`;
+  }
+  return String(count);
+}
+
+function formatHours(openTime, closeTime) {
+  const open = String(openTime || '').trim();
+  const close = String(closeTime || '').trim();
+
+  if (open && close) {
+    return `${open} - ${close}`;
+  }
+  if (open) {
+    return open;
+  }
+  if (close) {
+    return close;
+  }
+  return '';
+}
+
+function InfoRow({ label, value, fallback = 'Chưa cập nhật' }) {
+  const displayValue = String(value || '').trim() || fallback;
+
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLine}>
+        <Text style={styles.infoLabelInline}>{label}: </Text>
+        <Text style={styles.infoValueInline}>{displayValue}</Text>
+      </Text>
+    </View>
+  );
+}
+
+function StatCard({ label, value }) {
+  return (
+    <View style={styles.statCard}>
+      <Text style={styles.statValue}>{formatCount(value)}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+export default function StoreDetailScreen({ storeId, onBack, onProductPress, onOpenChat }) {  const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [activeTab, setActiveTab] = useState('products');
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [likedProducts, setLikedProducts] = useState({});
 
+  const toggleLikeProduct = (productId) => {
+    setLikedProducts((prev) => ({ ...prev, [productId]: !prev[productId] }));
+  };
   useEffect(() => {
     let isCurrent = true;
     setLoading(true);
@@ -87,7 +128,7 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
   if (loading) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#0f766e" />
+        <ActivityIndicator size="large" color="#0d7377" />
       </View>
     );
   }
@@ -95,7 +136,7 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
   if (!store) {
     return (
       <View style={styles.loadingScreen}>
-        <Text style={styles.errorText}>Không tìm thấy gian hàng</Text>
+        <Text style={styles.errorText}>Không tìm thấy cửa hàng</Text>
         <Pressable onPress={onBack} style={styles.backLink}>
           <Text style={styles.backLinkText}>← Quay lại</Text>
         </Pressable>
@@ -103,7 +144,9 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
     );
   }
 
-  const emoji = STORE_TYPE_EMOJI[store.type] || '🏪';
+  const username = store.shop_username ? `@${store.shop_username}` : '';
+  const hoursText = formatHours(store.open_time, store.close_time);
+  const coverImage = store.cover_image_url || store.image_url;
 
   function handleReportSubmit(reason) {
     setReportVisible(false);
@@ -130,49 +173,81 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
             <Text style={styles.reportBtnText}>⋯</Text>
           </Pressable>
           <View style={styles.cover}>
-            {store.image_url ? (
-              <Image source={{ uri: store.image_url }} style={styles.coverImage} />
+            {coverImage ? (
+              <Image source={{ uri: coverImage }} style={styles.coverImage} />
             ) : (
-              <Text style={styles.coverEmoji}>{emoji}</Text>
+              <Text style={styles.coverEmoji}>🏪</Text>
             )}
           </View>
+
           <View style={styles.headerInfo}>
-            <Text style={styles.storeName}>{store.name}</Text>
-            <Text style={styles.storeAddress}>📍 {store.address}</Text>
+            <View style={styles.shopNameRow}>
+              <Text style={styles.shopName} numberOfLines={2}>
+                {store.shop_name || store.name}
+              </Text>
+              <Pressable
+                onPress={() => setIsFollowing((prev) => !prev)}
+                style={({ pressed }) => [
+                  styles.followBtn,
+                  isFollowing && styles.followBtnActive,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[styles.followBtnText, isFollowing && styles.followBtnTextActive]}
+                >
+                  {isFollowing ? '✓ Đang theo dõi' : '+ Theo dõi'}
+                </Text>
+              </Pressable>
+            </View>
+            {username ? <Text style={styles.shopUsername}>{username}</Text> : null}
+            {store.intro ? (
+              <Text style={styles.shopDescription}>{store.intro}</Text>
+            ) : null}
+
             <View style={styles.ratingRow}>
               <StarRating rating={store.rating_avg} size={16} showValue />
-              <Text style={styles.reviewCount}>({store.review_count} đánh giá)</Text>
+              <Text style={styles.reviewCount}>
+                ({store.review_count || reviews.length} đánh giá)
+              </Text>
+            </View>
+
+            <View style={styles.statsRow}>
+              <StatCard label="Theo dõi" value={store.follow_count} />
+              <View style={styles.statDivider} />
+              <StatCard label="Sản phẩm" value={store.total_products || products.length} />
+              <View style={styles.statDivider} />
+              <StatCard label="Đã bán" value={store.sold_count} />
+              <View style={styles.statDivider} />
+              <StatCard label="Lượt thích" value={store.total_likes} />
             </View>
           </View>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{products.length}</Text>
-            <Text style={styles.statLabel}>Sản phẩm</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{store.rating_avg.toFixed(1)}</Text>
-            <Text style={styles.statLabel}>Điểm TB</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{store.review_count}</Text>
-            <Text style={styles.statLabel}>Đánh giá</Text>
-          </View>
-        </View>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
 
-        <View style={styles.contactSection}>
           <Pressable
             style={({ pressed }) => [styles.messageButton, pressed && styles.pressed]}
             onPress={handleOpenChat}
           >
             <Text style={styles.messageButtonText}>💬 Nhắn tin</Text>
           </Pressable>
-          <ContactActions phone={store.phone} zalo={store.zalo} />
-        </View>
 
+          <InfoRow label="Địa chỉ" value={store.user_address} />
+          <InfoRow label="Địa chỉ hệ thống" value={store.system_address} />
+          <InfoRow label="Số điện thoại" value={store.phone} />
+          <InfoRow label="Giờ đóng - mở cửa" value={hoursText} />
+          <InfoRow
+            label="Trạng thái"
+            value={store.is_open ? 'Đang mở cửa' : 'Đã đóng cửa'}
+            fallback="Chưa cập nhật"
+          />
+
+          <View style={styles.contactActions}>
+            <ContactActions phone={store.phone} zalo={store.zalo} />
+          </View>
+        </View>
         <View style={styles.tabBar}>
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key;
@@ -190,7 +265,7 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
           })}
         </View>
 
-        {activeTab === 'products' && (
+        {activeTab === 'products' ? (
           <View style={styles.productsGrid}>
             {products.length === 0 ? (
               <Text style={styles.emptyText}>Chưa có sản phẩm nào</Text>
@@ -202,29 +277,47 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
                   onPress={() => onProductPress?.(product.id)}
                 >
                   <View style={styles.productImage}>
-                    <Text style={styles.productEmoji}>{product.image_emoji}</Text>
+                    {product.thumbnail ? (
+                      <Image source={{ uri: product.thumbnail }} style={styles.productThumb} />
+                    ) : (
+                      <Text style={styles.productEmoji}>{product.image_emoji}</Text>
+                    )}
+                    <Pressable
+                      onPress={() => toggleLikeProduct(product.id)}
+                      hitSlop={8}
+                      style={styles.productLikeBtn}
+                    >
+                      <Text style={styles.productLikeIcon}>
+                        {likedProducts[product.id] ? '❤️' : '🤍'}
+                      </Text>
+                    </Pressable>
                   </View>
                   <Text style={styles.productName} numberOfLines={2}>
                     {product.name}
                   </Text>
-                  <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
+                  <Text style={styles.productPrice}>
+                    {formatPriceRange(
+                      product.minPrice ?? product.price,
+                      product.maxPrice ?? product.price
+                    )}
+                  </Text>
+                  <Text style={styles.productSold}>Đã bán: {product.soldCount || 0}</Text>
                 </Pressable>
               ))
             )}
           </View>
-        )}
-
-        {activeTab === 'reviews' && (
+        ) : (
           <View style={styles.reviewsList}>
             <View style={styles.reviewsSummary}>
               <Text style={styles.reviewsSummaryScore}>{store.rating_avg.toFixed(1)}</Text>
               <View>
                 <StarRating rating={store.rating_avg} size={18} />
                 <Text style={styles.reviewsSummaryCount}>
-                  {store.review_count} đánh giá từ khách hàng
+                  {store.review_count || reviews.length} đánh giá từ khách hàng
                 </Text>
               </View>
             </View>
+
             {reviews.length === 0 ? (
               <Text style={styles.emptyText}>Chưa có đánh giá nào</Text>
             ) : (
@@ -248,21 +341,6 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
             )}
           </View>
         )}
-
-        {activeTab === 'intro' && (
-          <View style={styles.introSection}>
-            <Text style={styles.introTitle}>Giới thiệu gian hàng</Text>
-            <Text style={styles.introText}>
-              {store.intro || 'Gian hàng chưa cập nhật thông tin giới thiệu.'}
-            </Text>
-            <View style={styles.introContact}>
-              <Text style={styles.introContactLabel}>Thông tin liên hệ</Text>
-              <Text style={styles.introContactItem}>📍 {store.address}</Text>
-              <Text style={styles.introContactItem}>📞 {store.phone || 'Chưa cập nhật'}</Text>
-              <Text style={styles.introContactItem}>💬 Zalo: {store.zalo || 'Chưa cập nhật'}</Text>
-            </View>
-          </View>
-        )}
       </ScrollView>
 
       <ReportSheet
@@ -278,13 +356,13 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f4f7f6',
   },
   loadingScreen: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f4f7f6',
   },
   errorText: {
     fontSize: 16,
@@ -295,7 +373,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   backLinkText: {
-    color: '#0f766e',
+    color: '#0d7377',
     fontWeight: '700',
   },
   scroll: {
@@ -306,7 +384,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#ffffff',
-    paddingBottom: 16,
+    marginBottom: 12,
   },
   backBtn: {
     position: 'absolute',
@@ -316,7 +394,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -354,8 +432,8 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   cover: {
-    height: 140,
-    backgroundColor: '#0f766e',
+    height: 180,
+    backgroundColor: '#0d7377',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -365,27 +443,61 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   coverEmoji: {
-    fontSize: 56,
+    fontSize: 64,
   },
   headerInfo: {
     paddingHorizontal: 20,
     paddingTop: 16,
+    paddingBottom: 16,
   },
-  storeName: {
+  shopNameRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 4,
+  },
+  shopName: {
+    flex: 1,
     fontSize: 22,
     fontWeight: '900',
     color: '#0f172a',
-    marginBottom: 4,
   },
-  storeAddress: {
+  followBtn: {
+    marginTop: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#0d7377',
+  },
+  followBtnActive: {
+    backgroundColor: '#e2e8f0',
+  },
+  followBtnText: {
     fontSize: 13,
-    color: '#64748b',
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  followBtnTextActive: {
+    color: '#475569',
+  },
+  shopUsername: {
+    fontSize: 14,
+    color: '#0d7377',
+    fontWeight: '700',
     marginBottom: 8,
+  },
+  shopDescription: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 21,
+    marginBottom: 10,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 14,
   },
   reviewCount: {
     fontSize: 13,
@@ -393,35 +505,41 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    marginTop: 1,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  statItem: {
+  statCard: {
     flex: 1,
     alignItems: 'center',
+    paddingHorizontal: 4,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
-    color: '#0f766e',
+    color: '#0d7377',
   },
   statLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 2,
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 4,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   statDivider: {
     width: 1,
     backgroundColor: '#e2e8f0',
   },
-  contactSection: {
+  sectionCard: {
     backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 16,
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     gap: 12,
   },
   messageButton: {
@@ -436,11 +554,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  tabBar: {
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  infoRow: {
+    marginBottom: 10,
+  },
+  infoLine: {
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  infoLabelInline: {
+    color: '#64748b',
+    fontWeight: '700',
+  },
+  infoValueInline: {
+    color: '#0f172a',
+    fontWeight: '600',
+  },
+  contactActions: {
+    marginTop: 4,
+  },  tabBar: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
   },
   tab: {
     flex: 1,
@@ -450,7 +595,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#0f766e',
+    borderBottomColor: '#0d7377',
+    backgroundColor: '#f8fffe',
   },
   tabText: {
     fontSize: 14,
@@ -458,13 +604,13 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
   },
   tabTextActive: {
-    color: '#0f766e',
+    color: '#0d7377',
     fontWeight: '800',
   },
   productsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 12,
+    paddingHorizontal: 16,
     gap: 12,
   },
   productCard: {
@@ -472,20 +618,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   pressed: {
     opacity: 0.85,
   },
   productImage: {
-    height: 100,
+    height: 110,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  productThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  productLikeBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productLikeIcon: {
+    fontSize: 15,
   },
   productEmoji: {
     fontSize: 40,
@@ -501,12 +663,21 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#0f766e',
+    color: '#0d7377',
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingTop: 4,
+  },
+  productSold: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '600',
+    paddingHorizontal: 10,
+    paddingTop: 2,
+    paddingBottom: 8,
   },
   reviewsList: {
-    padding: 16,
+    paddingHorizontal: 16,
+    gap: 10,
   },
   reviewsSummary: {
     flexDirection: 'row',
@@ -515,12 +686,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   reviewsSummaryScore: {
     fontSize: 36,
     fontWeight: '900',
-    color: '#0f766e',
+    color: '#0d7377',
   },
   reviewsSummaryCount: {
     fontSize: 12,
@@ -531,7 +703,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 14,
-    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -542,7 +715,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#0f766e',
+    backgroundColor: '#0d7377',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -569,40 +742,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#475569',
     lineHeight: 20,
-  },
-  introSection: {
-    padding: 16,
-  },
-  introTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
-    marginBottom: 10,
-  },
-  introText: {
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 22,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  introContact: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-  },
-  introContactLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-    marginBottom: 10,
-  },
-  introContactItem: {
-    fontSize: 14,
-    color: '#475569',
-    marginBottom: 6,
   },
   emptyText: {
     textAlign: 'center',

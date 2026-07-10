@@ -1,3 +1,5 @@
+import { normalizeCategoryId } from '../core/utils/categoryId';
+
 export const ROLE_BUYER = 1;
 export const ROLE_SELLER = 2;
 
@@ -30,6 +32,10 @@ export function makeProfileFromAuthUser(authUser, updates = {}) {
     phone: cleanText(patch.phone),
     photoUrl: cleanText(patch.photoUrl) || authUser.photoURL || '',
     coverImage: cleanText(patch.coverImage),
+    shopName: cleanText(patch.shopName),
+    shopUsername: cleanText(patch.shopUsername),
+    categoryId: cleanText(patch.categoryId),
+    categoryName: cleanText(patch.categoryName),
     shopDescription: cleanText(patch.shopDescription),
     shopPhone: cleanText(patch.shopPhone),
     verifyAccount: Boolean(patch.verifyAccount),
@@ -121,6 +127,22 @@ export function mergeProfile(authUser, baseProfile, updates = {}) {
       patch.shopSystemAddress !== undefined
         ? cleanText(patch.shopSystemAddress)
         : baseProfile?.shopSystemAddress || '',
+    shopName:
+      patch.shopName !== undefined
+        ? cleanText(patch.shopName)
+        : baseProfile?.shopName || '',
+    shopUsername:
+      patch.shopUsername !== undefined
+        ? cleanText(patch.shopUsername)
+        : baseProfile?.shopUsername || '',
+    categoryId:
+      patch.categoryId !== undefined
+        ? cleanText(patch.categoryId)
+        : baseProfile?.categoryId || '',
+    categoryName:
+      patch.categoryName !== undefined
+        ? cleanText(patch.categoryName)
+        : baseProfile?.categoryName || '',
     shopDescription:
       patch.shopDescription !== undefined
         ? cleanText(patch.shopDescription)
@@ -147,6 +169,10 @@ export function mapShopSettingsToProfilePatch(shop) {
   }
 
   return {
+    shopName: cleanText(shop.shopName),
+    shopUsername: cleanText(shop.shopUsername),
+    categoryId: cleanText(shop.categoryId),
+    categoryName: cleanText(shop.categoryName),
     shopDescription: cleanText(shop.description || shop.shopDescription),
     shopAddress: cleanText(shop.address),
     shopSystemAddress: cleanText(shop.systemAddress),
@@ -154,6 +180,22 @@ export function mapShopSettingsToProfilePatch(shop) {
     openTime: cleanText(shop.openTime),
     closeTime: cleanText(shop.closeTime),
     isOpen: Number(shop.isOpen) === 1 ? 1 : 0,
+  };
+}
+
+export function mapSellerVerificationToProfilePatch(verification) {
+  if (!verification) {
+    return {};
+  }
+
+  return {
+    shopName: cleanText(verification.shopName),
+    shopUsername: cleanText(verification.shopUsername),
+    categoryId: normalizeCategoryId(verification.categoryId),
+    categoryName: cleanText(verification.categoryName),
+    shopDescription: cleanText(verification.shopDescription),
+    shopAddress: cleanText(verification.address),
+    shopSystemAddress: cleanText(verification.DiaChiHeThong),
   };
 }
 
@@ -175,6 +217,10 @@ export function mapBackendUserToProfile(backendUser, authUser) {
     averageRating: backendUser?.averageRating ?? 0,
     responseRate: backendUser?.responseRate ?? 0,
     shopPhone: backendUser?.shopPhone || '',
+    shopName: backendUser?.shopName || '',
+    shopUsername: backendUser?.shopUsername || '',
+    categoryId: backendUser?.categoryId || '',
+    categoryName: backendUser?.categoryName || '',
     shopAddress: backendUser?.shopAddress || '',
     shopSystemAddress: backendUser?.shopSystemAddress || '',
     shopDescription:

@@ -115,6 +115,142 @@ export function PlusTabIcon({ color, size = 28 }) {
   );
 }
 
+export function SearchTabIcon({ color, size = 24, filled = false }) {
+  const lens = size * 0.42;
+  const handleLen = size * 0.22;
+
+  return (
+    <IconFrame size={size}>
+      <View
+        style={[
+          styles.circle,
+          {
+            width: lens,
+            height: lens,
+            borderRadius: lens / 2,
+            borderColor: color,
+            backgroundColor: filled ? `${color}18` : 'transparent',
+            top: size * 0.12,
+            left: size * 0.12,
+          },
+        ]}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          width: Math.max(2, size * 0.08),
+          height: handleLen,
+          backgroundColor: color,
+          borderRadius: 2,
+          transform: [{ rotate: '45deg' }],
+          top: size * 0.52,
+          left: size * 0.52,
+        }}
+      />
+    </IconFrame>
+  );
+}
+
+export function BagTabIcon({ color, size = 24, filled = false }) {
+  const bagW = size * 0.62;
+  const bagH = size * 0.48;
+
+  return (
+    <IconFrame size={size}>
+      <View
+        style={{
+          position: 'absolute',
+          width: bagW * 0.42,
+          height: size * 0.16,
+          borderWidth: 2,
+          borderColor: color,
+          borderBottomWidth: 0,
+          borderTopLeftRadius: 6,
+          borderTopRightRadius: 6,
+          top: size * 0.16,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          width: bagW,
+          height: bagH,
+          borderWidth: 2,
+          borderColor: color,
+          borderRadius: 6,
+          backgroundColor: filled ? `${color}18` : 'transparent',
+          top: size * 0.3,
+        }}
+      />
+    </IconFrame>
+  );
+}
+
+export function OrdersTabIcon({ color, size = 24, filled = false }) {
+  const boxW = size * 0.58;
+  const boxH = size * 0.5;
+
+  return (
+    <IconFrame size={size}>
+      <View
+        style={{
+          position: 'absolute',
+          width: boxW,
+          height: boxH,
+          borderWidth: 2,
+          borderColor: color,
+          borderRadius: 4,
+          backgroundColor: filled ? `${color}18` : 'transparent',
+          top: size * 0.22,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          width: boxW * 0.55,
+          height: 2,
+          backgroundColor: color,
+          top: size * 0.38,
+          left: size * 0.22,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          width: boxW * 0.4,
+          height: 2,
+          backgroundColor: color,
+          top: size * 0.48,
+          left: size * 0.22,
+        }}
+      />
+    </IconFrame>
+  );
+}
+
+export function ChartTabIcon({ color, size = 24, filled = false }) {
+  const barW = size * 0.12;
+
+  return (
+    <IconFrame size={size}>
+      {[0.22, 0.38, 0.54].map((leftRatio, index) => (
+        <View
+          key={leftRatio}
+          style={{
+            position: 'absolute',
+            width: barW,
+            height: size * (0.22 + index * 0.12),
+            backgroundColor: filled ? color : `${color}88`,
+            borderRadius: 2,
+            bottom: size * 0.18,
+            left: size * leftRatio,
+          }}
+        />
+      ))}
+    </IconFrame>
+  );
+}
+
 export function ChatTabIcon({ color, size = 24, filled = false }) {
   const bubbleW = size * 0.78;
   const bubbleH = size * 0.56;

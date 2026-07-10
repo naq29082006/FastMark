@@ -8,10 +8,16 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSelector } from 'react-redux';
+
 import {
   getBuyerConversationsOnBackend,
   getBuyerShopsOnBackend,
 } from '../../api/messageApi';
+import { getSellerConversationsOnBackend } from '../../api/sellerOpsApi';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
+import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
+import SellerChatScreen from '../seller/SellerChatScreen';
 import BuyerChatScreen from './BuyerChatScreen';
 
 const INBOX_TABS = [
@@ -76,7 +82,9 @@ function buildShopSuggestions(conversations, shops) {
     }));
 }
 
-export default function InboxScreen({ chatRequest = null }) {
+export default function InboxScreen({ chatRequest = null, buyerView = false }) {
+  const isSeller = useSelector(selectIsSeller);
+  const showSellerInbox = isSeller && !buyerView;
   const [activeTab, setActiveTab] = useState('messages');
   const [searchQuery, setSearchQuery] = useState('');
   const [conversations, setConversations] = useState([]);
@@ -88,6 +96,22 @@ export default function InboxScreen({ chatRequest = null }) {
   const loadConversations = useCallback(async () => {
     setIsLoading(true);
     setLoadError('');
+
+    if (showSellerInbox) {
+      try {
+        const idToken = await getCurrentUserIdToken();
+        const data = await getSellerConversationsOnBackend(idToken);
+        setConversations(Array.isArray(data) ? data : []);
+        setShopSuggestions([]);
+      } catch {
+        setConversations([]);
+        setShopSuggestions([]);
+        setLoadError('Không tải được hộp thư người bán.');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
 
     try {
       const [conversationRows, shopRows] = await Promise.all([
@@ -104,7 +128,7 @@ export default function InboxScreen({ chatRequest = null }) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showSellerInbox]);
 
   useEffect(() => {
     if (activeTab === 'messages') {
@@ -113,7 +137,7 @@ export default function InboxScreen({ chatRequest = null }) {
   }, [activeTab, loadConversations]);
 
   useEffect(() => {
-    if (!chatRequest?.shopId) {
+    if (!chatRequest?.shopId || showSellerInbox) {
       return;
     }
 
@@ -123,14 +147,30 @@ export default function InboxScreen({ chatRequest = null }) {
       shopId: chatRequest.shopId,
       shopName: chatRequest.shopName || 'Gian hàng',
     });
-  }, [chatRequest?.at, chatRequest?.shopId, chatRequest?.shopName]);
+  }, [chatRequest?.at, chatRequest?.shopId, chatRequest?.shopName, showSellerInbox]);
 
   const messageConversations = useMemo(() => {
+    if (showSellerInbox) {
+      return conversations;
+    }
     const merged = [...conversations, ...shopSuggestions];
     return filterConversations(merged, searchQuery);
-  }, [conversations, searchQuery, shopSuggestions]);
+  }, [conversations, searchQuery, shopSuggestions, showSellerInbox]);
 
   if (selectedChat) {
+    if (showSellerInbox) {
+      return (
+        <SellerChatScreen
+          conversationId={selectedChat.id}
+          buyerName={selectedChat.buyerName}
+          onBack={() => {
+            setSelectedChat(null);
+            loadConversations();
+          }}
+        />
+      );
+    }
+
     return (
       <BuyerChatScreen
         conversationId={selectedChat.conversationId}
@@ -144,11 +184,15 @@ export default function InboxScreen({ chatRequest = null }) {
     );
   }
 
+  const subtitle = showSellerInbox
+    ? 'Tin nhắn khách hàng'
+    : 'Tin nhắn với gian hàng';
+
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Inbox</Text>
-        <Text style={styles.subtitle}>Tin nhắn với gian hàng</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
 
       <View style={styles.tabRow}>
@@ -166,7 +210,7 @@ export default function InboxScreen({ chatRequest = null }) {
         })}
       </View>
 
-      {activeTab === 'messages' ? (
+      {activeTab === 'messages' && !showSellerInbox ? (
         <View style={styles.searchWrap}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
@@ -192,51 +236,86 @@ export default function InboxScreen({ chatRequest = null }) {
         ) : (
           <FlatList
             data={messageConversations}
-            keyExtractor={(item) => getConversationKey(item)}
+            keyExtractor={(item) =>
+              showSellerInbox ? String(item.id) : getConversationKey(item)
+            }
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyIcon}>💬</Text>
-                <Text style={styles.emptyTitle}>Chưa có cuộc trò chuyện</Text>
-                <Text style={styles.emptySubtitle}>
-                  Hãy chọn gian hàng bên dưới để bắt đầu nhắn tin.
+                <Text style={styles.emptyTitle}>
+                  {showSellerInbox ? 'Chưa có tin nhắn' : 'Chưa có cuộc trò chuyện'}
                 </Text>
+                {!showSellerInbox ? (
+                  <Text style={styles.emptySubtitle}>
+                    Hãy chọn gian hàng bên dưới để bắt đầu nhắn tin.
+                  </Text>
+                ) : null}
               </View>
             }
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.listItem}
-                onPress={() =>
-                  setSelectedChat({
-                    conversationId: item.isNew ? null : item.id,
-                    shopId: item.shop?.id || item.shopId,
-                    shopName: getConversationName(item),
-                  })
-                }
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{getConversationName(item).charAt(0)}</Text>
-                </View>
-
-                <View style={styles.listBody}>
-                  <View style={styles.listTopRow}>
-                    <Text style={styles.listTitle} numberOfLines={1}>
-                      {getConversationName(item)}
+            renderItem={({ item }) =>
+              showSellerInbox ? (
+                <Pressable
+                  style={styles.listItem}
+                  onPress={() =>
+                    setSelectedChat({
+                      id: item.id,
+                      buyerName:
+                        item.buyer?.fullName || item.buyer?.userName || 'Khách hàng',
+                    })
+                  }
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>
+                      {(item.buyer?.fullName || 'K').charAt(0)}
                     </Text>
-                    <Text style={styles.listTime}>{item.timeLabel || ''}</Text>
                   </View>
-                  <Text
-                    style={[styles.listPreview, item.isNew && styles.listPreviewNew]}
-                    numberOfLines={1}
-                  >
-                    {item.lastMessage || 'Chưa có tin nhắn'}
-                  </Text>
-                </View>
-
-                {item.unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
-              </Pressable>
-            )}
+                  <View style={styles.listBody}>
+                    <View style={styles.listTopRow}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {item.buyer?.fullName || 'Khách hàng'}
+                      </Text>
+                      <Text style={styles.listTime}>{item.timeLabel || ''}</Text>
+                    </View>
+                    <Text style={styles.listPreview} numberOfLines={1}>
+                      {item.lastMessage || 'Chưa có tin nhắn'}
+                    </Text>
+                  </View>
+                  {item.unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={styles.listItem}
+                  onPress={() =>
+                    setSelectedChat({
+                      conversationId: item.isNew ? null : item.id,
+                      shopId: item.shop?.id || item.shopId,
+                      shopName: getConversationName(item),
+                    })
+                  }
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{getConversationName(item).charAt(0)}</Text>
+                  </View>
+                  <View style={styles.listBody}>
+                    <View style={styles.listTopRow}>
+                      <Text style={styles.listTitle} numberOfLines={1}>
+                        {getConversationName(item)}
+                      </Text>
+                      <Text style={styles.listTime}>{item.timeLabel || ''}</Text>
+                    </View>
+                    <Text
+                      style={[styles.listPreview, item.isNew && styles.listPreviewNew]}
+                      numberOfLines={1}
+                    >
+                      {item.lastMessage || 'Chưa có tin nhắn'}
+                    </Text>
+                  </View>
+                  {item.unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
+                </Pressable>
+              )
+            }
           />
         )
       ) : (

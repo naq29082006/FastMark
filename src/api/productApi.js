@@ -1,5 +1,6 @@
 import { apiRequest, AUTH_TIMEOUT_MS, SELLER_UPLOAD_TIMEOUT_MS } from './client';
 import { API_ENDPOINTS } from './endpoints';
+import { normalizeCategoryId } from '../core/utils/categoryId';
 
 async function parseApiResponse(response) {
   const payload = await response.json().catch(() => ({}));
@@ -28,7 +29,11 @@ export async function getProductCategoriesOnBackend() {
   );
 
   const payload = await parseApiResponse(response);
-  return payload.data?.categories || [];
+  return (payload.data?.categories || []).map((category) => ({
+    ...category,
+    id: normalizeCategoryId(category.id || category._id),
+    categoryName: category.categoryName || category.name || '',
+  })).filter((category) => category.id && category.categoryName);
 }
 
 export async function getMyProductsOnBackend(idToken) {

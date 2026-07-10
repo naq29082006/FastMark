@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,22 +10,35 @@ import {
   View,
 } from 'react-native';
 
+import { formatPrice, formatPriceRange } from '../../core/utils/productFormat';
 import { loadProductById, loadStoreById } from '../../viewmodel/store/storeViewModel';
 import ContactActions from './components/ContactActions';
 import StarRating from './components/StarRating';
 import ReportSheet from '../shared/components/ReportSheet';
 import { storeLogger as log } from '../../core/utils/logger';
+function VariantImage({ image }) {
+  const uri = image?.imageUrl;
+  if (!uri) {
+    return null;
+  }
 
-function formatPrice(price) {
-  return `${Number(price).toLocaleString('vi-VN')}đ`;
+  return <Image source={{ uri }} style={styles.variantImage} />;
 }
 
-export default function ProductDetailScreen({ productId, onBack, onStorePress, onOpenChat }) {
+export default function ProductDetailScreen({
+  productId,
+  onBack,
+  onStorePress,
+  onOpenChat,
+  onReserve,
+  onDeal,
+  onMessageSeller,
+}) {
   const [product, setProduct] = useState(null);
   const [store, setStore] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
-
+  const [isLiked, setIsLiked] = useState(false);
   useEffect(() => {
     let isCurrent = true;
     setLoading(true);
@@ -55,6 +69,16 @@ export default function ProductDetailScreen({ productId, onBack, onStorePress, o
       isCurrent = false;
     };
   }, [productId]);
+
+  const priceLabel = useMemo(() => {
+    if (!product) {
+      return '';
+    }
+    return formatPriceRange(
+      product.minPrice ?? product.price,
+      product.maxPrice ?? product.price
+    );
+  }, [product]);
 
   if (loading) {
     return (
@@ -87,6 +111,7 @@ export default function ProductDetailScreen({ productId, onBack, onStorePress, o
     onOpenChat?.({ shopId: store.id, shopName: store.name });
   }
 
+  const variants = product.variants || [];
   return (
     <View style={styles.screen}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -103,36 +128,78 @@ export default function ProductDetailScreen({ productId, onBack, onStorePress, o
             <Text style={styles.reportBtnText}>⋯</Text>
           </Pressable>
           <View style={styles.imageBox}>
-            <Text style={styles.productEmoji}>{product.image_emoji}</Text>
+            {product.thumbnail ? (
+              <Image source={{ uri: product.thumbnail }} style={styles.heroImage} />
+            ) : (
+              <Text style={styles.productEmoji}>{product.image_emoji}</Text>
+            )}
           </View>
         </View>
 
         <View style={styles.infoSection}>
-          <Text style={styles.productName}>{product.name}</Text>
-          <Text style={styles.productPrice}>{formatPrice(product.price)}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.productName}>{product.name}</Text>
+            <Pressable
+              onPress={() => setIsLiked((prev) => !prev)}
+              hitSlop={8}
+              style={styles.likeBtn}
+            >
+              <Text style={styles.likeIcon}>{isLiked ? '❤️' : '🤍'}</Text>
+            </Pressable>
+          </View>
 
-          {store && (
-            <View style={styles.storeCard}>
-              <View style={styles.storeCardLeft}>
-                <View style={styles.storeAvatar}>
-                  <Text style={styles.storeAvatarText}>{store.name.charAt(0)}</Text>
-                </View>
-                <View>
-                  <Text style={styles.storeCardLabel}>Gian hàng</Text>
-                  <Text style={styles.storeCardName}>{store.name}</Text>
-                  <View style={styles.storeRating}>
-                    <StarRating rating={store.rating_avg} size={12} showValue />
-                  </View>
-                </View>
+          <Text style={styles.productPrice}>{priceLabel}</Text>
+
+          <View style={styles.metaRow}>
+            <Text style={styles.metaItem}>Đã bán: {product.soldCount || 0}</Text>
+            {product.donVi ? (
+              <>
+                <Text style={styles.metaDot}>•</Text>
+                <Text style={styles.metaItem}>ĐVT: {product.donVi}</Text>
+              </>
+            ) : null}
+            {product.isOutOfStock ? (
+              <>
+                <Text style={styles.metaDot}>•</Text>
+                <Text style={styles.outOfStockBadge}>Hết hàng</Text>
+              </>
+            ) : null}
+          </View>
+
+          {product.categoryName ? (
+            <View style={styles.categoryRow}>
+              <Text style={styles.categoryLabel}>Danh mục:</Text>
+              <View style={styles.categoryChip}>
+                <Text style={styles.categoryChipText}>{product.categoryName}</Text>
               </View>
-              <Pressable
-                style={({ pressed }) => [styles.viewStoreBtn, pressed && styles.pressed]}
-                onPress={() => onStorePress?.(store.id)}
-              >
-                <Text style={styles.viewStoreBtnText}>Xem shop</Text>
-              </Pressable>
             </View>
-          )}
+          ) : null}
+
+          {variants.length > 0 ? (
+            <>
+              <Text style={styles.sectionTitle}>Phân loại sản phẩm ({variants.length})</Text>
+              {variants.map((variant) => (
+                <View key={variant.id} style={styles.variantCard}>
+                  <View style={styles.variantHeader}>
+                    <Text style={styles.variantName}>{variant.variantName || 'Loại'}</Text>
+                    <Text style={styles.variantPrice}>{formatPrice(variant.price)}</Text>
+                  </View>
+                  <Text style={styles.variantStock}>
+                    Còn lại: {variant.quantity > 0 ? variant.quantity : 'Hết hàng'}
+                  </Text>
+                  {(variant.images || []).length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={styles.variantImageRow}>
+                        {variant.images.map((image) => (
+                          <VariantImage key={image.id || image.imageUrl} image={image} />
+                        ))}
+                      </View>
+                    </ScrollView>
+                  ) : null}
+                </View>
+              ))}
+            </>
+          ) : null}
 
           <Text style={styles.sectionTitle}>Mô tả sản phẩm</Text>
           <Text style={styles.description}>
@@ -141,27 +208,41 @@ export default function ProductDetailScreen({ productId, onBack, onStorePress, o
         </View>
       </ScrollView>
 
-      {store && (
-        <View style={styles.bottomBar}>
-          <Pressable
-            style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
-            onPress={handleOpenChat}
-          >
-            <Text style={styles.chatButtonText}>💬 Chat ngay</Text>
-          </Pressable>
+      <View style={styles.bottomBar}>
+        <Pressable
+          style={({ pressed }) => [styles.actionBtn, styles.reserveBtn, pressed && styles.pressed]}
+          onPress={() => onReserve?.(product, store)}
+        >
+          <Text style={styles.reserveBtnText}>Giữ hàng</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.actionBtn, styles.dealBtn, pressed && styles.pressed]}
+          onPress={() => onDeal?.(product, store)}
+        >
+          <Text style={styles.dealBtnText}>Deal giá</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
+          onPress={() => {
+            handleOpenChat();
+            onMessageSeller?.(product, store);
+          }}
+        >
+          <Text style={styles.chatButtonText}>💬 Chat</Text>
+        </Pressable>
+        {store ? (
           <View style={styles.contactWrap}>
             <ContactActions phone={store.phone} zalo={store.zalo} compact />
           </View>
-        </View>
-      )}
+        ) : null}
+      </View>
 
       <ReportSheet
         visible={reportVisible}
         title="Báo cáo sản phẩm"
         onClose={() => setReportVisible(false)}
         onSubmit={handleReportSubmit}
-      />
-    </View>
+      />    </View>
   );
 }
 
@@ -192,7 +273,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 110,
   },
   imageSection: {
     position: 'relative',
@@ -243,10 +324,16 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   imageBox: {
-    height: 280,
+    height: 300,
     backgroundColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   productEmoji: {
     fontSize: 80,
@@ -258,70 +345,78 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     marginTop: -16,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+  },
   productName: {
+    flex: 1,
     fontSize: 22,
     fontWeight: '900',
     color: '#0f172a',
-    marginBottom: 8,
+  },
+  likeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  likeIcon: {
+    fontSize: 20,
   },
   productPrice: {
     fontSize: 24,
     fontWeight: '900',
     color: '#0f766e',
-    marginBottom: 20,
+    marginBottom: 10,
   },
-  storeCard: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
   },
-  storeCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 10,
+  metaItem: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
   },
-  storeAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0f766e',
-    alignItems: 'center',
-    justifyContent: 'center',
+  metaDot: {
+    fontSize: 13,
+    color: '#cbd5e1',
   },
-  storeAvatarText: {
-    color: '#ffffff',
-    fontWeight: '800',
-    fontSize: 18,
-  },
-  storeCardLabel: {
-    fontSize: 11,
-    color: '#94a3b8',
-  },
-  storeCardName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  storeRating: {
-    marginTop: 2,
-  },
-  viewStoreBtn: {
-    backgroundColor: '#0f766e',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  viewStoreBtnText: {
-    color: '#ffffff',
+  outOfStockBadge: {
     fontSize: 12,
     fontWeight: '800',
+    color: '#dc2626',
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  categoryLabel: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  categoryChip: {
+    backgroundColor: '#e0f2f1',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  categoryChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f766e',
   },
   pressed: {
     opacity: 0.85,
@@ -330,7 +425,48 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#0f172a',
+    marginBottom: 10,
+  },
+  variantCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  variantHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 4,
+  },
+  variantName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  variantPrice: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f766e',
+  },
+  variantStock: {
+    fontSize: 12,
+    color: '#64748b',
     marginBottom: 8,
+  },
+  variantImageRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  variantImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 8,
+    backgroundColor: '#e2e8f0',
   },
   description: {
     fontSize: 14,
@@ -342,8 +478,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 28,
     borderTopWidth: 1,
@@ -372,5 +511,38 @@ const styles = StyleSheet.create({
   },
   contactWrap: {
     flex: 1,
+  },
+  actionBtn: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reserveBtn: {
+    flex: 1,
+    backgroundColor: '#e0f2f1',
+  },
+  reserveBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f766e',
+  },
+  dealBtn: {
+    flex: 1,
+    backgroundColor: '#fef3c7',
+  },
+  dealBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#b45309',
+  },
+  messageBtn: {
+    flex: 1.6,
+    backgroundColor: '#0f766e',
+  },
+  messageBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ffffff',
   },
 });
