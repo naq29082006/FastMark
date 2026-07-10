@@ -1,12 +1,17 @@
 import { apiRequest, AUTH_TIMEOUT_MS, SELLER_UPLOAD_TIMEOUT_MS } from './client';
 import { API_ENDPOINTS } from './endpoints';
+import { createLogger, logErrorDetails } from '../core/utils/logger';
+
+const log = createLogger('SellerApi');
 
 async function parseApiResponse(response) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok || payload.success === false) {
-    const error = new Error(payload.message || 'Yêu cầu API thất bại.');
+    const error = new Error(payload.message || payload.error || 'Yêu cầu API thất bại.');
     error.statusCode = response.status;
+    error.payload = payload;
+    log.warn('request failed', response.status, payload.message || payload.error || '');
     throw error;
   }
 
@@ -67,16 +72,22 @@ export async function getMySellerVerificationOnBackend(idToken) {
 }
 
 export async function submitSellerVerificationOnBackend({ idToken, payload }) {
-  const response = await apiRequest(
-    API_ENDPOINTS.sellerVerificationSubmit,
-    {
-      method: 'POST',
-      headers: await authHeaders(idToken),
-      body: JSON.stringify(payload),
-    },
-    SELLER_UPLOAD_TIMEOUT_MS
-  );
+  try {
+    const response = await apiRequest(
+      API_ENDPOINTS.sellerVerificationSubmit,
+      {
+        method: 'POST',
+        headers: await authHeaders(idToken),
+        body: JSON.stringify(payload),
+      },
+      SELLER_UPLOAD_TIMEOUT_MS
+    );
 
-  const parsed = await parseApiResponse(response);
-  return parsed.data;
+    const parsed = await parseApiResponse(response);
+    log.debug('submit verification ok');
+    return parsed.data;
+  } catch (error) {
+    logErrorDetails('SellerApi', 'submit verification failed', error);
+    throw error;
+  }
 }

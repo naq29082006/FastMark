@@ -27,7 +27,7 @@ const TABS = [
   RESERVATION_TAB.COMPLETED,
 ];
 
-export default function SellerOrdersScreen({ onBack, onOpenReservation, onRefreshKey = 0 }) {
+export default function SellerOrdersScreen({ onBack, onOpenReservation, onRefreshKey = 0, embedded = false }) {
   const [activeTab, setActiveTab] = useState(RESERVATION_TAB.HOLDING);
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,11 +143,15 @@ export default function SellerOrdersScreen({ onBack, onOpenReservation, onRefres
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
-        <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>Quản lý đơn hàng</Text>
+      <View style={[styles.topBar, embedded && styles.topBarEmbedded]}>
+        {embedded ? (
+          <View style={styles.topBarSpacer} />
+        ) : (
+          <Pressable onPress={onBack} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </Pressable>
+        )}
+        <Text style={styles.title}>{embedded ? 'Đơn hàng' : 'Quản lý đơn hàng'}</Text>
         <View style={styles.topBarSpacer} />
       </View>
 
@@ -222,6 +226,9 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
+  },
+  topBarEmbedded: {
+    paddingTop: 52,
   },
   backButton: {
     width: 36,

@@ -20,7 +20,7 @@ function toLoginError(error) {
   }
 
   if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
-    return 'Không kết nối được backend. Hãy chạy backend và kiểm tra VITE_API_URL trong web/.env.';
+    return 'Không kết nối được backend. Hãy chạy backend và kiểm tra VITE_API_URL trong .env ở thư mục gốc dự án.';
   }
 
   return message || 'Đăng nhập thất bại.';

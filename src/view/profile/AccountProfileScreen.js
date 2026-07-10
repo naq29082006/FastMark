@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
-  ImageBackground,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,7 +19,7 @@ import {
   selectIsSeller,
   selectSellerVerification,
 } from '../../viewmodel/auth/authSelectors';
-import { uploadUserAvatar, uploadUserCover, syncSellerAccess, loadUserProfile, applyShopSettingsToProfile } from '../../viewmodel/auth/authSlice';
+import { uploadUserAvatar, syncSellerAccess, loadUserProfile, applyShopSettingsToProfile } from '../../viewmodel/auth/authSlice';
 import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
 import { getMyProductsOnBackend } from '../../api/productApi';
 import { getSellerShopSettingsOnBackend } from '../../api/sellerOpsApi';
@@ -34,7 +31,12 @@ import {
 } from './ProfileTabIcons';
 
 const PROFILE_TABS = [
-  { key: 'catalog', label: 'Danh mục', Icon: SellerProductTabIcon },
+  {
+    key: 'catalog',
+    buyerLabel: 'Mặt hàng gần bạn',
+    sellerLabel: 'Danh mục',
+    Icon: SellerProductTabIcon,
+  },
   { key: 'liked', label: 'Sản phẩm đã thích', Icon: LikedProductTabIcon },
 ];
 
@@ -55,9 +57,6 @@ const DEMO_LIKED_PRODUCTS = [
   },
 ];
 
-const DEFAULT_COVER =
-  'https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=1200&q=80';
-
 function pickShopDescription(...values) {
   for (const value of values) {
     const text = typeof value === 'string' ? value.trim() : '';
@@ -74,6 +73,22 @@ function resolveImageUrl(value) {
     return null;
   }
   return url;
+}
+
+function getSellerRegisterButtonLabel({ isSeller, sellerVerification }) {
+  if (isSeller) {
+    return 'Chuyển sang người bán';
+  }
+
+  if (sellerVerification?.status === SELLER_VERIFICATION_STATUS.PENDING) {
+    return 'Xem hồ sơ chờ duyệt';
+  }
+
+  if (sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED) {
+    return 'Chỉnh sửa hồ sơ đăng ký';
+  }
+
+  return 'Đăng ký người bán';
 }
 
 function formatVerificationDate(value) {
@@ -253,6 +268,7 @@ function ProfileAvatar({ name, photoUrl, onPress, isUploading }) {
 }
 
 export default function AccountProfileScreen({
+  profileMode = 'buyer',
   isProfileVisible = false,
   productRefreshKey = 0,
   shopContactRefreshKey = 0,
@@ -264,12 +280,17 @@ export default function AccountProfileScreen({
   onOpenSellerOrders,
   onOpenSellerStats,
   onStartSellerRegister,
+  onSwitchToSellerMode,
+  onSwitchToBuyerMode,
+  canSwitchToSeller = false,
   onLogout,
 }) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
   const user = useSelector(selectAuthUser);
   const isSeller = useSelector(selectIsSeller);
+  const showAsSeller = profileMode === 'seller';
+  const showAsBuyer = profileMode === 'buyer';
   const sellerVerification = useSelector(selectSellerVerification);
   const error = useSelector(selectAuthError);
   const successMessage = useSelector(selectAuthSuccessMessage);
@@ -277,16 +298,14 @@ export default function AccountProfileScreen({
   const [menuOpen, setMenuOpen] = useState(false);
   const [localError, setLocalError] = useState('');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [sellerProducts, setSellerProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productsError, setProductsError] = useState('');
   const [shopContact, setShopContact] = useState(null);
   const [isLoadingShopContact, setIsLoadingShopContact] = useState(false);
-  const [coverImageError, setCoverImageError] = useState(false);
 
   const loadShopContact = useCallback(async () => {
-    if (!isSeller) {
+    if (!showAsSeller) {
       setShopContact(null);
       return;
     }
@@ -306,10 +325,10 @@ export default function AccountProfileScreen({
     } finally {
       setIsLoadingShopContact(false);
     }
-  }, [dispatch, isSeller]);
+  }, [dispatch, showAsSeller]);
 
   const loadSellerProducts = useCallback(async () => {
-    if (!isSeller) {
+    if (!showAsSeller) {
       setSellerProducts([]);
       return;
     }
@@ -332,7 +351,7 @@ export default function AccountProfileScreen({
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [dispatch, isSeller]);
+  }, [dispatch, showAsSeller]);
 
   useEffect(() => {
     if (!isProfileVisible || !user) {
@@ -343,7 +362,7 @@ export default function AccountProfileScreen({
   }, [dispatch, isProfileVisible, user, shopContactRefreshKey]);
 
   useEffect(() => {
-    if (!isProfileVisible || !isSeller) {
+    if (!isProfileVisible || !showAsSeller) {
       return;
     }
 
@@ -353,7 +372,7 @@ export default function AccountProfileScreen({
   }, [
     dispatch,
     isProfileVisible,
-    isSeller,
+    showAsSeller,
     loadSellerProducts,
     loadShopContact,
     productRefreshKey,
@@ -366,14 +385,9 @@ export default function AccountProfileScreen({
     }
   }, [dispatch, isSeller, profile?.role]);
 
-  useEffect(() => {
-    setCoverImageError(false);
-  }, [profile?.coverImage]);
-
   const displayName = profile?.fullName || user?.displayName || 'Fastmark user';
   const userName = profile?.userName || user?.email?.split('@')[0] || '';
   const avatarUrl = resolveImageUrl(profile?.photoUrl) || resolveImageUrl(user?.photoURL);
-  const coverUrl = resolveImageUrl(profile?.coverImage) || DEFAULT_COVER;
 
   const shopDescription = pickShopDescription(
     shopSettings?.description,
@@ -382,7 +396,7 @@ export default function AccountProfileScreen({
     shopContact?.shopDescription,
     profile?.shopDescription
   );
-  const showShopDescription = isSeller || Boolean(shopDescription);
+  const showShopDescription = showAsSeller || Boolean(shopDescription);
   const shopDescriptionText =
     shopDescription || 'Chưa có mô tả. Hãy cập nhật trong Cài đặt shop.';
 
@@ -396,15 +410,15 @@ export default function AccountProfileScreen({
 
   const stats = useMemo(
     () => ({
-      products: isSeller ? catalogStats.products : profile?.totalProducts ?? 0,
+      products: showAsSeller ? catalogStats.products : profile?.totalProducts ?? 0,
       sold: profile?.soldCount ?? 0,
-      likes: isSeller ? catalogStats.likes : profile?.likesCount ?? 0,
+      likes: showAsSeller ? catalogStats.likes : profile?.likesCount ?? 0,
       reviews: profile?.totalReviews ?? 0,
       rating: profile?.averageRating ?? 0,
       following: profile?.followingCount ?? 0,
       followers: profile?.followersCount ?? 0,
     }),
-    [catalogStats, isSeller, profile]
+    [catalogStats, showAsSeller, profile]
   );
 
   const visibleProducts = useMemo(() => {
@@ -412,11 +426,11 @@ export default function AccountProfileScreen({
       return DEMO_LIKED_PRODUCTS;
     }
 
-    return isSeller ? sellerProducts : [];
-  }, [activeTab, isSeller, sellerProducts]);
+    return showAsSeller ? sellerProducts : [];
+  }, [activeTab, showAsSeller, sellerProducts]);
 
   function renderCatalogTab() {
-    if (isSeller) {
+    if (showAsSeller) {
       if (isLoadingProducts && sellerProducts.length === 0) {
         return (
           <View style={styles.loadingProductsWrap}>
@@ -446,7 +460,7 @@ export default function AccountProfileScreen({
           <View style={styles.emptyLikedCard}>
             <Text style={styles.emptyLikedTitle}>Chưa có sản phẩm</Text>
             <Text style={styles.emptyLikedText}>
-              Hãy vào tab Đăng tin để đăng sản phẩm đầu tiên của bạn.
+              Hãy vào tab Sản phẩm để đăng sản phẩm đầu tiên của bạn.
             </Text>
           </View>
         );
@@ -575,97 +589,35 @@ export default function AccountProfileScreen({
     }
   }
 
-  async function handlePickCover() {
-    try {
-      setLocalError('');
-      const picked = await pickImageBase64();
-      if (!picked) {
-        return;
-      }
-
-      setIsUploadingCover(true);
-      await dispatch(
-        uploadUserCover({
-          imageBase64: picked.imageBase64,
-          mimeType: picked.mimeType,
-        })
-      ).unwrap();
-    } catch (pickError) {
-      setLocalError(typeof pickError === 'string' ? pickError : 'Không upload được ảnh bìa.');
-    } finally {
-      setIsUploadingCover(false);
-    }
-  }
-
   const feedbackMessage = localError || error;
-
-  function handleCallShop() {
-    const phone = shopContact?.shopPhone || shopContact?.userPhone || profile?.shopPhone || profile?.phone;
-    if (!phone) {
-      Alert.alert('Thông báo', 'Chưa có số điện thoại liên hệ.');
-      return;
-    }
-
-    const telUrl = `tel:${String(phone).replace(/\s/g, '')}`;
-    Linking.openURL(telUrl).catch(() => {
-      Alert.alert('Lỗi', 'Không thể mở ứng dụng gọi điện.');
-    });
-  }
 
   return (
     <View style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.coverSection}>
-          <ImageBackground
-            source={{ uri: coverImageError ? DEFAULT_COVER : coverUrl }}
-            style={styles.coverImage}
-            imageStyle={styles.coverImageStyle}
-            onError={() => setCoverImageError(true)}
-          >
-            <View style={styles.coverOverlay} />
-            <View style={styles.topActions}>
-              <Pressable
-                onPress={handlePickCover}
-                disabled={isUploadingCover}
-                style={({ pressed }) => [styles.coverEditButton, pressed && styles.buttonPressed]}
-              >
-                {isUploadingCover ? (
-                  <ActivityIndicator color="#0d7377" size="small" />
-                ) : (
-                  <Text style={styles.coverEditText}>Đổi ảnh bìa</Text>
-                )}
-              </Pressable>
-              <Pressable
-                onPress={() => setMenuOpen((current) => !current)}
-                style={({ pressed }) => [styles.iconButton, pressed && styles.buttonPressed]}
-              >
-                <Text style={styles.iconButtonText}>⚙</Text>
-              </Pressable>
-            </View>
-          </ImageBackground>
+        <View style={styles.profileCard}>
+          <View style={styles.profileTopBar}>
+            <View style={styles.profileTopBarSpacer} />
+            <Pressable
+              onPress={() => setMenuOpen((current) => !current)}
+              style={({ pressed }) => [styles.iconButton, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.iconButtonText}>⚙</Text>
+            </Pressable>
+          </View>
 
           {menuOpen ? (
             <View style={styles.menuDropdown}>
-              <Pressable
-                onPress={() => {
-                  setMenuOpen(false);
-                  onEditAccount?.();
-                }}
-                style={styles.menuItem}
-              >
-                <Text style={styles.menuItemText}>Sửa thông tin tài khoản</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setMenuOpen(false);
-                  onOpenActivity?.();
-                }}
-                style={styles.menuItem}
-              >
-                <Text style={styles.menuItemText}>Hoạt động của tôi</Text>
-              </Pressable>
-              {isSeller ? (
+              {showAsSeller ? (
                 <>
+                  <Pressable
+                    onPress={() => {
+                      setMenuOpen(false);
+                      onOpenSellerStats?.();
+                    }}
+                    style={styles.menuItem}
+                  >
+                    <Text style={styles.menuItemText}>Thống kê</Text>
+                  </Pressable>
                   <Pressable
                     onPress={() => {
                       setMenuOpen(false);
@@ -687,28 +639,47 @@ export default function AccountProfileScreen({
                   <Pressable
                     onPress={() => {
                       setMenuOpen(false);
-                      onOpenSellerStats?.();
+                      onSwitchToBuyerMode?.();
                     }}
                     style={styles.menuItem}
                   >
-                    <Text style={styles.menuItemText}>Thống kê</Text>
+                    <Text style={styles.menuItemText}>Chuyển sang người mua</Text>
                   </Pressable>
                 </>
-              ) : null}
-              <Pressable
-                onPress={() => {
-                  setMenuOpen(false);
-                  onLogout?.();
-                }}
-                style={styles.menuItem}
-              >
-                <Text style={[styles.menuItemText, styles.menuItemDanger]}>Đăng xuất</Text>
-              </Pressable>
+              ) : (
+                <>
+                  <Pressable
+                    onPress={() => {
+                      setMenuOpen(false);
+                      onEditAccount?.();
+                    }}
+                    style={styles.menuItem}
+                  >
+                    <Text style={styles.menuItemText}>Sửa thông tin tài khoản</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setMenuOpen(false);
+                      onOpenActivity?.();
+                    }}
+                    style={styles.menuItem}
+                  >
+                    <Text style={styles.menuItemText}>Hoạt động của tôi</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setMenuOpen(false);
+                      onLogout?.();
+                    }}
+                    style={styles.menuItem}
+                  >
+                    <Text style={[styles.menuItemText, styles.menuItemDanger]}>Đăng xuất</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           ) : null}
-        </View>
 
-        <View style={styles.profileCard}>
           <View style={styles.profileHeaderRow}>
             <ProfileAvatar
               name={displayName}
@@ -718,14 +689,31 @@ export default function AccountProfileScreen({
             />
             <View style={styles.profileHeaderInfo}>
               <Text style={styles.displayName} numberOfLines={1}>
-                {displayName}
+                {showAsSeller && (shopContact?.shopName || shopSettings?.shopName)
+                  ? shopContact?.shopName || shopSettings?.shopName
+                  : displayName}
               </Text>
+              {showAsSeller && (shopContact?.shopName || shopSettings?.shopName) ? (
+                <Text style={styles.personalNameHint} numberOfLines={1}>
+                  Chủ shop: {displayName}
+                </Text>
+              ) : null}
               {userName ? (
                 <Text style={styles.userName} numberOfLines={1}>
                   @{userName}
                 </Text>
               ) : null}
-              {isSeller ? (
+              {showAsSeller && (shopContact?.shopUsername || shopSettings?.shopUsername) ? (
+                <Text style={styles.shopUsername} numberOfLines={1}>
+                  Shop: @{shopContact?.shopUsername || shopSettings?.shopUsername}
+                </Text>
+              ) : null}
+              {showAsSeller && (shopContact?.categoryName || shopSettings?.categoryName) ? (
+                <Text style={styles.businessCategoryLabel} numberOfLines={1}>
+                  {shopContact?.categoryName || shopSettings?.categoryName}
+                </Text>
+              ) : null}
+              {showAsSeller ? (
                 <View style={styles.ratingRow}>
                   <StarRating rating={stats.rating || 0} size={14} showValue />
                   <Text style={styles.reviewCount}>
@@ -754,7 +742,7 @@ export default function AccountProfileScreen({
             </Text>
           </View>
 
-          {isSeller ? (
+          {showAsSeller ? (
             <View style={styles.contactCard}>
               <Text style={styles.contactTitle}>Thông tin liên hệ</Text>
               {isLoadingShopContact ? (
@@ -798,8 +786,14 @@ export default function AccountProfileScreen({
             </View>
           ) : null}
 
-          {isSeller ? (
+          {showAsSeller ? (
             <View style={styles.sellerToolsRow}>
+              <Pressable
+                onPress={onOpenSellerStats}
+                style={({ pressed }) => [styles.sellerToolButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.sellerToolText}>Thống kê</Text>
+              </Pressable>
               <Pressable
                 onPress={onOpenSellerOrders}
                 style={({ pressed }) => [styles.sellerToolButton, pressed && styles.buttonPressed]}
@@ -812,39 +806,37 @@ export default function AccountProfileScreen({
               >
                 <Text style={styles.sellerToolText}>Cài đặt shop</Text>
               </Pressable>
-              <Pressable
-                onPress={onOpenSellerStats}
-                style={({ pressed }) => [styles.sellerToolButton, pressed && styles.buttonPressed]}
-              >
-                <Text style={styles.sellerToolText}>Thống kê</Text>
-              </Pressable>
             </View>
           ) : null}
 
-          <View style={styles.actionRow}>
-            {isSeller ? (
-              <Pressable
-                onPress={handleCallShop}
-                style={({ pressed }) => [styles.primaryActionButton, pressed && styles.buttonPressed]}
-              >
-                <Text style={styles.primaryActionText}>📞 Gọi điện</Text>
-              </Pressable>
-            ) : (
+          {showAsBuyer ? (
+            <View style={styles.actionRow}>
               <Pressable
                 onPress={onEditAccount}
                 style={({ pressed }) => [styles.primaryActionButton, pressed && styles.buttonPressed]}
               >
                 <Text style={styles.primaryActionText}>Chỉnh sửa hồ sơ</Text>
               </Pressable>
-            )}
-            <Pressable
-              style={({ pressed }) => [styles.secondaryActionButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.secondaryActionText}>💬 Nhắn tin</Text>
-            </Pressable>
-          </View>
+              <Pressable
+                style={({ pressed }) => [styles.secondaryActionButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.secondaryActionText}>Nhắn tin</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
-          {isSeller ? (
+          {showAsBuyer ? (
+            <Pressable
+              onPress={isSeller ? onSwitchToSellerMode : onStartSellerRegister}
+              style={({ pressed }) => [styles.modeSwitchButton, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.modeSwitchButtonText}>
+                {getSellerRegisterButtonLabel({ isSeller, sellerVerification })}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {showAsSeller ? (
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{formatCount(stats.products)}</Text>
@@ -867,29 +859,33 @@ export default function AccountProfileScreen({
         {feedbackMessage ? <Text style={styles.errorText}>{feedbackMessage}</Text> : null}
         {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
 
-        <View style={styles.tabBar}>
-          {PROFILE_TABS.map((tab) => {
-            const isActive = activeTab === tab.key;
-            const color = isActive ? '#0d7377' : '#94a3b8';
-            const TabIcon = tab.Icon;
+        {!showAsSeller ? (
+          <>
+            <View style={styles.tabBar}>
+              {PROFILE_TABS.map((tab) => {
+                const isActive = activeTab === tab.key;
+                const color = isActive ? '#0d7377' : '#94a3b8';
+                const TabIcon = tab.Icon;
 
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                style={styles.tabItem}
-              >
-                <TabIcon color={color} size={22} filled={isActive} />
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                  {tab.label}
-                </Text>
-                {isActive ? <View style={styles.tabIndicator} /> : null}
-              </Pressable>
-            );
-          })}
-        </View>
+                return (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => setActiveTab(tab.key)}
+                    style={styles.tabItem}
+                  >
+                    <TabIcon color={color} size={22} filled={isActive} />
+                    <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                      {showAsBuyer ? tab.buyerLabel || tab.label : tab.sellerLabel || tab.label}
+                    </Text>
+                    {isActive ? <View style={styles.tabIndicator} /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
 
-        {activeTab === 'catalog' ? renderCatalogTab() : renderLikedTab()}
+            {activeTab === 'catalog' ? renderCatalogTab() : renderLikedTab()}
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -902,57 +898,49 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   scrollContent: {
+    paddingTop: 52,
     paddingBottom: 28,
   },
-  coverSection: {
+  profileCard: {
+    marginTop: 0,
+    marginHorizontal: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 4,
     position: 'relative',
   },
-  coverImage: {
-    height: 190,
-    justifyContent: 'flex-start',
-  },
-  coverImageStyle: {
-    resizeMode: 'cover',
-  },
-  coverOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.18)',
-  },
-  topActions: {
-    paddingTop: 52,
-    paddingHorizontal: 16,
+  profileTopBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  coverEditButton: {
-    minHeight: 36,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  coverEditText: {
-    color: '#0d7377',
-    fontSize: 13,
-    fontWeight: '800',
+  profileTopBarSpacer: {
+    flex: 1,
   },
   iconButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   iconButtonText: {
     fontSize: 18,
   },
   menuDropdown: {
     position: 'absolute',
-    top: 96,
-    right: 16,
+    top: 58,
+    right: 18,
     backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 1,
@@ -974,20 +962,6 @@ const styles = StyleSheet.create({
   },
   menuItemDanger: {
     color: '#b91c1c',
-  },
-  profileCard: {
-    marginTop: -42,
-    marginHorizontal: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 4,
   },
   profileHeaderRow: {
     flexDirection: 'row',
@@ -1048,9 +1022,27 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 4,
   },
+  personalNameHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginBottom: 4,
+  },
   userName: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#64748b',
+    marginBottom: 6,
+  },
+  shopUsername: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0d7377',
+    marginBottom: 4,
+  },
+  businessCategoryLabel: {
+    fontSize: 12,
+    fontWeight: '700',
     color: '#64748b',
     marginBottom: 6,
   },
@@ -1424,6 +1416,36 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 18,
+  },
+  modeSwitchButton: {
+    marginTop: 12,
+    minHeight: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#6ee7b7',
+  },
+  modeSwitchButtonAlt: {
+    marginTop: 12,
+    minHeight: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+  },
+  modeSwitchButtonText: {
+    color: '#047857',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  modeSwitchButtonTextAlt: {
+    color: '#1d4ed8',
+    fontSize: 14,
+    fontWeight: '800',
   },
   registerButton: {
     minHeight: 48,

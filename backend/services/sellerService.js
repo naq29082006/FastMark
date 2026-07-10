@@ -2,10 +2,115 @@ const SellerVerification = require("../models/SellerVerification");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
 const { SELLER_VERIFICATION_STATUS, USER_ROLE } = require("../constants/sellerVerification");
+const { assertCategoryExists } = require("./categoryService");
+const { normalizeCategoryId } = require("../utils/categoryId");
 const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService");
 
 const DEMO_PHONE_CODE = "123456";
 const PHONE_VERIFY_TTL_MS = 5 * 60 * 1000;
+const SHOP_USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
+
+function normalizeShopUsername(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeShopName(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function pickPayloadValue(body, keys) {
+  for (const key of keys) {
+    const value = body?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeSellerRegistrationPayload(body = {}) {
+  const shopName = pickPayloadValue(body, ["shopName", "storeName", "tenGianHang", "TenGianHang"]);
+  const shopUsername = pickPayloadValue(body, ["shopUsername", "storeUsername"]);
+  const shopDescription = pickPayloadValue(body, [
+    "shopDescription",
+    "description",
+    "bio",
+    "shopBio",
+    "gioiThieuShop",
+  ]);
+  const categoryId = pickPayloadValue(body, ["categoryId"]);
+  const address = pickPayloadValue(body, ["address", "Address"]);
+  const systemAddress = pickPayloadValue(body, [
+    "systemAddress",
+    "DiaChiHeThong",
+    "DiachiHethong",
+  ]);
+
+  return {
+    ...body,
+    shopName: shopName ?? body.shopName,
+    shopUsername: shopUsername ?? body.shopUsername,
+    shopDescription: shopDescription ?? body.shopDescription,
+    categoryId: normalizeCategoryId(categoryId ?? body.categoryId),
+    address: address ?? body.address,
+    systemAddress: systemAddress ?? body.systemAddress ?? body.DiaChiHeThong,
+    latitude: body.latitude ?? body.lat,
+    longitude: body.longitude ?? body.lng,
+  };
+}
+
+function resolveCategoryFields(verification) {
+  const category = verification?.categoryId;
+  if (category && typeof category === "object" && category.categoryName) {
+    return {
+      categoryId: normalizeCategoryId(category._id),
+      categoryName: category.categoryName || "",
+    };
+  }
+
+  return {
+    categoryId: normalizeCategoryId(verification?.categoryId),
+    categoryName: "",
+  };
+}
+
+function assertShopNameValid(shopName) {
+  const normalized = normalizeShopName(shopName);
+
+  if (normalized.length < 2 || normalized.length > 80) {
+    throw createServiceError("Tên gian hàng phải từ 2-80 ký tự.");
+  }
+
+  return normalized;
+}
+
+async function assertShopUsernameAvailable(shopUsername, userId) {
+  const normalized = normalizeShopUsername(shopUsername);
+
+  if (!SHOP_USERNAME_PATTERN.test(normalized)) {
+    throw createServiceError(
+      "Tên shop phải từ 3-30 ký tự, chỉ chữ thường, số và dấu gạch dưới."
+    );
+  }
+
+  const existingShop = await ShopProfile.findOne({ shopUsername: normalized }).lean();
+  if (existingShop && String(existingShop.userId) !== String(userId)) {
+    throw createServiceError("Tên shop đã được sử dụng.");
+  }
+
+  const pendingVerification = await SellerVerification.findOne({
+    shopUsername: normalized,
+    status: SELLER_VERIFICATION_STATUS.PENDING,
+    userId: { $ne: userId },
+  }).lean();
+
+  if (pendingVerification) {
+    throw createServiceError("Tên shop đã được sử dụng.");
+  }
+
+  return normalized;
+}
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -137,7 +242,17 @@ async function resolveVerificationImage({
 }
 
 async function getMySellerVerification(user) {
-  return SellerVerification.findOne({ userId: user._id }).sort({ CreatedAt: -1 });
+  return SellerVerification.findOne({ userId: user._id })
+    .sort({ CreatedAt: -1 })
+    .populate("categoryId", "categoryName");
+}
+
+async function reloadVerificationById(verificationId) {
+  if (!verificationId) {
+    return null;
+  }
+
+  return SellerVerification.findById(verificationId).populate("categoryId", "categoryName");
 }
 
 async function promoteUserToSeller(user, verification, approvedById = null) {
@@ -152,10 +267,16 @@ async function promoteUserToSeller(user, verification, approvedById = null) {
   user.Role = USER_ROLE.SELLER;
   await user.save();
 
+  const categoryId = verification.categoryId?._id || verification.categoryId || null;
+
   const existingShop = await ShopProfile.findOne({ userId: user._id });
   if (!existingShop) {
     await ShopProfile.create({
       userId: user._id,
+      shopUsername: verification.shopUsername || "",
+      shopName: verification.shopName || user.FullName || user.UserName || "",
+      categoryId,
+      description: verification.shopDescription || "",
       address: verification.address,
       DiaChiHeThong: verification.DiaChiHeThong || "",
       latitude: verification.latitude,
@@ -163,6 +284,15 @@ async function promoteUserToSeller(user, verification, approvedById = null) {
       phone: user.Phone,
     });
   } else {
+    existingShop.shopUsername = verification.shopUsername || existingShop.shopUsername || "";
+    existingShop.shopName =
+      verification.shopName || existingShop.shopName || user.FullName || user.UserName || "";
+    if (categoryId) {
+      existingShop.categoryId = categoryId;
+    }
+    if (verification.shopDescription) {
+      existingShop.description = verification.shopDescription;
+    }
     existingShop.address = verification.address;
     existingShop.DiaChiHeThong = verification.DiaChiHeThong || "";
     existingShop.latitude = verification.latitude;
@@ -198,6 +328,8 @@ async function syncSellerRoleFromVerification(user) {
 }
 
 async function submitSellerVerification(user, payload) {
+  const normalizedPayload = normalizeSellerRegistrationPayload(payload);
+
   if (!user.SellerPhoneVerified) {
     throw createServiceError("Bạn cần xác minh số điện thoại trước khi đăng ký người bán.");
   }
@@ -212,12 +344,10 @@ async function submitSellerVerification(user, payload) {
     throw createServiceError("Tài khoản đã được duyệt người bán.");
   }
 
-  const address = String(payload.address || "").trim();
-  const systemAddress = String(
-    payload.systemAddress || payload.DiaChiHeThong || payload.DiachiHethong || ""
-  ).trim();
-  const latitude = Number(payload.latitude);
-  const longitude = Number(payload.longitude);
+  const address = String(normalizedPayload.address || "").trim();
+  const systemAddress = String(normalizedPayload.systemAddress || "").trim();
+  const latitude = Number(normalizedPayload.latitude);
+  const longitude = Number(normalizedPayload.longitude);
 
   if (!address) {
     throw createServiceError("Vui lòng nhập địa chỉ.");
@@ -227,28 +357,41 @@ async function submitSellerVerification(user, payload) {
     throw createServiceError("Vui lòng chọn vị trí trên bản đồ.");
   }
 
+  const shopUsername = await assertShopUsernameAvailable(
+    normalizedPayload.shopUsername,
+    user._id
+  );
+  const shopName = assertShopNameValid(normalizedPayload.shopName);
+  const category = await assertCategoryExists(normalizedPayload.categoryId);
+  const shopDescription = String(normalizedPayload.shopDescription || "").trim();
+
+  if (!shopDescription) {
+    throw createServiceError("Vui lòng nhập giới thiệu shop.");
+  }
+
   const [cccdFrontImage, cccdBackImage, selfieImage] = await Promise.all([
     resolveVerificationImage({
       user,
-      imageBase64: payload.cccdFrontImageBase64,
-      mimeType: payload.cccdFrontMimeType,
-      existingUrl: existing?.cccdFrontImage,
+      imageBase64: normalizedPayload.cccdFrontImageBase64,
+      mimeType: normalizedPayload.cccdFrontMimeType,
+      existingUrl:
+        existing?.cccdFrontImage || normalizedPayload.cccdFrontImageUrl || null,
       folder: "seller-verification",
       label: "cccd-front",
     }),
     resolveVerificationImage({
       user,
-      imageBase64: payload.cccdBackImageBase64,
-      mimeType: payload.cccdBackMimeType,
-      existingUrl: existing?.cccdBackImage,
+      imageBase64: normalizedPayload.cccdBackImageBase64,
+      mimeType: normalizedPayload.cccdBackMimeType,
+      existingUrl: existing?.cccdBackImage || normalizedPayload.cccdBackImageUrl || null,
       folder: "seller-verification",
       label: "cccd-back",
     }),
     resolveVerificationImage({
       user,
-      imageBase64: payload.selfieImageBase64,
-      mimeType: payload.selfieMimeType,
-      existingUrl: existing?.selfieImage,
+      imageBase64: normalizedPayload.selfieImageBase64,
+      mimeType: normalizedPayload.selfieMimeType,
+      existingUrl: existing?.selfieImage || normalizedPayload.selfieImageUrl || null,
       folder: "seller-verification",
       label: "selfie",
     }),
@@ -258,11 +401,14 @@ async function submitSellerVerification(user, payload) {
     cccdFrontImage,
     cccdBackImage,
     selfieImage,
+    shopUsername,
+    shopName,
+    categoryId: category._id,
+    shopDescription,
     address,
     DiaChiHeThong: systemAddress,
     latitude,
     longitude,
-    note: String(payload.note || "").trim(),
     status: SELLER_VERIFICATION_STATUS.PENDING,
     LyDoTuChoi: "",
     rejectedAt: null,
@@ -276,12 +422,12 @@ async function submitSellerVerification(user, payload) {
     (existing.status === SELLER_VERIFICATION_STATUS.PENDING ||
       existing.status === SELLER_VERIFICATION_STATUS.REJECTED)
   ) {
-    Object.assign(existing, sharedFields);
+    existing.set(sharedFields);
     if (!existing.submittedAt) {
       existing.submittedAt = new Date();
     }
     await existing.save();
-    return existing;
+    return reloadVerificationById(existing._id);
   }
 
   const verification = await SellerVerification.create({
@@ -290,7 +436,7 @@ async function submitSellerVerification(user, payload) {
     submittedAt: new Date(),
   });
 
-  return verification;
+  return reloadVerificationById(verification._id);
 }
 
 async function listPendingSellerVerifications() {
@@ -298,7 +444,8 @@ async function listPendingSellerVerifications() {
     status: SELLER_VERIFICATION_STATUS.PENDING,
   })
     .sort({ submittedAt: 1 })
-    .populate("userId", "FullName Email Phone UserName");
+    .populate("userId", "FullName Email Phone UserName")
+    .populate("categoryId", "categoryName");
 
   return verifications;
 }
@@ -353,6 +500,8 @@ function toPublicVerification(verification) {
     return null;
   }
 
+  const category = resolveCategoryFields(verification);
+
   return {
     id: verification._id,
     userId: verification.userId,
@@ -363,7 +512,11 @@ function toPublicVerification(verification) {
     DiaChiHeThong: verification.DiaChiHeThong || "",
     latitude: verification.latitude,
     longitude: verification.longitude,
-    note: verification.note || "",
+    shopUsername: verification.shopUsername || "",
+    shopName: verification.shopName || "",
+    categoryId: category.categoryId,
+    categoryName: category.categoryName,
+    shopDescription: verification.shopDescription || "",
     status: verification.status,
     lyDoTuChoi: verification.LyDoTuChoi || "",
     submittedAt: verification.submittedAt,
@@ -403,6 +556,7 @@ module.exports = {
   getMySellerVerification,
   syncSellerRoleFromVerification,
   submitSellerVerification,
+  normalizeSellerRegistrationPayload,
   listPendingSellerVerifications,
   approveSellerVerificationByAdmin,
   rejectSellerVerificationByAdmin,

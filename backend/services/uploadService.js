@@ -42,7 +42,7 @@ async function uploadImageToSupabase({
 
   if (!supabase) {
     throw createUploadError(
-      "Supabase chưa được cấu hình. Thêm SUPABASE_URL và SUPABASE_ANON_KEY vào backend/.env.",
+      "Supabase chưa được cấu hình. Thêm SUPABASE_URL và SUPABASE_ANON_KEY vào .env ở thư mục gốc dự án.",
       503
     );
   }

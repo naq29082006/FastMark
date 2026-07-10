@@ -154,16 +154,26 @@ function activeProductFilter(extra = {}) {
   };
 }
 
-function toPublicProduct(product, variants = []) {
+function toPublicProduct(product, variants = [], category = null) {
   const normalizedVariants = variants.map(toPublicVariant);
   const isOutOfStock =
     normalizedVariants.length > 0 &&
     normalizedVariants.every((variant) => Number(variant.quantity) <= 0);
 
+  let minPrice = Number(product.MinPrice) || 0;
+  let maxPrice = Number(product.MaxPrice) || 0;
+
+  if (normalizedVariants.length > 0) {
+    const prices = normalizedVariants.map((variant) => Number(variant.price) || 0);
+    minPrice = Math.min(...prices);
+    maxPrice = Math.max(...prices);
+  }
+
   return {
     id: product._id,
     shopId: product.ShopId,
     categoryId: product.CategoryId,
+    categoryName: category?.categoryName || product.CategoryName || "",
     productName: product.ProductName,
     description: product.Description || "",
     donVi: product.DonVi || "",
@@ -178,8 +188,8 @@ function toPublicProduct(product, variants = []) {
         : product.IsDeleted
           ? PRODUCT_STATUS.HIDDEN
           : PRODUCT_STATUS.ACTIVE,
-    minPrice: product.MinPrice || 0,
-    maxPrice: product.MaxPrice || 0,
+    minPrice,
+    maxPrice: maxPrice || minPrice,
     variants: normalizedVariants,
     createdAt: product.CreatedAt,
     updatedAt: product.UpdatedAt,
@@ -368,7 +378,11 @@ async function getProductById(productId) {
     CreatedAt: 1,
   });
 
-  return toPublicProduct(product, variants);
+  const category = product.CategoryId
+    ? await Category.findById(product.CategoryId).lean()
+    : null;
+
+  return toPublicProduct(product, variants, category);
 }
 
 async function getMyProductById(user, productId) {
@@ -452,7 +466,7 @@ async function softDeleteProduct(user, productId) {
 async function listCategories() {
   const categories = await Category.find().sort({ categoryName: 1 });
   return categories.map((category) => ({
-    id: category._id,
+    id: String(category._id),
     categoryName: category.categoryName,
     description: category.description || "",
   }));
