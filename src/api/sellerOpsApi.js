@@ -164,21 +164,51 @@ export async function getSellerMessagesOnBackend(idToken, conversationId) {
     AUTH_TIMEOUT_MS
   );
   const payload = await parseApiResponse(response);
-  return payload.data?.messages || [];
+  return {
+    messages: payload.data?.messages || [],
+    sequence: payload.data?.sequence || null,
+  };
 }
 
-export async function sendSellerMessageOnBackend({ idToken, conversationId, content }) {
+export async function sendSellerMessageOnBackend({ idToken, conversationId, content, imageContent }) {
   const response = await apiRequest(
     API_ENDPOINTS.sellerConversationMessages(conversationId),
     {
       method: 'POST',
       headers: await authHeaders(idToken),
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({
+        content,
+        imageContent,
+        messageType: imageContent ? 1 : undefined,
+      }),
     },
     AUTH_TIMEOUT_MS
   );
   const payload = await parseApiResponse(response);
   return payload.data?.message;
+}
+
+export async function deleteSellerMessageOnBackend(idToken, conversationId, messageId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerConversationMessage(conversationId, messageId),
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${idToken}` },
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.message;
+}
+
+export async function getSellerConversationPeerOnBackend(idToken, conversationId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerConversationPeer(conversationId),
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.peer;
 }
 
 export async function getSellerStatsOnBackend(idToken) {

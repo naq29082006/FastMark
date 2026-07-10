@@ -1,11 +1,19 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
+const MessageImage = require("../models/MessageImage");
 const Restaurant = require("../models/Restaurant");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
 const { MESSAGE_TYPE } = require("../constants/messageType");
 const { MESSAGE_READ, MESSAGE_STATUS } = require("../constants/messageStatus");
+const { SENDER_TYPE } = require("../constants/messageSender");
 const { getShopForSeller } = require("./shopSettingsService");
+const { mapPresenceFields } = require("../utils/activityLabel");
+const { emitConversationEvent } = require("../socket");
+const {
+  resolveFileExtension,
+  uploadImageToSupabase,
+} = require("./uploadService");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -19,6 +27,13 @@ function pickString(value) {
 
 function isMongoObjectId(value) {
   return /^[a-f\d]{24}$/i.test(pickString(value));
+}
+
+function activeMessageFilter(extra = {}) {
+  return {
+    ...extra,
+    DeletedAt: null,
+  };
 }
 
 async function findOrCreateDemoShopProfile(restaurant) {
@@ -78,6 +93,17 @@ async function resolveShopForBuyerChat(shopId, shopName = "") {
   return findOrCreateDemoShopProfile(restaurant);
 }
 
+function formatBubbleTime(date) {
+  if (!date) {
+    return "";
+  }
+  const value = new Date(date);
+  if (Number.isNaN(value.getTime())) {
+    return "";
+  }
+  return value.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+}
+
 function formatTime(date) {
   if (!date) {
     return "";
@@ -104,28 +130,248 @@ function mapStatusToString(messageStatus) {
   return "sent";
 }
 
-function mapMessageToClient(message, userId) {
-  const isMine = String(message.senderId) === String(userId);
+function buildViewerContext(user, shop = null, mode = "buyer") {
+  return {
+    mode,
+    userId: user?._id,
+    shopId: shop?._id || null,
+  };
+}
+
+function isMessageFromViewer(message, viewer) {
+  if (!viewer || !message) {
+    return false;
+  }
+
+  const senderType = Number(message.senderType ?? SENDER_TYPE.USER);
+  const senderId = String(message.senderId || "");
+
+  if (viewer.mode === "seller") {
+    return senderType === SENDER_TYPE.SHOP && senderId === String(viewer.shopId || "");
+  }
+
+  return senderType === SENDER_TYPE.USER && senderId === String(viewer.userId || "");
+}
+
+function buildOpponentReadFilter(viewer) {
+  if (viewer.mode === "seller") {
+    return { senderType: SENDER_TYPE.USER };
+  }
+
+  return { senderType: SENDER_TYPE.SHOP };
+}
+
+function buildUnreadFilter(viewer) {
+  return buildOpponentReadFilter(viewer);
+}
+
+async function repairMessageSenders(conversation, shop) {
+  const rows = await Message.find({ conversationId: conversation._id }).select(
+    "_id senderId senderType"
+  );
+
+  for (const row of rows) {
+    const senderIdStr = String(row.senderId || "");
+    let senderType = SENDER_TYPE.USER;
+    let senderId = row.senderId;
+
+    if (senderIdStr === String(conversation.userId)) {
+      senderType = SENDER_TYPE.USER;
+    } else if (senderIdStr === String(conversation.shopId)) {
+      senderType = SENDER_TYPE.SHOP;
+    } else if (shop?.userId && senderIdStr === String(shop.userId)) {
+      senderType = SENDER_TYPE.SHOP;
+      senderId = conversation.shopId;
+    } else if (Number(row.senderType) === SENDER_TYPE.SHOP) {
+      senderType = SENDER_TYPE.SHOP;
+    }
+
+    const needsUpdate =
+      Number(row.senderType ?? SENDER_TYPE.USER) !== senderType ||
+      String(row.senderId || "") !== String(senderId || "");
+
+    if (needsUpdate) {
+      await Message.updateOne(
+        { _id: row._id },
+        { $set: { senderId, senderType, UpdatedAt: new Date() } }
+      );
+    }
+  }
+}
+
+async function ensureMessageSequences(conversation) {
+  const missing = await Message.find({
+    conversationId: conversation._id,
+    $or: [{ ThuTu: { $exists: false } }, { ThuTu: null }, { ThuTu: 0 }],
+  })
+    .sort({ CreatedAt: 1 })
+    .select("_id ThuTu CreatedAt");
+
+  if (missing.length === 0) {
+    return conversation;
+  }
+
+  const maxExisting = await Message.findOne({
+    conversationId: conversation._id,
+    ThuTu: { $gt: 0 },
+  })
+    .sort({ ThuTu: -1 })
+    .select("ThuTu");
+
+  let counter = Number(maxExisting?.ThuTu) || Number(conversation.nextThuTu) || 0;
+
+  for (const row of missing) {
+    counter += 1;
+    await Message.updateOne({ _id: row._id }, { $set: { ThuTu: counter, UpdatedAt: new Date() } });
+  }
+
+  conversation.nextThuTu = counter;
+  await conversation.save();
+  return conversation;
+}
+
+function buildSequenceMeta(messages, totalCount) {
+  const numbered = messages
+    .map((message) => Number(message.thuTu))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  return {
+    from: numbered.length > 0 ? Math.min(...numbered) : 0,
+    to: numbered.length > 0 ? Math.max(...numbered) : 0,
+    total: totalCount,
+    count: messages.length,
+  };
+}
+
+async function loadMessageImages(messageIds) {
+  if (!messageIds.length) {
+    return new Map();
+  }
+
+  const rows = await MessageImage.find({
+    messageId: { $in: messageIds },
+    DeletedAt: null,
+  }).sort({ sortOrder: 1, CreatedAt: 1 });
+
+  return rows.reduce((map, row) => {
+    const key = String(row.messageId);
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push({
+      id: row._id,
+      imageUrl: row.imageUrl,
+      sortOrder: row.sortOrder,
+    });
+    return map;
+  }, new Map());
+}
+
+function mapMessageToBroadcast(message, images = []) {
+  const isDeleted = Boolean(message.DeletedAt);
   const isImage = Number(message.messageType) === MESSAGE_TYPE.IMAGE;
+  const imageUri = isImage ? message.content || images[0]?.imageUrl || "" : undefined;
+
+  if (isDeleted) {
+    return {
+      id: message._id,
+      conversationId: message.conversationId,
+      senderId: message.senderId,
+      senderType: Number(message.senderType ?? SENDER_TYPE.USER),
+      thuTu: message.ThuTu || 0,
+      messageType: message.messageType,
+      content: "Tin nhắn đã được gỡ",
+      isDeleted: true,
+      isRead: message.isRead,
+      messageStatus: message.messageStatus,
+      createdAt: message.CreatedAt,
+      timeLabel: formatBubbleTime(message.CreatedAt),
+      images: [],
+    };
+  }
 
   return {
     id: message._id,
     conversationId: message.conversationId,
     senderId: message.senderId,
+    senderType: Number(message.senderType ?? SENDER_TYPE.USER),
+    thuTu: message.ThuTu || 0,
+    messageType: message.messageType,
+    content: isImage ? "" : message.content || "",
+    imageUri,
+    images,
+    isDeleted: false,
+    isRead: message.isRead,
+    messageStatus: message.messageStatus,
+    createdAt: message.CreatedAt,
+    timeLabel: formatBubbleTime(message.CreatedAt),
+  };
+}
+
+function mapMessageToClient(message, viewer, images = []) {
+  const isMine = isMessageFromViewer(message, viewer);
+  const isDeleted = Boolean(message.DeletedAt);
+  const isImage = Number(message.messageType) === MESSAGE_TYPE.IMAGE;
+  const imageUri = isImage ? message.content || images[0]?.imageUrl || "" : undefined;
+
+  if (isDeleted) {
+    return {
+      id: message._id,
+      conversationId: message.conversationId,
+      senderId: message.senderId,
+      senderType: Number(message.senderType ?? SENDER_TYPE.USER),
+      thuTu: message.ThuTu || 0,
+      isMine,
+      messageType: message.messageType,
+      content: "Tin nhắn đã được gỡ",
+      isDeleted: true,
+      isRead: message.isRead,
+      messageStatus: message.messageStatus,
+      status: isMine ? mapStatusToString(message.messageStatus) : undefined,
+      createdAt: message.CreatedAt,
+      timeLabel: formatBubbleTime(message.CreatedAt),
+      images: [],
+    };
+  }
+
+  return {
+    id: message._id,
+    conversationId: message.conversationId,
+    senderId: message.senderId,
+    senderType: Number(message.senderType ?? SENDER_TYPE.USER),
+    thuTu: message.ThuTu || 0,
     isMine,
     messageType: message.messageType,
     content: isImage ? "" : message.content || "",
-    imageUri: isImage ? message.content || "" : undefined,
+    imageUri,
+    images,
+    isDeleted: false,
     isRead: message.isRead,
     messageStatus: message.messageStatus,
     status: isMine ? mapStatusToString(message.messageStatus) : undefined,
     createdAt: message.CreatedAt,
+    timeLabel: formatBubbleTime(message.CreatedAt),
+  };
+}
+
+function mapBuyerPublicInfo(buyer) {
+  if (!buyer) {
+    return null;
+  }
+
+  return {
+    id: buyer._id,
+    fullName: buyer.FullName || "",
+    userName: buyer.UserName || "",
+    avatar: buyer.Avatar || "",
+    phone: buyer.Phone || "",
+    ...mapPresenceFields(buyer),
   };
 }
 
 async function getShopPublicInfo(shop) {
   const seller = shop?.userId ? await User.findById(shop.userId) : null;
-  let displayName = seller?.FullName || seller?.UserName || "";
+  let displayName = shop?.shopName || seller?.FullName || seller?.UserName || "";
 
   if (!displayName && shop?.externalRestaurantId) {
     const restaurant = await Restaurant.findOne({ externalId: shop.externalRestaurantId });
@@ -137,12 +383,47 @@ async function getShopPublicInfo(shop) {
     pickString(shop?.description).slice(0, 40) ||
     "Gian hàng";
 
+  const shopPresence = mapPresenceFields(shop);
+
   return {
     id: shop._id,
     name,
+    shopName: shop.shopName || name,
+    shopUsername: shop.shopUsername || "",
     avatar: seller?.Avatar || "",
     phone: shop.phone || seller?.Phone || "",
+    description: shop.description || "",
+    isOnline: shopPresence.isOnline,
+    lastActiveAt: shopPresence.lastActiveAt,
+    activityLabel: shopPresence.activityLabel,
   };
+}
+
+async function resolveImageContent(imageContent) {
+  const raw = pickString(imageContent);
+  if (!raw) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  const match = raw.match(/^data:(image\/[^;]+);base64,(.+)$/);
+  if (!match) {
+    return raw;
+  }
+
+  const mimeType = match[1];
+  const buffer = Buffer.from(match[2], "base64");
+  const uploaded = await uploadImageToSupabase({
+    buffer,
+    mimeType,
+    folder: "chat-images",
+    fileName: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${resolveFileExtension(mimeType)}`,
+  });
+
+  return uploaded.publicUrl;
 }
 
 function resolveMessagePayload(payload = {}) {
@@ -154,7 +435,7 @@ function resolveMessagePayload(payload = {}) {
     }
     return {
       messageType: MESSAGE_TYPE.IMAGE,
-      content: imageContent,
+      rawImageContent: imageContent,
       preview: "[Ảnh]",
     };
   }
@@ -171,27 +452,103 @@ function resolveMessagePayload(payload = {}) {
   };
 }
 
-async function createConversationMessage(conversation, senderId, payload) {
+async function createConversationMessage(conversation, senderId, senderType, payload, viewer) {
   const resolved = resolveMessagePayload(payload);
   const now = new Date();
+
+  let content = resolved.content || "";
+  if (resolved.messageType === MESSAGE_TYPE.IMAGE) {
+    content = await resolveImageContent(resolved.rawImageContent);
+  }
+
+  const updatedConversation = await Conversation.findByIdAndUpdate(
+    conversation._id,
+    {
+      $inc: { nextThuTu: 1 },
+      $set: {
+        lastMessage: resolved.preview,
+        lastMessageAt: now,
+        UpdatedAt: now,
+      },
+    },
+    { new: true }
+  );
+
+  const thuTu = Number(updatedConversation?.nextThuTu) || 1;
 
   const message = await Message.create({
     conversationId: conversation._id,
     senderId,
+    senderType,
+    ThuTu: thuTu,
     messageType: resolved.messageType,
-    content: resolved.content,
+    content,
     isRead: MESSAGE_READ.UNREAD,
     messageStatus: MESSAGE_STATUS.SENT,
     CreatedAt: now,
     UpdatedAt: now,
   });
 
-  conversation.lastMessage = resolved.preview;
-  conversation.lastMessageAt = now;
-  conversation.UpdatedAt = now;
-  await conversation.save();
+  let images = [];
+  if (resolved.messageType === MESSAGE_TYPE.IMAGE && content) {
+    const imageDoc = await MessageImage.create({
+      messageId: message._id,
+      imageUrl: content,
+      sortOrder: 0,
+      CreatedAt: now,
+      UpdatedAt: now,
+    });
+    images = [
+      {
+        id: imageDoc._id,
+        imageUrl: imageDoc.imageUrl,
+        sortOrder: imageDoc.sortOrder,
+      },
+    ];
+  }
+
+  const clientMessage = mapMessageToBroadcast(message, images);
+  emitConversationEvent(String(conversation._id), "message:new", {
+    conversationId: String(conversation._id),
+    message: clientMessage,
+  });
 
   return message;
+}
+
+async function markOpponentMessagesRead(conversation, viewer) {
+  const unreadMessages = await Message.find({
+    conversationId: conversation._id,
+    ...buildOpponentReadFilter(viewer),
+    isRead: MESSAGE_READ.UNREAD,
+    DeletedAt: null,
+  });
+
+  if (unreadMessages.length === 0) {
+    return [];
+  }
+
+  const messageIds = unreadMessages.map((message) => message._id);
+  const now = new Date();
+
+  await Message.updateMany(
+    { _id: { $in: messageIds } },
+    {
+      $set: {
+        isRead: MESSAGE_READ.READ,
+        messageStatus: MESSAGE_STATUS.SEEN,
+        UpdatedAt: now,
+      },
+    }
+  );
+
+  emitConversationEvent(String(conversation._id), "message:read", {
+    conversationId: String(conversation._id),
+    messageIds: messageIds.map(String),
+    status: "seen",
+  });
+
+  return messageIds;
 }
 
 async function listSellerConversations(user) {
@@ -205,8 +562,9 @@ async function listSellerConversations(user) {
     const buyer = await User.findById(conversation.userId);
     const unreadCount = await Message.countDocuments({
       conversationId: conversation._id,
-      senderId: { $ne: user._id },
+      ...buildUnreadFilter(buildViewerContext(user, shop, "seller")),
       isRead: MESSAGE_READ.UNREAD,
+      DeletedAt: null,
     });
 
     result.push({
@@ -215,15 +573,7 @@ async function listSellerConversations(user) {
       lastMessageAt: conversation.lastMessageAt || conversation.UpdatedAt,
       timeLabel: formatTime(conversation.lastMessageAt || conversation.UpdatedAt),
       unreadCount,
-      buyer: buyer
-        ? {
-            id: buyer._id,
-            fullName: buyer.FullName || "",
-            userName: buyer.UserName || "",
-            avatar: buyer.Avatar || "",
-            phone: buyer.Phone || "",
-          }
-        : null,
+      buyer: mapBuyerPublicInfo(buyer),
     });
   }
 
@@ -257,64 +607,116 @@ async function getBuyerOwnedConversation(user, conversationId) {
   return { shop, conversation };
 }
 
-async function listConversationMessages(user, conversationId) {
-  const { conversation } = await getOwnedConversation(user, conversationId);
-  const messages = await Message.find({ conversationId: conversation._id })
-    .sort({ CreatedAt: 1 })
+async function fetchConversationMessages(conversation, viewer, shop = null) {
+  await ensureMessageSequences(conversation);
+  await repairMessageSenders(conversation, shop);
+
+  const rows = await Message.find({ conversationId: conversation._id })
+    .sort({ ThuTu: 1, CreatedAt: 1 })
     .limit(200);
 
-  await Message.updateMany(
-    {
-      conversationId: conversation._id,
-      senderId: { $ne: user._id },
-      isRead: MESSAGE_READ.UNREAD,
-    },
-    {
-      $set: {
-        isRead: MESSAGE_READ.READ,
-        messageStatus: MESSAGE_STATUS.SEEN,
-        UpdatedAt: new Date(),
-      },
-    }
+  const imageMap = await loadMessageImages(rows.map((row) => row._id));
+  const clientMessages = rows.map((row) =>
+    mapMessageToClient(row, viewer, imageMap.get(String(row._id)) || [])
   );
 
-  return messages.map((message) => mapMessageToClient(message, user._id));
+  const totalCount = await Message.countDocuments({
+    conversationId: conversation._id,
+    DeletedAt: null,
+  });
+
+  return {
+    messages: clientMessages,
+    sequence: buildSequenceMeta(clientMessages, totalCount),
+  };
+}
+
+async function listConversationMessages(user, conversationId) {
+  const { shop, conversation } = await getOwnedConversation(user, conversationId);
+  const viewer = buildViewerContext(user, shop, "seller");
+  await markOpponentMessagesRead(conversation, viewer);
+  return fetchConversationMessages(conversation, viewer, shop);
 }
 
 async function listBuyerConversationMessages(user, conversationId) {
-  const { conversation } = await getBuyerOwnedConversation(user, conversationId);
-  const messages = await Message.find({ conversationId: conversation._id })
-    .sort({ CreatedAt: 1 })
-    .limit(200);
-
-  await Message.updateMany(
-    {
-      conversationId: conversation._id,
-      senderId: { $ne: user._id },
-      isRead: MESSAGE_READ.UNREAD,
-    },
-    {
-      $set: {
-        isRead: MESSAGE_READ.READ,
-        messageStatus: MESSAGE_STATUS.SEEN,
-        UpdatedAt: new Date(),
-      },
-    }
-  );
-
-  return messages.map((message) => mapMessageToClient(message, user._id));
+  const { shop, conversation } = await getBuyerOwnedConversation(user, conversationId);
+  const viewer = buildViewerContext(user, shop, "buyer");
+  await markOpponentMessagesRead(conversation, viewer);
+  return fetchConversationMessages(conversation, viewer, shop);
 }
 
 async function sendSellerMessage(user, conversationId, payload) {
-  const { conversation } = await getOwnedConversation(user, conversationId);
-  const message = await createConversationMessage(conversation, user._id, payload);
-  return mapMessageToClient(message, user._id);
+  const { shop, conversation } = await getOwnedConversation(user, conversationId);
+  const viewer = buildViewerContext(user, shop, "seller");
+  const message = await createConversationMessage(
+    conversation,
+    shop._id,
+    SENDER_TYPE.SHOP,
+    payload,
+    viewer
+  );
+  const images = await loadMessageImages([message._id]);
+  return mapMessageToClient(message, viewer, images.get(String(message._id)) || []);
 }
 
 async function sendBuyerMessage(user, conversationId, payload) {
-  const { conversation } = await getBuyerOwnedConversation(user, conversationId);
-  const message = await createConversationMessage(conversation, user._id, payload);
-  return mapMessageToClient(message, user._id);
+  const { shop, conversation } = await getBuyerOwnedConversation(user, conversationId);
+  const viewer = buildViewerContext(user, shop, "buyer");
+  const message = await createConversationMessage(
+    conversation,
+    user._id,
+    SENDER_TYPE.USER,
+    payload,
+    viewer
+  );
+  const images = await loadMessageImages([message._id]);
+  return mapMessageToClient(message, viewer, images.get(String(message._id)) || []);
+}
+
+async function deleteMessage(user, conversationId, messageId, { asSeller = false } = {}) {
+  const { shop, conversation } = asSeller
+    ? await getOwnedConversation(user, conversationId)
+    : await getBuyerOwnedConversation(user, conversationId);
+
+  const viewer = buildViewerContext(user, shop, asSeller ? "seller" : "buyer");
+  const ownerFilter = asSeller
+    ? { senderId: shop._id, senderType: SENDER_TYPE.SHOP }
+    : { senderId: user._id, senderType: SENDER_TYPE.USER };
+
+  const message = await Message.findOne({
+    _id: messageId,
+    conversationId: conversation._id,
+    ...ownerFilter,
+    DeletedAt: null,
+  });
+
+  if (!message) {
+    throw createServiceError("Không tìm thấy tin nhắn để gỡ.", 404);
+  }
+
+  message.DeletedAt = new Date();
+  message.UpdatedAt = new Date();
+  message.content = "";
+  await message.save();
+
+  const clientMessage = mapMessageToClient(message, viewer);
+  emitConversationEvent(String(conversation._id), "message:deleted", {
+    conversationId: String(conversation._id),
+    message: mapMessageToBroadcast(message),
+  });
+
+  return clientMessage;
+}
+
+async function getSellerConversationPeer(user, conversationId) {
+  const { conversation } = await getOwnedConversation(user, conversationId);
+  const buyer = await User.findById(conversation.userId);
+  return mapBuyerPublicInfo(buyer);
+}
+
+async function getBuyerConversationPeer(user, conversationId) {
+  const { shop } = await getBuyerOwnedConversation(user, conversationId);
+  return getShopPublicInfo(shop);
 }
 
 async function listBuyerConversations(user) {
@@ -331,8 +733,9 @@ async function listBuyerConversations(user) {
 
     const unreadCount = await Message.countDocuments({
       conversationId: conversation._id,
-      senderId: { $ne: user._id },
+      ...buildUnreadFilter(buildViewerContext(user, shop, "buyer")),
       isRead: MESSAGE_READ.UNREAD,
+      DeletedAt: null,
     });
 
     result.push({
@@ -449,6 +852,11 @@ module.exports = {
   listBuyerConversationMessages,
   sendSellerMessage,
   sendBuyerMessage,
+  deleteMessage,
+  getSellerConversationPeer,
+  getBuyerConversationPeer,
   startConversationWithShop,
   startConversationWithBuyer,
+  getShopPublicInfo,
+  mapBuyerPublicInfo,
 };

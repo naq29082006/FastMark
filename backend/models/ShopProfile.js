@@ -30,6 +30,9 @@ const ShopProfileSchema = new mongoose.Schema({
   totalProducts: { type: Number, default: 0 },
   soldCount: { type: Number, default: 0 },
 
+  DangHoatDong: { type: Boolean, default: false },
+  LanHoatDongCuoi: { type: Date, default: null },
+
   CreatedAt: { type: Date, default: Date.now },
   UpdatedAt: { type: Date, default: Date.now },
 });

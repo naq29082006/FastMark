@@ -77,7 +77,10 @@ export async function getBuyerMessagesOnBackend(conversationId) {
       AUTH_TIMEOUT_MS
     );
     const payload = await parseApiResponse(response);
-    return payload.data?.messages || [];
+    return {
+      messages: payload.data?.messages || [],
+      sequence: payload.data?.sequence || null,
+    };
   });
 }
 
@@ -98,5 +101,32 @@ export async function sendBuyerMessageOnBackend({ conversationId, content, image
     );
     const payload = await parseApiResponse(response);
     return payload.data?.message;
+  });
+}
+
+export async function deleteBuyerMessageOnBackend(conversationId, messageId) {
+  return callWithAuthToken(async (idToken) => {
+    const response = await apiRequest(
+      API_ENDPOINTS.buyerConversationMessage(conversationId, messageId),
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${idToken}` },
+      },
+      AUTH_TIMEOUT_MS
+    );
+    const payload = await parseApiResponse(response);
+    return payload.data?.message;
+  });
+}
+
+export async function getBuyerConversationPeerOnBackend(conversationId) {
+  return callWithAuthToken(async (idToken) => {
+    const response = await apiRequest(
+      API_ENDPOINTS.buyerConversationPeer(conversationId),
+      { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+      AUTH_TIMEOUT_MS
+    );
+    const payload = await parseApiResponse(response);
+    return payload.data?.peer;
   });
 }

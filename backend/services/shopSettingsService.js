@@ -20,6 +20,7 @@ function toPublicShopSettings(shop, user) {
       : "";
 
   return {
+    id: shop._id,
     shopId: shop._id,
     shopUsername: shop.shopUsername || "",
     shopName: shop.shopName || "",

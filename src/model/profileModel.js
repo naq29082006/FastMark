@@ -115,6 +115,10 @@ export function mergeProfile(authUser, baseProfile, updates = {}) {
       patch.responseRate !== undefined
         ? Number(patch.responseRate) || 0
         : Number(baseProfile?.responseRate) || 0,
+    mongoUserId:
+      patch.mongoUserId !== undefined
+        ? cleanText(patch.mongoUserId)
+        : baseProfile?.mongoUserId || '',
     shopPhone:
       patch.shopPhone !== undefined
         ? cleanText(patch.shopPhone)
@@ -201,6 +205,7 @@ export function mapSellerVerificationToProfilePatch(verification) {
 
 export function mapBackendUserToProfile(backendUser, authUser) {
   return mergeProfile(authUser, null, {
+    mongoUserId: backendUser?.id ? String(backendUser.id) : '',
     fullName: backendUser?.fullName,
     phone: backendUser?.phone,
     photoUrl: backendUser?.avatar,

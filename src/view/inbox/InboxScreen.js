@@ -17,8 +17,7 @@ import {
 import { getSellerConversationsOnBackend } from '../../api/sellerOpsApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
-import SellerChatScreen from '../seller/SellerChatScreen';
-import BuyerChatScreen from './BuyerChatScreen';
+import ChatScreen from './ChatScreen';
 
 const INBOX_TABS = [
   { key: 'messages', label: 'Tin nhắn' },
@@ -82,7 +81,7 @@ function buildShopSuggestions(conversations, shops) {
     }));
 }
 
-export default function InboxScreen({ chatRequest = null, buyerView = false }) {
+export default function InboxScreen({ chatRequest = null, buyerView = false, onViewShop }) {
   const isSeller = useSelector(selectIsSeller);
   const showSellerInbox = isSeller && !buyerView;
   const [activeTab, setActiveTab] = useState('messages');
@@ -158,28 +157,19 @@ export default function InboxScreen({ chatRequest = null, buyerView = false }) {
   }, [conversations, searchQuery, shopSuggestions, showSellerInbox]);
 
   if (selectedChat) {
-    if (showSellerInbox) {
-      return (
-        <SellerChatScreen
-          conversationId={selectedChat.id}
-          buyerName={selectedChat.buyerName}
-          onBack={() => {
-            setSelectedChat(null);
-            loadConversations();
-          }}
-        />
-      );
-    }
-
     return (
-      <BuyerChatScreen
-        conversationId={selectedChat.conversationId}
+      <ChatScreen
+        mode={showSellerInbox ? 'seller' : 'buyer'}
+        conversationId={selectedChat.conversationId || selectedChat.id}
         shopId={selectedChat.shopId}
         shopName={selectedChat.shopName}
+        buyerId={selectedChat.buyerId}
+        buyerName={selectedChat.buyerName}
         onBack={() => {
           setSelectedChat(null);
           loadConversations();
         }}
+        onViewShop={onViewShop}
       />
     );
   }
@@ -260,7 +250,8 @@ export default function InboxScreen({ chatRequest = null, buyerView = false }) {
                   style={styles.listItem}
                   onPress={() =>
                     setSelectedChat({
-                      id: item.id,
+                      conversationId: item.id,
+                      buyerId: item.buyer?.id,
                       buyerName:
                         item.buyer?.fullName || item.buyer?.userName || 'Khách hàng',
                     })

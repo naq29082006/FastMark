@@ -141,7 +141,8 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
     setError('');
     try {
       const idToken = await getCurrentUserIdToken();
-      const data = await getSellerMessagesOnBackend(idToken, conversationId);
+      const result = await getSellerMessagesOnBackend(idToken, conversationId);
+      const data = Array.isArray(result) ? result : result?.messages;
       setMessages(Array.isArray(data) && data.length > 0 ? data : getMockMessages(conversationId, buyerName));
     } catch (loadError) {
       setMessages(getMockMessages(conversationId, buyerName));

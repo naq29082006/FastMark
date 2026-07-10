@@ -37,4 +37,17 @@ router.post(
   asyncHandler(authController.uploadCover)
 );
 
+router.post("/presence/online", verifyFirebaseToken, asyncHandler(authController.setPresenceOnline));
+router.post("/presence/offline", verifyFirebaseToken, asyncHandler(authController.setPresenceOffline));
+router.post(
+  "/presence/shop/online",
+  verifyFirebaseToken,
+  asyncHandler(authController.setShopPresenceOnline)
+);
+router.post(
+  "/presence/shop/offline",
+  verifyFirebaseToken,
+  asyncHandler(authController.setShopPresenceOffline)
+);
+
 module.exports = router;

@@ -3,6 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { usePresence } from '../hooks/usePresence';
 import AuthenticatedHome from '../view/auth/AuthenticatedHome';
 import AuthScreen from '../view/auth/AuthScreen';
 import EmailVerificationScreen from '../view/auth/EmailVerificationScreen';
@@ -37,6 +38,8 @@ export default function FastmarkApp() {
   const profileStatus = useSelector(selectAuthProfileStatus);
   const pendingGoogle = useSelector(selectPendingGoogle);
   const needsEmailVerification = useSelector(selectNeedsEmailVerification);
+
+  usePresence();
 
   useEffect(() => {
     log.info('startup');

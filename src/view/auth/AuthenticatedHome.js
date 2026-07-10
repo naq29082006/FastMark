@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { APP_MODE_BUYER, APP_MODE_SELLER, useAppMode } from '../../hooks/useAppMode';
+import { useShopPresence } from '../../hooks/useShopPresence';
 import { useSellerAccessSync } from '../../hooks/useSellerAccessSync';
 import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
 import { syncSellerAccess } from '../../viewmodel/auth/authSlice';
@@ -73,6 +74,8 @@ export default function AuthenticatedHome() {
   const dispatch = useDispatch();
   const isSeller = useSelector(selectIsSeller);
   const { appMode, setAppMode, isReady, isBuyerMode, isSellerMode } = useAppMode(isSeller);
+
+  useShopPresence(appMode);
 
   const tabs = isSellerMode ? SELLER_TABS : BUYER_TABS;
   const [activeTab, setActiveTab] = useState(BUYER_TABS[0].key);
@@ -177,7 +180,13 @@ export default function AuthenticatedHome() {
         search: <SearchScreen onSelectLocation={handleSearchSelect} />,
         products: <ProductsScreen />,
         orders: <BuyerOrdersScreen onOpenStore={handleOpenStoreFromProfile} />,
-        inbox: <InboxScreen buyerView chatRequest={inboxChatRequest} />,
+        inbox: (
+          <InboxScreen
+            buyerView
+            chatRequest={inboxChatRequest}
+            onViewShop={handleOpenStoreFromProfile}
+          />
+        ),
         profile: (
           <ProfilePanel
             profileMode="buyer"

@@ -46,11 +46,11 @@ exports.startConversation = async (req, res) => {
 };
 
 exports.listMessages = async (req, res) => {
-  const messages = await messageService.listBuyerConversationMessages(
+  const result = await messageService.listBuyerConversationMessages(
     req.currentUser,
     req.params.id
   );
-  return success(res, { data: { messages } });
+  return success(res, { data: result });
 };
 
 exports.sendMessage = async (req, res) => {
@@ -72,6 +72,25 @@ exports.sendMessage = async (req, res) => {
     message: "Đã gửi tin nhắn.",
     data: { message },
   });
+};
+
+exports.deleteMessage = async (req, res) => {
+  const message = await messageService.deleteMessage(
+    req.currentUser,
+    req.params.id,
+    req.params.messageId,
+    { asSeller: false }
+  );
+
+  return success(res, {
+    message: "Đã gỡ tin nhắn.",
+    data: { message },
+  });
+};
+
+exports.getConversationPeer = async (req, res) => {
+  const peer = await messageService.getBuyerConversationPeer(req.currentUser, req.params.id);
+  return success(res, { data: { peer } });
 };
 
 exports.listReviews = async (req, res) => {

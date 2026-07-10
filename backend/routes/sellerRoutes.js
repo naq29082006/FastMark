@@ -122,6 +122,18 @@ router.post(
   requireSeller,
   asyncHandler(sellerOpsController.sendMessage)
 );
+router.delete(
+  "/conversations/:id/messages/:messageId",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerOpsController.deleteMessage)
+);
+router.get(
+  "/conversations/:id/peer",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerOpsController.getConversationPeer)
+);
 
 router.get("/stats", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.getStats));
 

@@ -1,5 +1,6 @@
 const authService = require("../services/authService");
 const userService = require("../services/userService");
+const presenceService = require("../services/presenceService");
 const { buildPublicUserProfile } = require("../services/profileService");
 const {
   resolveFileExtension,
@@ -381,5 +382,33 @@ exports.uploadCover = async (req, res) => {
       coverImageUrl: uploadResult.publicUrl,
       storagePath: uploadResult.path,
     },
+  });
+};
+
+exports.setPresenceOnline = async (req, res) => {
+  const presence = await presenceService.setUserOnline(req.currentUser);
+  return success(res, {
+    data: { presence },
+  });
+};
+
+exports.setPresenceOffline = async (req, res) => {
+  const presence = await presenceService.setUserOffline(req.currentUser);
+  return success(res, {
+    data: { presence },
+  });
+};
+
+exports.setShopPresenceOnline = async (req, res) => {
+  const presence = await presenceService.setShopOnline(req.currentUser);
+  return success(res, {
+    data: { presence },
+  });
+};
+
+exports.setShopPresenceOffline = async (req, res) => {
+  const presence = await presenceService.setShopOffline(req.currentUser);
+  return success(res, {
+    data: { presence },
   });
 };

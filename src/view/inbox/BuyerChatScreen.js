@@ -147,7 +147,8 @@ export default function BuyerChatScreen({ conversationId, shopId, shopName, onBa
 
     try {
       const activeConversationId = await ensureConversation();
-      const data = await getBuyerMessagesOnBackend(activeConversationId);
+      const result = await getBuyerMessagesOnBackend(activeConversationId);
+      const data = Array.isArray(result) ? result : result?.messages;
       setMessages(Array.isArray(data) ? data : []);
     } catch (loadError) {
       setMessages([]);
