@@ -139,12 +139,17 @@ exports.listMessages = async (req, res) => {
 
 exports.sendMessage = async (req, res) => {
   const content = pickBodyValue(req.body, ["content", "message"]);
-  if (!content) {
+  const imageContent = pickBodyValue(req.body, ["imageContent", "imageUri"]);
+  const messageType = req.body.messageType;
+
+  if (!content && !imageContent && Number(messageType) !== 1) {
     return fail(res, { status: 400, message: "Thiếu nội dung tin nhắn." });
   }
 
   const message = await messageService.sendSellerMessage(req.currentUser, req.params.id, {
     content,
+    messageType,
+    imageContent,
   });
   return success(res, {
     message: "Đã gửi tin nhắn.",

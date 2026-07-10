@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const storeRoutes = require('./routes/storeRoutes');
 const sellerRoutes = require('./routes/sellerRoutes');
+const buyerRoutes = require('./routes/buyerRoutes');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const errorHandler = require('./middleware/errorHandler');
@@ -32,6 +33,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/profile', profileRoutes);
 app.use('/api/seller', sellerRoutes);
+app.use('/api/buyer', buyerRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api', storeRoutes);

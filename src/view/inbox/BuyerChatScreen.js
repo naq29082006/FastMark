@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,11 +12,12 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { getCurrentUserIdToken } from '../../repository/authRepository';
 import {
-  getSellerMessagesOnBackend,
-  sendSellerMessageOnBackend,
-} from '../../api/sellerOpsApi';
+  getBuyerMessagesOnBackend,
+  sendBuyerMessageOnBackend,
+  startBuyerConversationOnBackend,
+} from '../../api/messageApi';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
 
 const MESSAGE_STATUS_LABEL = {
   sent: 'Đã gửi',
@@ -23,52 +25,13 @@ const MESSAGE_STATUS_LABEL = {
   seen: 'Đã xem',
 };
 
-function isMockConversation(conversationId) {
-  return String(conversationId || '').startsWith('mock-');
+function isRealConversationId(value) {
+  const id = String(value || '');
+  return id.length > 0 && !id.startsWith('mock-') && !id.startsWith('shop-');
 }
 
-function getActivityStatus(conversationId, buyerName) {
-  if (conversationId === 'mock-1' || buyerName === 'Nguyễn Văn An') {
-    return 'Đang hoạt động';
-  }
-  return 'Hoạt động 5 phút trước';
-}
-
-function getMockMessages(conversationId, buyerName) {
-  if (conversationId === 'mock-1' || buyerName === 'Nguyễn Văn An') {
-    return [
-      {
-        id: 'mock-msg-1',
-        content: 'Shop ơi, sản phẩm này còn hàng không ạ?',
-        isMine: false,
-      },
-      {
-        id: 'mock-msg-2',
-        content: 'Dạ shop còn hàng ạ, bạn cần đặt mấy phần?',
-        isMine: true,
-        status: 'seen',
-      },
-      {
-        id: 'mock-msg-3',
-        content: 'Cho mình 2 phần, giao chiều nay được không?',
-        isMine: false,
-      },
-    ];
-  }
-
-  return [
-    {
-      id: `mock-msg-${conversationId}-1`,
-      content: `Xin chào shop, mình là ${buyerName || 'khách hàng'}.`,
-      isMine: false,
-    },
-    {
-      id: `mock-msg-${conversationId}-2`,
-      content: 'Dạ shop có thể hỗ trợ đơn hàng giúp mình nhé.',
-      isMine: true,
-      status: 'delivered',
-    },
-  ];
+function getActivityStatus() {
+  return 'Đang hoạt động';
 }
 
 function createLocalMessage(content, extra = {}) {
@@ -89,40 +52,70 @@ function MessageStatus({ status }) {
   return <Text style={styles.messageStatus}>{MESSAGE_STATUS_LABEL[status] || 'Đã gửi'}</Text>;
 }
 
-function ChatBubble({ item }) {
-  const isMine = Boolean(item.isMine);
+function ImageMessageContent({ imageUri, isMine, caption }) {
+  const showCaption = Boolean(caption);
 
   return (
-    <View style={[styles.messageRow, isMine ? styles.messageRowMine : styles.messageRowOther]}>
-      <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
-        {item.imageUri ? (
-          <View style={styles.imageBubble}>
-            <Text style={styles.imageBubbleIcon}>🖼️</Text>
-            <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]} numberOfLines={2}>
-              {item.content || 'Ảnh sản phẩm'}
-            </Text>
-          </View>
-        ) : (
-          <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{item.content}</Text>
-        )}
-      </View>
-      {isMine ? <MessageStatus status={item.status} /> : null}
+    <View style={styles.imageMessageWrap}>
+      <Image source={{ uri: imageUri }} style={styles.chatImage} resizeMode="cover" />
+      {showCaption ? (
+        <Text style={[styles.imageCaption, isMine && styles.bubbleTextMine]}>{caption}</Text>
+      ) : null}
     </View>
   );
 }
 
-export default function SellerChatScreen({ conversationId, buyerName, onBack }) {
+function ChatBubble({ item, shopInitial }) {
+  const isMine = Boolean(item.isMine);
+
+  if (isMine) {
+    return (
+      <View style={[styles.messageRow, styles.messageRowMine]}>
+        <View style={[styles.bubble, styles.bubbleMine, item.imageUri && styles.bubbleImage]}>
+          {item.imageUri ? (
+            <ImageMessageContent imageUri={item.imageUri} isMine caption={item.content} />
+          ) : (
+            <Text style={[styles.bubbleText, styles.bubbleTextMine]}>{item.content}</Text>
+          )}
+        </View>
+        <MessageStatus status={item.status} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.messageRowOtherWrap}>
+      <View style={styles.shopAvatar}>
+        <Text style={styles.shopAvatarText}>{shopInitial || 'S'}</Text>
+      </View>
+      <View style={styles.messageRowOther}>
+        <View style={[styles.bubble, styles.bubbleOther, item.imageUri && styles.bubbleImage]}>
+          {item.imageUri ? (
+            <ImageMessageContent imageUri={item.imageUri} isMine={false} caption={item.content} />
+          ) : (
+            <Text style={styles.bubbleText}>{item.content}</Text>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export default function BuyerChatScreen({ conversationId, shopId, shopName, onBack }) {
   const listRef = useRef(null);
+  const [resolvedConversationId, setResolvedConversationId] = useState(
+    isRealConversationId(conversationId) ? String(conversationId) : null
+  );
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState('');
 
-  const displayName = buyerName || 'Tin nhắn';
-  const activityStatus = getActivityStatus(conversationId, buyerName);
-  const canSend = draft.trim().length > 0 && !isSending;
-  const useMockData = isMockConversation(conversationId);
+  const displayName = shopName || 'Gian hàng';
+  const shopInitial = displayName.charAt(0).toUpperCase();
+  const activityStatus = getActivityStatus();
+  const canSend = draft.trim().length > 0 && !isSending && Boolean(resolvedConversationId);
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => {
@@ -130,26 +123,42 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
     });
   }, []);
 
-  const loadMessages = useCallback(async () => {
-    if (useMockData) {
-      setMessages(getMockMessages(conversationId, buyerName));
-      setIsLoading(false);
-      return;
+  const ensureConversation = useCallback(async () => {
+    if (resolvedConversationId) {
+      return resolvedConversationId;
     }
 
+    if (!shopId) {
+      throw new Error('Không tìm thấy gian hàng để nhắn tin.');
+    }
+
+    const idToken = await getCurrentUserIdToken();
+    const result = await startBuyerConversationOnBackend({ idToken, shopId });
+    const nextId = String(result.conversationId || '');
+    if (!nextId) {
+      throw new Error('Không tạo được cuộc trò chuyện.');
+    }
+
+    setResolvedConversationId(nextId);
+    return nextId;
+  }, [resolvedConversationId, shopId]);
+
+  const loadMessages = useCallback(async () => {
     setIsLoading(true);
     setError('');
+
     try {
+      const activeConversationId = await ensureConversation();
       const idToken = await getCurrentUserIdToken();
-      const data = await getSellerMessagesOnBackend(idToken, conversationId);
-      setMessages(Array.isArray(data) && data.length > 0 ? data : getMockMessages(conversationId, buyerName));
+      const data = await getBuyerMessagesOnBackend(idToken, activeConversationId);
+      setMessages(Array.isArray(data) ? data : []);
     } catch (loadError) {
-      setMessages(getMockMessages(conversationId, buyerName));
-      setError(loadError.message || 'Không tải được tin nhắn. Đang hiển thị dữ liệu mẫu.');
+      setMessages([]);
+      setError(loadError.message || 'Không tải được tin nhắn.');
     } finally {
       setIsLoading(false);
     }
-  }, [buyerName, conversationId, useMockData]);
+  }, [ensureConversation]);
 
   useEffect(() => {
     loadMessages();
@@ -161,30 +170,9 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
     }
   }, [isLoading, messages.length, scrollToEnd]);
 
-  function promoteMessageStatus(messageId, status) {
-    setMessages((current) =>
-      current.map((item) => (item.id === messageId ? { ...item, status } : item))
-    );
-  }
-
-  function appendLocalMessage(message) {
-    setMessages((current) => [...current, message]);
-    scrollToEnd();
-
-    setTimeout(() => promoteMessageStatus(message.id, 'delivered'), 800);
-    setTimeout(() => promoteMessageStatus(message.id, 'seen'), 1800);
-  }
-
   async function handleSend() {
     const content = draft.trim();
     if (!content || isSending) {
-      return;
-    }
-
-    if (useMockData) {
-      const message = createLocalMessage(content);
-      setDraft('');
-      appendLocalMessage(message);
       return;
     }
 
@@ -195,16 +183,17 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
     scrollToEnd();
 
     try {
+      const activeConversationId = await ensureConversation();
       const idToken = await getCurrentUserIdToken();
-      const message = await sendSellerMessageOnBackend({ idToken, conversationId, content });
+      const message = await sendBuyerMessageOnBackend({
+        idToken,
+        conversationId: activeConversationId,
+        content,
+      });
+
       setMessages((current) =>
-        current.map((item) =>
-          item.id === optimistic.id
-            ? { ...message, isMine: true, status: message.status || 'delivered' }
-            : item
-        )
+        current.map((item) => (item.id === optimistic.id ? message : item))
       );
-      promoteMessageStatus(message.id || optimistic.id, 'seen');
     } catch (sendError) {
       setMessages((current) => current.filter((item) => item.id !== optimistic.id));
       setDraft(content);
@@ -224,7 +213,8 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      quality: 0.8,
+      quality: 0.7,
+      base64: true,
     });
 
     if (result.canceled || !result.assets?.[0]) {
@@ -232,17 +222,39 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
     }
 
     const asset = result.assets[0];
-    const message = createLocalMessage('Đã gửi ảnh sản phẩm', {
-      imageUri: asset.uri,
-    });
-
-    if (useMockData) {
-      appendLocalMessage(message);
+    if (!asset.base64) {
+      setError('Không đọc được ảnh đã chọn. Vui lòng thử lại.');
       return;
     }
 
-    appendLocalMessage(message);
-    setError('Ảnh đã được thêm vào cuộc trò chuyện (demo UI). Tích hợp upload server sẽ bổ sung sau.');
+    const imageContent = `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`;
+    const optimistic = createLocalMessage('', { imageUri: asset.uri, status: 'sent' });
+    setMessages((current) => [...current, optimistic]);
+    scrollToEnd();
+    setIsSending(true);
+
+    try {
+      const activeConversationId = await ensureConversation();
+      const idToken = await getCurrentUserIdToken();
+      const message = await sendBuyerMessageOnBackend({
+        idToken,
+        conversationId: activeConversationId,
+        imageContent,
+      });
+
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === optimistic.id
+            ? { ...message, imageUri: message.imageUri || asset.uri }
+            : item
+        )
+      );
+    } catch (sendError) {
+      setMessages((current) => current.filter((item) => item.id !== optimistic.id));
+      setError(sendError.message || 'Không gửi được ảnh.');
+    } finally {
+      setIsSending(false);
+    }
   }
 
   return (
@@ -290,8 +302,8 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
           onContentSizeChange={scrollToEnd}
-          renderItem={({ item }) => <ChatBubble item={item} />}
-          ListEmptyComponent={<Text style={styles.emptyText}>Chưa có tin nhắn.</Text>}
+          renderItem={({ item }) => <ChatBubble item={item} shopInitial={shopInitial} />}
+          ListEmptyComponent={<Text style={styles.emptyText}>Chưa có tin nhắn. Hãy gửi lời chào.</Text>}
         />
       )}
 
@@ -299,6 +311,7 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
         <Pressable
           accessibilityRole="button"
           onPress={handlePickImage}
+          disabled={isSending}
           style={({ pressed }) => [styles.attachButton, pressed && styles.buttonPressed]}
         >
           <Text style={styles.attachButtonText}>📷</Text>
@@ -386,8 +399,31 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     alignItems: 'flex-end',
   },
-  messageRowOther: {
+  messageRowOtherWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     alignSelf: 'flex-start',
+    maxWidth: '88%',
+    marginBottom: 10,
+    gap: 8,
+  },
+  shopAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#0d7377',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  shopAvatarText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  messageRowOther: {
+    flex: 1,
+    minWidth: 0,
     alignItems: 'flex-start',
   },
   bubble: {
@@ -407,8 +443,26 @@ const styles = StyleSheet.create({
   },
   bubbleText: { color: '#0f172a', fontSize: 14, lineHeight: 20, fontWeight: '500' },
   bubbleTextMine: { color: '#ffffff' },
-  imageBubble: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  imageBubbleIcon: { fontSize: 18 },
+  bubbleImage: {
+    padding: 4,
+    overflow: 'hidden',
+  },
+  imageMessageWrap: {
+    maxWidth: 220,
+  },
+  chatImage: {
+    width: 220,
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: '#e2e8f0',
+  },
+  imageCaption: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#0f172a',
+    fontWeight: '500',
+  },
   messageStatus: {
     marginTop: 4,
     fontSize: 11,

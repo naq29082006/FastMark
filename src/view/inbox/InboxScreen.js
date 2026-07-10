@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSelector } from 'react-redux';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import {
+  getBuyerConversationsOnBackend,
+  getBuyerShopsOnBackend,
+} from '../../api/messageApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
-import { getSellerConversationsOnBackend } from '../../api/sellerOpsApi';
-import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
-import SellerChatScreen from '../seller/SellerChatScreen';
+import BuyerChatScreen from './BuyerChatScreen';
 
 const INBOX_TABS = [
   { key: 'messages', label: 'Tin nhắn' },
@@ -12,33 +21,92 @@ const INBOX_TABS = [
 ];
 
 const MOCK_NOTIFICATIONS = [
-  { id: '1', title: 'Đơn hàng mới', body: 'Bạn có tin nhắn mới từ khách hàng.', time: '5 phút', unread: true },
-  { id: '2', title: 'Khuyến mãi', body: 'Giảm 10% phí đăng tin tuần này.', time: '1 giờ', unread: false },
+  {
+    id: '1',
+    title: 'Đơn hàng đã xác nhận',
+    body: 'Gian hàng đã xác nhận đơn của bạn.',
+    time: '5 phút',
+    unread: true,
+  },
+  {
+    id: '2',
+    title: 'Khuyến mãi',
+    body: 'Giảm 10% cho đơn đầu tiên tại cửa hàng đối tác.',
+    time: '1 giờ',
+    unread: false,
+  },
 ];
 
+function getConversationName(item) {
+  return item.shop?.name || 'Gian hàng';
+}
+
+function getConversationKey(item) {
+  return String(item.id || item.shop?.id || item.shopId);
+}
+
+function filterConversations(conversations, query) {
+  const keyword = query.trim().toLowerCase();
+  if (!keyword) {
+    return conversations;
+  }
+
+  return conversations.filter((item) => {
+    const name = getConversationName(item).toLowerCase();
+    const preview = String(item.lastMessage || '').toLowerCase();
+    return name.includes(keyword) || preview.includes(keyword);
+  });
+}
+
+function buildShopSuggestions(conversations, shops) {
+  const existingShopIds = new Set(
+    conversations.map((item) => String(item.shop?.id || '')).filter(Boolean)
+  );
+
+  return shops
+    .filter((entry) => entry?.shop?.id && !existingShopIds.has(String(entry.shop.id)))
+    .slice(0, 6)
+    .map((entry) => ({
+      id: `shop-${entry.shop.id}`,
+      shopId: entry.shop.id,
+      shop: entry.shop,
+      lastMessage: 'Bắt đầu trò chuyện với gian hàng',
+      timeLabel: '',
+      unreadCount: 0,
+      isNew: true,
+    }));
+}
+
 export default function InboxScreen() {
-  const isSeller = useSelector(selectIsSeller);
   const [activeTab, setActiveTab] = useState('messages');
+  const [searchQuery, setSearchQuery] = useState('');
   const [conversations, setConversations] = useState([]);
+  const [shopSuggestions, setShopSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [selectedChat, setSelectedChat] = useState(null);
 
   const loadConversations = useCallback(async () => {
-    if (!isSeller) {
-      setConversations([]);
-      return;
-    }
     setIsLoading(true);
+    setLoadError('');
+
     try {
       const idToken = await getCurrentUserIdToken();
-      const data = await getSellerConversationsOnBackend(idToken);
-      setConversations(data);
-    } catch {
+      const [conversationRows, shopRows] = await Promise.all([
+        getBuyerConversationsOnBackend(idToken),
+        getBuyerShopsOnBackend(idToken),
+      ]);
+
+      setConversations(Array.isArray(conversationRows) ? conversationRows : []);
+      setShopSuggestions(buildShopSuggestions(conversationRows || [], shopRows || []));
+    } catch (error) {
       setConversations([]);
+      setShopSuggestions([]);
+      setLoadError(error.message || 'Không tải được hộp thư. Vui lòng đăng nhập lại.');
     } finally {
       setIsLoading(false);
     }
-  }, [isSeller]);
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'messages') {
@@ -46,12 +114,21 @@ export default function InboxScreen() {
     }
   }, [activeTab, loadConversations]);
 
+  const messageConversations = useMemo(() => {
+    const merged = [...conversations, ...shopSuggestions];
+    return filterConversations(merged, searchQuery);
+  }, [conversations, searchQuery, shopSuggestions]);
+
   if (selectedChat) {
     return (
-      <SellerChatScreen
-        conversationId={selectedChat.id}
-        buyerName={selectedChat.buyerName}
-        onBack={() => setSelectedChat(null)}
+      <BuyerChatScreen
+        conversationId={selectedChat.conversationId}
+        shopId={selectedChat.shopId}
+        shopName={selectedChat.shopName}
+        onBack={() => {
+          setSelectedChat(null);
+          loadConversations();
+        }}
       />
     );
   }
@@ -60,9 +137,7 @@ export default function InboxScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.title}>Inbox</Text>
-        <Text style={styles.subtitle}>
-          {isSeller ? 'Tin nhắn khách hàng' : 'Tin nhắn và thông báo'}
-        </Text>
+        <Text style={styles.subtitle}>Tin nhắn với gian hàng</Text>
       </View>
 
       <View style={styles.tabRow}>
@@ -81,19 +156,41 @@ export default function InboxScreen() {
       </View>
 
       {activeTab === 'messages' ? (
+        <View style={styles.searchWrap}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Tìm kiếm cuộc trò chuyện..."
+            placeholderTextColor="#94a3b8"
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+          />
+        </View>
+      ) : null}
+
+      {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
+
+      {activeTab === 'messages' ? (
         isLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator color="#0d7377" />
           </View>
         ) : (
           <FlatList
-            data={conversations}
-            keyExtractor={(item) => String(item.id)}
+            data={messageConversations}
+            keyExtractor={(item) => getConversationKey(item)}
             contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyIcon}>💬</Text>
-                <Text style={styles.emptyTitle}>Chưa có tin nhắn</Text>
+                <Text style={styles.emptyTitle}>Chưa có cuộc trò chuyện</Text>
+                <Text style={styles.emptySubtitle}>
+                  Hãy chọn gian hàng bên dưới để bắt đầu nhắn tin.
+                </Text>
               </View>
             }
             renderItem={({ item }) => (
@@ -101,25 +198,31 @@ export default function InboxScreen() {
                 style={styles.listItem}
                 onPress={() =>
                   setSelectedChat({
-                    id: item.id,
-                    buyerName: item.buyer?.fullName || item.buyer?.userName || 'Khách hàng',
+                    conversationId: item.isNew ? null : item.id,
+                    shopId: item.shop?.id || item.shopId,
+                    shopName: getConversationName(item),
                   })
                 }
               >
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {(item.buyer?.fullName || 'K').charAt(0)}
-                  </Text>
+                  <Text style={styles.avatarText}>{getConversationName(item).charAt(0)}</Text>
                 </View>
+
                 <View style={styles.listBody}>
                   <View style={styles.listTopRow}>
-                    <Text style={styles.listTitle}>{item.buyer?.fullName || 'Khách hàng'}</Text>
-                    <Text style={styles.listTime}>{item.timeLabel}</Text>
+                    <Text style={styles.listTitle} numberOfLines={1}>
+                      {getConversationName(item)}
+                    </Text>
+                    <Text style={styles.listTime}>{item.timeLabel || ''}</Text>
                   </View>
-                  <Text style={styles.listPreview} numberOfLines={1}>
+                  <Text
+                    style={[styles.listPreview, item.isNew && styles.listPreviewNew]}
+                    numberOfLines={1}
+                  >
                     {item.lastMessage || 'Chưa có tin nhắn'}
                   </Text>
                 </View>
+
                 {item.unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
               </Pressable>
             )}
@@ -164,8 +267,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
   },
   tabItem: {
     flex: 1,
@@ -178,7 +279,30 @@ const styles = StyleSheet.create({
   tabItemActive: { backgroundColor: '#e8f3f1' },
   tabText: { fontWeight: '700', color: '#64748b' },
   tabTextActive: { color: '#0d7377' },
-  listContent: { padding: 16, paddingBottom: 32 },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0f172a',
+    fontWeight: '500',
+  },
+  listContent: { paddingHorizontal: 16, paddingBottom: 32 },
   listItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -190,9 +314,9 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#e8f3f1',
     alignItems: 'center',
     justifyContent: 'center',
@@ -200,10 +324,11 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 18, fontWeight: '800', color: '#0d7377' },
   listBody: { flex: 1, minWidth: 0 },
-  listTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  listTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, alignItems: 'center' },
   listTitle: { fontSize: 15, fontWeight: '800', color: '#0f172a', flex: 1 },
   listTime: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
-  listPreview: { color: '#64748b', marginTop: 4, fontSize: 13 },
+  listPreview: { color: '#64748b', marginTop: 4, fontSize: 13, fontWeight: '500' },
+  listPreviewNew: { color: '#0d7377', fontWeight: '700' },
   unreadDot: {
     width: 10,
     height: 10,
@@ -212,7 +337,21 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyBox: { alignItems: 'center', paddingVertical: 60 },
+  emptyBox: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 24 },
   emptyIcon: { fontSize: 40, marginBottom: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#64748b' },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#64748b', textAlign: 'center' },
+  emptySubtitle: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  errorText: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    color: '#b91c1c',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

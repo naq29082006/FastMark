@@ -37,4 +37,7 @@ export const API_ENDPOINTS = {
   sellerConversations: '/api/seller/conversations',
   sellerConversationMessages: (id) => `/api/seller/conversations/${id}/messages`,
   sellerStats: '/api/seller/stats',
+  buyerConversations: '/api/buyer/conversations',
+  buyerConversationMessages: (id) => `/api/buyer/conversations/${id}/messages`,
+  buyerShops: '/api/buyer/shops',
 };
