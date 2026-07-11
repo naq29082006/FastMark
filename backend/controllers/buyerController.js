@@ -1,5 +1,6 @@
 const messageService = require("../services/messageService");
 const buyerReviewService = require("../services/buyerReviewService");
+const reportService = require("../services/reportService");
 const { success, fail } = require("../utils/apiResponse");
 
 function pickBodyValue(body, keys) {
@@ -134,4 +135,26 @@ exports.updateReview = async (req, res) => {
 exports.deleteReview = async (req, res) => {
   await buyerReviewService.deleteBuyerReview(req.currentUser, req.params.id);
   return success(res, { message: "Đã xóa đánh giá." });
+};
+
+exports.createReport = async (req, res) => {
+  const title = pickBodyValue(req.body, ["title", "reason"]);
+  if (!title) {
+    return fail(res, { status: 400, message: "Vui lòng chọn lý do báo cáo." });
+  }
+
+  const report = await reportService.createReport(req.currentUser, {
+    reportType: req.body.reportType,
+    shopId: pickBodyValue(req.body, ["shopId", "shop_id", "storeId", "store_id"]),
+    shopName: pickBodyValue(req.body, ["shopName", "shop_name", "storeName", "store_name"]),
+    productId: pickBodyValue(req.body, ["productId", "product_id"]),
+    productName: pickBodyValue(req.body, ["productName", "product_name"]),
+    title,
+    content: pickBodyValue(req.body, ["content", "message", "note"]),
+  });
+
+  return success(res, {
+    message: "Đã gửi báo cáo vi phạm.",
+    data: { report },
+  });
 };

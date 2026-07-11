@@ -4,6 +4,8 @@ const ReportSchema = new mongoose.Schema({
     userId:{type:mongoose.Schema.Types.ObjectId,ref:"User"},
     targetUserId:{type:mongoose.Schema.Types.ObjectId,ref:"User"},
     productId:{type:mongoose.Schema.Types.ObjectId,ref:"Product"},
+    shopId:{type:mongoose.Schema.Types.ObjectId,ref:"ShopProfile"},
+    reviewId:{type:String,default:""},
 
     reportType:Number,
     title:String,

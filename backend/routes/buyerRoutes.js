@@ -40,6 +40,7 @@ router.get("/reviews", verifyFirebaseToken, asyncHandler(buyerController.listRev
 router.post("/reviews", verifyFirebaseToken, asyncHandler(buyerController.createReview));
 router.put("/reviews/:id", verifyFirebaseToken, asyncHandler(buyerController.updateReview));
 router.delete("/reviews/:id", verifyFirebaseToken, asyncHandler(buyerController.deleteReview));
+router.post("/reports", verifyFirebaseToken, asyncHandler(buyerController.createReport));
 
 const buyerOpsController = require("../controllers/buyerOpsController");
 

@@ -15,6 +15,8 @@ import {
   loadReviewsByStoreId,
   loadStoreById,
 } from '../../viewmodel/store/storeViewModel';
+import { submitReportOnBackend } from '../../api/reportApi';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
 import ContactActions from './components/ContactActions';
 import StarRating from './components/StarRating';
 import ReportSheet from '../shared/components/ReportSheet';
@@ -148,9 +150,28 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
   const hoursText = formatHours(store.open_time, store.close_time);
   const coverImage = store.cover_image_url || store.image_url;
 
-  function handleReportSubmit(reason) {
+  async function handleReportSubmit(reason) {
     setReportVisible(false);
-    Alert.alert('Đã gửi báo cáo', `Cảm ơn bạn. Chúng tôi đã ghi nhận: "${reason}".`);
+
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        Alert.alert('Thông báo', 'Vui lòng đăng nhập để gửi báo cáo.');
+        return;
+      }
+
+      await submitReportOnBackend({
+        idToken,
+        reportType: 3,
+        shopId: store.id,
+        shopName: store.name,
+        title: reason,
+      });
+
+      Alert.alert('Đã gửi báo cáo', `Cảm ơn bạn. Chúng tôi đã ghi nhận: "${reason}".`);
+    } catch (error) {
+      Alert.alert('Không gửi được báo cáo', error.message || 'Vui lòng thử lại sau.');
+    }
   }
 
   function handleOpenChat() {

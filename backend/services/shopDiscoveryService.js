@@ -464,7 +464,11 @@ async function listPublicReviewsByShopId(shopId) {
     throw error;
   }
 
-  const rows = await Review.find({ store_id: String(shopId) })
+  const rows = await Review.find({
+    store_id: String(shopId),
+    is_deleted: { $ne: true },
+    is_hidden: { $ne: true },
+  })
     .sort({ created_at: -1 })
     .lean();
 

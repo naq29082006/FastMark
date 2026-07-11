@@ -16,6 +16,15 @@ export default function AdminLayout() {
           <NavLink to="/accounts">
             Quản lý người dùng
           </NavLink>
+          <NavLink to="/reports">
+            Quản lý báo cáo vi phạm
+          </NavLink>
+          <NavLink to="/reviews">
+            Quản lý đánh giá
+          </NavLink>
+          <NavLink to="/notifications">
+            Gửi thông báo hệ thống
+          </NavLink>
           <NavLink to="/categories">
             Quản lý danh mục
           </NavLink>

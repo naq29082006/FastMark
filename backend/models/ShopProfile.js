@@ -23,6 +23,9 @@ const ShopProfileSchema = new mongoose.Schema({
 
   isOpen: { type: Number, default: 1 },
   status: { type: Number, default: 1 },
+  visibilityRestrictedUntil: { type: Date, default: null },
+  suspendedUntil: { type: Date, default: null },
+  permanentlyClosedAt: { type: Date, default: null },
 
   averageRating: { type: Number, default: 0 },
   totalLikes: { type: Number, default: 0 },
