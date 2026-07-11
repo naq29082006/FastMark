@@ -14,6 +14,7 @@ import {
   getBuyerConversationsOnBackend,
   getBuyerShopsOnBackend,
 } from '../../api/messageApi';
+import { getMyNotificationsOnBackend } from '../../api/notificationApi';
 import { getSellerConversationsOnBackend } from '../../api/sellerOpsApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
@@ -24,22 +25,42 @@ const INBOX_TABS = [
   { key: 'notifications', label: 'Thông báo' },
 ];
 
-const MOCK_NOTIFICATIONS = [
-  {
-    id: '1',
-    title: 'Đơn hàng đã xác nhận',
-    body: 'Gian hàng đã xác nhận đơn của bạn.',
-    time: '5 phút',
-    unread: true,
-  },
-  {
-    id: '2',
-    title: 'Khuyến mãi',
-    body: 'Giảm 10% cho đơn đầu tiên tại cửa hàng đối tác.',
-    time: '1 giờ',
-    unread: false,
-  },
-];
+function formatNotificationTime(value) {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) {
+    return 'Vừa xong';
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes} phút`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} giờ`;
+  }
+
+  return date.toLocaleString('vi-VN');
+}
+
+function capitalizeFirstLetter(value = '') {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 function getConversationName(item) {
   return item.shop?.name || 'Gian hàng';
@@ -91,6 +112,9 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [selectedChat, setSelectedChat] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [notificationError, setNotificationError] = useState('');
 
   const loadConversations = useCallback(async () => {
     setIsLoading(true);
@@ -129,11 +153,32 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
     }
   }, [showSellerInbox]);
 
+  const loadNotifications = useCallback(async () => {
+    setIsLoadingNotifications(true);
+    setNotificationError('');
+
+    try {
+      const items = await getMyNotificationsOnBackend();
+      setNotifications(Array.isArray(items) ? items : []);
+    } catch (error) {
+      setNotifications([]);
+      setNotificationError(error.message || 'Không tải được thông báo.');
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'messages') {
       loadConversations();
     }
   }, [activeTab, loadConversations]);
+
+  useEffect(() => {
+    if (activeTab === 'notifications') {
+      loadNotifications();
+    }
+  }, [activeTab, loadNotifications]);
 
   useEffect(() => {
     if (!chatRequest?.shopId || showSellerInbox) {
@@ -217,6 +262,7 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
       ) : null}
 
       {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
+      {notificationError ? <Text style={styles.errorText}>{notificationError}</Text> : null}
 
       {activeTab === 'messages' ? (
         isLoading ? (
@@ -309,11 +355,24 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
             }
           />
         )
+      ) : isLoadingNotifications ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color="#0d7377" />
+        </View>
       ) : (
         <FlatList
-          data={MOCK_NOTIFICATIONS}
-          keyExtractor={(item) => item.id}
+          data={notifications}
+          keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyIcon}>🔔</Text>
+              <Text style={styles.emptyTitle}>Chưa có thông báo</Text>
+              <Text style={styles.emptySubtitle}>
+                Thông báo hệ thống và cập nhật đơn hàng sẽ hiển thị tại đây.
+              </Text>
+            </View>
+          }
           renderItem={({ item }) => (
             <Pressable style={styles.listItem}>
               <View style={styles.avatar}>
@@ -321,14 +380,16 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
               </View>
               <View style={styles.listBody}>
                 <View style={styles.listTopRow}>
-                  <Text style={styles.listTitle}>{item.title}</Text>
-                  <Text style={styles.listTime}>{item.time}</Text>
+                  <Text style={styles.notificationTitle} numberOfLines={1}>
+                    {capitalizeFirstLetter(item.title)}
+                  </Text>
+                  <Text style={styles.listTime}>{formatNotificationTime(item.createdAt)}</Text>
                 </View>
-                <Text style={styles.listPreview} numberOfLines={2}>
-                  {item.body}
+                <Text style={styles.notificationBody} numberOfLines={2}>
+                  {item.content || item.body || ''}
                 </Text>
               </View>
-              {item.unread ? <View style={styles.unreadDot} /> : null}
+              {!item.isRead ? <View style={styles.unreadDot} /> : null}
             </Pressable>
           )}
         />
@@ -407,6 +468,14 @@ const styles = StyleSheet.create({
   listBody: { flex: 1, minWidth: 0 },
   listTopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, alignItems: 'center' },
   listTitle: { fontSize: 15, fontWeight: '800', color: '#0f172a', flex: 1 },
+  notificationTitle: { fontSize: 15, fontWeight: '800', color: '#0f172a', flex: 1 },
+  notificationBody: {
+    color: '#94a3b8',
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '400',
+    lineHeight: 18,
+  },
   listTime: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
   listPreview: { color: '#64748b', marginTop: 4, fontSize: 13, fontWeight: '500' },
   listPreviewNew: { color: '#0d7377', fontWeight: '700' },

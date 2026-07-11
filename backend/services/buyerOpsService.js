@@ -424,7 +424,7 @@ async function listBuyerReservations(user, { tab = "holding", search } = {}) {
       const shop = await ShopProfile.findById(doc.shopId);
       return {
         ...publicReservation,
-        shopId: doc.shopId,
+        shopId: doc.shopId ? String(doc.shopId) : "",
         storeName: shop?.shopName || shop?.description || "",
       };
     })

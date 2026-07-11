@@ -420,10 +420,10 @@ function BuyerOrdersContent({
               style={[styles.actionButton, styles.actionButtonSecondary, styles.actionButtonFlex]}
               onPress={() =>
                 onReviewStore?.({
-                  storeId: item.shopId,
+                  storeId: item.shopId ? String(item.shopId) : '',
                   storeName: item.storeName,
                   productName: item.product?.productName,
-                  orderCode: item.id,
+                  orderCode: item.id ? String(item.id) : '',
                 })
               }
             >

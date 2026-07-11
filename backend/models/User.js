@@ -70,6 +70,8 @@ const userSchema = new mongoose.Schema({
   SellerPhoneVerifyCode: { type: String, default: null },
   SellerPhoneVerifyCodeExpiresAt: { type: Date, default: null },
 
+  FcmToken: { type: String, default: "" },
+
   CreatedAt: { type: Date, default: Date.now },
   UpdatedAt: { type: Date, default: Date.now },
 });

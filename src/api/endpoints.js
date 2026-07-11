@@ -52,6 +52,7 @@ export const API_ENDPOINTS = {
   buyerShops: '/api/buyer/shops',
   buyerReviews: '/api/buyer/reviews',
   buyerReview: (id) => `/api/buyer/reviews/${id}`,
+  buyerReports: '/api/buyer/reports',
   buyerOrders: '/api/buyer/orders',
   buyerDeals: '/api/buyer/deals',
   buyerDeal: (id) => `/api/buyer/deals/${id}`,
@@ -69,4 +70,5 @@ export const API_ENDPOINTS = {
   shopById: (id) => `/api/shops/${id}`,
   shopProducts: (id) => `/api/shops/${id}/products`,
   shopReviews: (id) => `/api/shops/${id}/reviews`,
+  notifications: '/api/notifications',
 };

@@ -1,0 +1,16 @@
+const REPORT_STATUS = {
+  PENDING: 0,
+  PROCESSED: 1,
+  REJECTED: 2,
+};
+
+const REPORT_STATUS_LABELS = {
+  [REPORT_STATUS.PENDING]: "Chờ xử lý",
+  [REPORT_STATUS.PROCESSED]: "Đã xử lý",
+  [REPORT_STATUS.REJECTED]: "Đã bác bỏ",
+};
+
+module.exports = {
+  REPORT_STATUS,
+  REPORT_STATUS_LABELS,
+};

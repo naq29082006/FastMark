@@ -1,4 +1,4 @@
-import { apiRequest, AUTH_TIMEOUT_MS } from './client';
+import { apiRequest, AUTH_TIMEOUT_MS, SELLER_UPLOAD_TIMEOUT_MS } from './client';
 import { API_ENDPOINTS } from './endpoints';
 
 async function parseApiResponse(response) {
@@ -40,6 +40,7 @@ export async function submitBuyerReviewOnBackend({
   comment,
   imageUrl,
 }) {
+  const timeoutMs = imageUrl ? SELLER_UPLOAD_TIMEOUT_MS : AUTH_TIMEOUT_MS;
   const response = await apiRequest(
     API_ENDPOINTS.buyerReviews,
     {
@@ -55,7 +56,7 @@ export async function submitBuyerReviewOnBackend({
         imageUrl,
       }),
     },
-    AUTH_TIMEOUT_MS
+    timeoutMs
   );
   const payload = await parseApiResponse(response);
   return payload.data?.review;

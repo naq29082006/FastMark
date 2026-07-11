@@ -9,6 +9,9 @@ import CategoriesPage from './pages/CategoriesPage';
 import SellerVerificationsPage from './pages/SellerVerificationsPage';
 import AccountsPage from './pages/AccountsPage';
 import AccountDetailPage from './pages/AccountDetailPage';
+import ReportManagement from './pages/ReportManagement';
+import ReviewManagement from './pages/ReviewManagement';
+import SystemNotification from './pages/SystemNotification';
 
 function ProtectedRoutes() {
   const { user, isAdmin, loading } = useAuth();
@@ -35,6 +38,9 @@ function ProtectedRoutes() {
         <Route index element={<SellerVerificationsPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="accounts/:accountId" element={<AccountDetailPage />} />
+        <Route path="reports" element={<ReportManagement />} />
+        <Route path="reviews" element={<ReviewManagement />} />
+        <Route path="notifications" element={<SystemNotification />} />
         <Route path="categories" element={<CategoriesPage />} />
       </Route>
     </Routes>

@@ -7,6 +7,9 @@ const reviewSchema = new mongoose.Schema(
     user_name: { type: String, default: 'Khách hàng' },
     rating: { type: Number, required: true, min: 1, max: 5 },
     comment: { type: String, default: '' },
+    is_hidden: { type: Boolean, default: false },
+    is_deleted: { type: Boolean, default: false },
+    deleted_at: { type: Date, default: null },
     created_at: { type: Date, default: Date.now },
   },
   { timestamps: true, versionKey: false }

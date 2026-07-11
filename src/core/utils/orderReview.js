@@ -2,7 +2,6 @@ import { Alert } from 'react-native';
 
 import { submitBuyerReviewOnBackend } from '../../api/reviewApi';
 import { markOrderAsReviewed } from '../../hooks/useReviewedOrderCodes';
-import { addMockMyReview } from '../../model/mock/activityMockData';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 
 export const PURCHASE_REVIEW_STATUSES = ['Hoàn thành', 'Đã giao'];
@@ -56,30 +55,14 @@ export async function submitShopReview({
     throw new Error('Vui lòng chọn số sao trước khi gửi đánh giá.');
   }
 
+  const idToken = await getCurrentUserIdToken();
+  if (!idToken) {
+    throw new Error('Vui lòng đăng nhập để gửi đánh giá.');
+  }
+
   try {
-    const idToken = await getCurrentUserIdToken();
-    if (idToken) {
-      const review = await submitBuyerReviewOnBackend({
-        idToken,
-        storeId,
-        storeName,
-        productName,
-        orderCode,
-        rating,
-        comment,
-        imageUrl,
-      });
-      if (review) {
-        markOrderAsReviewed({ orderCode });
-        return review;
-      }
-    }
-  } catch (error) {
-    if (error.statusCode === 409) {
-      markOrderAsReviewed({ orderCode });
-      throw error;
-    }
-    const fallback = addMockMyReview({
+    const review = await submitBuyerReviewOnBackend({
+      idToken,
       storeId,
       storeName,
       productName,
@@ -88,23 +71,24 @@ export async function submitShopReview({
       comment,
       imageUrl,
     });
-    markOrderAsReviewed({ orderCode });
-    Alert.alert(
-      'Đã lưu tạm',
-      error.message || 'Không gửi được lên máy chủ. Đánh giá được lưu cục bộ.'
-    );
-    return fallback;
-  }
 
-  const fallback = addMockMyReview({
-    storeId,
-    storeName,
-    productName,
-    orderCode,
-    rating,
-    comment,
-    imageUrl,
-  });
-  markOrderAsReviewed({ orderCode });
-  return fallback;
+    markOrderAsReviewed({ orderCode });
+    return review;
+  } catch (error) {
+    if (error.statusCode === 409) {
+      markOrderAsReviewed({ orderCode });
+    }
+    throw error;
+  }
+}
+
+export async function submitShopReviewWithFeedback(params) {
+  try {
+    const review = await submitShopReview(params);
+    Alert.alert('Cảm ơn bạn', 'Đánh giá đã được gửi lên hệ thống.');
+    return review;
+  } catch (error) {
+    Alert.alert('Lỗi', error.message || 'Không gửi được đánh giá.');
+    throw error;
+  }
 }

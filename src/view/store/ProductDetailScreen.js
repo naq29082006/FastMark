@@ -12,6 +12,8 @@ import {
 
 import { formatPrice, formatPriceRange } from '../../core/utils/productFormat';
 import { loadProductById, loadStoreById } from '../../viewmodel/store/storeViewModel';
+import { submitReportOnBackend } from '../../api/reportApi';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
 import ContactActions from './components/ContactActions';
 import StarRating from './components/StarRating';
 import ReportSheet from '../shared/components/ReportSheet';
@@ -99,9 +101,30 @@ export default function ProductDetailScreen({
     );
   }
 
-  function handleReportSubmit(reason) {
+  async function handleReportSubmit(reason) {
     setReportVisible(false);
-    Alert.alert('Đã gửi báo cáo', `Cảm ơn bạn. Chúng tôi đã ghi nhận: "${reason}".`);
+
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        Alert.alert('Thông báo', 'Vui lòng đăng nhập để gửi báo cáo.');
+        return;
+      }
+
+      await submitReportOnBackend({
+        idToken,
+        reportType: 4,
+        productId: product.id,
+        productName: product.name,
+        shopId: store?.id || product.store_id,
+        shopName: store?.name,
+        title: reason,
+      });
+
+      Alert.alert('Đã gửi báo cáo', `Cảm ơn bạn. Chúng tôi đã ghi nhận: "${reason}".`);
+    } catch (error) {
+      Alert.alert('Không gửi được báo cáo', error.message || 'Vui lòng thử lại sau.');
+    }
   }
 
   function handleOpenChat() {
