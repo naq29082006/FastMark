@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f4f7f6' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   topBar: {
-    paddingTop: 52,
+    paddingTop: 12,
     paddingHorizontal: 16,
     paddingBottom: 12,
     flexDirection: 'row',

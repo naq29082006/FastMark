@@ -40,9 +40,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       }
 
       .leaflet-control-attribution {
-        border-radius: 8px 0 0 0;
-        color: #50615c;
-        font-size: 10px;
+        display: none !important;
       }
 
       .user-marker {
@@ -63,8 +61,86 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         background: #f7c948;
       }
 
+      .location-pin {
+        position: relative;
+        width: 28px;
+        height: 36px;
+        filter: drop-shadow(0 4px 8px rgba(220, 38, 38, 0.35));
+      }
+
+      .location-pin svg,
+      .scan-marker svg {
+        width: 28px;
+        height: 36px;
+        display: block;
+      }
+
+      .scan-marker {
+        position: relative;
+        width: 28px;
+        height: 36px;
+        filter: drop-shadow(0 4px 8px rgba(37, 99, 235, 0.35));
+      }
+
+      .shop-marker {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
+        overflow: hidden;
+        box-sizing: border-box;
+        display: block;
+        flex-shrink: 0;
+      }
+
+      .shop-marker img {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+        object-position: center;
+        display: block;
+        background: #f8fafc;
+      }
+
+      .shop-marker-emoji {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #f1f5f9;
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        line-height: 1;
+        box-sizing: border-box;
+      }
+
+      .fastmark-restaurant-icon {
+        background: transparent !important;
+        border: none !important;
+      }
+
+      .fastmark-restaurant-icon .shop-marker,
+      .fastmark-restaurant-icon .shop-marker-emoji {
+        pointer-events: auto;
+        touch-action: manipulation;
+      }
+
       .leaflet-bottom.leaflet-right {
         margin-bottom: 154px;
+      }
+
+      .leaflet-bottom.leaflet-left {
+        margin-bottom: 72px;
+      }
+
+      .leaflet-control-zoom {
+        border: none;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
       }
 
       .destination-marker {
@@ -95,11 +171,6 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       .marker-food { background: #e11d48; }
       .marker-milktea { background: #8b5cf6; }
       .marker-snack { background: #10b981; }
-
-      .fastmark-restaurant-icon {
-        background: transparent !important;
-        border: none !important;
-      }
 
       .fastmark-restaurant-icon .restaurant-marker {
         pointer-events: auto;
@@ -144,6 +215,8 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       let routeLayer = null;
       let destinationMarker = null;
       let activeRouteDestination = null;
+      let scanMarker = null;
+      let lastMapTap = null;
 
       function hasLocation(value) {
         return (
@@ -193,24 +266,75 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         ? initialData.currentLocation
         : fallbackLocation;
 
+      function escapeHtmlAttr(value) {
+        return String(value)
+          .split('&').join('&amp;')
+          .split('"').join('&quot;')
+          .split('<').join('&lt;');
+      }
+
       const map = L.map('map', {
         zoomControl: false,
-        attributionControl: true,
+        attributionControl: false,
       }).setView(getLatLng(startLocation), 18);
 
       L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
+        attribution: '',
       }).addTo(map);
+
+      const RED_PIN_SVG =
+        '<svg viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg">' +
+        '<path fill="#dc2626" stroke="#ffffff" stroke-width="1.5" d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z"/>' +
+        '<circle cx="12" cy="12" r="4.5" fill="#ffffff" opacity="0.95"/>' +
+        '</svg>';
+
+      const BLUE_PIN_SVG =
+        '<svg viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg">' +
+        '<path fill="#2563eb" stroke="#ffffff" stroke-width="1.5" d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z"/>' +
+        '<circle cx="12" cy="12" r="4.5" fill="#ffffff" opacity="0.95"/>' +
+        '</svg>';
 
       const userIcon = L.divIcon({
         className: '',
-        html: '<div class="user-marker"></div>',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
+        html: '<div class="location-pin">' + RED_PIN_SVG + '</div>',
+        iconSize: [28, 36],
+        iconAnchor: [14, 36],
       });
+
+      const scanIcon = L.divIcon({
+        className: '',
+        html: '<div class="scan-marker">' + BLUE_PIN_SVG + '</div>',
+        iconSize: [28, 36],
+        iconAnchor: [14, 36],
+      });
+
+      function isNearLocation(left, right) {
+        return (
+          Math.abs(Number(left.latitude) - Number(right.latitude)) < 0.0003 &&
+          Math.abs(Number(left.longitude) - Number(right.longitude)) < 0.0003
+        );
+      }
+
+      function drawScanLocation(location) {
+        if (!hasLocation(location)) {
+          if (scanMarker) {
+            map.removeLayer(scanMarker);
+            scanMarker = null;
+          }
+          return;
+        }
+
+        const latLng = getLatLng(location);
+
+        if (!scanMarker) {
+          scanMarker = L.marker(latLng, { icon: scanIcon, interactive: false }).addTo(map);
+        } else {
+          scanMarker.setLatLng(latLng);
+        }
+      }
 
       function hideAccuracyCircle() {
         if (accuracyCircle) {
@@ -334,13 +458,21 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         activeRouteDestination = to;
 
         const destIcon = L.divIcon({
-          className: '',
-          html: '<div class="destination-marker">🏪</div>',
+          className: 'fastmark-restaurant-icon',
+          html: getShopMarkerIcon({
+            category_icon: to.category_icon || to.categoryIcon || '',
+            categoryIcon: to.category_icon || to.categoryIcon || '',
+            type: to.type || 'shop',
+          }),
           iconSize: [36, 36],
           iconAnchor: [18, 18],
         });
 
-        destinationMarker = L.marker(getLatLng(to), { icon: destIcon, interactive: false }).addTo(map);
+        destinationMarker = L.marker(getLatLng(to), {
+          icon: destIcon,
+          interactive: false,
+          zIndexOffset: 1000,
+        }).addTo(map);
 
         try {
           const url =
@@ -386,6 +518,24 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         }
       }
 
+      function isRemoteIconUrl(value) {
+        return value.indexOf('http://') === 0 || value.indexOf('https://') === 0;
+      }
+
+      function getShopMarkerIcon(restaurant) {
+        const iconValue = String(restaurant.category_icon || restaurant.categoryIcon || '').trim();
+        if (isRemoteIconUrl(iconValue)) {
+          return (
+            '<div class="shop-marker">' +
+            '<img src="' + escapeHtmlAttr(iconValue) + '" alt="" ' +
+            'style="width:36px;height:36px;object-fit:contain;object-position:center;display:block;background:#f8fafc;" />' +
+            '</div>'
+          );
+        }
+        const emoji = iconValue || getRestaurantEmoji(restaurant.type);
+        return '<div class="shop-marker-emoji">' + emoji + '</div>';
+      }
+
       function drawRestaurants(restaurantsList) {
         clearLayerList(restaurantMarkers);
         
@@ -399,13 +549,12 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           }
 
           const latLng = [Number(r.latitude), Number(r.longitude)];
-          const emoji = getRestaurantEmoji(r.type);
           
           const icon = L.divIcon({
             className: 'fastmark-restaurant-icon',
-            html: '<div class="restaurant-marker marker-' + (r.type || 'food') + '">' + emoji + '</div>',
-            iconSize: [44, 44],
-            iconAnchor: [22, 22],
+            html: getShopMarkerIcon(r),
+            iconSize: [36, 36],
+            iconAnchor: [18, 18],
           });
 
           const marker = L.marker(latLng, {
@@ -488,6 +637,10 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           drawRadiusCircle(command.center, command.radius);
         }
 
+        if (command.type === 'scanLocation') {
+          drawScanLocation(command.location);
+        }
+
         if (command.type === 'showRoute') {
           showRoute(command.from, command.to);
         }
@@ -506,10 +659,28 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       });
 
       map.on('click', function(event) {
+        const location = toLocation(event.latlng);
+        const now = Date.now();
+
         postToApp({
           type: 'mapTap',
-          location: toLocation(event.latlng),
+          location: location,
         });
+
+        if (lastMapTap && now - lastMapTap.time < 450 && isNearLocation(lastMapTap.location, location)) {
+          postToApp({
+            type: 'mapDoubleTap',
+            location: location,
+          });
+          lastMapTap = null;
+          return;
+        }
+
+        lastMapTap = { time: now, location: location };
+      });
+
+      map.on('dblclick', function(event) {
+        L.DomEvent.preventDefault(event);
       });
 
       map.on('dragstart zoomstart', function() {

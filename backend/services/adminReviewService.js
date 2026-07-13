@@ -95,7 +95,10 @@ function toReviewerSummary(user, fallbackName = "") {
 }
 
 async function buildReviewFilter({ search, rating, status }) {
-  const filter = { is_deleted: { $ne: true } };
+  const filter = {
+    is_deleted: { $ne: true },
+    externalId: { $not: /^seed-admin-review/i },
+  };
   const normalizedRating = pickString(rating);
   const normalizedStatus = pickString(status);
   const keyword = pickString(search);

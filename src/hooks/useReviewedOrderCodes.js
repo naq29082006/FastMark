@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { getMyReviewsOnBackend } from '../api/reviewApi';
-import { MOCK_MY_REVIEWS } from '../model/mock/activityMockData';
 import { getCurrentUserIdToken } from '../repository/authRepository';
 
 const sessionReviewedOrderCodes = new Set();
@@ -12,13 +11,6 @@ export function getOrderReviewKey(order) {
 
 export async function loadReviewedOrderCodes() {
   const codes = new Set(sessionReviewedOrderCodes);
-
-  MOCK_MY_REVIEWS.forEach((review) => {
-    const key = String(review.orderCode || '').trim();
-    if (key) {
-      codes.add(key);
-    }
-  });
 
   try {
     const idToken = await getCurrentUserIdToken();
@@ -32,7 +24,7 @@ export async function loadReviewedOrderCodes() {
       });
     }
   } catch {
-    // Keep local/mock codes when API is unavailable.
+    // Keep session-only codes when API is unavailable.
   }
 
   return codes;

@@ -10,7 +10,7 @@ const { PRODUCT_STATUS } = require("../constants/productStatus");
 const { SHOP_STATUS, SHOP_OPEN } = require("../constants/shopStatus");
 const { MESSAGE_TYPE } = require("../constants/messageType");
 const { toPublicReservation } = require("./reservationService");
-const { formatOfferMessageContent } = require("../utils/offerMessageFormat");
+const { formatOfferMessageContent, formatBuyerCounterMessageContent } = require("../utils/offerMessageFormat");
 const { createNotification } = require("./notificationService");
 const messageService = require("./messageService");
 
@@ -29,12 +29,27 @@ function pickString(value) {
   return String(value || "").trim();
 }
 
+const MAX_DEAL_DISCOUNT_PERCENT = 50;
+
 function computeDiscountPercent(originalPrice, offeredPrice) {
   if (!originalPrice || originalPrice <= 0) {
     return 0;
   }
   const discount = ((originalPrice - offeredPrice) / originalPrice) * 100;
   return Math.max(0, Math.round(discount * 100) / 100);
+}
+
+function assertDealDiscountAllowed(originalPrice, offeredPrice) {
+  if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
+    throw createServiceError("Giá đề nghị không hợp lệ.");
+  }
+  if (offeredPrice >= originalPrice) {
+    throw createServiceError("Giá đề nghị phải thấp hơn giá niêm yết.");
+  }
+  const discountPercent = computeDiscountPercent(originalPrice, offeredPrice);
+  if (discountPercent > MAX_DEAL_DISCOUNT_PERCENT) {
+    throw createServiceError(`Không được deal giảm quá ${MAX_DEAL_DISCOUNT_PERCENT}%.`);
+  }
 }
 
 async function validateProductAndShop(productId, variantId) {
@@ -77,6 +92,7 @@ async function toPublicDeal(deal) {
     status: deal.status,
     originalPrice: deal.originalPrice || 0,
     offeredPrice: deal.offeredPrice || 0,
+    quantity: Number(deal.quantity) || 1,
     sellerCounterPrice: deal.sellerCounterPrice || null,
     discountPercent: deal.discountPercent || 0,
     note: deal.note || "",
@@ -95,12 +111,39 @@ async function toPublicDeal(deal) {
   };
 }
 
+async function sendBuyerCounterChatMessage(user, shop, deal, previousSellerCounter) {
+  const product = await Product.findById(deal.productId);
+  const content = formatBuyerCounterMessageContent({
+    productName: product?.ProductName || "",
+    originalPrice: deal.originalPrice,
+    sellerCounterPrice: previousSellerCounter,
+    offeredPrice: deal.offeredPrice,
+    quantity: deal.quantity || 1,
+    discountPercent: deal.discountPercent,
+    note: deal.note || "",
+  });
+
+  const { conversation } = await messageService.findOrCreateBuyerConversation(
+    user,
+    String(shop._id),
+    shop.shopName || ""
+  );
+
+  await messageService.sendBuyerMessage(user, conversation._id, {
+    content,
+    messageType: MESSAGE_TYPE.OFFER,
+  });
+
+  return conversation._id;
+}
+
 async function sendOfferChatMessage(user, shop, deal) {
   const product = await Product.findById(deal.productId);
   const content = formatOfferMessageContent({
     productName: product?.ProductName || "",
     originalPrice: deal.originalPrice,
     offeredPrice: deal.offeredPrice,
+    quantity: deal.quantity || 1,
     discountPercent: deal.discountPercent,
     note: deal.note || "",
   });
@@ -130,6 +173,7 @@ async function createDealOffer(user, payload) {
   const productId = pickString(payload.productId);
   const variantId = pickString(payload.variantId);
   const offeredPrice = pickNumber(payload.offeredPrice ?? payload.offered_price);
+  const quantity = pickNumber(payload.quantity) || 1;
   const note = pickString(payload.note);
 
   if (!productId || !variantId) {
@@ -138,13 +182,18 @@ async function createDealOffer(user, payload) {
   if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
     throw createServiceError("Giá đề nghị không hợp lệ.");
   }
+  if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
+    throw createServiceError("Số lượng không hợp lệ.");
+  }
 
   const { product, variant, shop } = await validateProductAndShop(productId, variantId);
   const originalPrice = Number(variant.Price) || 0;
 
-  if (offeredPrice >= originalPrice) {
-    throw createServiceError("Giá đề nghị phải thấp hơn giá niêm yết.");
+  if ((variant.Quantity ?? 0) < quantity) {
+    throw createServiceError(`Chỉ còn ${variant.Quantity} sản phẩm trong kho.`);
   }
+
+  assertDealDiscountAllowed(originalPrice, offeredPrice);
 
   const existingPending = await DealOffer.findOne({
     userId: user._id,
@@ -166,6 +215,7 @@ async function createDealOffer(user, payload) {
     shopId: shop._id,
     originalPrice,
     offeredPrice,
+    quantity,
     discountPercent,
     note,
     status: DEAL_OFFER_STATUS.PENDING,
@@ -177,7 +227,7 @@ async function createDealOffer(user, payload) {
 
   await notifyShopOwner(shop, {
     title: "Đề nghị deal giá mới",
-    content: `${user.FullName || user.UserName} đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ cho ${product.ProductName}.`,
+    content: `${user.FullName || user.UserName} đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ x${quantity} cho ${product.ProductName}.`,
   });
 
   return toPublicDeal(deal);
@@ -233,9 +283,7 @@ async function resubmitDealOffer(user, dealId, payload) {
   const { product, variant, shop } = await validateProductAndShop(deal.productId, deal.variantId);
   const originalPrice = Number(variant.Price) || 0;
 
-  if (offeredPrice >= originalPrice) {
-    throw createServiceError("Giá đề nghị phải thấp hơn giá niêm yết.");
-  }
+  assertDealDiscountAllowed(originalPrice, offeredPrice);
 
   const now = new Date();
   deal.offeredPrice = offeredPrice;
@@ -255,6 +303,52 @@ async function resubmitDealOffer(user, dealId, payload) {
   await notifyShopOwner(shop, {
     title: "Đề nghị deal giá mới",
     content: `${user.FullName || user.UserName} gửi lại đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ cho ${product.ProductName}.`,
+  });
+
+  return toPublicDeal(deal);
+}
+
+async function counterDealOfferByBuyer(user, dealId, payload) {
+  const deal = await DealOffer.findOne({ _id: dealId, userId: user._id });
+  if (!deal) {
+    throw createServiceError("Không tìm thấy deal giá.", 404);
+  }
+  if (deal.status !== DEAL_OFFER_STATUS.PENDING) {
+    throw createServiceError("Deal này đã được xử lý.");
+  }
+  if (!deal.sellerCounterPrice) {
+    throw createServiceError("Shop chưa đề xuất giá để trả giá lại.");
+  }
+
+  const offeredPrice = pickNumber(payload.offeredPrice ?? payload.offered_price);
+  const note = pickString(payload.note ?? deal.note);
+
+  if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
+    throw createServiceError("Giá đề nghị không hợp lệ.");
+  }
+
+  const { product, variant, shop } = await validateProductAndShop(deal.productId, deal.variantId);
+  const originalPrice = Number(variant.Price) || 0;
+
+  assertDealDiscountAllowed(originalPrice, offeredPrice);
+
+  const now = new Date();
+  const previousSellerCounter = deal.sellerCounterPrice;
+  deal.offeredPrice = offeredPrice;
+  deal.originalPrice = originalPrice;
+  deal.discountPercent = computeDiscountPercent(originalPrice, offeredPrice);
+  deal.note = note;
+  deal.sellerCounterPrice = null;
+  deal.sellerNote = "";
+  deal.respondedAt = null;
+  deal.UpdatedAt = now;
+  await deal.save();
+
+  await sendBuyerCounterChatMessage(user, shop, deal, previousSellerCounter);
+
+  await notifyShopOwner(shop, {
+    title: "Khách trả giá lại",
+    content: `${user.FullName || user.UserName} đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ (shop đề xuất ${Number(previousSellerCounter).toLocaleString("vi-VN")}đ) cho ${product.ProductName}.`,
   });
 
   return toPublicDeal(deal);
@@ -502,47 +596,10 @@ async function cancelReservationByBuyer(user, reservationId) {
 }
 
 async function completeReservationByBuyer(user, reservationId) {
-  const reservation = await Reservation.findOne({ _id: reservationId, userId: user._id });
-  if (!reservation) {
-    throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
-  }
-
-  if (reservation.status === RESERVATION_STATUS.COMPLETED) {
-    throw createServiceError("Đơn đã được đánh dấu hoàn thành.");
-  }
-  if (reservation.status === RESERVATION_STATUS.CANCELLED) {
-    throw createServiceError("Đơn đã bị hủy.");
-  }
-  if (reservation.status !== RESERVATION_STATUS.CONFIRMED) {
-    throw createServiceError("Shop chưa xác nhận đơn. Vui lòng đợi shop xác nhận trước khi lấy hàng.");
-  }
-
-  const shop = await ShopProfile.findById(reservation.shopId);
-  const now = new Date();
-  reservation.status = RESERVATION_STATUS.COMPLETED;
-  reservation.completedAt = now;
-  reservation.UpdatedAt = now;
-  await reservation.save();
-
-  const soldQuantity = Number(reservation.quantity) || 1;
-  if (shop) {
-    shop.soldCount = (shop.soldCount || 0) + soldQuantity;
-    shop.UpdatedAt = now;
-    await shop.save();
-    await notifyShopOwner(shop, {
-      title: "Khách đã lấy hàng",
-      content: `${user.FullName || user.UserName} đã xác nhận nhận hàng thành công.`,
-    });
-  }
-
-  if (reservation.productId) {
-    await Product.findByIdAndUpdate(reservation.productId, {
-      $inc: { SoldCount: soldQuantity },
-      $set: { UpdatedAt: now },
-    });
-  }
-
-  return toPublicReservation(reservation);
+  throw createServiceError(
+    "Chỉ người bán mới có thể xác nhận khách đã nhận hàng.",
+    403
+  );
 }
 
 module.exports = {
@@ -550,6 +607,7 @@ module.exports = {
   listBuyerDeals,
   getBuyerDeal,
   resubmitDealOffer,
+  counterDealOfferByBuyer,
   acceptCounterOffer,
   createReservation,
   listBuyerReservations,

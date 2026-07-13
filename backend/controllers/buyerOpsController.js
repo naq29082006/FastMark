@@ -53,6 +53,23 @@ exports.resubmitDeal = async (req, res) => {
   });
 };
 
+exports.counterDeal = async (req, res) => {
+  const offeredPrice = req.body.offeredPrice ?? req.body.offered_price;
+  if (offeredPrice === undefined || offeredPrice === null) {
+    return fail(res, { status: 400, message: "Thiếu giá đề nghị." });
+  }
+
+  const deal = await buyerOpsService.counterDealOfferByBuyer(
+    req.currentUser,
+    req.params.id,
+    req.body
+  );
+  return success(res, {
+    message: "Đã gửi đề nghị giá mới.",
+    data: { deal },
+  });
+};
+
 exports.acceptCounter = async (req, res) => {
   const deal = await buyerOpsService.acceptCounterOffer(req.currentUser, req.params.id);
   return success(res, {

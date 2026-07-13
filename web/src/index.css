@@ -376,6 +376,46 @@ a {
   white-space: nowrap;
 }
 
+.category-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.category-tabs .tab-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.category-tabs .tab-btn.active {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
+}
+
+.category-panel h2 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.category-icon-preview img,
+.category-icon-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+}
+
+.category-icon-preview {
+  margin-top: -4px;
+}
+
 .table-actions {
   display: flex;
   flex-direction: row;

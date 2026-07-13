@@ -9,17 +9,30 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { createBuyerDealOnBackend } from '../../api/buyerOpsApi';
 import { formatPrice } from '../../core/utils/productFormat';
+import SelectedVariantCard from './SelectedVariantCard';
 
 function parsePriceInput(value) {
   const digits = String(value || '').replace(/\D/g, '');
   return digits ? Number(digits) : NaN;
 }
 
-export default function DealOfferModal({ visible, product, store, onClose, onSuccess }) {
+const MAX_DEAL_DISCOUNT_PERCENT = 50;
+
+export default function DealOfferModal({
+  visible,
+  product,
+  store,
+  preselectedVariantId = null,
+  onClose,
+  onSuccess,
+}) {
+  const insets = useSafeAreaInsets();
+  const hasPresetVariant = Boolean(preselectedVariantId);
   const variants = useMemo(() => {
     const list = (product?.variants || []).filter((v) => (v.quantity ?? 0) > 0);
     if (list.length > 0) {
@@ -39,6 +52,7 @@ export default function DealOfferModal({ visible, product, store, onClose, onSuc
   }, [product]);
 
   const [selectedVariantId, setSelectedVariantId] = useState(null);
+  const [quantity, setQuantity] = useState('1');
   const [priceInput, setPriceInput] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
@@ -51,15 +65,21 @@ export default function DealOfferModal({ visible, product, store, onClose, onSuc
     if (!visible) {
       return;
     }
-    setSelectedVariantId(variants[0]?.id || null);
+    setSelectedVariantId(preselectedVariantId || variants[0]?.id || null);
+    setQuantity('1');
     setPriceInput('');
     setNote('');
     setError('');
     setConfirmVisible(false);
-  }, [visible, variants]);
+  }, [visible, variants, preselectedVariantId]);
 
   const originalPrice = Number(selectedVariant?.price) || 0;
   const offeredPrice = parsePriceInput(priceInput);
+  const qtyNum = Number(quantity) || 0;
+  const originalTotal = originalPrice * (qtyNum > 0 ? qtyNum : 0);
+  const offeredTotal =
+    Number.isFinite(offeredPrice) && qtyNum > 0 ? offeredPrice * qtyNum : 0;
+  const minOfferedUnitPrice = Math.ceil(originalPrice * (1 - MAX_DEAL_DISCOUNT_PERCENT / 100));
   const discountPercent =
     originalPrice > 0 && Number.isFinite(offeredPrice)
       ? Math.max(0, Math.round(((originalPrice - offeredPrice) / originalPrice) * 10000) / 100)
@@ -69,11 +89,20 @@ export default function DealOfferModal({ visible, product, store, onClose, onSuc
     if (!selectedVariant) {
       return 'Vui lòng chọn biến thể sản phẩm.';
     }
+    if (!Number.isInteger(qtyNum) || qtyNum <= 0) {
+      return 'Số lượng không hợp lệ.';
+    }
+    if (qtyNum > (selectedVariant.quantity ?? 0)) {
+      return `Chỉ còn ${selectedVariant.quantity} sản phẩm trong kho.`;
+    }
     if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
       return 'Giá đề nghị không hợp lệ.';
     }
     if (offeredPrice >= originalPrice) {
       return 'Giá đề nghị phải thấp hơn giá niêm yết.';
+    }
+    if (discountPercent > MAX_DEAL_DISCOUNT_PERCENT) {
+      return `Không được deal giảm quá ${MAX_DEAL_DISCOUNT_PERCENT}%. Giá tối thiểu ${formatPrice(minOfferedUnitPrice)} /sp.`;
     }
     return '';
   }
@@ -94,6 +123,7 @@ export default function DealOfferModal({ visible, product, store, onClose, onSuc
         productId: product.id,
         variantId: selectedVariant.id,
         offeredPrice,
+        quantity: qtyNum,
         note: note.trim(),
       });
       onSuccess?.(deal);
@@ -113,7 +143,7 @@ export default function DealOfferModal({ visible, product, store, onClose, onSuc
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.handle} />
           <View style={styles.titleRow}>
             <Text style={styles.titleIcon}>💬</Text>
@@ -125,32 +155,59 @@ export default function DealOfferModal({ visible, product, store, onClose, onSuc
           {store?.name ? <Text style={styles.shopName}>🏪 {store.name}</Text> : null}
 
           <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
-            <Text style={styles.label}>Chọn biến thể</Text>
-            {variants.length === 0 ? (
-              <Text style={styles.hint}>Sản phẩm hết hàng.</Text>
-            ) : (
-              variants.map((variant) => {
-                const isActive = String(variant.id) === String(selectedVariantId);
-                return (
-                  <Pressable
-                    key={variant.id}
-                    style={[styles.variantChip, isActive && styles.variantChipActive]}
-                    onPress={() => setSelectedVariantId(variant.id)}
-                  >
-                    <Text style={[styles.variantText, isActive && styles.variantTextActive]}>
-                      {variant.name || variant.variantName} — {formatPrice(variant.price)}
-                    </Text>
-                  </Pressable>
-                );
-              })
-            )}
+            {!hasPresetVariant ? (
+              <>
+                <Text style={styles.label}>Chọn biến thể</Text>
+                {variants.length === 0 ? (
+                  <Text style={styles.hint}>Sản phẩm hết hàng.</Text>
+                ) : (
+                  variants.map((variant) => {
+                    const isActive = String(variant.id) === String(selectedVariantId);
+                    return (
+                      <Pressable
+                        key={variant.id}
+                        style={[styles.variantChip, isActive && styles.variantChipActive]}
+                        onPress={() => setSelectedVariantId(variant.id)}
+                      >
+                        <Text style={[styles.variantText, isActive && styles.variantTextActive]}>
+                          {variant.name || variant.variantName} — {formatPrice(variant.price)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </>
+            ) : selectedVariant ? (
+              <SelectedVariantCard
+                variant={selectedVariant}
+                productThumbnail={product?.thumbnail || ''}
+              />
+            ) : null}
 
             {selectedVariant ? (
               <>
-                <Text style={styles.label}>Giá niêm yết</Text>
-                <Text style={styles.originalPrice}>{formatPrice(originalPrice)}</Text>
+                <Text style={styles.label}>Số lượng</Text>
+                <TextInput
+                  style={styles.input}
+                  value={quantity}
+                  onChangeText={(value) => {
+                    setQuantity(value.replace(/\D/g, ''));
+                    setError('');
+                  }}
+                  keyboardType="number-pad"
+                  placeholder="1"
+                  placeholderTextColor="#94a3b8"
+                />
 
-                <Text style={styles.label}>Giá bạn đề nghị</Text>
+                <Text style={styles.label}>Giá niêm yết (1 sp)</Text>
+                <Text style={styles.originalPrice}>{formatPrice(originalPrice)}</Text>
+                {qtyNum > 0 ? (
+                  <Text style={styles.totalHint}>
+                    Tổng niêm yết: {formatPrice(originalTotal)} ({qtyNum} sp)
+                  </Text>
+                ) : null}
+
+                <Text style={styles.label}>Giá bạn đề nghị (1 sp)</Text>
                 <TextInput
                   style={styles.input}
                   value={priceInput}
@@ -159,11 +216,16 @@ export default function DealOfferModal({ visible, product, store, onClose, onSuc
                     setError('');
                   }}
                   keyboardType="number-pad"
-                  placeholder="Nhập giá đề nghị"
+                  placeholder="Nhập giá đề nghị /sp"
                   placeholderTextColor="#94a3b8"
                 />
-                {Number.isFinite(offeredPrice) && offeredPrice > 0 ? (
-                  <Text style={styles.discountText}>Giảm ~{discountPercent}%</Text>
+                {Number.isFinite(offeredPrice) && offeredPrice > 0 && qtyNum > 0 ? (
+                  <>
+                    <Text style={styles.totalHint}>
+                      Tổng đề nghị: {formatPrice(offeredTotal)} ({qtyNum} sp)
+                    </Text>
+                    <Text style={styles.discountText}>Giảm ~{discountPercent}% /sp</Text>
+                  </>
                 ) : null}
 
                 <Text style={styles.label}>Ghi chú (tuỳ chọn)</Text>
@@ -216,8 +278,8 @@ export default function DealOfferModal({ visible, product, store, onClose, onSuc
           <View style={styles.confirmBox}>
             <Text style={styles.confirmTitle}>Xác nhận gửi deal giá?</Text>
             <Text style={styles.confirmBody}>
-              Bạn đề nghị {formatPrice(offeredPrice)} cho{' '}
-              {selectedVariant?.name || selectedVariant?.variantName} (giảm {discountPercent}%).
+              Bạn đề nghị {formatPrice(offeredPrice)} /sp × {qtyNum} = {formatPrice(offeredTotal)} cho{' '}
+              {selectedVariant?.name || selectedVariant?.variantName} (giảm {discountPercent}% /sp).
             </Text>
             <View style={styles.confirmActions}>
               <Pressable style={styles.cancelBtn} onPress={() => setConfirmVisible(false)}>
@@ -324,6 +386,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f766e',
   },
+  totalHint: {
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -370,11 +438,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f1f5f9',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   cancelBtnText: {
     color: '#475569',
     fontWeight: '800',
     fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   submitBtn: {
     flex: 1.4,
@@ -383,6 +455,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0f766e',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   submitBtnDisabled: {
     opacity: 0.6,
@@ -391,6 +465,8 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '900',
     fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   confirmOverlay: {
     ...StyleSheet.absoluteFillObject,

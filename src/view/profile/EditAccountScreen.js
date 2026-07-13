@@ -14,6 +14,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
 
+import CircularBackButton from '../shared/components/CircularBackButton';
+
 import {
   selectAuthError,
   selectAuthProfile,
@@ -197,13 +199,7 @@ export default function EditAccountScreen({ onBack }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.topBar}>
-        <Pressable
-          onPress={onBack}
-          style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-          accessibilityRole="button"
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </Pressable>
+        <CircularBackButton onPress={onBack} variant="light" />
         <Text style={styles.topBarTitle}>Sửa thông tin tài khoản</Text>
         <View style={styles.topBarSpacer} />
       </View>
@@ -393,26 +389,10 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 56,
+    paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  backButtonPressed: {
-    opacity: 0.7,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
   },
   topBarTitle: {
     flex: 1,

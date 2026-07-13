@@ -20,6 +20,7 @@ import { selectAuthProfile } from '../../viewmodel/auth/authSelectors';
 import { reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
 import ProfileSubScreen from '../profile/ProfileSubScreen';
 import SellerLocationPickerScreen from './SellerLocationPickerScreen';
+import TimePickerField from '../shared/components/TimePickerField';
 
 export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSaved }) {
   const dispatch = useDispatch();
@@ -252,8 +253,18 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Giờ hoạt động</Text>
-        <Field label="Giờ mở cửa (HH:mm)" value={openTime} onChangeText={setOpenTime} placeholder="08:00" />
-        <Field label="Giờ đóng cửa (HH:mm)" value={closeTime} onChangeText={setCloseTime} placeholder="21:00" />
+        <TimePickerField
+          label="Giờ mở cửa"
+          value={openTime}
+          onChange={setOpenTime}
+          placeholder="08:00"
+        />
+        <TimePickerField
+          label="Giờ đóng cửa"
+          value={closeTime}
+          onChange={setCloseTime}
+          placeholder="21:00"
+        />
         <View style={styles.switchRow}>
           <View style={styles.switchInfo}>
             <Text style={styles.switchLabel}>Đang mở cửa</Text>

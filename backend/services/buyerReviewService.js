@@ -2,7 +2,6 @@ const crypto = require("crypto");
 const BuyerReview = require("../models/BuyerReview");
 const Review = require("../models/Review");
 const Reservation = require("../models/Reservation");
-const Restaurant = require("../models/Restaurant");
 const ShopProfile = require("../models/ShopProfile");
 const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService");
 
@@ -53,71 +52,12 @@ async function findShopByObjectId(id) {
   return ShopProfile.findById(id).lean();
 }
 
-async function findOrCreateShopFromRestaurant(restaurant) {
-  const externalId = pickString(restaurant?.externalId);
-  if (!externalId) {
-    return null;
-  }
-
-  let shop = await ShopProfile.findOne({ externalRestaurantId: externalId }).lean();
-  if (shop) {
-    return shop;
-  }
-
-  try {
-    const created = await ShopProfile.create({
-      externalRestaurantId: externalId,
-      description: restaurant.name,
-      shopName: restaurant.name,
-      address: restaurant.address || "",
-      DiaChiHeThong: restaurant.address || "",
-      latitude: restaurant.latitude,
-      longitude: restaurant.longitude,
-      phone: restaurant.phone || restaurant.zalo || "",
-    });
-    return created.toObject();
-  } catch (error) {
-    if (error?.code === 11000) {
-      return ShopProfile.findOne({ externalRestaurantId: externalId }).lean();
-    }
-    throw error;
-  }
-}
-
-async function findShopByExternalId(externalId, storeName = "") {
-  const rawId = pickString(externalId);
-  if (!rawId) {
-    return null;
-  }
-
-  const linkedShop = await ShopProfile.findOne({ externalRestaurantId: rawId }).lean();
-  if (linkedShop) {
-    return linkedShop;
-  }
-
-  let restaurant = await Restaurant.findOne({ externalId: rawId }).lean();
-  if (!restaurant && storeName) {
-    restaurant = await Restaurant.findOne({ name: storeName }).lean();
-  }
-
-  if (!restaurant) {
-    return null;
-  }
-
-  return findOrCreateShopFromRestaurant(restaurant);
-}
-
 async function resolveShopProfile(user, { storeId, orderCode, storeName } = {}) {
   const normalizedStoreId = normalizeObjectIdString(storeId);
   if (normalizedStoreId) {
     const shopByObjectId = await findShopByObjectId(normalizedStoreId);
     if (shopByObjectId) {
       return shopByObjectId;
-    }
-
-    const shopByExternalId = await findShopByExternalId(normalizedStoreId, storeName);
-    if (shopByExternalId) {
-      return shopByExternalId;
     }
   }
 
@@ -134,6 +74,10 @@ async function resolveShopProfile(user, { storeId, orderCode, storeName } = {}) 
         return shop;
       }
     }
+  }
+
+  if (storeName) {
+    throw createServiceError("Không tìm thấy gian hàng để đánh giá.", 404);
   }
 
   throw createServiceError("Không tìm thấy gian hàng để đánh giá.", 404);
@@ -196,7 +140,7 @@ async function refreshShopReviewStats(storeId) {
   return shop;
 }
 
-async function syncPublicReview({ buyerReview, user, storeId, imageUrl }) {
+async function syncPublicReview({ buyerReview, user, storeId }) {
   const externalId = `buyer-${buyerReview._id}`;
   const userName = pickString(user.FullName) || pickString(user.UserName) || "Khách hàng";
 
@@ -261,7 +205,7 @@ async function createBuyerReview(user, payload = {}) {
     UpdatedAt: now,
   });
 
-  await syncPublicReview({ buyerReview: review, user, storeId, imageUrl });
+  await syncPublicReview({ buyerReview: review, user, storeId });
 
   return review.toClientReview();
 }

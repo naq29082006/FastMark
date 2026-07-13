@@ -1,19 +1,25 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+
+import { useScreenInsets } from '../../hooks/useScreenInsets';
+import CircularBackButton from '../shared/components/CircularBackButton';
 
 export default function ProfileSubScreen({ title, onBack, embedded = false, children }) {
+  const insets = useScreenInsets();
+
   return (
     <View style={styles.screen}>
-      <View style={[styles.topBar, embedded && styles.topBarEmbedded]}>
+      <View
+        style={[
+          styles.topBar,
+          embedded && styles.topBarEmbedded,
+          { paddingTop: embedded ? 8 : insets.contentPaddingTop },
+          { paddingBottom: 14 },
+        ]}
+      >
         {embedded ? (
           <View style={styles.topBarSpacer} />
         ) : (
-          <Pressable
-            onPress={onBack}
-            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-            accessibilityRole="button"
-          >
-            <Text style={styles.backButtonText}>←</Text>
-          </Pressable>
+          <CircularBackButton onPress={onBack} variant="light" />
         )}
         <Text style={styles.title} numberOfLines={1}>
           {title}
@@ -22,7 +28,7 @@ export default function ProfileSubScreen({ title, onBack, embedded = false, chil
       </View>
       <ScrollView
         style={styles.body}
-        contentContainerStyle={styles.bodyContent}
+        contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottomSpacing + 16 }]}
         showsVerticalScrollIndicator={false}
       >
         {children}
@@ -39,30 +45,10 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 56,
-    paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
   },
-  topBarEmbedded: {
-    paddingTop: 52,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  backButtonPressed: {
-    opacity: 0.7,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
+  topBarEmbedded: {},
   title: {
     flex: 1,
     marginHorizontal: 12,

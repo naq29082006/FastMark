@@ -12,14 +12,12 @@ function pickQueryValue(query, keys) {
 }
 
 exports.listReports = async (req, res) => {
-  const includeDemo = pickQueryValue(req.query, ["includeDemo", "include_demo"]) === "1";
   const data = await adminReportService.listReports({
     search: pickQueryValue(req.query, ["search", "q"]),
     reportType: pickQueryValue(req.query, ["reportType", "type"]),
     status: pickQueryValue(req.query, ["status"]),
     page: req.query.page,
     limit: req.query.limit,
-    includeDemo,
   });
 
   return success(res, { data });

@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { callStore, contactZalo } from '../../../core/utils/storeContact';
+import { callStore } from '../../../core/utils/storeContact';
 
-export default function ContactActions({ phone, zalo, compact = false }) {
+export default function ContactActions({ phone, onMessage, compact = false }) {
   return (
     <View style={[styles.row, compact && styles.rowCompact]}>
       <Pressable
@@ -13,14 +13,16 @@ export default function ContactActions({ phone, zalo, compact = false }) {
         <Text style={styles.btnIcon}>📞</Text>
         {!compact && <Text style={styles.btnText}>Gọi điện</Text>}
       </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.btn, styles.zaloBtn, pressed && styles.pressed]}
-        onPress={() => contactZalo(zalo)}
-      >
-        <Text style={styles.btnIcon}>💬</Text>
-        {!compact && <Text style={styles.btnText}>Zalo</Text>}
-      </Pressable>
+      {onMessage ? (
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.btn, styles.messageBtn, pressed && styles.pressed]}
+          onPress={onMessage}
+        >
+          <Text style={styles.btnIcon}>💬</Text>
+          {!compact && <Text style={styles.btnText}>Nhắn tin</Text>}
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -46,8 +48,8 @@ const styles = StyleSheet.create({
   callBtn: {
     backgroundColor: '#0f766e',
   },
-  zaloBtn: {
-    backgroundColor: '#0068ff',
+  messageBtn: {
+    backgroundColor: '#0d7377',
   },
   pressed: {
     opacity: 0.8,

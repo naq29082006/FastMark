@@ -12,9 +12,11 @@ import {
   View,
 } from 'react-native';
 
+import CircularBackButton from '../shared/components/CircularBackButton';
 import {
   acceptBuyerCounterOnBackend,
   cancelBuyerReservationOnBackend,
+  counterBuyerDealOnBackend,
   getBuyerOrdersOnBackend,
   resubmitBuyerDealOnBackend,
 } from '../../api/buyerOpsApi';
@@ -159,6 +161,7 @@ function BuyerOrdersContent({
   const [dealFilter, setDealFilter] = useState('all');
   const [resubmitDeal, setResubmitDeal] = useState(null);
   const [resubmitPrice, setResubmitPrice] = useState('');
+  const [priceModalMode, setPriceModalMode] = useState('resubmit');
 
   const loadOrders = useCallback(async (refresh = false) => {
     if (refresh) {
@@ -228,8 +231,15 @@ function BuyerOrdersContent({
   }
 
   function handleResubmitDeal(deal) {
+    setPriceModalMode('resubmit');
     setResubmitDeal(deal);
     setResubmitPrice(String(deal.offeredPrice || ''));
+  }
+
+  function handleCounterDeal(deal) {
+    setPriceModalMode('counter');
+    setResubmitDeal(deal);
+    setResubmitPrice('');
   }
 
   async function submitResubmitDeal() {
@@ -240,15 +250,27 @@ function BuyerOrdersContent({
     }
     try {
       const idToken = await getCurrentUserIdToken();
-      await resubmitBuyerDealOnBackend({
-        idToken,
-        dealId: resubmitDeal.id,
-        offeredPrice,
-      });
+      if (priceModalMode === 'counter') {
+        await counterBuyerDealOnBackend({
+          idToken,
+          dealId: resubmitDeal.id,
+          offeredPrice,
+        });
+      } else {
+        await resubmitBuyerDealOnBackend({
+          idToken,
+          dealId: resubmitDeal.id,
+          offeredPrice,
+        });
+      }
       setResubmitDeal(null);
       loadOrders(true);
     } catch (actionError) {
-      Alert.alert('Lỗi', actionError.message || 'Không gửi lại được đề nghị.');
+      Alert.alert(
+        'Lỗi',
+        actionError.message ||
+          (priceModalMode === 'counter' ? 'Không gửi được đề nghị mới.' : 'Không gửi lại được đề nghị.')
+      );
     }
   }
 
@@ -282,6 +304,8 @@ function BuyerOrdersContent({
       item.status === DEAL_OFFER_STATUS.ACCEPTED && !item.reservationId;
     const canResubmit = item.status === DEAL_OFFER_STATUS.REJECTED;
     const canAcceptCounter =
+      item.status === DEAL_OFFER_STATUS.PENDING && item.sellerCounterPrice;
+    const canCounter =
       item.status === DEAL_OFFER_STATUS.PENDING && item.sellerCounterPrice;
 
     return (
@@ -322,6 +346,16 @@ function BuyerOrdersContent({
           {canAcceptCounter ? (
             <Pressable style={[styles.actionButton, styles.actionButtonFlex]} onPress={() => handleAcceptCounter(item)}>
               <Text style={styles.actionButtonText}>Chấp nhận giá</Text>
+            </Pressable>
+          ) : null}
+          {canCounter ? (
+            <Pressable
+              style={[styles.actionButton, styles.actionButtonSecondary, styles.actionButtonFlex]}
+              onPress={() => handleCounterDeal(item)}
+            >
+              <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
+                Đề nghị lại
+              </Text>
             </Pressable>
           ) : null}
           {canReserve ? (
@@ -515,13 +549,20 @@ function BuyerOrdersContent({
       <Modal visible={Boolean(resubmitDeal)} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Gửi lại đề nghị</Text>
+            <Text style={styles.modalTitle}>
+              {priceModalMode === 'counter' ? 'Đề nghị giá mới' : 'Gửi lại đề nghị'}
+            </Text>
+            {priceModalMode === 'counter' && resubmitDeal?.sellerCounterPrice ? (
+              <Text style={styles.modalHint}>
+                Shop đề xuất: {formatPrice(resubmitDeal.sellerCounterPrice)}
+              </Text>
+            ) : null}
             <TextInput
               style={styles.modalInput}
               value={resubmitPrice}
               onChangeText={(value) => setResubmitPrice(value.replace(/\D/g, ''))}
               keyboardType="number-pad"
-              placeholder="Giá đề nghị mới"
+              placeholder={priceModalMode === 'counter' ? 'Giá bạn muốn đề nghị' : 'Giá đề nghị mới'}
             />
             <View style={styles.modalActions}>
               <Pressable style={styles.modalCancel} onPress={() => setResubmitDeal(null)}>
@@ -648,7 +689,11 @@ export default function BuyerOrdersScreen({
     return (
       <View style={styles.screen}>
         <View style={styles.topBar}>
-          <View style={styles.topBarSpacer} />
+          {onBack ? (
+            <CircularBackButton onPress={onBack} variant="light" />
+          ) : (
+            <View style={styles.topBarSpacer} />
+          )}
           <Text style={styles.title}>Đơn hàng</Text>
           <View style={styles.topBarSpacer} />
         </View>
@@ -661,9 +706,7 @@ export default function BuyerOrdersScreen({
   return (
     <View style={styles.screen}>
       <View style={[styles.topBar, styles.topBarWithBack]}>
-        <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </Pressable>
+        <CircularBackButton onPress={onBack} variant="light" />
         <Text style={styles.title}>Lịch sử giữ hàng</Text>
         <View style={styles.topBarSpacer} />
       </View>
@@ -681,26 +724,13 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 52,
+    paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
   },
   topBarWithBack: {
-    paddingTop: 56,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
+    paddingTop: 12,
   },
   title: {
     flex: 1,
@@ -1087,6 +1117,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0f172a',
     marginBottom: 12,
+  },
+  modalHint: {
+    fontSize: 14,
+    color: '#b45309',
+    fontWeight: '700',
+    marginBottom: 10,
   },
   modalInput: {
     borderWidth: 1,

@@ -17,6 +17,7 @@ import {
   rejectSellerDealOnBackend,
 } from '../../api/sellerOpsApi';
 import { RESERVATION_TAB, RESERVATION_TAB_LABELS } from '../../constants/sellerOrders';
+import CircularBackButton from '../shared/components/CircularBackButton';
 import { formatPrice } from '../../core/utils/productFormat';
 import ProfileSubScreen from '../profile/ProfileSubScreen';
 
@@ -99,6 +100,7 @@ export default function SellerOrdersScreen({ onBack, onOpenReservation, onRefres
   }
 
   function renderDealItem({ item }) {
+    const canSellerCounter = !item.sellerCounterPrice;
     return (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{item.product?.productName || 'Sản phẩm'}</Text>
@@ -111,13 +113,18 @@ export default function SellerOrdersScreen({ onBack, onOpenReservation, onRefres
         {item.sellerCounterPrice ? (
           <Text style={styles.counterText}>Giá shop đề xuất: {formatPrice(item.sellerCounterPrice)}</Text>
         ) : null}
+        {item.sellerCounterPrice ? (
+          <Text style={styles.waitText}>Đang chờ khách phản hồi</Text>
+        ) : null}
         <View style={styles.actionRow}>
           <Pressable onPress={() => handleAcceptDeal(item.id)} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Chấp nhận</Text>
           </Pressable>
-          <Pressable onPress={() => setCounterDealId(item.id)} style={styles.secondaryBtn}>
-            <Text style={styles.secondaryBtnText}>Trả giá khác</Text>
-          </Pressable>
+          {canSellerCounter ? (
+            <Pressable onPress={() => setCounterDealId(item.id)} style={styles.secondaryBtn}>
+              <Text style={styles.secondaryBtnText}>Trả giá khác</Text>
+            </Pressable>
+          ) : null}
           <Pressable onPress={() => handleRejectDeal(item.id)} style={styles.dangerBtn}>
             <Text style={styles.dangerBtnText}>Từ chối</Text>
           </Pressable>
@@ -147,9 +154,7 @@ export default function SellerOrdersScreen({ onBack, onOpenReservation, onRefres
         {embedded ? (
           <View style={styles.topBarSpacer} />
         ) : (
-          <Pressable onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>←</Text>
-          </Pressable>
+          <CircularBackButton onPress={onBack} variant="light" />
         )}
         <Text style={styles.title}>{embedded ? 'Đơn hàng' : 'Quản lý đơn hàng'}</Text>
         <View style={styles.topBarSpacer} />
@@ -222,23 +227,14 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 56,
+    paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
   },
   topBarEmbedded: {
-    paddingTop: 52,
+    paddingTop: 12,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  backButtonText: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
   title: { flex: 1, marginHorizontal: 12, color: '#ffffff', fontSize: 17, fontWeight: '900', textAlign: 'center' },
   topBarSpacer: { width: 36 },
   tabRow: {
@@ -278,6 +274,7 @@ const styles = StyleSheet.create({
   cardMeta: { color: '#64748b', fontSize: 13, marginTop: 4 },
   priceText: { color: '#0d7377', fontWeight: '800', marginTop: 8 },
   counterText: { color: '#b45309', fontSize: 13, marginTop: 4, fontWeight: '700' },
+  waitText: { color: '#64748b', fontSize: 13, marginTop: 4, fontStyle: 'italic' },
   actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   primaryBtn: {
     minHeight: 36,

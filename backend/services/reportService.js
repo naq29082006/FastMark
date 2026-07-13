@@ -1,7 +1,6 @@
 const Report = require("../models/Report");
 const Product = require("../models/Product");
 const ShopProfile = require("../models/ShopProfile");
-const Restaurant = require("../models/Restaurant");
 const { REPORT_STATUS } = require("../constants/reportStatus");
 const { REPORT_TYPE } = require("../constants/reportType");
 
@@ -33,38 +32,7 @@ async function findShopByObjectId(id) {
   return ShopProfile.findById(id).lean();
 }
 
-async function findOrCreateShopFromRestaurant(restaurant) {
-  const externalId = pickString(restaurant?.externalId);
-  if (!externalId) {
-    return null;
-  }
-
-  let shop = await ShopProfile.findOne({ externalRestaurantId: externalId }).lean();
-  if (shop) {
-    return shop;
-  }
-
-  try {
-    const created = await ShopProfile.create({
-      externalRestaurantId: externalId,
-      description: restaurant.name,
-      shopName: restaurant.name,
-      address: restaurant.address || "",
-      DiaChiHeThong: restaurant.address || "",
-      latitude: restaurant.latitude,
-      longitude: restaurant.longitude,
-      phone: restaurant.phone || restaurant.zalo || "",
-    });
-    return created.toObject();
-  } catch (error) {
-    if (error?.code === 11000) {
-      return ShopProfile.findOne({ externalRestaurantId: externalId }).lean();
-    }
-    throw error;
-  }
-}
-
-async function resolveShopByStoreId(storeId, storeName = "") {
+async function resolveShopByStoreId(storeId) {
   const rawId = pickString(storeId);
   if (!rawId) {
     throw createServiceError("Thiếu mã gian hàng.", 400);
@@ -75,25 +43,7 @@ async function resolveShopByStoreId(storeId, storeName = "") {
     return shopByObjectId;
   }
 
-  let shop = await ShopProfile.findOne({ externalRestaurantId: rawId }).lean();
-  if (shop) {
-    return shop;
-  }
-
-  let restaurant = await Restaurant.findOne({ externalId: rawId }).lean();
-  if (!restaurant && storeName) {
-    restaurant = await Restaurant.findOne({ name: storeName }).lean();
-  }
-  if (!restaurant) {
-    throw createServiceError("Không tìm thấy gian hàng để báo cáo.", 404);
-  }
-
-  shop = await findOrCreateShopFromRestaurant(restaurant);
-  if (!shop) {
-    throw createServiceError("Không tìm thấy gian hàng để báo cáo.", 404);
-  }
-
-  return shop;
+  throw createServiceError("Không tìm thấy gian hàng để báo cáo.", 404);
 }
 
 async function resolveProductById(productId) {

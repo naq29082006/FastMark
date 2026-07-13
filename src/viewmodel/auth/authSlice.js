@@ -62,6 +62,62 @@ const initialState = {
 const EMAIL_CODE_TTL_SECONDS = 5 * 60;
 const EMAIL_RESEND_COOLDOWN_SECONDS = 3 * 60;
 
+const SELLER_ACCESS_PROFILE_KEYS = [
+  'role',
+  'phone',
+  'sellerPhoneVerified',
+  'shopName',
+  'shopUsername',
+  'shopDescription',
+  'shopAddress',
+  'shopSystemAddress',
+  'categoryId',
+  'categoryName',
+  'openTime',
+  'closeTime',
+  'isOpen',
+  'totalProducts',
+  'soldCount',
+  'likesCount',
+  'totalReviews',
+  'averageRating',
+  'verifyAccount',
+];
+
+function pickSellerAccessProfileSnapshot(profile) {
+  if (!profile) {
+    return null;
+  }
+
+  return SELLER_ACCESS_PROFILE_KEYS.reduce((snapshot, key) => {
+    snapshot[key] = profile[key] ?? null;
+    return snapshot;
+  }, {});
+}
+
+function areSellerAccessProfilesEqual(previousProfile, nextProfile) {
+  return (
+    JSON.stringify(pickSellerAccessProfileSnapshot(previousProfile)) ===
+    JSON.stringify(pickSellerAccessProfileSnapshot(nextProfile))
+  );
+}
+
+function areSellerVerificationsEqual(previousVerification, nextVerification) {
+  if (!previousVerification && !nextVerification) {
+    return true;
+  }
+
+  if (!previousVerification || !nextVerification) {
+    return false;
+  }
+
+  return (
+    previousVerification.id === nextVerification.id &&
+    previousVerification.status === nextVerification.status &&
+    previousVerification.lyDoTuChoi === nextVerification.lyDoTuChoi
+  );
+}
+
 function normalizeEmailVerification(payload, fallbackEmail = '', { isResend = false } = {}) {
   if (!payload) {
     return null;
@@ -752,11 +808,18 @@ const authSlice = createSlice({
       .addCase(syncSellerAccess.fulfilled, (state, action) => {
         state.sellerAccessStatus = 'succeeded';
         state.sellerAccessSyncedAt = Date.now();
-        state.sellerVerification = action.payload.verification;
-        if (action.payload.profile) {
-          state.profile = action.payload.profile;
+
+        const nextVerification = action.payload.verification;
+        if (!areSellerVerificationsEqual(state.sellerVerification, nextVerification)) {
+          state.sellerVerification = nextVerification;
+        }
+
+        const nextProfile = action.payload.profile;
+        if (nextProfile && !areSellerAccessProfilesEqual(state.profile, nextProfile)) {
+          state.profile = nextProfile;
           state.profileStatus = 'succeeded';
         }
+
         state.error = null;
       })
       .addCase(syncSellerAccess.rejected, (state) => {

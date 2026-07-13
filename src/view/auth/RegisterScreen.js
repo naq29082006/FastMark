@@ -20,6 +20,7 @@ import { clearAuthFeedback, registerUser } from '../../viewmodel/auth/authSlice'
 import { validateRegisterForm } from '../../viewmodel/auth/authFormValidation';
 import { getGoogleAuthSetupError } from '../../viewmodel/auth/googleAuthConfig';
 import AuthBrand from './components/AuthBrand';
+import CircularBackButton from '../shared/components/CircularBackButton';
 import AuthDivider from './components/AuthDivider';
 import AuthInput from './components/AuthInput';
 import { AUTH_COLORS, AUTH_RADIUS } from './components/authTheme';
@@ -85,9 +86,12 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Pressable onPress={onGoBack} style={styles.backButton}>
-          <Text style={styles.backIcon}>‹</Text>
-        </Pressable>
+        <CircularBackButton
+          onPress={onGoBack}
+          variant="surface"
+          size={40}
+          style={styles.backButton}
+        />
 
         <AuthBrand title="FastMark" subtitle="Tạo tài khoản mới" />
 
@@ -228,25 +232,14 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 52,
+    paddingTop: 12,
     paddingBottom: 36,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 8,
     borderWidth: 1,
     borderColor: AUTH_COLORS.border,
-  },
-  backIcon: {
-    fontSize: 28,
-    lineHeight: 30,
-    color: AUTH_COLORS.text,
-    marginTop: -2,
+    backgroundColor: '#ffffff',
   },
   card: {
     backgroundColor: AUTH_COLORS.card,

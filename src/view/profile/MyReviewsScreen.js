@@ -16,7 +16,6 @@ import {
   getMyReviewsOnBackend,
   updateBuyerReviewOnBackend,
 } from '../../api/reviewApi';
-import { MOCK_MY_REVIEWS } from '../../model/mock/activityMockData';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import StarRating from '../store/components/StarRating';
 
@@ -56,9 +55,9 @@ export default function MyReviewsScreen({ refreshKey = 0 }) {
           return;
         }
       }
-      setReviews(MOCK_MY_REVIEWS.map(normalizeReview));
+      setReviews([]);
     } catch {
-      setReviews(MOCK_MY_REVIEWS.map(normalizeReview));
+      setReviews([]);
     } finally {
       setIsLoading(false);
     }

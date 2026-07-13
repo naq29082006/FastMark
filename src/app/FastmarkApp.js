@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { usePresence } from '../hooks/usePresence';
@@ -97,47 +98,55 @@ export default function FastmarkApp() {
 
   if (status === 'checking') {
     return (
-      <View style={styles.loadingScreen}>
-        <StatusBar style="dark" />
-        <ActivityIndicator size="large" color="#0f766e" />
-        <Text style={styles.loadingText}>Đang kiểm tra đăng nhập...</Text>
-      </View>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.loadingScreen} edges={['top', 'bottom', 'left', 'right']}>
+          <StatusBar style="dark" />
+          <ActivityIndicator size="large" color="#0f766e" />
+          <Text style={styles.loadingText}>Đang kiểm tra đăng nhập...</Text>
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
   if (pendingGoogle) {
     return (
-      <>
-        <StatusBar style="dark" />
-        <GoogleUsernameSetupScreen />
-      </>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+          <StatusBar style="dark" />
+          <GoogleUsernameSetupScreen />
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
   if (status === 'authenticated' && profileStatus === 'loading' && !profile) {
     return (
-      <View style={styles.loadingScreen}>
-        <StatusBar style="dark" />
-        <ActivityIndicator size="large" color="#0f766e" />
-        <Text style={styles.loadingText}>Đang tải hồ sơ...</Text>
-      </View>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.loadingScreen} edges={['top', 'bottom', 'left', 'right']}>
+          <StatusBar style="dark" />
+          <ActivityIndicator size="large" color="#0f766e" />
+          <Text style={styles.loadingText}>Đang tải hồ sơ...</Text>
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
   if (needsEmailVerification) {
     return (
-      <>
-        <StatusBar style="dark" />
-        <EmailVerificationScreen />
-      </>
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+          <StatusBar style="dark" />
+          <EmailVerificationScreen />
+        </SafeAreaView>
+      </SafeAreaProvider>
     );
   }
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="dark" />
       {status === 'authenticated' ? <AuthenticatedHome /> : <AuthScreen />}
-    </>
+    </SafeAreaProvider>
   );
 }
 
@@ -146,6 +155,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#e7f0ed',
+  },
+  safeArea: {
+    flex: 1,
     backgroundColor: '#e7f0ed',
   },
   loadingText: {

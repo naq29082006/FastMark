@@ -12,6 +12,7 @@ const DealOfferSchema = new mongoose.Schema({
   sellerCounterPrice: Number,
   discountPercent: Number,
 
+  quantity: { type: Number, default: 1, min: 1 },
   status: { type: Number, default: 0 },
   note: String,
   sellerNote: String,

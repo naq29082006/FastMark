@@ -19,6 +19,7 @@ import { getSellerConversationsOnBackend } from '../../api/sellerOpsApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
 import ChatScreen from './ChatScreen';
+import NotificationDetailScreen from './NotificationDetailScreen';
 
 const INBOX_TABS = [
   { key: 'messages', label: 'Tin nhắn' },
@@ -102,7 +103,12 @@ function buildShopSuggestions(conversations, shops) {
     }));
 }
 
-export default function InboxScreen({ chatRequest = null, buyerView = false, onViewShop }) {
+export default function InboxScreen({
+  chatRequest = null,
+  buyerView = false,
+  onViewShop,
+  onNavigationStateChange,
+}) {
   const isSeller = useSelector(selectIsSeller);
   const showSellerInbox = isSeller && !buyerView;
   const [activeTab, setActiveTab] = useState('messages');
@@ -113,6 +119,7 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
   const [loadError, setLoadError] = useState('');
   const [selectedChat, setSelectedChat] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const [selectedNotification, setSelectedNotification] = useState(null);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
   const [notificationError, setNotificationError] = useState('');
 
@@ -169,10 +176,10 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'messages') {
+    if (buyerView || activeTab === 'messages') {
       loadConversations();
     }
-  }, [activeTab, loadConversations]);
+  }, [activeTab, buyerView, loadConversations]);
 
   useEffect(() => {
     if (activeTab === 'notifications') {
@@ -193,6 +200,10 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
     });
   }, [chatRequest?.at, chatRequest?.shopId, chatRequest?.shopName, showSellerInbox]);
 
+  useEffect(() => {
+    onNavigationStateChange?.(Boolean(selectedChat));
+  }, [onNavigationStateChange, selectedChat]);
+
   const messageConversations = useMemo(() => {
     if (showSellerInbox) {
       return conversations;
@@ -200,6 +211,15 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
     const merged = [...conversations, ...shopSuggestions];
     return filterConversations(merged, searchQuery);
   }, [conversations, searchQuery, shopSuggestions, showSellerInbox]);
+
+  if (selectedNotification) {
+    return (
+      <NotificationDetailScreen
+        notification={selectedNotification}
+        onBack={() => setSelectedNotification(null)}
+      />
+    );
+  }
 
   if (selectedChat) {
     return (
@@ -222,6 +242,7 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
   const subtitle = showSellerInbox
     ? 'Tin nhắn khách hàng'
     : 'Tin nhắn với gian hàng';
+  const showInboxTabs = !buyerView;
 
   return (
     <View style={styles.screen}>
@@ -230,22 +251,24 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
         <Text style={styles.subtitle}>{subtitle}</Text>
       </View>
 
-      <View style={styles.tabRow}>
-        {INBOX_TABS.map((tab) => {
-          const isActive = activeTab === tab.key;
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => setActiveTab(tab.key)}
-              style={[styles.tabItem, isActive && styles.tabItemActive]}
-            >
-              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {showInboxTabs ? (
+        <View style={styles.tabRow}>
+          {INBOX_TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key)}
+                style={[styles.tabItem, isActive && styles.tabItemActive]}
+              >
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
 
-      {activeTab === 'messages' && !showSellerInbox ? (
+      {(buyerView || activeTab === 'messages') && !showSellerInbox ? (
         <View style={styles.searchWrap}>
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
@@ -264,7 +287,7 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
       {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
       {notificationError ? <Text style={styles.errorText}>{notificationError}</Text> : null}
 
-      {activeTab === 'messages' ? (
+      {buyerView || activeTab === 'messages' ? (
         isLoading ? (
           <View style={styles.centered}>
             <ActivityIndicator color="#0d7377" />
@@ -374,7 +397,7 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
             </View>
           }
           renderItem={({ item }) => (
-            <Pressable style={styles.listItem}>
+            <Pressable style={styles.listItem} onPress={() => setSelectedNotification(item)}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>🔔</Text>
               </View>
@@ -400,7 +423,7 @@ export default function InboxScreen({ chatRequest = null, buyerView = false, onV
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { paddingTop: 56, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: '#ffffff' },
+  header: { paddingTop: 12, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: '#ffffff' },
   title: { fontSize: 24, fontWeight: '900', color: '#0f172a' },
   subtitle: { color: '#64748b', marginTop: 4, fontWeight: '600' },
   tabRow: {

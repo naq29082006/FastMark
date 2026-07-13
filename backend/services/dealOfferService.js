@@ -1,9 +1,14 @@
 const DealOffer = require("../models/DealOffer");
+const Product = require("../models/Product");
 const ProductVariant = require("../models/ProductVariant");
+const Conversation = require("../models/Conversation");
 const User = require("../models/User");
 const { DEAL_OFFER_STATUS } = require("../constants/dealOfferStatus");
+const { MESSAGE_TYPE } = require("../constants/messageType");
+const { formatSellerCounterMessageContent } = require("../utils/offerMessageFormat");
 const { getShopForSeller } = require("./shopSettingsService");
 const { createNotification } = require("./notificationService");
+const messageService = require("./messageService");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -63,7 +68,7 @@ async function acceptDealOffer(user, dealId) {
     throw createServiceError("Biến thể sản phẩm không tồn tại.");
   }
 
-  const finalPrice = deal.sellerCounterPrice || deal.offeredPrice;
+  const finalPrice = deal.offeredPrice;
   const now = new Date();
 
   deal.status = DEAL_OFFER_STATUS.ACCEPTED;
@@ -110,16 +115,62 @@ async function rejectDealOffer(user, dealId, { reason } = {}) {
   };
 }
 
+async function sendSellerCounterChatMessage(sellerUser, shop, deal) {
+  const product = await Product.findById(deal.productId);
+  const content = formatSellerCounterMessageContent({
+    productName: product?.ProductName || "",
+    originalPrice: deal.originalPrice,
+    offeredPrice: deal.offeredPrice,
+    sellerCounterPrice: deal.sellerCounterPrice,
+    quantity: deal.quantity || 1,
+    note: deal.sellerNote || "",
+  });
+
+  let conversation = await Conversation.findOne({
+    shopId: shop._id,
+    userId: deal.userId,
+  });
+
+  const now = new Date();
+  if (!conversation) {
+    conversation = await Conversation.create({
+      shopId: shop._id,
+      userId: deal.userId,
+      lastMessage: "",
+      lastMessageAt: now,
+      CreatedAt: now,
+      UpdatedAt: now,
+    });
+  }
+
+  await messageService.sendSellerMessage(sellerUser, conversation._id, {
+    content,
+    messageType: MESSAGE_TYPE.OFFER,
+  });
+}
+
 async function counterDealOffer(user, dealId, payload) {
-  const { deal } = await getOwnedDeal(user, dealId);
+  const { shop, deal } = await getOwnedDeal(user, dealId);
 
   if (deal.status !== DEAL_OFFER_STATUS.PENDING) {
     throw createServiceError("Deal này đã được xử lý.");
   }
 
+  if (deal.sellerCounterPrice) {
+    throw createServiceError("Đang chờ khách phản hồi. Không thể trả giá thêm lúc này.");
+  }
+
   const counterPrice = pickNumber(payload.counterPrice ?? payload.sellerCounterPrice);
   if (!Number.isFinite(counterPrice) || counterPrice <= 0) {
     throw createServiceError("Giá đề xuất không hợp lệ.");
+  }
+
+  if (counterPrice <= deal.offeredPrice) {
+    throw createServiceError("Giá đề xuất phải cao hơn giá khách đề nghị.");
+  }
+
+  if (counterPrice >= deal.originalPrice) {
+    throw createServiceError("Giá đề xuất phải thấp hơn giá niêm yết.");
   }
 
   const now = new Date();
@@ -128,6 +179,16 @@ async function counterDealOffer(user, dealId, payload) {
   deal.respondedAt = now;
   deal.UpdatedAt = now;
   await deal.save();
+
+  const buyer = await User.findById(deal.userId);
+  if (buyer) {
+    await createNotification(buyer._id, {
+      title: "Shop trả giá",
+      content: `Shop đề xuất mức giá ${Number(counterPrice).toLocaleString("vi-VN")}đ. Bạn có thể chấp nhận hoặc đề nghị lại trong mục Đơn hàng.`,
+    });
+  }
+
+  await sendSellerCounterChatMessage(user, shop, deal);
 
   return {
     id: deal._id,

@@ -1,17 +1,17 @@
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getBuyerOrdersOnBackend } from '../../api/buyerOpsApi';
+import { RESERVATION_STATUS, RESERVATION_TAB } from '../../constants/sellerOrders';
 import {
   canReviewReservationOrder,
   canShowReviewButton,
+  getReservationStatusLabel,
   isOrderAlreadyReviewed,
   submitShopReview,
 } from '../../core/utils/orderReview';
 import { useReviewedOrderCodes } from '../../hooks/useReviewedOrderCodes';
-import {
-  getReservationStatusLabel,
-  MOCK_RESERVATIONS,
-} from '../../model/mock/activityMockData';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { ReviewedBadge, ReviewNowButton } from '../shared/components/ReviewOrderAction';
 import ShopReviewModal from '../shared/components/ShopReviewModal';
 import ProfileSubScreen from './ProfileSubScreen';
@@ -28,14 +28,20 @@ function formatDateTime(iso) {
 }
 
 const STATUS_COLORS = {
-  active: { bg: '#d1fae5', text: '#047857' },
-  picked_up: { bg: '#e0e7ff', text: '#4338ca' },
-  expired: { bg: '#fee2e2', text: '#b91c1c' },
+  [RESERVATION_STATUS.PENDING]: { bg: '#fef3c7', text: '#b45309' },
+  [RESERVATION_STATUS.CONFIRMED]: { bg: '#d1fae5', text: '#047857' },
+  [RESERVATION_STATUS.COMPLETED]: { bg: '#e0e7ff', text: '#4338ca' },
+  [RESERVATION_STATUS.CANCELLED]: { bg: '#fee2e2', text: '#b91c1c' },
 };
-function ReservationList({ onOpenOrderDetail, onOpenStore, onReviewStore, reviewedOrderCodes }) {
-  return MOCK_RESERVATIONS.map((item) => {
-    const statusStyle = STATUS_COLORS[item.status] || STATUS_COLORS.active;
-    const isActiveReservation = item.status === 'active';
+
+function ReservationList({ items, onOpenOrderDetail, onOpenStore, onReviewStore, reviewedOrderCodes }) {
+  if (items.length === 0) {
+    return <Text style={styles.emptyText}>Chưa có phiếu giữ hàng.</Text>;
+  }
+
+  return items.map((item) => {
+    const statusStyle = STATUS_COLORS[item.status] || STATUS_COLORS[RESERVATION_STATUS.PENDING];
+    const isActiveReservation = item.status === RESERVATION_STATUS.CONFIRMED;
     const isPickedUp = canReviewReservationOrder(item);
     const showReviewButton = canShowReviewButton(
       { ...item, orderCode: item.id },
@@ -102,9 +108,49 @@ export default function ReservationHistoryScreen({
 }) {
   const [reviewTarget, setReviewTarget] = useState(null);
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
+  const [reservations, setReservations] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { reviewedOrderCodes: internalReviewedCodes, markReviewed } =
     useReviewedOrderCodes(localRefreshKey);
   const reviewedOrderCodes = externalReviewedCodes || internalReviewedCodes;
+
+  const loadReservations = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        setReservations([]);
+        return;
+      }
+
+      const data = await getBuyerOrdersOnBackend({
+        idToken,
+        tab: RESERVATION_TAB.HOLDING,
+      });
+      const rows = (data?.reservations || []).map((reservation) => ({
+        id: String(reservation.id),
+        storeId: reservation.shopId || reservation.storeId || '',
+        productName:
+          reservation.product?.productName ||
+          reservation.variant?.variantName ||
+          'Sản phẩm',
+        storeName: reservation.storeName || 'Gian hàng',
+        quantity: Number(reservation.quantity || 1),
+        reservedAt: reservation.createdAt,
+        expiresAt: reservation.expiresAt || reservation.pickupDeadline,
+        status: reservation.status,
+      }));
+      setReservations(rows);
+    } catch {
+      setReservations([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadReservations();
+  }, [loadReservations, localRefreshKey]);
 
   async function handleSubmitReview({ rating, comment, imageUrl }) {
     if (!reviewTarget) {
@@ -139,12 +185,17 @@ export default function ReservationHistoryScreen({
 
   const content = (
     <>
-      <ReservationList
-        onOpenOrderDetail={onOpenOrderDetail}
-        onOpenStore={onOpenStore}
-        onReviewStore={setReviewTarget}
-        reviewedOrderCodes={reviewedOrderCodes}
-      />
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#0f766e" style={styles.loader} />
+      ) : (
+        <ReservationList
+          items={reservations}
+          onOpenOrderDetail={onOpenOrderDetail}
+          onOpenStore={onOpenStore}
+          onReviewStore={setReviewTarget}
+          reviewedOrderCodes={reviewedOrderCodes}
+        />
+      )}
       <ShopReviewModal
         visible={Boolean(reviewTarget)}
         storeName={reviewTarget?.storeName}
@@ -166,7 +217,18 @@ export default function ReservationHistoryScreen({
   );
 }
 
-const styles = StyleSheet.create({  card: {
+const styles = StyleSheet.create({
+  loader: {
+    marginTop: 24,
+  },
+  emptyText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 24,
+  },
+  card: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,

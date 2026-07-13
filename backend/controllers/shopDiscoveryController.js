@@ -56,8 +56,20 @@ exports.searchShops = async (req, res) => {
   });
 };
 
+exports.listShopCategories = async (req, res) => {
+  const shopCategoryService = require("../services/shopCategoryService");
+  const categories = await shopCategoryService.listCategories();
+
+  return success(res, {
+    data: { categories },
+  });
+};
+
 exports.getShop = async (req, res) => {
-  const shop = await shopDiscoveryService.getPublicShopById(req.params.id);
+  const shop = await shopDiscoveryService.getPublicShopById(req.params.id, {
+    latitude: req.query.lat ?? req.query.latitude,
+    longitude: req.query.lng ?? req.query.longitude,
+  });
 
   return success(res, {
     data: {

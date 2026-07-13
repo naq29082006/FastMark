@@ -1,7 +1,6 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
 const MessageImage = require("../models/MessageImage");
-const Restaurant = require("../models/Restaurant");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
 const { MESSAGE_TYPE } = require("../constants/messageType");
@@ -37,61 +36,21 @@ function activeMessageFilter(extra = {}) {
   };
 }
 
-async function findOrCreateDemoShopProfile(restaurant) {
-  const externalId = String(restaurant.externalId);
-  let shop = await ShopProfile.findOne({ externalRestaurantId: externalId });
-  if (shop) {
-    return shop;
-  }
-
-  try {
-    shop = await ShopProfile.create({
-      externalRestaurantId: externalId,
-      description: restaurant.name,
-      address: restaurant.address || "",
-      DiaChiHeThong: restaurant.address || "",
-      latitude: restaurant.latitude,
-      longitude: restaurant.longitude,
-      phone: restaurant.phone || restaurant.zalo || "",
-    });
-    return shop;
-  } catch (error) {
-    if (error?.code === 11000) {
-      const existing = await ShopProfile.findOne({ externalRestaurantId: externalId });
-      if (existing) {
-        return existing;
-      }
-    }
-    throw error;
-  }
-}
-
-async function resolveShopForBuyerChat(shopId, shopName = "") {
+async function resolveShopForBuyerChat(shopId) {
   const rawId = pickString(shopId);
   if (!rawId) {
     throw createServiceError("Thiếu shopId.", 400);
   }
 
-  if (isMongoObjectId(rawId)) {
-    const shop = await ShopProfile.findById(rawId);
-    if (!shop) {
-      throw createServiceError("Không tìm thấy gian hàng.", 404);
-    }
-    return shop;
+  if (!isMongoObjectId(rawId)) {
+    throw createServiceError("Không tìm thấy gian hàng.", 404);
   }
 
-  let restaurant = await Restaurant.findOne({ externalId: rawId });
-  if (!restaurant && shopName) {
-    restaurant = await Restaurant.findOne({ name: shopName });
+  const shop = await ShopProfile.findById(rawId);
+  if (!shop) {
+    throw createServiceError("Không tìm thấy gian hàng.", 404);
   }
-  if (!restaurant) {
-    throw createServiceError(
-      "Không tìm thấy gian hàng để nhắn tin. Hãy chạy seed dữ liệu demo trên backend.",
-      404
-    );
-  }
-
-  return findOrCreateDemoShopProfile(restaurant);
+  return shop;
 }
 
 function formatBubbleTime(date) {
@@ -386,12 +345,7 @@ function mapBuyerPublicInfo(buyer) {
 
 async function getShopPublicInfo(shop) {
   const seller = shop?.userId ? await User.findById(shop.userId) : null;
-  let displayName = shop?.shopName || seller?.FullName || seller?.UserName || "";
-
-  if (!displayName && shop?.externalRestaurantId) {
-    const restaurant = await Restaurant.findOne({ externalId: shop.externalRestaurantId });
-    displayName = restaurant?.name || "";
-  }
+  const displayName = shop?.shopName || seller?.FullName || seller?.UserName || "";
 
   const name =
     displayName ||
@@ -800,7 +754,7 @@ async function listShopsForBuyer() {
 }
 
 async function findOrCreateBuyerConversation(user, shopId, shopName = "") {
-  const shop = await resolveShopForBuyerChat(shopId, shopName);
+  const shop = await resolveShopForBuyerChat(shopId);
   if (!shop) {
     throw createServiceError("Không tìm thấy gian hàng.", 404);
   }

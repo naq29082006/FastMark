@@ -47,7 +47,7 @@ export async function pickImages({ multiple = true } = {}) {
     }));
 }
 
-export function CategoryCombobox({ categories, value, onChange, disabled }) {
+export function CategoryCombobox({ categories, value, onChange, disabled, showDetails = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectedCategory = useMemo(
     () => categories.find((category) => String(category.id) === String(value)) || null,
@@ -61,13 +61,20 @@ export function CategoryCombobox({ categories, value, onChange, disabled }) {
         onPress={() => setIsOpen(true)}
         style={({ pressed }) => [
           styles.combobox,
+          showDetails && styles.comboboxRich,
           disabled && styles.comboboxDisabled,
           pressed && !disabled && styles.buttonPressed,
         ]}
       >
-        <Text style={[styles.comboboxText, !selectedCategory && styles.comboboxPlaceholder]}>
-          {selectedCategory?.categoryName || 'Chọn danh mục'}
-        </Text>
+        {showDetails && selectedCategory ? (
+          <View style={styles.comboboxRichContent}>
+            <CategoryOptionContent category={selectedCategory} compact />
+          </View>
+        ) : (
+          <Text style={[styles.comboboxText, !selectedCategory && styles.comboboxPlaceholder]}>
+            {selectedCategory?.categoryName || 'Chọn danh mục'}
+          </Text>
+        )}
         <Text style={styles.comboboxArrow}>▼</Text>
       </Pressable>
 
@@ -85,11 +92,15 @@ export function CategoryCombobox({ categories, value, onChange, disabled }) {
                       onChange(String(category.id));
                       setIsOpen(false);
                     }}
-                    style={[styles.modalOption, isActive && styles.modalOptionActive]}
+                    style={[styles.modalOption, showDetails && styles.modalOptionRich, isActive && styles.modalOptionActive]}
                   >
-                    <Text style={[styles.modalOptionText, isActive && styles.modalOptionTextActive]}>
-                      {category.categoryName}
-                    </Text>
+                    {showDetails ? (
+                      <CategoryOptionContent category={category} active={isActive} />
+                    ) : (
+                      <Text style={[styles.modalOptionText, isActive && styles.modalOptionTextActive]}>
+                        {category.categoryName}
+                      </Text>
+                    )}
                   </Pressable>
                 );
               })}
@@ -98,6 +109,51 @@ export function CategoryCombobox({ categories, value, onChange, disabled }) {
         </Pressable>
       </Modal>
     </>
+  );
+}
+
+function CategoryOptionContent({ category, active = false, compact = false }) {
+  const iconUrl = String(category?.icon || '').trim();
+  const description = String(category?.description || '').trim();
+
+  return (
+    <View style={[styles.categoryOptionRow, compact && styles.categoryOptionRowCompact]}>
+      {iconUrl ? (
+        <Image source={{ uri: iconUrl }} style={styles.categoryOptionImage} />
+      ) : (
+        <View style={[styles.categoryOptionImage, styles.categoryOptionImagePlaceholder]}>
+          <Text style={styles.categoryOptionImagePlaceholderText}>?</Text>
+        </View>
+      )}
+      <View style={styles.categoryOptionTextWrap}>
+        <Text
+          style={[
+            styles.categoryOptionName,
+            compact && styles.categoryOptionNameCompact,
+            active && styles.categoryOptionNameActive,
+          ]}
+          numberOfLines={1}
+        >
+          {category?.categoryName || 'Danh mục'}
+        </Text>
+        {description ? (
+          <Text
+            style={[
+              styles.categoryOptionDescription,
+              compact && styles.categoryOptionDescriptionCompact,
+              active && styles.categoryOptionDescriptionActive,
+            ]}
+            numberOfLines={compact ? 1 : 2}
+          >
+            {description}
+          </Text>
+        ) : (
+          <Text style={styles.categoryOptionDescriptionMuted} numberOfLines={1}>
+            Chưa có mô tả
+          </Text>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -298,6 +354,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  comboboxRich: {
+    minHeight: 72,
+    paddingVertical: 10,
+  },
+  comboboxRichContent: {
+    flex: 1,
+    minWidth: 0,
+  },
   comboboxDisabled: {
     backgroundColor: '#f8fafc',
     opacity: 0.7,
@@ -349,6 +413,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: '#ffffff',
   },
+  modalOptionRich: {
+    paddingVertical: 10,
+  },
   modalOptionActive: {
     borderColor: '#0d7377',
     backgroundColor: '#e8f3f1',
@@ -360,6 +427,68 @@ const styles = StyleSheet.create({
   },
   modalOptionTextActive: {
     color: '#0d7377',
+  },
+  categoryOptionRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minWidth: 0,
+  },
+  categoryOptionRowCompact: {
+    gap: 10,
+  },
+  categoryOptionImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#e2e8f0',
+  },
+  categoryOptionImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  categoryOptionImagePlaceholderText: {
+    color: '#94a3b8',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  categoryOptionTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  categoryOptionName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  categoryOptionNameCompact: {
+    marginBottom: 2,
+  },
+  categoryOptionNameActive: {
+    color: '#0d7377',
+  },
+  categoryOptionDescription: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  categoryOptionDescriptionCompact: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  categoryOptionDescriptionActive: {
+    color: '#0f766e',
+  },
+  categoryOptionDescriptionMuted: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
   },
   helperText: {
     color: '#94a3b8',
@@ -383,6 +512,7 @@ const styles = StyleSheet.create({
   },
   thumbnailWrap: {
     position: 'relative',
+    overflow: 'visible',
   },
   thumbnailImage: {
     width: 120,
@@ -416,10 +546,14 @@ const styles = StyleSheet.create({
   },
   imageRow: {
     flexGrow: 0,
+    paddingTop: 8,
+    paddingRight: 8,
+    paddingBottom: 4,
   },
   imageThumbWrap: {
     position: 'relative',
     marginRight: 10,
+    overflow: 'visible',
   },
   imageThumb: {
     width: 88,
@@ -431,18 +565,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -6,
     right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#ef4444',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    zIndex: 2,
   },
   removeImageText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '900',
-    lineHeight: 16,
+    lineHeight: 18,
+    marginTop: -1,
   },
   addImageButton: {
     width: 88,

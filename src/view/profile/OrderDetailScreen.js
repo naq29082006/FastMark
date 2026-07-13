@@ -8,7 +8,7 @@ import {
   submitShopReview,
 } from '../../core/utils/orderReview';
 import { useReviewedOrderCodes } from '../../hooks/useReviewedOrderCodes';
-import { getReservationStatusLabel } from '../../model/mock/activityMockData';
+import { getReservationStatusLabel } from '../../core/utils/orderReview';
 import { ReviewedBadge, ReviewNowButton } from '../shared/components/ReviewOrderAction';
 import ShopReviewModal from '../shared/components/ShopReviewModal';
 import ProfileSubScreen from './ProfileSubScreen';

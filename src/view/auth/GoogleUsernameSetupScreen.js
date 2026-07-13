@@ -23,6 +23,7 @@ import {
 } from '../../viewmodel/auth/authSlice';
 import { validateGoogleProfileForm } from '../../viewmodel/auth/authFormValidation';
 import AuthBrand from './components/AuthBrand';
+import CircularBackButton from '../shared/components/CircularBackButton';
 import AuthInput from './components/AuthInput';
 import { AUTH_COLORS, AUTH_RADIUS } from './components/authTheme';
 
@@ -70,9 +71,12 @@ export default function GoogleUsernameSetupScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Pressable onPress={handleCancel} style={styles.backButton}>
-          <Text style={styles.backIcon}>‹</Text>
-        </Pressable>
+        <CircularBackButton
+          onPress={handleCancel}
+          variant="surface"
+          size={40}
+          style={styles.backButton}
+        />
 
         <AuthBrand
           title="Hoàn tất tài khoản"
@@ -153,25 +157,14 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 52,
+    paddingTop: 12,
     paddingBottom: 36,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 8,
     borderWidth: 1,
     borderColor: AUTH_COLORS.border,
-  },
-  backIcon: {
-    fontSize: 28,
-    lineHeight: 30,
-    color: AUTH_COLORS.text,
-    marginTop: -2,
+    backgroundColor: '#ffffff',
   },
   card: {
     backgroundColor: AUTH_COLORS.card,

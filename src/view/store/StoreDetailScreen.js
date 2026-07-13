@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,11 +16,21 @@ import {
   loadStoreById,
 } from '../../viewmodel/store/storeViewModel';
 import { submitReportOnBackend } from '../../api/reportApi';
+import { fetchRouteDistanceMeters } from '../../api/routingApi';
+import {
+  addFavoriteProductOnBackend,
+  getFavoriteProductIdsOnBackend,
+  removeFavoriteProductOnBackend,
+} from '../../api/favoriteApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 import ContactActions from './components/ContactActions';
 import StarRating from './components/StarRating';
 import ReportSheet from '../shared/components/ReportSheet';
+import CircularBackButton from '../shared/components/CircularBackButton';
+import FollowConnectionsScreen from '../profile/FollowConnectionsScreen';
 import { formatPriceRange } from '../../core/utils/productFormat';
+import { formatDistance, calculateDistanceMeters, hasValidLocation } from '../../core/utils/geo';
 import { storeLogger as log } from '../../core/utils/logger';
 const TABS = [
   { key: 'products', label: 'Sản phẩm' },
@@ -72,26 +82,149 @@ function InfoRow({ label, value, fallback = 'Chưa cập nhật' }) {
   );
 }
 
-function StatCard({ label, value }) {
-  return (
-    <View style={styles.statCard}>
+function StatCard({ label, value, onPress }) {
+  const content = (
+    <>
       <Text style={styles.statValue}>{formatCount(value)}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.statCard}>{content}</View>;
+  }
+
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.statCard, pressed && styles.pressed]}>
+      {content}
+    </Pressable>
   );
 }
 
-export default function StoreDetailScreen({ storeId, onBack, onProductPress, onOpenChat }) {  const [store, setStore] = useState(null);
+export default function StoreDetailScreen({
+  storeId,
+  originLocation,
+  onBack,
+  onProductPress,
+  onOpenChat,
+  onNavigateDirections,
+  previewMode = false,
+}) {
+  const insets = useScreenInsets();
+  const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [activeTab, setActiveTab] = useState('products');
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [showFollowScreen, setShowFollowScreen] = useState(false);
   const [likedProducts, setLikedProducts] = useState({});
+  const [routeDistanceMeters, setRouteDistanceMeters] = useState(null);
 
-  const toggleLikeProduct = (productId) => {
-    setLikedProducts((prev) => ({ ...prev, [productId]: !prev[productId] }));
+  const straightLineDistanceMeters = useMemo(() => {
+    if (!store || !hasValidLocation(originLocation)) {
+      return null;
+    }
+
+    return calculateDistanceMeters(originLocation, {
+      latitude: store.latitude,
+      longitude: store.longitude,
+    });
+  }, [store, originLocation?.latitude, originLocation?.longitude]);
+
+  useEffect(() => {
+    if (!store || !hasValidLocation(originLocation)) {
+      setRouteDistanceMeters(null);
+      return undefined;
+    }
+
+    let active = true;
+    const timer = setTimeout(() => {
+      fetchRouteDistanceMeters(originLocation, {
+        latitude: store.latitude,
+        longitude: store.longitude,
+      })
+        .then((distance) => {
+          if (active) {
+            setRouteDistanceMeters(distance);
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setRouteDistanceMeters(null);
+          }
+        });
+    }, 200);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [
+    store?.id,
+    store?.latitude,
+    store?.longitude,
+    originLocation?.latitude,
+    originLocation?.longitude,
+  ]);
+
+  const distanceMeters = Number.isFinite(routeDistanceMeters)
+    ? routeDistanceMeters
+    : straightLineDistanceMeters ??
+      (Number.isFinite(Number(store?.distance_meters)) ? Number(store.distance_meters) : null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadFavoriteIds() {
+      try {
+        const idToken = await getCurrentUserIdToken();
+        if (!idToken || !active) {
+          return;
+        }
+        const productIds = await getFavoriteProductIdsOnBackend(idToken);
+        if (!active) {
+          return;
+        }
+        const likedMap = {};
+        (productIds || []).forEach((productId) => {
+          likedMap[String(productId)] = true;
+        });
+        setLikedProducts(likedMap);
+      } catch {
+        // Ignore favorite preload errors.
+      }
+    }
+
+    loadFavoriteIds();
+    return () => {
+      active = false;
+    };
+  }, [storeId]);
+
+  const toggleLikeProduct = async (productId) => {
+    const normalizedId = String(productId);
+    const wasLiked = Boolean(likedProducts[normalizedId]);
+
+    setLikedProducts((prev) => ({ ...prev, [normalizedId]: !wasLiked }));
+
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        setLikedProducts((prev) => ({ ...prev, [normalizedId]: wasLiked }));
+        Alert.alert('Đăng nhập', 'Vui lòng đăng nhập để lưu sản phẩm yêu thích.');
+        return;
+      }
+
+      if (wasLiked) {
+        await removeFavoriteProductOnBackend(idToken, normalizedId);
+      } else {
+        await addFavoriteProductOnBackend({ idToken, productId: normalizedId });
+      }
+    } catch {
+      setLikedProducts((prev) => ({ ...prev, [normalizedId]: wasLiked }));
+    }
   };
   useEffect(() => {
     let isCurrent = true;
@@ -178,16 +311,43 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
     onOpenChat?.({ shopId: store.id, shopName: store.name });
   }
 
+  function handleNavigateDirections() {
+    const latitude = Number(store.latitude);
+    const longitude = Number(store.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      Alert.alert('Không chỉ đường được', 'Gian hàng chưa có tọa độ trên bản đồ.');
+      return;
+    }
+
+    onNavigateDirections?.({
+      shopId: store.id,
+      storeName: store.shop_name || store.name,
+      latitude,
+      longitude,
+      categoryIcon: store.category_icon || store.categoryIcon || '',
+      categoryId: store.category_id || store.categoryId || '',
+      storeAvatar: store.image_url || store.cover_image_url || '',
+    });
+  }
+
+  if (showFollowScreen && previewMode) {
+    return <FollowConnectionsScreen onBack={() => setShowFollowScreen(false)} />;
+  }
+
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottomSpacing + 24 }]}
+      >
         <View style={styles.header}>
-          <Pressable onPress={onBack} style={styles.backBtn} accessibilityRole="button">
-            <Text style={styles.backBtnText}>←</Text>
-          </Pressable>
+          {!previewMode ? (
+            <CircularBackButton onPress={onBack} variant="surface" style={[styles.backBtn, { top: 12 }]} />
+          ) : null}
           <Pressable
             onPress={() => setReportVisible(true)}
-            style={styles.reportBtn}
+            style={[styles.reportBtn, { top: 12 }]}
             accessibilityRole="button"
             accessibilityLabel="Báo cáo gian hàng"
           >
@@ -228,13 +388,19 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
 
             <View style={styles.ratingRow}>
               <StarRating rating={store.rating_avg} size={16} showValue />
-              <Text style={styles.reviewCount}>
-                ({store.review_count || reviews.length} đánh giá)
-              </Text>
+              <Pressable onPress={() => setActiveTab('reviews')} hitSlop={8}>
+                <Text style={styles.reviewCount}>
+                  ({store.review_count || reviews.length} đánh giá)
+                </Text>
+              </Pressable>
             </View>
 
             <View style={styles.statsRow}>
-              <StatCard label="Theo dõi" value={store.follow_count} />
+              <StatCard
+                label="Theo dõi"
+                value={store.follow_count}
+                onPress={previewMode ? () => setShowFollowScreen(true) : undefined}
+              />
               <View style={styles.statDivider} />
               <StatCard label="Sản phẩm" value={store.total_products || products.length} />
               <View style={styles.statDivider} />
@@ -248,15 +414,24 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
 
-          <Pressable
-            style={({ pressed }) => [styles.messageButton, pressed && styles.pressed]}
-            onPress={handleOpenChat}
-          >
-            <Text style={styles.messageButtonText}>💬 Nhắn tin</Text>
-          </Pressable>
-
           <InfoRow label="Địa chỉ" value={store.user_address} />
           <InfoRow label="Địa chỉ hệ thống" value={store.system_address} />
+          {Number.isFinite(distanceMeters) ? (
+            <View style={styles.distanceRow}>
+              <Text style={styles.infoLine}>
+                <Text style={styles.infoLabelInline}>Khoảng cách: </Text>
+                <Text style={styles.infoValueInline}>{`Cách bạn ${formatDistance(distanceMeters)}`}</Text>
+              </Text>
+              {onNavigateDirections ? (
+                <Pressable
+                  onPress={handleNavigateDirections}
+                  style={({ pressed }) => [styles.directionsChip, pressed && styles.pressed]}
+                >
+                  <Text style={styles.directionsChipText}>Chỉ đường</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
           <InfoRow label="Số điện thoại" value={store.phone} />
           <InfoRow label="Giờ đóng - mở cửa" value={hoursText} />
           <InfoRow
@@ -266,7 +441,7 @@ export default function StoreDetailScreen({ storeId, onBack, onProductPress, onO
           />
 
           <View style={styles.contactActions}>
-            <ContactActions phone={store.phone} zalo={store.zalo} />
+            <ContactActions phone={store.phone} onMessage={handleOpenChat} />
           </View>
         </View>
         <View style={styles.tabBar}>
@@ -401,7 +576,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 32,
+    paddingBottom: 24,
   },
   header: {
     backgroundColor: '#ffffff',
@@ -409,29 +584,16 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     position: 'absolute',
-    top: 48,
     left: 16,
     zIndex: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  backBtnText: {
-    fontSize: 20,
-    color: '#0f172a',
-    fontWeight: '700',
-  },
   reportBtn: {
     position: 'absolute',
-    top: 48,
     right: 16,
     zIndex: 10,
     width: 36,
@@ -598,7 +760,29 @@ const styles = StyleSheet.create({
   },
   contactActions: {
     marginTop: 4,
-  },  tabBar: {
+    gap: 10,
+  },
+  distanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 8,
+  },
+  directionsChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#99f6e4',
+  },
+  directionsChipText: {
+    color: '#0f766e',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  tabBar: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
     marginHorizontal: 16,
@@ -632,6 +816,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 16,
+    paddingBottom: 8,
     gap: 12,
   },
   productCard: {
@@ -698,6 +883,7 @@ const styles = StyleSheet.create({
   },
   reviewsList: {
     paddingHorizontal: 16,
+    paddingBottom: 8,
     gap: 10,
   },
   reviewsSummary: {

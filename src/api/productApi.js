@@ -32,7 +32,28 @@ export async function getProductCategoriesOnBackend() {
   return (payload.data?.categories || []).map((category) => ({
     ...category,
     id: normalizeCategoryId(category.id || category._id),
-    categoryName: category.categoryName || category.name || '',
+    name: category.name || category.categoryName || '',
+    categoryName: category.name || category.categoryName || '',
+    icon: category.icon || '',
+    description: category.description || '',
+  })).filter((category) => category.id && category.categoryName);
+}
+
+export async function getShopCategoriesOnBackend() {
+  const response = await apiRequest(
+    API_ENDPOINTS.shopCategories,
+    { method: 'GET' },
+    AUTH_TIMEOUT_MS
+  );
+
+  const payload = await parseApiResponse(response);
+  return (payload.data?.categories || []).map((category) => ({
+    ...category,
+    id: normalizeCategoryId(category.id || category._id),
+    name: category.name || category.categoryName || '',
+    categoryName: category.name || category.categoryName || '',
+    icon: category.icon || '',
+    description: category.description || '',
   })).filter((category) => category.id && category.categoryName);
 }
 

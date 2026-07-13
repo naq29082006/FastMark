@@ -1,4 +1,4 @@
-const Notification = require("../models/Notification,js");
+const Notification = require("../models/Notification.js");
 const { emitUserEvent } = require("../socket");
 
 async function createNotification(userId, { title, content } = {}) {

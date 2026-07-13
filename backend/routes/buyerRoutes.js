@@ -44,11 +44,20 @@ router.post("/reports", verifyFirebaseToken, asyncHandler(buyerController.create
 
 const buyerOpsController = require("../controllers/buyerOpsController");
 
+router.get("/favorites", verifyFirebaseToken, asyncHandler(buyerController.listFavorites));
+router.get("/favorites/ids", verifyFirebaseToken, asyncHandler(buyerController.listFavoriteIds));
+router.post("/favorites", verifyFirebaseToken, asyncHandler(buyerController.addFavorite));
+router.delete(
+  "/favorites/:productId",
+  verifyFirebaseToken,
+  asyncHandler(buyerController.removeFavorite)
+);
 router.get("/orders", verifyFirebaseToken, asyncHandler(buyerOpsController.listOrders));
 router.post("/deals", verifyFirebaseToken, asyncHandler(buyerOpsController.createDeal));
 router.get("/deals", verifyFirebaseToken, asyncHandler(buyerOpsController.listDeals));
 router.get("/deals/:id", verifyFirebaseToken, asyncHandler(buyerOpsController.getDeal));
 router.post("/deals/:id/resubmit", verifyFirebaseToken, asyncHandler(buyerOpsController.resubmitDeal));
+router.post("/deals/:id/counter", verifyFirebaseToken, asyncHandler(buyerOpsController.counterDeal));
 router.post("/deals/:id/accept-counter", verifyFirebaseToken, asyncHandler(buyerOpsController.acceptCounter));
 router.post("/reservations", verifyFirebaseToken, asyncHandler(buyerOpsController.createReservation));
 router.get("/reservations/:id", verifyFirebaseToken, asyncHandler(buyerOpsController.getReservation));

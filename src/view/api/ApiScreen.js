@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingTop: 56,
+    paddingTop: 12,
     paddingBottom: 32,
   },
   header: {

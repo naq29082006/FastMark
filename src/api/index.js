@@ -5,7 +5,6 @@ export * from './authApi';
 export * from './authBackendApi';
 export * from './profileApi';
 export * from './profileCacheApi';
-export * from './restaurantApi';
 export * from './storeApi';
 export * from './productApi';
 export * from './reviewApi';

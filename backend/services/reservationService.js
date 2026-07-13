@@ -205,6 +205,13 @@ async function completeReservation(user, reservationId) {
     });
   }
 
+  if (reservation.variantId) {
+    await ProductVariant.findByIdAndUpdate(reservation.variantId, {
+      $inc: { SoldCount: soldQuantity, Quantity: -soldQuantity },
+      $set: { UpdatedAt: now },
+    });
+  }
+
   return toPublicReservation(reservation);
 }
 

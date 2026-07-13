@@ -1,5 +1,6 @@
 const messageService = require("../services/messageService");
 const buyerReviewService = require("../services/buyerReviewService");
+const favoriteProductService = require("../services/favoriteProductService");
 const reportService = require("../services/reportService");
 const { success, fail } = require("../utils/apiResponse");
 
@@ -135,6 +136,37 @@ exports.updateReview = async (req, res) => {
 exports.deleteReview = async (req, res) => {
   await buyerReviewService.deleteBuyerReview(req.currentUser, req.params.id);
   return success(res, { message: "Đã xóa đánh giá." });
+};
+
+exports.listFavorites = async (req, res) => {
+  const favorites = await favoriteProductService.listFavorites(req.currentUser);
+  return success(res, { data: { favorites } });
+};
+
+exports.listFavoriteIds = async (req, res) => {
+  const productIds = await favoriteProductService.listFavoriteProductIds(req.currentUser);
+  return success(res, { data: { productIds } });
+};
+
+exports.addFavorite = async (req, res) => {
+  const productId = pickBodyValue(req.body, ["productId", "product_id"]);
+  if (!productId) {
+    return fail(res, { status: 400, message: "Thiếu productId." });
+  }
+
+  const favorite = await favoriteProductService.addFavorite(req.currentUser, productId);
+  return success(res, {
+    message: "Đã thêm vào yêu thích.",
+    data: { favorite },
+  });
+};
+
+exports.removeFavorite = async (req, res) => {
+  const result = await favoriteProductService.removeFavorite(req.currentUser, req.params.productId);
+  return success(res, {
+    message: "Đã bỏ yêu thích.",
+    data: result,
+  });
 };
 
 exports.createReport = async (req, res) => {

@@ -1,6 +1,7 @@
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { formatActivityLabel } from '../../core/utils/activityLabel';
+import CircularBackButton from '../shared/components/CircularBackButton';
 
 function ProfileAvatar({ name, avatar }) {
   if (avatar) {
@@ -27,9 +28,7 @@ export default function ChatProfileScreen({ peer, peerType = 'shop', onBack, onV
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </Pressable>
+        <CircularBackButton onPress={onBack} variant="light" />
         <Text style={styles.topTitle}>Hồ sơ</Text>
         <View style={styles.topSpacer} />
       </View>
@@ -74,20 +73,11 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 56,
+    paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  backButtonText: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
   topTitle: { flex: 1, textAlign: 'center', color: '#ffffff', fontSize: 16, fontWeight: '800' },
   topSpacer: { width: 36 },
   content: { padding: 20, gap: 16 },

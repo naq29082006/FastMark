@@ -6,15 +6,67 @@ function formatOfferMessageContent({
   productName = "",
   originalPrice = 0,
   offeredPrice = 0,
+  quantity = 1,
   discountPercent = 0,
   note = "",
 } = {}) {
   const lines = [
     "💰 Đề nghị deal giá",
     productName ? `Sản phẩm: ${productName}` : "",
+    `Số lượng: ${quantity}`,
     `Giá gốc: ${formatPriceVnd(originalPrice)}`,
     `Giá đề nghị: ${formatPriceVnd(offeredPrice)}`,
     `Giảm: ${discountPercent || 0}%`,
+  ].filter(Boolean);
+
+  if (note) {
+    lines.push(`Ghi chú: ${note}`);
+  }
+
+  return lines.join("\n");
+}
+
+function formatBuyerCounterMessageContent({
+  productName = "",
+  originalPrice = 0,
+  sellerCounterPrice = 0,
+  offeredPrice = 0,
+  quantity = 1,
+  discountPercent = 0,
+  note = "",
+} = {}) {
+  const lines = [
+    "💰 Khách trả giá lại",
+    productName ? `Sản phẩm: ${productName}` : "",
+    `Số lượng: ${quantity}`,
+    `Giá gốc: ${formatPriceVnd(originalPrice)}`,
+    `Shop đề xuất: ${formatPriceVnd(sellerCounterPrice)}`,
+    `Giá đề nghị mới: ${formatPriceVnd(offeredPrice)}`,
+    `Giảm: ${discountPercent || 0}%`,
+  ].filter(Boolean);
+
+  if (note) {
+    lines.push(`Ghi chú: ${note}`);
+  }
+
+  return lines.join("\n");
+}
+
+function formatSellerCounterMessageContent({
+  productName = "",
+  originalPrice = 0,
+  offeredPrice = 0,
+  sellerCounterPrice = 0,
+  quantity = 1,
+  note = "",
+} = {}) {
+  const lines = [
+    "🏪 Shop trả giá",
+    productName ? `Sản phẩm: ${productName}` : "",
+    `Số lượng: ${quantity}`,
+    `Giá gốc: ${formatPriceVnd(originalPrice)}`,
+    `Khách đề nghị: ${formatPriceVnd(offeredPrice)}`,
+    `Giá shop đề xuất: ${formatPriceVnd(sellerCounterPrice)}`,
   ].filter(Boolean);
 
   if (note) {
@@ -54,6 +106,8 @@ function parseOfferMessageContent(content) {
 
 module.exports = {
   formatOfferMessageContent,
+  formatBuyerCounterMessageContent,
+  formatSellerCounterMessageContent,
   parseOfferMessageContent,
   formatPriceVnd,
 };

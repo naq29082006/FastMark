@@ -6,7 +6,6 @@ const { assertCategoryExists } = require("./categoryService");
 const { normalizeCategoryId } = require("../utils/categoryId");
 const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService");
 
-const DEMO_PHONE_CODE = "123456";
 const PHONE_VERIFY_TTL_MS = 5 * 60 * 1000;
 const SHOP_USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 
@@ -126,6 +125,10 @@ function ensureUserHasPhone(user) {
   return phone;
 }
 
+function generatePhoneVerifyCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 async function requestSellerPhoneCode(user) {
   const phone = ensureUserHasPhone(user);
 
@@ -135,19 +138,19 @@ async function requestSellerPhoneCode(user) {
       alreadyVerified: true,
       expiresAt: null,
       expiresInSeconds: 0,
-      devCode: null,
     };
   }
 
-  user.SellerPhoneVerifyCode = DEMO_PHONE_CODE;
+  const code = generatePhoneVerifyCode();
+  user.SellerPhoneVerifyCode = code;
   user.SellerPhoneVerifyCodeExpiresAt = new Date(Date.now() + PHONE_VERIFY_TTL_MS);
   await user.save();
 
   return {
     phone,
+    verificationCode: code,
     expiresAt: user.SellerPhoneVerifyCodeExpiresAt,
     expiresInSeconds: PHONE_VERIFY_TTL_MS / 1000,
-    devCode: DEMO_PHONE_CODE,
   };
 }
 
@@ -549,7 +552,6 @@ function toAdminVerification(verification) {
 }
 
 module.exports = {
-  DEMO_PHONE_CODE,
   SELLER_VERIFICATION_STATUS,
   requestSellerPhoneCode,
   confirmSellerPhoneCode,

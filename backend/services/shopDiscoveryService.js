@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const ShopProfile = require("../models/ShopProfile");
-const { getCategoryNameMap } = require("./categoryService");
+const { getShopCategoryNameMap } = require("./shopCategoryService");
 const User = require("../models/User");
 const UserFollow = require("../models/UserFollow");
 const Product = require("../models/Product");
@@ -143,13 +143,28 @@ function pickShopText(shop, ...keys) {
   return "";
 }
 
+function resolveShopCategory(categoryMap, categoryId) {
+  const entry = categoryMap.get(String(categoryId));
+  if (!entry) {
+    return { name: "", icon: "" };
+  }
+  if (typeof entry === "string") {
+    return { name: entry, icon: "" };
+  }
+  return {
+    name: entry.name || "",
+    icon: entry.icon || "",
+  };
+}
+
 function toPublicStore(
   shop,
   user,
   productCount,
   distanceMeters,
   categoryName = "",
-  followCount = 0
+  followCount = 0,
+  categoryIcon = ""
 ) {
   const shopDisplayName =
     shop.shopName ||
@@ -178,6 +193,8 @@ function toPublicStore(
     shopUsername,
     categoryId: shop.categoryId ? String(shop.categoryId) : "",
     categoryName,
+    category_icon: categoryIcon,
+    categoryIcon,
     type: "shop",
     latitude: shop.latitude,
     longitude: shop.longitude,
@@ -234,7 +251,7 @@ async function listNearbyShops({ latitude, longitude, radiusMeters = 2000, limit
     Role: USER_ROLE.SELLER,
   }).lean();
   const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
-  const categoryNameMap = await getCategoryNameMap(shops.map((shop) => shop.categoryId));
+  const categoryNameMap = await getShopCategoryNameMap(shops.map((shop) => shop.categoryId));
 
   const nearby = [];
 
@@ -273,15 +290,18 @@ async function listNearbyShops({ latitude, longitude, radiusMeters = 2000, limit
 
   nearby.sort((left, right) => left.distanceMeters - right.distanceMeters);
 
-  return nearby.slice(0, maxResults).map(({ shop, seller, productCount, distanceMeters }) =>
-    toPublicStore(
+  return nearby.slice(0, maxResults).map(({ shop, seller, productCount, distanceMeters }) => {
+    const category = resolveShopCategory(categoryNameMap, shop.categoryId);
+    return toPublicStore(
       shop,
       seller,
       productCount,
       distanceMeters,
-      categoryNameMap.get(String(shop.categoryId)) || ""
-    )
-  );
+      category.name,
+      0,
+      category.icon
+    );
+  });
 }
 
 async function searchShops({
@@ -324,7 +344,7 @@ async function searchShops({
     Role: USER_ROLE.SELLER,
   }).lean();
   const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
-  const categoryNameMap = await getCategoryNameMap(shops.map((shop) => shop.categoryId));
+  const categoryNameMap = await getShopCategoryNameMap(shops.map((shop) => shop.categoryId));
 
   const [productMatchesFromProductQuery, productMatchesFromShopQuery] = await Promise.all([
     findProductMatchesByShopId(productKeyword, normalizedProductCategoryId),
@@ -409,12 +429,15 @@ async function searchShops({
   );
 
   return sliced.map(({ shop, seller, distanceMeters, matchedProducts }, index) => {
+    const category = resolveShopCategory(categoryNameMap, shop.categoryId);
     const store = toPublicStore(
       shop,
       seller,
       productCounts[index],
       distanceMeters,
-      categoryNameMap.get(String(shop.categoryId)) || ""
+      category.name,
+      0,
+      category.icon
     );
     return {
       ...store,
@@ -424,7 +447,7 @@ async function searchShops({
   });
 }
 
-async function getPublicShopById(shopId) {
+async function getPublicShopById(shopId, { latitude, longitude } = {}) {
   const shop = await ShopProfile.findById(shopId).lean();
   if (!shop) {
     const error = new Error("Không tìm thấy gian hàng.");
@@ -444,16 +467,35 @@ async function getPublicShopById(shopId) {
   }
 
   const productCount = await Product.countDocuments(activeProductFilter({ ShopId: shop._id }));
-  const categoryNameMap = await getCategoryNameMap([shop.categoryId]);
+  const categoryNameMap = await getShopCategoryNameMap([shop.categoryId]);
   const followCount = await UserFollow.countDocuments({ followedUserId: seller._id });
 
+  let distanceMeters = 0;
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    Number.isFinite(Number(shop.latitude)) &&
+    Number.isFinite(Number(shop.longitude))
+  ) {
+    distanceMeters = calculateDistanceMeters(
+      lat,
+      lng,
+      Number(shop.latitude),
+      Number(shop.longitude)
+    );
+  }
+
+  const category = resolveShopCategory(categoryNameMap, shop.categoryId);
   return toPublicStore(
     shop,
     seller,
     productCount,
-    0,
-    categoryNameMap.get(String(shop.categoryId)) || "",
-    followCount
+    distanceMeters,
+    category.name,
+    followCount,
+    category.icon
   );
 }
 
@@ -521,6 +563,7 @@ async function listPublicReviewsByShopId(shopId) {
     store_id: String(shopId),
     is_deleted: { $ne: true },
     is_hidden: { $ne: true },
+    externalId: { $not: /^seed-admin-review/i },
   })
     .sort({ created_at: -1 })
     .lean();

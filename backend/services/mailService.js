@@ -109,9 +109,45 @@ async function sendPasswordResetEmail({ to, code, expiresInMinutes = 5 }) {
   return true;
 }
 
+async function sendSellerPhoneCodeEmail({ to, phone, code, expiresInMinutes = 5 }) {
+  const transporter = getTransporter();
+
+  if (!transporter) {
+    throw new Error("SMTP chưa cấu hình. Không thể gửi mã xác minh số điện thoại.");
+  }
+
+  const from = smtpFrom || smtpUser;
+  const maskedPhone = String(phone || "").replace(/(\d{3})\d{4}(\d{3})/, "$1****$2");
+
+  await transporter.sendMail({
+    from: `FastMark <${from}>`,
+    to,
+    subject: "Mã xác minh số điện thoại FastMark",
+    text: [
+      "Xin chào,",
+      "",
+      `Mã xác minh số điện thoại ${maskedPhone} của bạn là: ${code}`,
+      `Mã có hiệu lực trong ${expiresInMinutes} phút.`,
+      "",
+      "Nếu bạn không yêu cầu mã này, hãy bỏ qua email.",
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
+        <h2 style="color:#0f766e">Xác minh số điện thoại FastMark</h2>
+        <p>Mã xác minh cho số <strong>${maskedPhone}</strong>:</p>
+        <p style="font-size:28px;font-weight:bold;letter-spacing:4px;color:#0f766e">${code}</p>
+        <p>Mã hết hạn sau <strong>${expiresInMinutes} phút</strong>.</p>
+      </div>
+    `,
+  });
+
+  return true;
+}
+
 module.exports = {
   isMailConfigured,
   getTransporter,
   sendVerificationEmail,
   sendPasswordResetEmail,
+  sendSellerPhoneCodeEmail,
 };

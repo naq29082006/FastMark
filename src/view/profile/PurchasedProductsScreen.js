@@ -1,14 +1,17 @@
-import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { getBuyerOrdersOnBackend } from '../../api/buyerOpsApi';
+import { RESERVATION_TAB } from '../../constants/sellerOrders';
 import {
   canShowReviewButton,
   getPurchaseStatusLabel,
+  getReservationStatusLabel,
   isOrderAlreadyReviewed,
   submitShopReview,
 } from '../../core/utils/orderReview';
 import { useReviewedOrderCodes } from '../../hooks/useReviewedOrderCodes';
-import { MOCK_PURCHASES } from '../../model/mock/activityMockData';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { ReviewedBadge, ReviewNowButton } from '../shared/components/ReviewOrderAction';
 import ShopReviewModal from '../shared/components/ShopReviewModal';
 import ProfileSubScreen from './ProfileSubScreen';
@@ -32,8 +35,12 @@ function formatOrderTotal(price, quantity) {
   return Number(price || 0) * Number(quantity || 0);
 }
 
-function PurchaseList({ onOpenOrderDetail, onOpenStore, onReviewStore, reviewedOrderCodes }) {
-  return MOCK_PURCHASES.map((item) => {
+function PurchaseList({ items, onOpenOrderDetail, onOpenStore, onReviewStore, reviewedOrderCodes }) {
+  if (items.length === 0) {
+    return <Text style={styles.emptyText}>Chưa có đơn hàng hoàn thành.</Text>;
+  }
+
+  return items.map((item) => {
     const showReviewButton = canShowReviewButton(item, reviewedOrderCodes);
     const alreadyReviewed = isOrderAlreadyReviewed(item, reviewedOrderCodes);
 
@@ -71,7 +78,9 @@ function PurchaseList({ onOpenOrderDetail, onOpenStore, onReviewStore, reviewedO
               </Text>
               <Text style={styles.detailText}>
                 Trạng thái:{' '}
-                <Text style={styles.detailValue}>{getPurchaseStatusLabel(item.status)}</Text>
+                <Text style={styles.detailValue}>
+                  {getReservationStatusLabel(item.status) || getPurchaseStatusLabel(item.status)}
+                </Text>
               </Text>
               <Text style={styles.detailText}>
                 Ngày mua: <Text style={styles.detailValue}>{formatDateTime(item.purchasedAt)}</Text>
@@ -114,9 +123,52 @@ export default function PurchasedProductsScreen({
 }) {
   const [reviewTarget, setReviewTarget] = useState(null);
   const [localRefreshKey, setLocalRefreshKey] = useState(0);
+  const [purchases, setPurchases] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { reviewedOrderCodes: internalReviewedCodes, markReviewed } =
     useReviewedOrderCodes(localRefreshKey);
   const reviewedOrderCodes = externalReviewedCodes || internalReviewedCodes;
+
+  const loadPurchases = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        setPurchases([]);
+        return;
+      }
+
+      const data = await getBuyerOrdersOnBackend({
+        idToken,
+        tab: RESERVATION_TAB.COMPLETED,
+      });
+      const rows = (data?.reservations || []).map((reservation) => ({
+        id: String(reservation.id),
+        orderCode: String(reservation.id),
+        storeId: reservation.shopId || reservation.storeId || '',
+        productName:
+          reservation.product?.productName ||
+          reservation.variant?.variantName ||
+          'Sản phẩm',
+        storeName: reservation.storeName || 'Gian hàng',
+        price: Number(reservation.variant?.price || reservation.product?.minPrice || 0),
+        quantity: Number(reservation.quantity || 1),
+        purchasedAt: reservation.completedAt || reservation.updatedAt || reservation.createdAt,
+        imageEmoji: '📦',
+        status: reservation.status,
+        type: 'purchase',
+      }));
+      setPurchases(rows);
+    } catch {
+      setPurchases([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPurchases();
+  }, [loadPurchases, localRefreshKey]);
 
   async function handleSubmitReview({ rating, comment, imageUrl }) {
     if (!reviewTarget) {
@@ -151,12 +203,17 @@ export default function PurchasedProductsScreen({
 
   const content = (
     <>
-      <PurchaseList
-        onOpenOrderDetail={onOpenOrderDetail}
-        onOpenStore={onOpenStore}
-        onReviewStore={setReviewTarget}
-        reviewedOrderCodes={reviewedOrderCodes}
-      />
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#0f766e" style={styles.loader} />
+      ) : (
+        <PurchaseList
+          items={purchases}
+          onOpenOrderDetail={onOpenOrderDetail}
+          onOpenStore={onOpenStore}
+          onReviewStore={setReviewTarget}
+          reviewedOrderCodes={reviewedOrderCodes}
+        />
+      )}
       <ShopReviewModal
         visible={Boolean(reviewTarget)}
         storeName={reviewTarget?.storeName}
@@ -179,6 +236,16 @@ export default function PurchasedProductsScreen({
 }
 
 const styles = StyleSheet.create({
+  loader: {
+    marginTop: 24,
+  },
+  emptyText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 24,
+  },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 12,

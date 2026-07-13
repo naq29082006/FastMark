@@ -63,9 +63,6 @@ export default function SellerPhoneVerifyScreen({ phone, onBack, onVerified, onN
       }
 
       setVerification(data);
-      if (data?.devCode) {
-        setCode(String(data.devCode));
-      }
     } catch (requestError) {
       const message = requestError.message || 'Không tạo được mã xác minh.';
       setError(message);
@@ -178,7 +175,7 @@ export default function SellerPhoneVerifyScreen({ phone, onBack, onVerified, onN
       <View style={styles.card}>
         <Text style={styles.title}>Nhập mã xác minh</Text>
         <Text style={styles.subtitle}>
-          Mã demo sẽ được hiển thị tạm thời để bạn test luồng đăng ký người bán.
+          Hệ thống chưa gửi SMS. Mã xác minh hiển thị bên dưới — nhập đúng mã để xác minh số điện thoại.
         </Text>
 
         <View style={styles.phoneBox}>
@@ -186,14 +183,14 @@ export default function SellerPhoneVerifyScreen({ phone, onBack, onVerified, onN
           <Text style={styles.phoneValue}>{phone || verification?.phone || '—'}</Text>
         </View>
 
-        {verification?.devCode ? (
-          <View style={styles.devBox}>
-            <Text style={styles.devTitle}>Mã demo</Text>
-            <Text style={styles.devCode}>{verification.devCode}</Text>
+        {verification?.verificationCode ? (
+          <View style={styles.codeBox}>
+            <Text style={styles.codeBoxLabel}>Mã xác minh của bạn</Text>
+            <Text style={styles.codeBoxValue}>{verification.verificationCode}</Text>
           </View>
         ) : null}
 
-        <Text style={styles.label}>Mã xác minh</Text>
+        <Text style={styles.label}>Nhập mã xác minh</Text>
         <TextInput
           value={code}
           onChangeText={(value) => {
@@ -201,7 +198,7 @@ export default function SellerPhoneVerifyScreen({ phone, onBack, onVerified, onN
             setError('');
           }}
           keyboardType="number-pad"
-          placeholder="123456"
+          placeholder="Nhập 6 số"
           placeholderTextColor="#94a3b8"
           style={styles.input}
         />
@@ -289,26 +286,26 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontWeight: '800',
   },
-  devBox: {
-    backgroundColor: '#fffbeb',
+  codeBox: {
+    backgroundColor: '#ecfdf5',
     borderRadius: 12,
     padding: 14,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: '#a7f3d0',
+    alignItems: 'center',
   },
-  devTitle: {
+  codeBoxLabel: {
     fontSize: 13,
-    color: '#92400e',
+    color: '#047857',
     marginBottom: 6,
     fontWeight: '700',
   },
-  devCode: {
-    fontSize: 28,
+  codeBoxValue: {
+    fontSize: 32,
     fontWeight: '800',
-    color: '#b45309',
-    letterSpacing: 4,
-    textAlign: 'center',
+    color: '#0f766e',
+    letterSpacing: 6,
   },
   label: {
     fontSize: 13,

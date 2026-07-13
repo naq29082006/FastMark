@@ -314,11 +314,7 @@ async function buildReportFilter({ search, reportType, status }) {
   return filter;
 }
 
-function buildDatabaseQuery(filter, { includeDemo = false } = {}) {
-  if (includeDemo) {
-    return filter;
-  }
-
+function buildDatabaseQuery(filter) {
   return {
     $and: [filter, { content: { $not: new RegExp(SEED_DEMO_TAG, "i") } }],
   };
@@ -330,14 +326,11 @@ async function listReports({
   status = "",
   page = 1,
   limit = 20,
-  includeDemo = false,
 } = {}) {
   const currentPage = Math.max(1, Number(page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(limit) || 20));
   const skip = (currentPage - 1) * pageSize;
-  const filter = buildDatabaseQuery(await buildReportFilter({ search, reportType, status }), {
-    includeDemo,
-  });
+  const filter = buildDatabaseQuery(await buildReportFilter({ search, reportType, status }));
 
   const [reports, total] = await Promise.all([
     Report.find(filter).sort({ CreatedAt: -1 }).skip(skip).limit(pageSize).lean(),
@@ -377,7 +370,6 @@ async function listReports({
     meta: {
       dataSource: "mongodb",
       collection: "reports",
-      includeDemo: Boolean(includeDemo),
     },
   };
 }

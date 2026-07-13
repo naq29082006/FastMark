@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getReadableMessageContent, isOfferMessage } from '../../core/utils/offerMessageFormat';
+import CircularBackButton from '../shared/components/CircularBackButton';
 
 const MESSAGE_STATUS_LABEL = {
   sent: 'Đã gửi',
@@ -128,7 +129,7 @@ export default function BuyerChatScreen({ conversationId, shopId, shopName, onBa
   const displayName = shopName || 'Gian hàng';
   const shopInitial = displayName.charAt(0).toUpperCase();
   const activityStatus = getActivityStatus();
-  const canSend = draft.trim().length > 0 && !isSending && Boolean(resolvedConversationId);
+  const canSend = draft.trim().length > 0 && !isSending && Boolean(shopId || resolvedConversationId);
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => {
@@ -160,8 +161,13 @@ export default function BuyerChatScreen({ conversationId, shopId, shopName, onBa
     setError('');
 
     try {
-      const activeConversationId = await ensureConversation();
-      const result = await getBuyerMessagesOnBackend(activeConversationId);
+      if (!resolvedConversationId) {
+        setMessages([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const result = await getBuyerMessagesOnBackend(resolvedConversationId);
       const data = Array.isArray(result) ? result : result?.messages;
       setMessages(Array.isArray(data) ? data : []);
     } catch (loadError) {
@@ -170,7 +176,7 @@ export default function BuyerChatScreen({ conversationId, shopId, shopName, onBa
     } finally {
       setIsLoading(false);
     }
-  }, [ensureConversation]);
+  }, [resolvedConversationId]);
 
   useEffect(() => {
     loadMessages();
@@ -272,13 +278,7 @@ export default function BuyerChatScreen({ conversationId, shopId, shopName, onBa
       keyboardVerticalOffset={0}
     >
       <View style={styles.topBar}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onBack}
-          style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </Pressable>
+        <CircularBackButton onPress={onBack} variant="light" />
 
         <View style={styles.headerInfo}>
           <View style={styles.headerAvatar}>
@@ -358,20 +358,11 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 56,
+    paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  backButtonText: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
   headerInfo: {
     flex: 1,
     flexDirection: 'row',

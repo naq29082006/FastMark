@@ -26,7 +26,7 @@ export default function AdminLayout() {
             Gửi thông báo hệ thống
           </NavLink>
           <NavLink to="/categories">
-            Quản lý danh mục
+            Quản lý danh mục SP/CH
           </NavLink>
         </nav>
         <div className="sidebar-footer">

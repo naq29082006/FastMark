@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
 
 import {
@@ -16,46 +17,20 @@ import {
   selectAuthProfile,
   selectAuthSuccessMessage,
   selectAuthUser,
-  selectIsSeller,
+  selectCanSwitchToSeller,
   selectSellerVerification,
+  selectUserRole,
 } from '../../viewmodel/auth/authSelectors';
 import { uploadUserAvatar, syncSellerAccess, loadUserProfile, applyShopSettingsToProfile } from '../../viewmodel/auth/authSlice';
-import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
+import {
+  getSellerRegisterButtonLabel,
+} from '../seller/sellerRegistrationFlow';
 import { getMyProductsOnBackend } from '../../api/productApi';
 import { getSellerShopSettingsOnBackend } from '../../api/sellerOpsApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import StarRating from '../store/components/StarRating';
-import {
-  LikedProductTabIcon,
-  SellerProductTabIcon,
-} from './ProfileTabIcons';
-
-const PROFILE_TABS = [
-  {
-    key: 'catalog',
-    buyerLabel: 'Mặt hàng gần bạn',
-    sellerLabel: 'Danh mục',
-    Icon: SellerProductTabIcon,
-  },
-  { key: 'liked', label: 'Sản phẩm đã thích', Icon: LikedProductTabIcon },
-];
-
-const DEMO_LIKED_PRODUCTS = [
-  {
-    id: 'liked-1',
-    name: 'Cam sành Tiền Giang',
-    price: 35000,
-    sold: 420,
-    emoji: '🍊',
-  },
-  {
-    id: 'liked-2',
-    name: 'Rau muống sạch buổi sáng',
-    price: 12000,
-    sold: 210,
-    emoji: '🥬',
-  },
-];
+import { OrdersTabIcon } from '../shared/components/TabBarIcons';
+import BuyerQuickMenu from '../shared/components/BuyerQuickMenu';
 
 function pickShopDescription(...values) {
   for (const value of values) {
@@ -75,35 +50,6 @@ function resolveImageUrl(value) {
   return url;
 }
 
-function getSellerRegisterButtonLabel({ isSeller, sellerVerification }) {
-  if (isSeller) {
-    return 'Chuyển sang người bán';
-  }
-
-  if (sellerVerification?.status === SELLER_VERIFICATION_STATUS.PENDING) {
-    return 'Xem hồ sơ chờ duyệt';
-  }
-
-  if (sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED) {
-    return 'Chỉnh sửa hồ sơ đăng ký';
-  }
-
-  return 'Đăng ký người bán';
-}
-
-function formatVerificationDate(value) {
-  if (!value) {
-    return '';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return date.toLocaleDateString('vi-VN');
-}
-
 function formatCount(value) {
   const number = Number(value) || 0;
   if (number >= 1000000) {
@@ -114,8 +60,6 @@ function formatCount(value) {
   }
   return String(number);
 }
-
-import { formatPriceRange } from '../../core/utils/productFormat';
 
 async function pickImageBase64() {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -139,72 +83,6 @@ async function pickImageBase64() {
     imageBase64: asset.base64,
     mimeType: asset.mimeType || 'image/jpeg',
   };
-}
-
-function ProductCard({ product, onPress }) {
-  const priceLabel = formatPriceRange(
-    product.minPrice ?? product.price,
-    product.maxPrice ?? product.originalPrice ?? product.price
-  );
-  const isOutOfStock = Boolean(product.isOutOfStock);
-
-  const content = (
-    <>
-      <View style={styles.productImageWrap}>
-        <View style={styles.productStatsBadge}>
-          <Text style={styles.productStatText}>👁 {product.viewCount || 0}</Text>
-          <Text style={styles.productStatText}>♥ {product.likeCount || 0}</Text>
-        </View>
-        {product.thumbnail ? (
-          <Image
-            source={{ uri: product.thumbnail }}
-            style={[styles.productImage, isOutOfStock && styles.dimmedImage]}
-          />
-        ) : (
-          <Text style={[styles.productEmoji, isOutOfStock && styles.dimmedImage]}>
-            {product.emoji || '📦'}
-          </Text>
-        )}
-        {isOutOfStock ? (
-          <View style={styles.outOfStockOverlay}>
-            <Text style={styles.outOfStockText}>Hết hàng</Text>
-          </View>
-        ) : null}
-      </View>
-      <Text style={styles.productName} numberOfLines={2}>
-        {product.name}
-      </Text>
-      <Text
-        style={styles.productPrice}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.8}
-      >
-        {priceLabel}
-      </Text>
-      <View style={styles.productMetaRow}>
-        <Text style={styles.productDonVi} numberOfLines={1}>
-          {product.donVi || '—'}
-        </Text>
-        <Text style={styles.productSoldCount} numberOfLines={1}>
-          Đã bán: {product.soldCount || 0}
-        </Text>
-      </View>
-    </>
-  );
-
-  if (onPress) {
-    return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [styles.productCard, pressed && styles.buttonPressed]}
-      >
-        {content}
-      </Pressable>
-    );
-  }
-
-  return <View style={styles.productCard}>{content}</View>;
 }
 
 function mapApiProductToCard(product) {
@@ -278,31 +156,40 @@ export default function AccountProfileScreen({
   onOpenActivity,
   onOpenNotificationSettings,
   onOpenInbox,
+  onOpenBuyerOrders,
   onOpenSellerShopSettings,
   onOpenSellerOrders,
   onOpenSellerStats,
+  onOpenBuyerView,
   onStartSellerRegister,
   onSwitchToSellerMode,
   onSwitchToBuyerMode,
-  canSwitchToSeller = false,
   onLogout,
+  onOpenFollowConnections,
 }) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
   const user = useSelector(selectAuthUser);
-  const isSeller = useSelector(selectIsSeller);
+  const role = useSelector(selectUserRole);
+  const canSwitchToSeller = useSelector(selectCanSwitchToSeller);
   const showAsSeller = profileMode === 'seller';
   const showAsBuyer = profileMode === 'buyer';
   const sellerVerification = useSelector(selectSellerVerification);
+  const sellerButtonLabel = getSellerRegisterButtonLabel({ role, verification: sellerVerification });
+
+  function handleSellerAction() {
+    if (canSwitchToSeller) {
+      onSwitchToSellerMode?.();
+      return;
+    }
+    onStartSellerRegister?.();
+  }
   const error = useSelector(selectAuthError);
   const successMessage = useSelector(selectAuthSuccessMessage);
-  const [activeTab, setActiveTab] = useState('catalog');
   const [menuOpen, setMenuOpen] = useState(false);
   const [localError, setLocalError] = useState('');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [sellerProducts, setSellerProducts] = useState([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  const [productsError, setProductsError] = useState('');
   const [shopContact, setShopContact] = useState(null);
   const [isLoadingShopContact, setIsLoadingShopContact] = useState(false);
 
@@ -335,9 +222,6 @@ export default function AccountProfileScreen({
       return;
     }
 
-    setIsLoadingProducts(true);
-    setProductsError('');
-
     try {
       const idToken = await getCurrentUserIdToken();
       if (!idToken) {
@@ -346,12 +230,8 @@ export default function AccountProfileScreen({
 
       const products = await getMyProductsOnBackend(idToken);
       setSellerProducts(products.map(mapApiProductToCard));
-      await dispatch(syncSellerAccess());
-    } catch (loadError) {
-      setProductsError(loadError.message || 'Không tải được sản phẩm.');
+    } catch {
       setSellerProducts([]);
-    } finally {
-      setIsLoadingProducts(false);
     }
   }, [dispatch, showAsSeller]);
 
@@ -370,9 +250,7 @@ export default function AccountProfileScreen({
 
     loadSellerProducts();
     loadShopContact();
-    dispatch(syncSellerAccess());
   }, [
-    dispatch,
     isProfileVisible,
     showAsSeller,
     loadSellerProducts,
@@ -382,10 +260,12 @@ export default function AccountProfileScreen({
   ]);
 
   useEffect(() => {
-    if (!isSeller) {
-      dispatch(syncSellerAccess());
+    if (!isProfileVisible || canSwitchToSeller) {
+      return;
     }
-  }, [dispatch, isSeller, profile?.role]);
+
+    dispatch(syncSellerAccess());
+  }, [dispatch, isProfileVisible, canSwitchToSeller]);
 
   const displayName = profile?.fullName || user?.displayName || 'Fastmark user';
   const userName = profile?.userName || user?.email?.split('@')[0] || '';
@@ -423,152 +303,6 @@ export default function AccountProfileScreen({
     [catalogStats, showAsSeller, profile]
   );
 
-  const visibleProducts = useMemo(() => {
-    if (activeTab === 'liked') {
-      return DEMO_LIKED_PRODUCTS;
-    }
-
-    return showAsSeller ? sellerProducts : [];
-  }, [activeTab, showAsSeller, sellerProducts]);
-
-  function renderCatalogTab() {
-    if (showAsSeller) {
-      if (isLoadingProducts && sellerProducts.length === 0) {
-        return (
-          <View style={styles.loadingProductsWrap}>
-            <ActivityIndicator color="#0d7377" />
-            <Text style={styles.loadingProductsText}>Đang tải sản phẩm...</Text>
-          </View>
-        );
-      }
-
-      if (productsError && sellerProducts.length === 0) {
-        return (
-          <View style={styles.emptyLikedCard}>
-            <Text style={styles.emptyLikedTitle}>Không tải được sản phẩm</Text>
-            <Text style={styles.emptyLikedText}>{productsError}</Text>
-            <Pressable
-              onPress={loadSellerProducts}
-              style={({ pressed }) => [styles.registerButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.registerButtonText}>Thử lại</Text>
-            </Pressable>
-          </View>
-        );
-      }
-
-      if (sellerProducts.length === 0) {
-        return (
-          <View style={styles.emptyLikedCard}>
-            <Text style={styles.emptyLikedTitle}>Chưa có sản phẩm</Text>
-            <Text style={styles.emptyLikedText}>
-              Hãy vào tab Sản phẩm để đăng sản phẩm đầu tiên của bạn.
-            </Text>
-          </View>
-        );
-      }
-
-      return (
-        <View style={styles.productGrid}>
-          {sellerProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onPress={() => onOpenProduct?.(product.id)}
-            />
-          ))}
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.buyerCard}>
-        {sellerVerification?.status === SELLER_VERIFICATION_STATUS.PENDING ? (
-          <>
-            <View style={styles.statusBadgePending}>
-              <Text style={styles.statusBadgeText}>Đang chờ duyệt</Text>
-            </View>
-            <Text style={styles.buyerTitle}>Hồ sơ đang được xem xét</Text>
-            <Text style={styles.buyerText}>
-              Admin đang duyệt hồ sơ của bạn. Bạn có thể xem lại và chỉnh sửa hồ sơ trước khi được duyệt.
-            </Text>
-            {sellerVerification.submittedAt ? (
-              <Text style={styles.verificationMeta}>
-                Gửi lúc: {formatVerificationDate(sellerVerification.submittedAt)}
-              </Text>
-            ) : null}
-            {sellerVerification.address ? (
-              <Text style={styles.verificationMeta}>Địa chỉ: {sellerVerification.address}</Text>
-            ) : null}
-            <Pressable
-              onPress={onStartSellerRegister}
-              style={({ pressed }) => [styles.registerButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.registerButtonText}>Xem và chỉnh sửa hồ sơ</Text>
-            </Pressable>
-          </>
-        ) : sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED ? (
-          <>
-            <View style={styles.statusBadgeRejected}>
-              <Text style={styles.statusBadgeText}>Bị từ chối</Text>
-            </View>
-            <Text style={styles.buyerTitle}>Hồ sơ bị từ chối</Text>
-            <Text style={styles.buyerText}>
-              {sellerVerification.lyDoTuChoi ||
-                'Hồ sơ đăng ký người bán chưa đạt yêu cầu. Vui lòng chỉnh sửa và gửi lại.'}
-            </Text>
-            <Pressable
-              onPress={onStartSellerRegister}
-              style={({ pressed }) => [styles.registerButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.registerButtonText}>Chỉnh sửa và gửi lại</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <Text style={styles.buyerTitle}>Cần đăng ký người bán</Text>
-            <Text style={styles.buyerText}>
-              {profile?.sellerPhoneVerified
-                ? 'Số điện thoại đã xác minh. Hãy gửi hồ sơ CCCD và địa chỉ. Sau khi admin duyệt, danh mục sản phẩm của bạn sẽ hiển thị tại đây.'
-                : 'Bạn cần đăng ký tài khoản người bán để mở danh mục sản phẩm và đăng tin bán hàng.'}
-            </Text>
-            <Pressable
-              onPress={onStartSellerRegister}
-              style={({ pressed }) => [styles.registerButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.registerButtonText}>
-                {profile?.sellerPhoneVerified ? 'Tiếp tục đăng ký' : 'Đăng ký người bán hàng'}
-              </Text>
-            </Pressable>
-          </>
-        )}
-      </View>
-    );
-  }
-
-  function renderLikedTab() {
-    if (visibleProducts.length > 0) {
-      return (
-        <View style={styles.productGrid}>
-          {visibleProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.likedSection}>
-        <View style={styles.emptyLikedCard}>
-          <Text style={styles.emptyLikedTitle}>Chưa có sản phẩm đã thích</Text>
-          <Text style={styles.emptyLikedText}>
-            Hãy thích sản phẩm khi mua sắm để xem lại tại đây.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   async function handlePickAvatar() {
     try {
       setLocalError('');
@@ -599,36 +333,31 @@ export default function AccountProfileScreen({
         <View style={styles.profileCard}>
           <View style={styles.profileTopBar}>
             <View style={styles.profileTopBarSpacer} />
-            <Pressable
-              onPress={() => setMenuOpen((current) => !current)}
-              style={({ pressed }) => [styles.iconButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.iconButtonText}>⚙</Text>
-            </Pressable>
+            {showAsSeller ? (
+              <Pressable
+                onPress={() => setMenuOpen((current) => !current)}
+                style={({ pressed }) => [styles.iconButton, pressed && styles.buttonPressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Tiện ích"
+              >
+                <Ionicons name="menu-outline" size={22} color="#0f172a" />
+              </Pressable>
+            ) : (
+              <BuyerQuickMenu
+                sellerButtonLabel={sellerButtonLabel}
+                onEditAccount={() => onEditAccount?.()}
+                onSellerAction={handleSellerAction}
+                onLogout={() => onLogout?.()}
+                style={styles.buyerMenuWrap}
+                buttonStyle={styles.iconButton}
+              />
+            )}
           </View>
 
-          {menuOpen ? (
+          {menuOpen && showAsSeller ? (
             <View style={styles.menuDropdown}>
               {showAsSeller ? (
                 <>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onOpenSellerStats?.();
-                    }}
-                    style={styles.menuItem}
-                  >
-                    <Text style={styles.menuItemText}>Thống kê</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onOpenSellerOrders?.();
-                    }}
-                    style={styles.menuItem}
-                  >
-                    <Text style={styles.menuItemText}>Quản lý đơn hàng</Text>
-                  </Pressable>
                   <Pressable
                     onPress={() => {
                       setMenuOpen(false);
@@ -641,53 +370,23 @@ export default function AccountProfileScreen({
                   <Pressable
                     onPress={() => {
                       setMenuOpen(false);
-                      onSwitchToBuyerMode?.();
+                      onOpenBuyerView?.();
                     }}
                     style={styles.menuItem}
+                  >
+                    <Text style={styles.menuItemText}>Chế độ xem</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setMenuOpen(false);
+                      onSwitchToBuyerMode?.();
+                    }}
+                    style={[styles.menuItem, styles.menuItemLast]}
                   >
                     <Text style={styles.menuItemText}>Chuyển sang người mua</Text>
                   </Pressable>
                 </>
-              ) : (
-                <>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onEditAccount?.();
-                    }}
-                    style={styles.menuItem}
-                  >
-                    <Text style={styles.menuItemText}>Sửa thông tin tài khoản</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onOpenActivity?.();
-                    }}
-                    style={styles.menuItem}
-                  >
-                    <Text style={styles.menuItemText}>Hoạt động của tôi</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onOpenNotificationSettings?.();
-                    }}
-                    style={styles.menuItem}
-                  >
-                    <Text style={styles.menuItemText}>Cài đặt thông báo</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onLogout?.();
-                    }}
-                    style={styles.menuItem}
-                  >
-                    <Text style={[styles.menuItemText, styles.menuItemDanger]}>Đăng xuất</Text>
-                  </Pressable>
-                </>
-              )}
+              ) : null}
             </View>
           ) : null}
 
@@ -744,14 +443,28 @@ export default function AccountProfileScreen({
           ) : null}
 
           <View style={styles.followRow}>
-            <Text style={styles.followText}>
-              <Text style={styles.followValue}>{formatCount(stats.following)}</Text> đang theo dõi
-            </Text>
+            <Pressable onPress={() => onOpenFollowConnections?.()}>
+              <Text style={styles.followText}>
+                <Text style={styles.followValue}>{formatCount(stats.following)}</Text> đang theo dõi
+              </Text>
+            </Pressable>
             <Text style={styles.followDivider}>•</Text>
-            <Text style={styles.followText}>
-              <Text style={styles.followValue}>{formatCount(stats.followers)}</Text> người theo dõi
-            </Text>
+            <Pressable onPress={() => onOpenFollowConnections?.()}>
+              <Text style={styles.followText}>
+                <Text style={styles.followValue}>{formatCount(stats.followers)}</Text> người theo dõi
+              </Text>
+            </Pressable>
           </View>
+
+          {showAsBuyer ? (
+            <Pressable
+              onPress={onOpenBuyerOrders}
+              style={({ pressed }) => [styles.ordersEntry, pressed && styles.buttonPressed]}
+            >
+              <OrdersTabIcon color="#0d7377" size={22} filled />
+              <Text style={styles.ordersEntryText}>Đơn hàng</Text>
+            </Pressable>
+          ) : null}
 
           {showAsSeller ? (
             <View style={styles.contactCard}>
@@ -797,29 +510,6 @@ export default function AccountProfileScreen({
             </View>
           ) : null}
 
-          {showAsSeller ? (
-            <View style={styles.sellerToolsRow}>
-              <Pressable
-                onPress={onOpenSellerStats}
-                style={({ pressed }) => [styles.sellerToolButton, pressed && styles.buttonPressed]}
-              >
-                <Text style={styles.sellerToolText}>Thống kê</Text>
-              </Pressable>
-              <Pressable
-                onPress={onOpenSellerOrders}
-                style={({ pressed }) => [styles.sellerToolButton, pressed && styles.buttonPressed]}
-              >
-                <Text style={styles.sellerToolText}>Quản lý đơn</Text>
-              </Pressable>
-              <Pressable
-                onPress={onOpenSellerShopSettings}
-                style={({ pressed }) => [styles.sellerToolButton, pressed && styles.buttonPressed]}
-              >
-                <Text style={styles.sellerToolText}>Cài đặt shop</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
           {showAsBuyer ? (
             <View style={styles.actionRow}>
               <Pressable
@@ -829,23 +519,12 @@ export default function AccountProfileScreen({
                 <Text style={styles.primaryActionText}>Chỉnh sửa hồ sơ</Text>
               </Pressable>
               <Pressable
-                onPress={onOpenInbox}
+                onPress={handleSellerAction}
                 style={({ pressed }) => [styles.secondaryActionButton, pressed && styles.buttonPressed]}
               >
-                <Text style={styles.secondaryActionText}>💬 Nhắn tin</Text>
+                <Text style={styles.secondaryActionText}>{sellerButtonLabel}</Text>
               </Pressable>
             </View>
-          ) : null}
-
-          {showAsBuyer ? (
-            <Pressable
-              onPress={isSeller ? onSwitchToSellerMode : onStartSellerRegister}
-              style={({ pressed }) => [styles.modeSwitchButton, pressed && styles.buttonPressed]}
-            >
-              <Text style={styles.modeSwitchButtonText}>
-                {getSellerRegisterButtonLabel({ isSeller, sellerVerification })}
-              </Text>
-            </Pressable>
           ) : null}
 
           {showAsSeller ? (
@@ -870,34 +549,6 @@ export default function AccountProfileScreen({
 
         {feedbackMessage ? <Text style={styles.errorText}>{feedbackMessage}</Text> : null}
         {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
-
-        {!showAsSeller ? (
-          <>
-            <View style={styles.tabBar}>
-              {PROFILE_TABS.map((tab) => {
-                const isActive = activeTab === tab.key;
-                const color = isActive ? '#0d7377' : '#94a3b8';
-                const TabIcon = tab.Icon;
-
-                return (
-                  <Pressable
-                    key={tab.key}
-                    onPress={() => setActiveTab(tab.key)}
-                    style={styles.tabItem}
-                  >
-                    <TabIcon color={color} size={22} filled={isActive} />
-                    <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                      {showAsBuyer ? tab.buyerLabel || tab.label : tab.sellerLabel || tab.label}
-                    </Text>
-                    {isActive ? <View style={styles.tabIndicator} /> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {activeTab === 'catalog' ? renderCatalogTab() : renderLikedTab()}
-          </>
-        ) : null}
       </ScrollView>
     </View>
   );
@@ -910,7 +561,7 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   scrollContent: {
-    paddingTop: 52,
+    paddingTop: 8,
     paddingBottom: 28,
   },
   profileCard: {
@@ -946,6 +597,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
+  buyerMenuWrap: {
+    position: 'relative',
+  },
   iconButtonText: {
     fontSize: 18,
   },
@@ -966,6 +620,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
   },
   menuItemText: {
     color: '#0f172a',
@@ -1082,6 +739,25 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
   },
+  ordersEntry: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 12,
+    backgroundColor: '#e8f3f1',
+    borderWidth: 1,
+    borderColor: '#c5e3df',
+  },
+  ordersEntryText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0d7377',
+  },
   followText: {
     color: '#6b7280',
     fontSize: 13,
@@ -1138,8 +814,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   sellerToolButton: {
-    flexGrow: 1,
-    flexBasis: '30%',
+    flex: 1,
     minHeight: 42,
     borderRadius: 12,
     backgroundColor: '#e8f3f1',
@@ -1154,12 +829,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   actionRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 10,
     marginTop: 16,
   },
   primaryActionButton: {
-    flex: 1,
+    width: '100%',
     minHeight: 44,
     borderRadius: 12,
     backgroundColor: '#0d7377',
@@ -1172,7 +847,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   secondaryActionButton: {
-    flex: 1,
+    width: '100%',
     minHeight: 44,
     borderRadius: 12,
     backgroundColor: '#e8f3f1',

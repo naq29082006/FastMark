@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 
 import { getCurrentUserIdToken } from '../../repository/authRepository';
-import { getProductCategoriesOnBackend } from '../../api/productApi';
+import { getShopCategoriesOnBackend } from '../../api/productApi';
 import { isValidCategoryId, normalizeCategoryId } from '../../core/utils/categoryId';
 import {
   getMySellerVerificationOnBackend,
@@ -190,7 +190,7 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
     async function loadCategories() {
       setIsLoadingCategories(true);
       try {
-        const items = await getProductCategoriesOnBackend();
+        const items = await getShopCategoriesOnBackend();
         if (isMounted) {
           setCategories(items);
         }
@@ -521,16 +521,12 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
               <CategoryCombobox
                 categories={categories}
                 value={categoryId}
+                showDetails
                 onChange={(value) => {
                   setCategoryId(normalizeCategoryId(value));
                   setError('');
                 }}
               />
-              {isValidCategoryId(categoryId) ? (
-                <Text style={styles.fieldHint}>
-                  Đã chọn: {categories.find((item) => item.id === categoryId)?.categoryName || 'Danh mục'}
-                </Text>
-              ) : null}
             </>
           )}
         </View>
@@ -587,7 +583,7 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
               {isLocating ? (
                 <ActivityIndicator color="#0d7377" />
               ) : (
-                <Text style={styles.pickButtonText}>📍 Vị trí hiện tại</Text>
+                <Text style={styles.pickButtonText}>Vị trí hiện tại</Text>
               )}
             </Pressable>
             <Pressable
@@ -598,7 +594,7 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
                 pressed && styles.pickButtonPressed,
               ]}
             >
-              <Text style={styles.pickButtonText}>🗺️ Chọn trên bản đồ</Text>
+              <Text style={styles.pickButtonText}>Chọn vị trí</Text>
             </Pressable>
           </View>
         </View>

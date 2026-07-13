@@ -7,8 +7,15 @@ export const selectAuthUser = (state) => state.auth.user;
 export const selectAuthProfile = (state) => state.auth.profile;
 export const selectAuthProfileStatus = (state) => state.auth.profileStatus;
 export const selectUserRole = (state) => state.auth.profile?.role ?? 1;
+import { canSwitchToSellerMode } from '../../view/seller/sellerRegistrationFlow';
+
 export const selectIsSeller = (state) => Number(state.auth.profile?.role ?? 1) === 2;
 export const selectCanPostProducts = (state) => Number(state.auth.profile?.role ?? 1) === 2;
+export const selectCanSwitchToSeller = (state) =>
+  canSwitchToSellerMode({
+    role: state.auth.profile?.role ?? 1,
+    verification: state.auth.sellerVerification,
+  });
 export const selectSellerVerification = (state) => state.auth.sellerVerification;
 export const selectSellerAccessStatus = (state) => state.auth.sellerAccessStatus;
 export const selectSellerAccessSyncedAt = (state) => state.auth.sellerAccessSyncedAt;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 
 import {
@@ -17,6 +17,7 @@ import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { getSellerShopSettingsOnBackend } from '../../api/sellerOpsApi';
 import AccountProfileScreen from '../profile/AccountProfileScreen';
 import EditAccountScreen from '../profile/EditAccountScreen';
+import FollowConnectionsScreen from '../profile/FollowConnectionsScreen';
 import MyActivityScreen from '../profile/MyActivityScreen';
 import NotificationSettingsScreen from '../profile/NotificationSettingsScreen';
 import PurchasedProductsScreen from '../profile/PurchasedProductsScreen';
@@ -31,13 +32,18 @@ import SellerShopSettingsScreen from '../seller/SellerShopSettingsScreen';
 import SellerOrdersScreen from '../seller/SellerOrdersScreen';
 import SellerOrderDetailScreen from '../seller/SellerOrderDetailScreen';
 import SellerStatsScreen from '../seller/SellerStatsScreen';
+import BuyerOrdersScreen from '../buyer/BuyerOrdersScreen';
+import StoreDetailScreen from '../store/StoreDetailScreen';
 import { getSellerRegistrationStep } from '../seller/sellerRegistrationFlow';
 import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
 
 export default function ProfilePanel({
   profileMode = 'buyer',
   onOpenStore,
+  onNavigateToStore,
   onOpenInbox,
+  onNavigatePickup,
+  openBuyerOrdersRequest = 0,
   sellerRegisterRequest = 0,
   isProfileVisible = false,
   productDetailId = null,
@@ -47,6 +53,8 @@ export default function ProfilePanel({
   onSwitchToSellerMode,
   onSwitchToBuyerMode,
   canSwitchToSeller = false,
+  profileNavRequest = null,
+  onNavigationStateChange,
 }) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
@@ -93,7 +101,7 @@ export default function ProfilePanel({
   }, [dispatch, user, profile]);
 
   async function startSellerRegistration() {
-    if (isSeller) {
+    if (canSwitchToSeller) {
       return;
     }
 
@@ -119,6 +127,52 @@ export default function ProfilePanel({
     }
     startSellerRegistration();
   }, [sellerRegisterRequest]);
+
+  useEffect(() => {
+    if (!openBuyerOrdersRequest || profileMode !== 'buyer') {
+      return;
+    }
+    setProfileNav('buyer-orders');
+  }, [openBuyerOrdersRequest, profileMode]);
+
+  useEffect(() => {
+    if (!profileNavRequest?.screen) {
+      return;
+    }
+    setProfileNav(profileNavRequest.screen);
+  }, [profileNavRequest]);
+
+  useEffect(() => {
+    onNavigationStateChange?.(Boolean(sellerStep || profileNav || productDetailId));
+  }, [onNavigationStateChange, productDetailId, profileNav, sellerStep]);
+
+  const openBuyerPreview = useCallback(async () => {
+    let shop = shopSettings;
+
+    if (!shop?.id && !shop?.shopId) {
+      try {
+        const idToken = await getCurrentUserIdToken();
+        if (!idToken) {
+          throw new Error('Phiên đăng nhập đã hết hạn.');
+        }
+
+        shop = await getSellerShopSettingsOnBackend(idToken);
+        setShopSettings(shop);
+        dispatch(applyShopSettingsToProfile(shop));
+      } catch (error) {
+        Alert.alert('Không mở được chế độ xem', error.message || 'Vui lòng thử lại sau.');
+        return;
+      }
+    }
+
+    const storeId = shop?.id || shop?.shopId;
+    if (!storeId) {
+      Alert.alert('Không mở được chế độ xem', 'Chưa tìm thấy cửa hàng của bạn.');
+      return;
+    }
+
+    setProfileNav('buyer-preview');
+  }, [dispatch, shopSettings]);
 
   if (sellerStep === 'phone') {
     return (
@@ -263,6 +317,10 @@ export default function ProfilePanel({
     return <EditAccountScreen onBack={() => setProfileNav(null)} />;
   }
 
+  if (profileNav === 'follow-connections') {
+    return <FollowConnectionsScreen onBack={() => setProfileNav(null)} />;
+  }
+
   if (profileNav === 'my-activity') {
     return (
       <MyActivityScreen
@@ -303,6 +361,52 @@ export default function ProfilePanel({
     );
   }
 
+  if (profileNav === 'buyer-orders') {
+    return (
+      <BuyerOrdersScreen
+        onBack={() => setProfileNav(null)}
+        onNavigatePickup={onNavigatePickup}
+      />
+    );
+  }
+
+  if (profileNav === 'buyer-preview') {
+    const storeId = shopSettings?.id || shopSettings?.shopId;
+
+    return (
+      <View style={styles.screen}>
+        <View style={styles.previewBanner}>
+          <View style={styles.previewBannerTextWrap}>
+            <Text style={styles.previewBannerTitle}>Chế độ xem</Text>
+            <Text style={styles.previewBannerSubtitle}>Góc nhìn người mua</Text>
+          </View>
+          <Pressable
+            onPress={() => setProfileNav(null)}
+            style={({ pressed }) => [styles.previewExitButton, pressed && styles.previewExitButtonPressed]}
+          >
+            <Text style={styles.previewExitButtonText}>Thoát</Text>
+          </Pressable>
+        </View>
+        {storeId ? (
+          <StoreDetailScreen
+            key={String(storeId)}
+            storeId={String(storeId)}
+            onBack={() => setProfileNav(null)}
+            onNavigateDirections={onNavigateToStore}
+            previewMode
+          />
+        ) : (
+          <View style={styles.previewFallback}>
+            <Text style={styles.previewFallbackText}>Không tải được cửa hàng.</Text>
+            <Pressable onPress={() => setProfileNav(null)} style={styles.previewExitButton}>
+              <Text style={styles.previewExitButtonText}>Thoát</Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    );
+  }
+
   if (productDetailId) {
     return (
       <SellerProductDetailScreen
@@ -326,14 +430,16 @@ export default function ProfilePanel({
         onOpenActivity={() => setProfileNav('my-activity')}
         onOpenNotificationSettings={() => setProfileNav('notification-settings')}
         onOpenInbox={onOpenInbox}
+        onOpenBuyerOrders={() => setProfileNav('buyer-orders')}
         onOpenSellerShopSettings={() => setProfileNav('seller-shop-settings')}
         onOpenSellerOrders={() => setProfileNav('seller-orders')}
         onOpenSellerStats={() => setProfileNav('seller-stats')}
+        onOpenBuyerView={openBuyerPreview}
         onStartSellerRegister={startSellerRegistration}
         onSwitchToSellerMode={onSwitchToSellerMode}
         onSwitchToBuyerMode={onSwitchToBuyerMode}
-        canSwitchToSeller={canSwitchToSeller}
         onLogout={() => dispatch(logoutUser())}
+        onOpenFollowConnections={() => setProfileNav('follow-connections')}
       />
     </View>
   );
@@ -344,5 +450,59 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f4f7f6',
     minHeight: 0,
+  },
+  previewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#ecfdf5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#a7f3d0',
+  },
+  previewBannerTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  previewBannerTitle: {
+    color: '#0f766e',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  previewBannerSubtitle: {
+    marginTop: 2,
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  previewExitButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#99f6e4',
+  },
+  previewExitButtonPressed: {
+    opacity: 0.75,
+  },
+  previewExitButtonText: {
+    color: '#0f766e',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  previewFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 12,
+  },
+  previewFallbackText: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

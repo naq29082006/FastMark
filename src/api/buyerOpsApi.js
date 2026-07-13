@@ -40,13 +40,20 @@ export async function getBuyerOrdersOnBackend({ idToken, tab, search }) {
   return payload.data;
 }
 
-export async function createBuyerDealOnBackend({ idToken, productId, variantId, offeredPrice, note }) {
+export async function createBuyerDealOnBackend({
+  idToken,
+  productId,
+  variantId,
+  offeredPrice,
+  quantity = 1,
+  note,
+}) {
   const response = await apiRequest(
     API_ENDPOINTS.buyerDeals,
     {
       method: 'POST',
       headers: await authHeaders(idToken),
-      body: JSON.stringify({ productId, variantId, offeredPrice, note }),
+      body: JSON.stringify({ productId, variantId, offeredPrice, quantity, note }),
     },
     AUTH_TIMEOUT_MS
   );
@@ -57,6 +64,20 @@ export async function createBuyerDealOnBackend({ idToken, productId, variantId, 
 export async function resubmitBuyerDealOnBackend({ idToken, dealId, offeredPrice, note }) {
   const response = await apiRequest(
     API_ENDPOINTS.buyerDealResubmit(dealId),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ offeredPrice, note }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.deal;
+}
+
+export async function counterBuyerDealOnBackend({ idToken, dealId, offeredPrice, note }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.buyerDealCounter(dealId),
     {
       method: 'POST',
       headers: await authHeaders(idToken),

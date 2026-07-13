@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const REPORT_REASONS = [
   'Hàng giả / hàng kém chất lượng',
@@ -10,29 +11,40 @@ const REPORT_REASONS = [
 ];
 
 export default function ReportSheet({ visible, title, onClose, onSubmit }) {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 12);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
+      <View style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { paddingBottom: bottomInset }]}>
           <View style={styles.handle} />
           <Text style={styles.title}>{title || 'Báo cáo vi phạm'}</Text>
           <Text style={styles.subtitle}>Chọn lý do báo cáo</Text>
 
-          {REPORT_REASONS.map((reason) => (
-            <Pressable
-              key={reason}
-              style={({ pressed }) => [styles.reasonItem, pressed && styles.reasonItemPressed]}
-              onPress={() => onSubmit?.(reason)}
-            >
-              <Text style={styles.reasonText}>{reason}</Text>
-            </Pressable>
-          ))}
+          <ScrollView
+            style={styles.reasonList}
+            contentContainerStyle={styles.reasonListContent}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+          >
+            {REPORT_REASONS.map((reason) => (
+              <Pressable
+                key={reason}
+                style={({ pressed }) => [styles.reasonItem, pressed && styles.reasonItemPressed]}
+                onPress={() => onSubmit?.(reason)}
+              >
+                <Text style={styles.reasonText}>{reason}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
 
           <Pressable style={styles.cancelButton} onPress={onClose}>
             <Text style={styles.cancelText}>Hủy</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -40,8 +52,11 @@ export default function ReportSheet({ visible, title, onClose, onSubmit }) {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
   },
   sheet: {
     backgroundColor: '#ffffff',
@@ -49,7 +64,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 18,
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 28,
+    maxHeight: '72%',
   },
   handle: {
     alignSelf: 'center',
@@ -71,6 +86,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  reasonList: {
+    flexGrow: 0,
+  },
+  reasonListContent: {
+    paddingBottom: 4,
+  },
   reasonItem: {
     minHeight: 48,
     borderRadius: 10,
@@ -90,7 +111,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cancelButton: {
-    marginTop: 8,
+    marginTop: 4,
     minHeight: 46,
     borderRadius: 10,
     alignItems: 'center',

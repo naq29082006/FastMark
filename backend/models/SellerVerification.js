@@ -10,7 +10,7 @@ const SellerVerificationSchema = new mongoose.Schema({
   shopUsername: { type: String, trim: true, lowercase: true },
   shopName: String,
   shopDescription: String,
-  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopCategory" },
 
   address: String,
   DiaChiHeThong: String,

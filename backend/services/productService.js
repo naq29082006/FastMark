@@ -1,6 +1,7 @@
 const Product = require("../models/Product");
 const ProductVariant = require("../models/ProductVariant");
-const Category = require("../models/Category");
+const ProductCategory = require("../models/ProductCategory");
+const { assertProductCategoryExists } = require("./productCategoryService");
 const ShopProfile = require("../models/ShopProfile");
 const { PRODUCT_STATUS } = require("../constants/productStatus");
 const { sanitizeUploadLabel } = require("../utils/sanitizeFileName");
@@ -137,6 +138,7 @@ function toPublicVariant(variant) {
     variantName: variant.VariantName,
     price: variant.Price,
     quantity: variant.Quantity,
+    soldCount: variant.SoldCount || 0,
     images: (variant.Images || []).map(toPublicVariantImage),
     status: variant.Status,
     createdAt: variant.CreatedAt,
@@ -173,7 +175,7 @@ function toPublicProduct(product, variants = [], category = null) {
     id: product._id,
     shopId: product.ShopId,
     categoryId: product.CategoryId,
-    categoryName: category?.categoryName || product.CategoryName || "",
+    categoryName: category?.name || category?.categoryName || product.CategoryName || "",
     productName: product.ProductName,
     description: product.Description || "",
     donVi: product.DonVi || "",
@@ -300,10 +302,7 @@ async function createProduct(user, payload) {
     throw createServiceError("Vui lòng chọn danh mục sản phẩm.");
   }
 
-  const category = await Category.findById(categoryId);
-  if (!category) {
-    throw createServiceError("Danh mục sản phẩm không tồn tại.");
-  }
+  const category = await assertProductCategoryExists(categoryId);
 
   const shop = await getSellerShop(user);
   const { minPrice, maxPrice } = computePriceRange(variantsInput);
@@ -379,7 +378,7 @@ async function getProductById(productId) {
   });
 
   const category = product.CategoryId
-    ? await Category.findById(product.CategoryId).lean()
+    ? await ProductCategory.findById(product.CategoryId).lean()
     : null;
 
   return toPublicProduct(product, variants, category);
@@ -407,10 +406,7 @@ async function updateProduct(user, productId, payload) {
     throw createServiceError("Vui lòng nhập tên sản phẩm.");
   }
 
-  const category = await Category.findById(categoryId);
-  if (!category) {
-    throw createServiceError("Danh mục sản phẩm không tồn tại.");
-  }
+  const category = await assertProductCategoryExists(categoryId);
 
   const { minPrice, maxPrice } = computePriceRange(variantsInput);
   const variantDocs = await buildVariantDocs(user, variantsInput);
@@ -464,11 +460,16 @@ async function softDeleteProduct(user, productId) {
 }
 
 async function listCategories() {
-  const categories = await Category.find().sort({ categoryName: 1 });
+  const categories = await ProductCategory.find({
+    $or: [{ IsDeleted: 1 }, { IsDeleted: { $exists: false } }],
+  }).sort({ CreatedAt: 1, _id: 1 });
   return categories.map((category) => ({
     id: String(category._id),
-    categoryName: category.categoryName,
+    name: category.name || category.categoryName || "",
+    categoryName: category.name || category.categoryName || "",
     description: category.description || "",
+    icon: String(category.icon || "").trim(),
+    isDeleted: Number(category.IsDeleted) === 0 ? 0 : 1,
   }));
 }
 

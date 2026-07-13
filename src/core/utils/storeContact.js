@@ -1,4 +1,4 @@
-import { Alert, Linking, Platform } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 export async function callStore(phone) {
   if (!phone) {
@@ -6,14 +6,15 @@ export async function callStore(phone) {
     return;
   }
 
-  const url = `tel:${phone}`;
+  const normalized = String(phone).replace(/[^\d+]/g, '');
+  if (!normalized) {
+    Alert.alert('Không có số điện thoại', 'Số điện thoại không hợp lệ.');
+    return;
+  }
+
+  const url = `tel:${normalized}`;
 
   try {
-    const supported = await Linking.canOpenURL(url);
-    if (!supported && Platform.OS !== 'web') {
-      Alert.alert('Không thể gọi', 'Thiết bị không hỗ trợ gọi điện.');
-      return;
-    }
     await Linking.openURL(url);
   } catch {
     Alert.alert('Lỗi', 'Không thể mở ứng dụng gọi điện.');

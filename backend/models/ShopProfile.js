@@ -14,7 +14,7 @@ const ShopProfileSchema = new mongoose.Schema({
 
   shopUsername: { type: String, trim: true, lowercase: true, sparse: true, unique: true },
   shopName: String,
-  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopCategory" },
 
   phone: String,
 

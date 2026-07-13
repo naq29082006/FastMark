@@ -36,9 +36,11 @@ import {
 import { formatActivityLabel } from '../../core/utils/activityLabel';
 import { buildChatListItems, markMessagesFromServer, mergeMessages, normalizeMessages, upsertMessage, applyMessageViewerContext } from '../../core/utils/chatMessageUtils';
 import { useChatSocket } from '../../hooks/useChatSocket';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { selectAuthProfile, selectAuthUser } from '../../viewmodel/auth/authSelectors';
 import ChatProfileScreen from './ChatProfileScreen';
+import CircularBackButton from '../shared/components/CircularBackButton';
 
 const MESSAGE_STATUS_LABEL = {
   sent: 'Đã gửi',
@@ -213,6 +215,7 @@ export default function ChatScreen({
   const authUser = useSelector(selectAuthUser);
   const authProfile = useSelector(selectAuthProfile);
   const mongoUserId = authProfile?.mongoUserId || '';
+  const screenInsets = useScreenInsets();
 
   const [resolvedConversationId, setResolvedConversationId] = useState(
     isRealConversationId(conversationId) ? String(conversationId) : null
@@ -323,7 +326,31 @@ export default function ChatScreen({
     setError('');
 
     try {
-      const activeConversationId = await ensureConversation();
+      let activeConversationId = resolvedConversationId;
+
+      if (!activeConversationId && isRealConversationId(conversationId)) {
+        activeConversationId = String(conversationId);
+        setResolvedConversationId(activeConversationId);
+      }
+
+      if (!activeConversationId && !isSellerMode) {
+        setMessages([]);
+        setSequence(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!activeConversationId && isSellerMode) {
+        activeConversationId = await ensureConversation();
+      }
+
+      if (!activeConversationId) {
+        setMessages([]);
+        setSequence(null);
+        setIsLoading(false);
+        return;
+      }
+
       let activeShopId = ownShopId;
       let result = { messages: [], sequence: null };
 
@@ -357,7 +384,7 @@ export default function ChatScreen({
     } finally {
       setIsLoading(false);
     }
-  }, [ensureConversation, isSellerMode, loadPeer, ownShopId, viewerContext]);
+  }, [conversationId, ensureConversation, isSellerMode, loadPeer, ownShopId, resolvedConversationId, viewerContext]);
 
   useEffect(() => {
     if (!isSellerMode) {
@@ -676,10 +703,8 @@ export default function ChatScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
-      <View style={styles.topBar}>
-        <Pressable onPress={onBack} style={({ pressed }) => [styles.iconButton, pressed && styles.buttonPressed]}>
-          <Text style={styles.backButtonText}>←</Text>
-        </Pressable>
+      <View style={[styles.topBar, { paddingTop: screenInsets.contentPaddingTop }]}>
+        <CircularBackButton onPress={onBack} variant="plain" />
 
         <Pressable
           onPress={() => setShowProfile(true)}
@@ -750,7 +775,7 @@ export default function ChatScreen({
         />
       )}
 
-      <View style={styles.composer}>
+      <View style={[styles.composer, { paddingBottom: screenInsets.bottomSpacing }]}>
         <Pressable
           onPress={handleAttachMenu}
           disabled={isSending}
@@ -799,21 +824,12 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 56,
     paddingBottom: 12,
     paddingHorizontal: 12,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e8edf2',
   },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backButtonText: { color: '#0f172a', fontSize: 22, fontWeight: '700' },
   headerInfo: {
     flex: 1,
     flexDirection: 'row',

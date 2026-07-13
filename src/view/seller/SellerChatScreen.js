@@ -11,61 +11,16 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { getSellerMessagesOnBackend, sendSellerMessageOnBackend } from '../../api/sellerOpsApi';
 import { getReadableMessageContent, isOfferMessage } from '../../core/utils/offerMessageFormat';
+import { getCurrentUserIdToken } from '../../repository/authRepository';
+import CircularBackButton from '../shared/components/CircularBackButton';
 
 const MESSAGE_STATUS_LABEL = {
   sent: 'Đã gửi',
   delivered: 'Đã nhận',
   seen: 'Đã xem',
 };
-
-function isMockConversation(conversationId) {
-  return String(conversationId || '').startsWith('mock-');
-}
-
-function getActivityStatus(conversationId, buyerName) {
-  if (conversationId === 'mock-1' || buyerName === 'Nguyễn Văn An') {
-    return 'Đang hoạt động';
-  }
-  return 'Hoạt động 5 phút trước';
-}
-
-function getMockMessages(conversationId, buyerName) {
-  if (conversationId === 'mock-1' || buyerName === 'Nguyễn Văn An') {
-    return [
-      {
-        id: 'mock-msg-1',
-        content: 'Shop ơi, sản phẩm này còn hàng không ạ?',
-        isMine: false,
-      },
-      {
-        id: 'mock-msg-2',
-        content: 'Dạ shop còn hàng ạ, bạn cần đặt mấy phần?',
-        isMine: true,
-        status: 'seen',
-      },
-      {
-        id: 'mock-msg-3',
-        content: 'Cho mình 2 phần, giao chiều nay được không?',
-        isMine: false,
-      },
-    ];
-  }
-
-  return [
-    {
-      id: `mock-msg-${conversationId}-1`,
-      content: `Xin chào shop, mình là ${buyerName || 'khách hàng'}.`,
-      isMine: false,
-    },
-    {
-      id: `mock-msg-${conversationId}-2`,
-      content: 'Dạ shop có thể hỗ trợ đơn hàng giúp mình nhé.',
-      isMine: true,
-      status: 'delivered',
-    },
-  ];
-}
 
 function createLocalMessage(content, extra = {}) {
   return {
@@ -124,9 +79,7 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
   const [error, setError] = useState('');
 
   const displayName = buyerName || 'Tin nhắn';
-  const activityStatus = getActivityStatus(conversationId, buyerName);
   const canSend = draft.trim().length > 0 && !isSending;
-  const useMockData = isMockConversation(conversationId);
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => {
@@ -135,26 +88,20 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
   }, []);
 
   const loadMessages = useCallback(async () => {
-    if (useMockData) {
-      setMessages(getMockMessages(conversationId, buyerName));
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     setError('');
     try {
       const idToken = await getCurrentUserIdToken();
       const result = await getSellerMessagesOnBackend(idToken, conversationId);
       const data = Array.isArray(result) ? result : result?.messages;
-      setMessages(Array.isArray(data) && data.length > 0 ? data : getMockMessages(conversationId, buyerName));
+      setMessages(Array.isArray(data) ? data : []);
     } catch (loadError) {
-      setMessages(getMockMessages(conversationId, buyerName));
-      setError(loadError.message || 'Không tải được tin nhắn. Đang hiển thị dữ liệu mẫu.');
+      setMessages([]);
+      setError(loadError.message || 'Không tải được tin nhắn.');
     } finally {
       setIsLoading(false);
     }
-  }, [buyerName, conversationId, useMockData]);
+  }, [conversationId]);
 
   useEffect(() => {
     loadMessages();
@@ -183,13 +130,6 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
   async function handleSend() {
     const content = draft.trim();
     if (!content || isSending) {
-      return;
-    }
-
-    if (useMockData) {
-      const message = createLocalMessage(content);
-      setDraft('');
-      appendLocalMessage(message);
       return;
     }
 
@@ -241,13 +181,7 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
       imageUri: asset.uri,
     });
 
-    if (useMockData) {
-      appendLocalMessage(message);
-      return;
-    }
-
-    appendLocalMessage(message);
-    setError('Ảnh đã được thêm vào cuộc trò chuyện (demo UI). Tích hợp upload server sẽ bổ sung sau.');
+    setError('Chưa hỗ trợ gửi ảnh trong cuộc trò chuyện.');
   }
 
   return (
@@ -257,13 +191,7 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
       keyboardVerticalOffset={0}
     >
       <View style={styles.topBar}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onBack}
-          style={({ pressed }) => [styles.backButton, pressed && styles.buttonPressed]}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </Pressable>
+        <CircularBackButton onPress={onBack} variant="light" />
 
         <View style={styles.headerInfo}>
           <View style={styles.headerAvatar}>
@@ -274,7 +202,7 @@ export default function SellerChatScreen({ conversationId, buyerName, onBack }) 
               {displayName}
             </Text>
             <Text style={styles.activityStatus} numberOfLines={1}>
-              {activityStatus}
+              Tin nhắn với khách hàng
             </Text>
           </View>
         </View>
@@ -342,20 +270,11 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 56,
+    paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: '#0f766e',
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  backButtonText: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
   headerInfo: {
     flex: 1,
     flexDirection: 'row',

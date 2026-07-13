@@ -22,8 +22,10 @@ export default function LeafletMap({
   radiusCircle,
   recenterRequest,
   routeRequest,
+  scanLocation,
   restaurants,
   onEvent,
+  navigationMode = false,
 }) {
   const webViewRef = useRef(null);
   const onEventRef = useRef(onEvent);
@@ -78,13 +80,13 @@ export default function LeafletMap({
     sendCommand({
       type: 'location',
       location: currentLocation,
-      recenter: !hasCenteredRef.current,
+      recenter: navigationMode ? false : !hasCenteredRef.current,
     });
 
-    if (!hasCenteredRef.current) {
+    if (!navigationMode && !hasCenteredRef.current) {
       hasCenteredRef.current = true;
     }
-  }, [currentLocation, ready]);
+  }, [currentLocation, ready, navigationMode]);
 
   useEffect(() => {
     sendCommand({ type: 'showRestaurants', restaurants });
@@ -110,6 +112,13 @@ export default function LeafletMap({
       radius: radiusCircle?.radius ?? null,
     });
   }, [recenterRequest, radiusCircle?.radius, ready]);
+
+  useEffect(() => {
+    sendCommand({
+      type: 'scanLocation',
+      location: hasValidLocation(scanLocation) ? scanLocation : null,
+    });
+  }, [scanLocation, ready]);
 
   useEffect(() => {
     if (!routeRequest?.to || !hasValidLocation(routeRequest.to)) {

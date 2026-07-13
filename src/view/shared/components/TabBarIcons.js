@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 function IconFrame({ children, size = 24 }) {
   return (
@@ -8,39 +9,8 @@ function IconFrame({ children, size = 24 }) {
   );
 }
 
-export function HomeTabIcon({ color, size = 24, filled = false }) {
-  const roof = size * 0.34;
-  const bodyW = size * 0.56;
-  const bodyH = size * 0.34;
-
-  return (
-    <IconFrame size={size}>
-      <View
-        style={[
-          styles.homeRoof,
-          {
-            width: roof,
-            height: roof,
-            borderColor: color,
-            backgroundColor: filled ? color : 'transparent',
-            top: size * 0.08,
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.homeBody,
-          {
-            width: bodyW,
-            height: bodyH,
-            borderColor: color,
-            backgroundColor: filled ? color : 'transparent',
-            top: size * 0.36,
-          },
-        ]}
-      />
-    </IconFrame>
-  );
+export function HomeTabIcon({ color, size = 24 }) {
+  return <MaterialCommunityIcons name="home-outline" size={size} color={color} />;
 }
 
 export function CompassTabIcon({ color, size = 24, filled = false }) {
@@ -287,6 +257,106 @@ export function ChatTabIcon({ color, size = 24, filled = false }) {
   );
 }
 
+export function HeartTabIcon({ color, size = 24, filled = false }) {
+  const lobe = size * 0.4;
+  const body = size * 0.52;
+  const fillColor = filled ? color : '#ffffff';
+
+  return (
+    <IconFrame size={size}>
+      <View
+        style={[
+          styles.heartBody,
+          {
+            width: body,
+            height: body,
+            borderColor: color,
+            backgroundColor: fillColor,
+            top: size * 0.31,
+            transform: [{ rotate: '45deg' }],
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.heartLobe,
+          {
+            width: lobe,
+            height: lobe,
+            borderRadius: lobe / 2,
+            borderColor: color,
+            backgroundColor: fillColor,
+            top: size * 0.18,
+            left: size * 0.16,
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.heartLobe,
+          {
+            width: lobe,
+            height: lobe,
+            borderRadius: lobe / 2,
+            borderColor: color,
+            backgroundColor: fillColor,
+            top: size * 0.18,
+            right: size * 0.16,
+          },
+        ]}
+      />
+    </IconFrame>
+  );
+}
+
+export function BellTabIcon({ color, size = 24, filled = false }) {
+  const bellW = size * 0.58;
+  const bellH = size * 0.42;
+  const knob = size * 0.12;
+
+  return (
+    <IconFrame size={size}>
+      <View
+        style={{
+          position: 'absolute',
+          width: knob,
+          height: knob,
+          borderRadius: knob / 2,
+          borderWidth: 2,
+          borderColor: color,
+          backgroundColor: filled ? color : 'transparent',
+          top: size * 0.1,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          width: bellW,
+          height: bellH,
+          borderWidth: 2,
+          borderColor: color,
+          borderTopLeftRadius: bellW / 2,
+          borderTopRightRadius: bellW / 2,
+          borderBottomLeftRadius: 5,
+          borderBottomRightRadius: 5,
+          backgroundColor: filled ? `${color}18` : 'transparent',
+          top: size * 0.2,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          width: size * 0.24,
+          height: Math.max(2, size * 0.07),
+          backgroundColor: color,
+          borderRadius: 2,
+          bottom: size * 0.14,
+        }}
+      />
+    </IconFrame>
+  );
+}
+
 export function PersonTabIcon({ color, size = 24, filled = false }) {
   const head = size * 0.3;
 
@@ -329,19 +399,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  homeRoof: {
-    position: 'absolute',
-    borderLeftWidth: 2,
-    borderTopWidth: 2,
-    transform: [{ rotate: '45deg' }],
-  },
-  homeBody: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 3,
-    borderBottomRightRadius: 3,
-  },
   circle: {
     position: 'absolute',
     borderWidth: 2,
@@ -373,6 +430,17 @@ const styles = StyleSheet.create({
     width: 3,
     height: 3,
     borderRadius: 2,
+  },
+  heartBody: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+    borderRadius: 2,
+  },
+  heartLobe: {
+    position: 'absolute',
+    borderWidth: 2,
   },
   personHead: {
     position: 'absolute',

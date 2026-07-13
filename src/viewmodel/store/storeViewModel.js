@@ -2,8 +2,8 @@ import { fetchProductById, fetchProductsByStoreId } from '../../repository/produ
 import { fetchReviewsByStoreId } from '../../repository/reviewRepository';
 import { fetchStoreById } from '../../repository/storeRepository';
 
-export async function loadStoreById(storeId) {
-  return fetchStoreById(storeId);
+export async function loadStoreById(storeId, originLocation = null) {
+  return fetchStoreById(storeId, originLocation);
 }
 
 export async function loadProductsByStoreId(storeId) {

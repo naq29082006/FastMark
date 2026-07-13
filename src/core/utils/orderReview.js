@@ -4,7 +4,23 @@ import { submitBuyerReviewOnBackend } from '../../api/reviewApi';
 import { markOrderAsReviewed } from '../../hooks/useReviewedOrderCodes';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 
+import { RESERVATION_STATUS } from '../../constants/sellerOrders';
+
 export const PURCHASE_REVIEW_STATUSES = ['Hoàn thành', 'Đã giao'];
+
+const RESERVATION_STATUS_LABEL = {
+  [RESERVATION_STATUS.PENDING]: 'Chờ xác nhận',
+  [RESERVATION_STATUS.CONFIRMED]: 'Đã xác nhận',
+  [RESERVATION_STATUS.COMPLETED]: 'Hoàn thành',
+  [RESERVATION_STATUS.CANCELLED]: 'Đã hủy',
+  active: 'Đang giữ',
+  picked_up: 'Đã nhận',
+  expired: 'Hết hạn',
+};
+
+export function getReservationStatusLabel(status) {
+  return RESERVATION_STATUS_LABEL[status] || status || 'Đang xử lý';
+}
 
 export function canReviewPurchaseOrder(order) {
   const status = String(order?.status || '').trim();
@@ -12,7 +28,10 @@ export function canReviewPurchaseOrder(order) {
 }
 
 export function canReviewReservationOrder(order) {
-  return order?.status === 'picked_up';
+  return (
+    order?.status === RESERVATION_STATUS.COMPLETED ||
+    order?.status === 'picked_up'
+  );
 }
 
 export function canReviewOrder(order) {

@@ -15,18 +15,6 @@ async function parseJson(response, label) {
   return response.json();
 }
 
-export async function fetchRestaurantsFromNode(type = 'all') {
-  if (!hasStoreNodeApi()) {
-    return null;
-  }
-
-  const query = type && type !== 'all' ? `?type=${encodeURIComponent(type)}` : '';
-  const response = await apiRequest(`${API_ENDPOINTS.restaurants}${query}`);
-  const data = await parseJson(response, 'fetchRestaurantsFromNode');
-  log.ok('fetchRestaurantsFromNode', { type, count: data.restaurants?.length || 0 });
-  return data.restaurants || [];
-}
-
 function isMongoObjectId(value) {
   return /^[a-f\d]{24}$/i.test(String(value || ''));
 }
@@ -92,40 +80,40 @@ export async function fetchSearchShopsFromNode({
   };
 }
 
-export async function fetchStoreFromNode(storeId) {
+export async function fetchStoreFromNode(storeId, { latitude, longitude } = {}) {
   if (!hasStoreNodeApi()) {
     return null;
   }
 
   const normalizedId = String(storeId);
-
-  if (isMongoObjectId(normalizedId)) {
-    const shopResponse = await apiRequest(API_ENDPOINTS.shopById(normalizedId));
-    const shopPayload = await parseJson(shopResponse, 'fetchShopFromNode');
-    return shopPayload.data?.shop || null;
+  if (!isMongoObjectId(normalizedId)) {
+    return null;
   }
 
-  const response = await apiRequest(API_ENDPOINTS.restaurant(normalizedId));
-  const data = await parseJson(response, 'fetchStoreFromNode');
-  return data.store || null;
+  const params = new URLSearchParams();
+  if (Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {
+    params.set('lat', String(latitude));
+    params.set('lng', String(longitude));
+  }
+  const query = params.toString() ? `?${params.toString()}` : '';
+  const shopResponse = await apiRequest(`${API_ENDPOINTS.shopById(normalizedId)}${query}`);
+  const shopPayload = await parseJson(shopResponse, 'fetchShopFromNode');
+  return shopPayload.data?.shop || null;
 }
 
 export async function fetchProductsFromNode(storeId) {
   if (!hasStoreNodeApi()) {
-    return null;
+    return [];
   }
 
   const normalizedId = String(storeId);
-
-  if (isMongoObjectId(normalizedId)) {
-    const response = await apiRequest(API_ENDPOINTS.shopProducts(normalizedId));
-    const payload = await parseJson(response, 'fetchShopProductsFromNode');
-    return payload.data?.products || [];
+  if (!isMongoObjectId(normalizedId)) {
+    return [];
   }
 
-  const response = await apiRequest(API_ENDPOINTS.restaurantProducts(normalizedId));
-  const data = await parseJson(response, 'fetchProductsFromNode');
-  return data.products || [];
+  const response = await apiRequest(API_ENDPOINTS.shopProducts(normalizedId));
+  const payload = await parseJson(response, 'fetchShopProductsFromNode');
+  return payload.data?.products || [];
 }
 
 export async function fetchProductFromNode(productId) {
@@ -133,25 +121,27 @@ export async function fetchProductFromNode(productId) {
     return null;
   }
 
-  const response = await apiRequest(API_ENDPOINTS.product(productId));
+  const normalizedId = String(productId);
+  if (!isMongoObjectId(normalizedId)) {
+    return null;
+  }
+
+  const response = await apiRequest(API_ENDPOINTS.productById(normalizedId));
   const payload = await parseJson(response, 'fetchProductFromNode');
   return payload.data?.product || payload.product || null;
 }
 
 export async function fetchReviewsFromNode(storeId) {
   if (!hasStoreNodeApi()) {
-    return null;
+    return [];
   }
 
   const normalizedId = String(storeId);
-
-  if (isMongoObjectId(normalizedId)) {
-    const response = await apiRequest(API_ENDPOINTS.shopReviews(normalizedId));
-    const payload = await parseJson(response, 'fetchShopReviewsFromNode');
-    return payload.data?.reviews || [];
+  if (!isMongoObjectId(normalizedId)) {
+    return [];
   }
 
-  const response = await apiRequest(API_ENDPOINTS.restaurantReviews(storeId));
-  const data = await parseJson(response, 'fetchReviewsFromNode');
-  return data.reviews || [];
+  const response = await apiRequest(API_ENDPOINTS.shopReviews(normalizedId));
+  const payload = await parseJson(response, 'fetchShopReviewsFromNode');
+  return payload.data?.reviews || [];
 }

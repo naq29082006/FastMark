@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { SELLER_VERIFICATION_STATUS } from '../constants/sellerVerification';
 import { ROLE_SELLER } from '../model/profileModel';
 import {
   selectCanPostProducts,
@@ -12,11 +13,11 @@ import {
 } from '../viewmodel/auth/authSelectors';
 import { syncSellerAccess } from '../viewmodel/auth/authSlice';
 
-const DEFAULT_POLL_INTERVAL_MS = 5000;
+const PENDING_POLL_INTERVAL_MS = 15000;
 
 export function useSellerAccessSync({
   enabled = true,
-  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  pollIntervalMs = PENDING_POLL_INTERVAL_MS,
 } = {}) {
   const dispatch = useDispatch();
   const role = useSelector(selectUserRole);
@@ -25,6 +26,8 @@ export function useSellerAccessSync({
   const accessStatus = useSelector(selectSellerAccessStatus);
   const syncedAt = useSelector(selectSellerAccessSyncedAt);
   const isSyncingRef = useRef(false);
+  const shouldPoll =
+    enabled && verification?.status === SELLER_VERIFICATION_STATUS.PENDING;
 
   const refresh = useCallback(async () => {
     if (!enabled || isSyncingRef.current) {
@@ -49,10 +52,6 @@ export function useSellerAccessSync({
 
     refresh();
 
-    const intervalId = setInterval(() => {
-      refresh();
-    }, pollIntervalMs);
-
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         refresh();
@@ -60,10 +59,23 @@ export function useSellerAccessSync({
     });
 
     return () => {
-      clearInterval(intervalId);
       appStateSubscription.remove();
     };
-  }, [enabled, pollIntervalMs, refresh]);
+  }, [enabled, refresh]);
+
+  useEffect(() => {
+    if (!shouldPoll) {
+      return undefined;
+    }
+
+    const intervalId = setInterval(() => {
+      refresh();
+    }, pollIntervalMs);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [pollIntervalMs, refresh, shouldPoll]);
 
   const isInitialLoading = enabled && !syncedAt;
   const isRefreshing = enabled && accessStatus === 'loading' && Boolean(syncedAt);

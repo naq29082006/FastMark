@@ -9,16 +9,24 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { createBuyerReservationOnBackend } from '../../api/buyerOpsApi';
 import { formatPrice } from '../../core/utils/productFormat';
 import { formatPickupInputs, parsePickupInputs } from '../../core/utils/pickupDateTime';
+import SelectedVariantCard from './SelectedVariantCard';
 
 function buildDefaultPickupDate() {
   const d = new Date();
-  d.setHours(d.getHours() + 2, 0, 0, 0);
+  d.setTime(d.getTime() + 2 * 60 * 60 * 1000);
   return d;
+}
+
+function addHoursFromNow(hours) {
+  const date = new Date();
+  date.setTime(date.getTime() + hours * 60 * 60 * 1000);
+  return date;
 }
 
 export default function ReservationModal({
@@ -27,9 +35,12 @@ export default function ReservationModal({
   store,
   dealOfferId,
   agreedPrice,
+  preselectedVariantId = null,
   onClose,
   onSuccess,
 }) {
+  const insets = useSafeAreaInsets();
+  const hasPresetVariant = Boolean(preselectedVariantId);
   const variants = useMemo(() => {
     const list = (product?.variants || []).filter((v) => (v.quantity ?? 0) > 0);
     if (list.length > 0) {
@@ -62,35 +73,27 @@ export default function ReservationModal({
   const totalAmount = unitPrice * qtyNum;
   const pickupTime = parsePickupInputs(dateInput, timeInput);
 
-  const pickupOptions = useMemo(() => {
-    const options = [];
-    const in2h = buildDefaultPickupDate();
-    options.push({ label: 'Sau 2 giờ', value: in2h });
-
-    const in4h = new Date();
-    in4h.setHours(in4h.getHours() + 4, 0, 0, 0);
-    options.push({ label: 'Sau 4 giờ', value: in4h });
-
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    options.push({ label: 'Ngày mai 9:00', value: tomorrow });
-
-    return options;
-  }, []);
+  const pickupOptions = useMemo(
+    () =>
+      [1, 2, 5, 12, 24].map((hours) => ({
+        label: `Sau ${hours}h`,
+        value: addHoursFromNow(hours),
+      })),
+    []
+  );
 
   useEffect(() => {
     if (!visible) {
       return;
     }
-    setSelectedVariantId(variants[0]?.id || null);
+    setSelectedVariantId(preselectedVariantId || variants[0]?.id || null);
     setQuantity('1');
     setNote('');
     setError('');
     const defaults = formatPickupInputs(buildDefaultPickupDate());
     setDateInput(defaults.dateInput);
     setTimeInput(defaults.timeInput);
-  }, [visible, variants]);
+  }, [visible, variants, preselectedVariantId]);
 
   function applyPickupDate(date) {
     const formatted = formatPickupInputs(date);
@@ -153,7 +156,7 @@ export default function ReservationModal({
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.handle} />
           <View style={styles.titleRow}>
             <Text style={styles.titleIcon}>{dealOfferId ? '🕐' : '📦'}</Text>
@@ -172,7 +175,7 @@ export default function ReservationModal({
           ) : null}
 
           <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
-            {!dealOfferId ? (
+            {!dealOfferId && !hasPresetVariant ? (
               <>
                 <Text style={styles.label}>Chọn biến thể</Text>
                 {variants.map((variant) => {
@@ -191,6 +194,13 @@ export default function ReservationModal({
                   );
                 })}
               </>
+            ) : null}
+
+            {!dealOfferId && hasPresetVariant && selectedVariant ? (
+              <SelectedVariantCard
+                variant={selectedVariant}
+                productThumbnail={product?.thumbnail || ''}
+              />
             ) : null}
 
             <Text style={styles.label}>Số lượng</Text>
@@ -493,11 +503,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f1f5f9',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   cancelBtnText: {
     color: '#475569',
     fontWeight: '800',
     fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   submitBtn: {
     flex: 1.4,
@@ -506,6 +520,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0f766e',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   submitBtnDisabled: {
     opacity: 0.6,
@@ -514,5 +530,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '900',
     fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
 });

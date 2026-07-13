@@ -59,5 +59,8 @@ export function normalizeStore(row) {
     is_registered_shop: isRegisteredShop,
     distance_meters: row.distance_meters ?? null,
     category_name: row.categoryName || row.category_name || '',
+    categoryId: row.categoryId || row.category_id || '',
+    category_id: row.categoryId || row.category_id || '',
+    category_icon: row.categoryIcon || row.category_icon || '',
   };
 }

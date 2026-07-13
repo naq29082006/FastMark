@@ -1,19 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { useSelector } from 'react-redux';
 
-import { completeBuyerReservationOnBackend } from '../../api/buyerOpsApi';
-import { getCurrentUserIdToken } from '../../repository/authRepository';
-import { formatDistanceMeters, formatDurationSeconds } from '../../core/utils/pickupDateTime';
+import { getShopCategoriesOnBackend } from '../../api/productApi';
+import { fetchRouteDistancesFromOrigin } from '../../api/routingApi';
+import {
+  selectSellerVerification,
+  selectUserRole,
+} from '../../viewmodel/auth/authSelectors';
+import { getSellerRegisterButtonLabel } from '../seller/sellerRegistrationFlow';
 
 import LeafletMap from '../shared/components/LeafletMap';
+import BuyerQuickMenu from '../shared/components/BuyerQuickMenu';
+import DirectionsScreen from './DirectionsScreen';
 import AddressSearchBar from './AddressSearchBar';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import StoreDetailScreen from '../store/StoreDetailScreen';
 import DealOfferModal from '../buyer/DealOfferModal';
 import ReservationModal from '../buyer/ReservationModal';
-import { calculateDistanceMeters, hasValidLocation, normalizeExpoLocation } from '../../core/utils/geo';
-import { loadRestaurants, loadNearbyRegisteredShops } from '../../viewmodel/map/mapViewModel';
+import { calculateDistanceMeters, formatDistance, hasValidLocation, normalizeExpoLocation } from '../../core/utils/geo';
+import { loadNearbyRegisteredShops, reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
 import { loadStoreById } from '../../viewmodel/store/storeViewModel';
 import { mapLogger as log } from '../../core/utils/logger';
 
@@ -25,32 +33,161 @@ const TYPE_EMOJI = {
   shop: '🏪',
 };
 
+const TYPE_LABEL = {
+  cafe: 'Cà phê',
+  food: 'Quán ăn',
+  milktea: 'Trà sữa',
+  snack: 'Ăn vặt',
+  shop: 'Gian hàng',
+};
+
+const PANEL_HANDLE_HEIGHT = 20;
+const MAP_FLEX_HALF = 3;
+const SHOP_FLEX_HALF = 3;
+const MAP_FLEX_SHOP_COLLAPSED = 5;
+const SHOP_FLEX_COLLAPSED = 1;
+
+function formatScanCoords(location) {
+  if (!hasValidLocation(location)) {
+    return 'Chưa có tọa độ';
+  }
+
+  return `${Number(location.latitude).toFixed(5)}, ${Number(location.longitude).toFixed(5)}`;
+}
+
+function isRemoteIcon(value) {
+  return /^https?:\/\//i.test(String(value || '').trim());
+}
+
+function MapCategoryOption({ category, selected, onPress }) {
+  const iconValue = String(category.icon || '').trim();
+  const showRemoteImage = isRemoteIcon(iconValue);
+
+  return (
+    <Pressable
+      style={[styles.categoryItem, selected && styles.categoryItemActive]}
+      onPress={onPress}
+    >
+      <View style={styles.categoryOptionRow}>
+        {showRemoteImage ? (
+          <Image source={{ uri: iconValue }} style={styles.categoryOptionImage} />
+        ) : (
+          <View style={styles.categoryOptionImagePlaceholder}>
+            <Text style={styles.categoryOptionEmoji}>{iconValue || '🏪'}</Text>
+          </View>
+        )}
+        <Text
+          style={[styles.categoryOptionName, selected && styles.categoryTextActive]}
+          numberOfLines={1}
+        >
+          {category.name}
+        </Text>
+      </View>
+      {selected ? <Text style={styles.checkmark}>✓</Text> : null}
+    </Pressable>
+  );
+}
+
 export default function MapScreen({
   children,
   focusStoreRequest,
   onOpenChat,
   onClearFocus,
   onPickupCompleted,
+  onNavigationStateChange,
+  onEditAccount,
+  onSellerAction,
+  onLogout,
+  isScreenActive = true,
 }) {
   const watcherRef = useRef(null);
   const mountedRef = useRef(false);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [scanLocation, setScanLocation] = useState(null);
+  const [scanSystemAddress, setScanSystemAddress] = useState('');
+  const [isResolvingScanAddress, setIsResolvingScanAddress] = useState(false);
+  const [usingCustomScan, setUsingCustomScan] = useState(false);
   const [recenterRequest, setRecenterRequest] = useState(null);
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedRadius, setSelectedRadius] = useState(2000);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [restaurants, setRestaurants] = useState([]);
   const [registeredShops, setRegisteredShops] = useState([]);
   const [storeNav, setStoreNav] = useState(null);
   const [dealModal, setDealModal] = useState(null);
   const [reserveModal, setReserveModal] = useState(null);
   const [directionsSession, setDirectionsSession] = useState(null);
-  const [routeInfo, setRouteInfo] = useState(null);
-  const [isCompletingPickup, setIsCompletingPickup] = useState(false);
+  const [routeDistanceById, setRouteDistanceById] = useState({});
+  const [isShopPanelExpanded, setIsShopPanelExpanded] = useState(false);
+  const [shopCategories, setShopCategories] = useState([]);
+
+  const toggleFilterMenu = useCallback(() => {
+    setMenuVisible((current) => {
+      if (!current) {
+        setIsShopPanelExpanded(false);
+      }
+      return !current;
+    });
+  }, []);
+
+  const closeFilterMenu = useCallback(() => {
+    setMenuVisible(false);
+  }, []);
+
+  const role = useSelector(selectUserRole);
+  const sellerVerification = useSelector(selectSellerVerification);
+  const sellerButtonLabel = getSellerRegisterButtonLabel({ role, verification: sellerVerification });
   const lastAcceptedRef = useRef(null);
+  const reverseScanRequestRef = useRef(0);
+  const scanFetchTimerRef = useRef(null);
+  const lastScanFetchRef = useRef(null);
+
+  const resolveScanAddress = useCallback(async (location) => {
+    if (!hasValidLocation(location)) {
+      setScanSystemAddress('');
+      return;
+    }
+
+    const requestId = reverseScanRequestRef.current + 1;
+    reverseScanRequestRef.current = requestId;
+    setIsResolvingScanAddress(true);
+
+    try {
+      const displayName = await reverseGeocodeLocation(
+        location.latitude,
+        location.longitude
+      );
+
+      if (reverseScanRequestRef.current === requestId) {
+        setScanSystemAddress(displayName || '');
+      }
+    } catch {
+      if (reverseScanRequestRef.current === requestId) {
+        setScanSystemAddress('');
+      }
+    } finally {
+      if (reverseScanRequestRef.current === requestId) {
+        setIsResolvingScanAddress(false);
+      }
+    }
+  }, []);
+
+  const applyScanLocation = useCallback((location, { custom = false } = {}) => {
+    if (!hasValidLocation(location)) {
+      return;
+    }
+
+    setUsingCustomScan(custom);
+    setScanLocation(location);
+    resolveScanAddress(location);
+  }, [resolveScanAddress]);
+
+  useEffect(() => {
+    onNavigationStateChange?.(Boolean(storeNav || directionsSession));
+  }, [onNavigationStateChange, storeNav, directionsSession]);
 
   const openStore = useCallback((storeId) => {
+    setMenuVisible(false);
     log.info('openStore', { storeId });
     setStoreNav({ screen: 'store', storeId: String(storeId) });
   }, []);
@@ -169,26 +306,13 @@ export default function MapScreen({
   }, [startLocationTracking]);
 
   useEffect(() => {
-    if (selectedCategory === 'none' || selectedCategory === 'shop') {
-      setRestaurants([]);
-      return undefined;
+    if (!hasValidLocation(currentLocation) || usingCustomScan) {
+      return;
     }
 
-    let isCurrent = true;
-    log.info('fetchRestaurants:map', { category: selectedCategory });
-    loadRestaurants(selectedCategory).then((data) => {
-      if (isCurrent) {
-        log.ok('fetchRestaurants:map-loaded', { category: selectedCategory, count: data.length });
-        setRestaurants(data);
-      }
-    }).catch((error) => {
-      log.fail('fetchRestaurants:map-failed', error);
-    });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedCategory]);
+    setScanLocation(currentLocation);
+    resolveScanAddress(currentLocation);
+  }, [currentLocation, usingCustomScan, resolveScanAddress]);
 
   useEffect(() => {
     if (selectedCategory === 'none') {
@@ -196,38 +320,145 @@ export default function MapScreen({
       return undefined;
     }
 
-    if (!hasValidLocation(currentLocation)) {
+    if (!hasValidLocation(scanLocation)) {
       return undefined;
     }
 
     let isCurrent = true;
     const effectiveRadius = selectedRadius ?? 20000;
 
-    log.info('fetchRegisteredShops:map', {
-      lat: currentLocation.latitude,
-      lng: currentLocation.longitude,
-      radiusMeters: effectiveRadius,
-    });
+    if (scanFetchTimerRef.current) {
+      clearTimeout(scanFetchTimerRef.current);
+    }
 
-    loadNearbyRegisteredShops({
-      latitude: currentLocation.latitude,
-      longitude: currentLocation.longitude,
-      radiusMeters: effectiveRadius,
-    })
-      .then((data) => {
-        if (isCurrent) {
-          log.ok('fetchRegisteredShops:map-loaded', { count: data.length });
-          setRegisteredShops(data);
-        }
-      })
-      .catch((error) => {
-        log.fail('fetchRegisteredShops:map-failed', error);
+    scanFetchTimerRef.current = setTimeout(() => {
+      const categoryKey =
+        selectedCategory === 'all' || selectedCategory === 'none' ? 'all' : String(selectedCategory);
+      const locKey = `${Number(scanLocation.latitude).toFixed(4)},${Number(scanLocation.longitude).toFixed(4)},${effectiveRadius},${categoryKey}`;
+      if (lastScanFetchRef.current === locKey) {
+        return;
+      }
+      lastScanFetchRef.current = locKey;
+
+      log.info('fetchRegisteredShops:map', {
+        lat: scanLocation.latitude,
+        lng: scanLocation.longitude,
+        radiusMeters: effectiveRadius,
+        categoryId: categoryKey,
+        customScan: usingCustomScan,
       });
+
+      loadNearbyRegisteredShops({
+        latitude: scanLocation.latitude,
+        longitude: scanLocation.longitude,
+        radiusMeters: effectiveRadius,
+        shopCategoryId: selectedCategory === 'all' || selectedCategory === 'none' ? '' : selectedCategory,
+      })
+        .then((data) => {
+          if (isCurrent) {
+            log.ok('fetchRegisteredShops:map-loaded', { count: data.length });
+            setRegisteredShops(data);
+          }
+        })
+        .catch((error) => {
+          log.fail('fetchRegisteredShops:map-failed', error);
+        });
+    }, 400);
 
     return () => {
       isCurrent = false;
+      if (scanFetchTimerRef.current) {
+        clearTimeout(scanFetchTimerRef.current);
+      }
     };
-  }, [currentLocation, selectedRadius, selectedCategory]);
+  }, [scanLocation, selectedRadius, selectedCategory, usingCustomScan]);
+
+  useEffect(() => {
+    let active = true;
+
+    getShopCategoriesOnBackend()
+      .then((items) => {
+        if (active) {
+          setShopCategories(Array.isArray(items) ? items : []);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setShopCategories([]);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const shopCategoryLookup = useMemo(() => {
+    const byId = new Map();
+    shopCategories.forEach((category) => {
+      if (!category?.id) {
+        return;
+      }
+      byId.set(String(category.id), {
+        icon: String(category.icon || '').trim(),
+        name: category.name || category.categoryName || '',
+      });
+    });
+    return byId;
+  }, [shopCategories]);
+
+  const enrichShopWithCategory = useCallback(
+    (shop) => {
+      const categoryId = String(shop.category_id || shop.categoryId || '');
+      const categoryMeta = shopCategoryLookup.get(categoryId);
+
+      return {
+        ...shop,
+        category_id: categoryId,
+        categoryId,
+        category_name: shop.category_name || categoryMeta?.name || '',
+        category_icon: String(shop.category_icon || shop.categoryIcon || categoryMeta?.icon || '').trim(),
+      };
+    },
+    [shopCategoryLookup]
+  );
+
+  const startDirectionsToStore = useCallback(
+    ({ shopId, storeName, latitude, longitude, categoryIcon = '', categoryId = '', storeAvatar = '' }) => {
+      const nextLatitude = Number(latitude);
+      const nextLongitude = Number(longitude);
+
+      if (!Number.isFinite(nextLatitude) || !Number.isFinite(nextLongitude)) {
+        Alert.alert('Không chỉ đường được', 'Gian hàng chưa có tọa độ trên bản đồ.');
+        return;
+      }
+
+      const { category_icon: resolvedIcon } = enrichShopWithCategory({
+        category_icon: categoryIcon,
+        categoryIcon,
+        category_id: categoryId,
+        categoryId,
+      });
+
+      setStoreNav(null);
+      setMenuVisible(false);
+      setDirectionsSession({
+        storeId: String(shopId),
+        reservationId: null,
+        storeName: storeName || 'Gian hàng',
+        storeAvatar: String(storeAvatar || '').trim(),
+        categoryIcon: resolvedIcon,
+        destination: {
+          latitude: nextLatitude,
+          longitude: nextLongitude,
+          category_icon: resolvedIcon,
+          type: 'shop',
+        },
+      });
+      onClearFocus?.();
+    },
+    [enrichShopWithCategory, onClearFocus]
+  );
 
   useEffect(() => {
     const targetStoreId = focusStoreRequest?.storeId;
@@ -267,16 +498,20 @@ export default function MapScreen({
       setStoreNav(null);
 
       if (showDirections) {
+        const enrichedStore = enrichShopWithCategory(targetStore);
         setDirectionsSession({
           storeId: String(targetStoreId),
           reservationId: focusStoreRequest?.reservationId || null,
-          storeName: focusStoreRequest?.storeName || targetStore.name || 'Gian hàng',
+          storeName: focusStoreRequest?.storeName || enrichedStore.name || 'Gian hàng',
+          storeAvatar: String(enrichedStore.image_url || enrichedStore.cover_image_url || '').trim(),
+          categoryIcon: enrichedStore.category_icon || '',
           destination: {
             latitude: targetStore.latitude,
             longitude: targetStore.longitude,
+            category_icon: enrichedStore.category_icon || '',
+            type: 'shop',
           },
         });
-        setRouteInfo(null);
       }
 
       setRecenterRequest({
@@ -289,7 +524,7 @@ export default function MapScreen({
       log.info('focusStoreRequest', { storeId: targetStoreId, showDirections });
     }
 
-    const cachedStore = [...restaurants, ...registeredShops].find(
+    const cachedStore = registeredShops.find(
       (store) => String(store.id) === String(targetStoreId)
     );
 
@@ -307,46 +542,114 @@ export default function MapScreen({
     return () => {
       isCurrent = false;
     };
-  }, [focusStoreRequest, restaurants, registeredShops]);
+  }, [focusStoreRequest, registeredShops, enrichShopWithCategory]);
 
   const mapItems = useMemo(() => {
     if (selectedCategory === 'none') {
       return [];
     }
 
-    if (selectedCategory === 'shop') {
-      return registeredShops;
-    }
+    const enrichedShops = registeredShops.map(enrichShopWithCategory);
 
     if (selectedCategory === 'all') {
-      const registeredIds = new Set(registeredShops.map((shop) => String(shop.id)));
-      const demoItems = restaurants.filter((item) => !registeredIds.has(String(item.id)));
-      return [...registeredShops, ...demoItems];
+      return enrichedShops;
     }
 
-    return restaurants;
-  }, [restaurants, registeredShops, selectedCategory]);
+    return enrichedShops.filter(
+      (item) => String(item.category_id || item.categoryId || '') === String(selectedCategory)
+    );
+  }, [registeredShops, selectedCategory, enrichShopWithCategory]);
 
   const visibleRestaurants = useMemo(() => {
-    if (!hasValidLocation(currentLocation) || mapItems.length === 0) {
+    const distanceOrigin = scanLocation || currentLocation;
+
+    if (!hasValidLocation(distanceOrigin) || mapItems.length === 0) {
       return mapItems;
     }
-    if (!selectedRadius) {
-      return mapItems;
-    }
-    return mapItems.filter((r) => {
-      if (!r.latitude || !r.longitude) return false;
-      const dist = calculateDistanceMeters(currentLocation, {
-        latitude: r.latitude,
-        longitude: r.longitude,
-      });
-      return dist !== null && dist <= selectedRadius;
+
+    const enriched = mapItems.map((item) => {
+      const distanceMeters = Number.isFinite(Number(item.distance_meters))
+        ? Number(item.distance_meters)
+        : calculateDistanceMeters(distanceOrigin, item);
+
+      return {
+        ...item,
+        distance_meters: distanceMeters,
+      };
     });
-  }, [mapItems, currentLocation, selectedRadius]);
+
+    const filtered = selectedRadius
+      ? enriched.filter(
+          (item) =>
+            item.distance_meters !== null &&
+            Number.isFinite(item.distance_meters) &&
+            item.distance_meters <= selectedRadius
+        )
+      : enriched;
+
+    return [...filtered].sort(
+      (left, right) => (left.distance_meters ?? Number.MAX_SAFE_INTEGER) - (right.distance_meters ?? Number.MAX_SAFE_INTEGER)
+    );
+  }, [mapItems, scanLocation, currentLocation, selectedRadius]);
+
+  const distanceOrigin = scanLocation || currentLocation;
+  const visibleRestaurantIds = useMemo(
+    () => visibleRestaurants.map((item) => String(item.id)).join('|'),
+    [visibleRestaurants]
+  );
+
+  useEffect(() => {
+    if (!hasValidLocation(distanceOrigin) || visibleRestaurants.length === 0) {
+      setRouteDistanceById({});
+      return undefined;
+    }
+
+    let active = true;
+    const timer = setTimeout(() => {
+      fetchRouteDistancesFromOrigin(distanceOrigin, visibleRestaurants)
+        .then((distances) => {
+          if (active) {
+            setRouteDistanceById(distances);
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setRouteDistanceById({});
+          }
+        });
+    }, 350);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [
+    distanceOrigin?.latitude,
+    distanceOrigin?.longitude,
+    visibleRestaurantIds,
+  ]);
+
+  const displayRestaurants = useMemo(() => {
+    const enriched = visibleRestaurants.map((item) => {
+      const routeDistance = routeDistanceById[String(item.id)];
+      return {
+        ...item,
+        distance_meters: Number.isFinite(routeDistance) ? routeDistance : item.distance_meters,
+      };
+    });
+
+    return [...enriched].sort(
+      (left, right) =>
+        (left.distance_meters ?? Number.MAX_SAFE_INTEGER) -
+        (right.distance_meters ?? Number.MAX_SAFE_INTEGER)
+    );
+  }, [visibleRestaurants, routeDistanceById]);
+
+  const originLocation = distanceOrigin;
 
   const radiusCircleProp =
-    selectedRadius && hasValidLocation(currentLocation)
-      ? { center: currentLocation, radius: selectedRadius }
+    selectedRadius && hasValidLocation(scanLocation || currentLocation)
+      ? { center: scanLocation || currentLocation, radius: selectedRadius }
       : null;
 
   function requestRecenter(location) {
@@ -357,6 +660,7 @@ export default function MapScreen({
 
   function handleRecenterPress() {
     log.info('recenter:pressed');
+    setUsingCustomScan(false);
 
     const cached = lastAcceptedRef.current || currentLocation;
     if (hasValidLocation(cached)) {
@@ -403,68 +707,38 @@ export default function MapScreen({
       });
   }
 
+  useEffect(() => {
+    if (!isScreenActive) {
+      setMenuVisible(false);
+    }
+  }, [isScreenActive]);
+
+  useEffect(() => {
+    if (storeNav) {
+      setMenuVisible(false);
+    }
+  }, [storeNav]);
+
   const handleMapEvent = useCallback((payload) => {
     log.debug('mapEvent', payload?.type, payload);
+    if (payload?.type === 'mapTap') {
+      closeFilterMenu();
+      return;
+    }
+    if (payload?.type === 'mapDoubleTap' && hasValidLocation(payload.location)) {
+      log.info('scan:double-tap', payload.location);
+      applyScanLocation(payload.location, { custom: true });
+      return;
+    }
     if (payload?.type === 'restaurantTap' && payload.restaurant?.id != null) {
       openStore(payload.restaurant.id);
       return;
     }
-    if (payload?.type === 'routeReady') {
-      setRouteInfo({
-        distance: payload.distance,
-        duration: payload.duration,
-      });
-      return;
-    }
-    if (payload?.type === 'routeError') {
-      setRouteInfo(null);
-      Alert.alert('Chỉ đường', payload.message || 'Không vẽ được lộ trình.');
-    }
-  }, [openStore]);
-
-  const routeRequest = useMemo(() => {
-    if (!directionsSession?.destination || !hasValidLocation(currentLocation)) {
-      return null;
-    }
-    return {
-      from: currentLocation,
-      to: directionsSession.destination,
-      at: Date.now(),
-    };
-  }, [directionsSession, currentLocation]);
+  }, [openStore, applyScanLocation, closeFilterMenu]);
 
   function handleStopDirections() {
     setDirectionsSession(null);
-    setRouteInfo(null);
     onClearFocus?.();
-  }
-
-  async function handleCompletePickup() {
-    if (!directionsSession?.reservationId) {
-      Alert.alert('Thông báo', 'Không tìm thấy mã đơn giữ hàng.');
-      return;
-    }
-
-    Alert.alert('Xác nhận', 'Bạn đã lấy hàng tại shop?', [
-      { text: 'Huỷ', style: 'cancel' },
-      {
-        text: 'Đã lấy hàng',
-        onPress: async () => {
-          setIsCompletingPickup(true);
-          try {
-            const idToken = await getCurrentUserIdToken();
-            await completeBuyerReservationOnBackend(idToken, directionsSession.reservationId);
-            Alert.alert('Thành công', 'Đã cập nhật trạng thái lấy hàng.');
-            handleStopDirections();
-            onPickupCompleted?.();
-          } catch (error) {
-            Alert.alert('Lỗi', error.message || 'Không cập nhật được trạng thái.');
-          } finally {
-            setIsCompletingPickup(false);
-          }
-        },
-      },
-    ]);
   }
 
   function handleSearchSelect(result) {
@@ -491,31 +765,61 @@ export default function MapScreen({
     { key: 2000, label: '📍 2 km' },
   ];
 
-  const restaurantCategories = [
-    { key: 'none', label: '🚫 Ẩn tất cả' },
-    { key: 'all', label: '🌐 Tất cả' },
-    { key: 'shop', label: '🏪 Gian hàng đăng ký' },
-    { key: 'cafe', label: '☕ Cà phê' },
-    { key: 'food', label: '🍜 Quán ăn' },
-    { key: 'milktea', label: '🧋 Trà sữa' },
-    { key: 'snack', label: '🍿 Ăn vặt' },
-  ];
+  const restaurantCategories = useMemo(() => {
+    const dynamicCategories = shopCategories.map((category) => ({
+      key: String(category.id),
+      name: category.name || category.categoryName || 'Danh mục',
+      icon: category.icon || '',
+      description: category.description || '',
+    }));
+
+    return [
+      { key: 'none', name: 'Ẩn tất cả', icon: '🚫' },
+      { key: 'all', name: 'Tất cả gian hàng', icon: '🌐' },
+      ...dynamicCategories,
+    ];
+  }, [shopCategories]);
+
+  const selectedCategoryLabel =
+    restaurantCategories.find((category) => category.key === selectedCategory)?.name || 'Tất cả';
 
   const selectedRadiusLabel =
     radiusOptions.find((opt) => opt.key === selectedRadius)?.label || 'Tắt';
 
   const showNearbyPanel =
-    selectedCategory !== 'none' && visibleRestaurants.length > 0 && !storeNav;
+    selectedCategory !== 'none' && displayRestaurants.length > 0 && !storeNav;
+
+  const scanLocationLabel = useMemo(() => {
+    const coords = formatScanCoords(scanLocation || currentLocation);
+    const address = isResolvingScanAddress
+      ? 'Đang lấy địa chỉ hệ thống...'
+      : scanSystemAddress || 'Chưa có địa chỉ hệ thống';
+
+    return `${coords} · ${address}`;
+  }, [scanLocation, currentLocation, isResolvingScanAddress, scanSystemAddress]);
+
+  const mapFlex = isShopPanelExpanded ? MAP_FLEX_HALF : MAP_FLEX_SHOP_COLLAPSED;
+  const shopFlex = isShopPanelExpanded ? SHOP_FLEX_HALF : SHOP_FLEX_COLLAPSED;
+
 
   let screenContent;
 
-  if (storeNav?.screen === 'store') {
+  if (directionsSession) {
+    screenContent = (
+      <DirectionsScreen
+        session={directionsSession}
+        onStop={handleStopDirections}
+      />
+    );
+  } else if (storeNav?.screen === 'store') {
     screenContent = (
       <StoreDetailScreen
         storeId={storeNav.storeId}
+        originLocation={originLocation}
         onBack={closeStoreNav}
         onProductPress={openProduct}
         onOpenChat={onOpenChat}
+        onNavigateDirections={startDirectionsToStore}
       />
     );
   } else if (storeNav?.screen === 'product') {
@@ -525,16 +829,18 @@ export default function MapScreen({
         onBack={goBackStoreNav}
         onStorePress={openStore}
         onOpenChat={onOpenChat}
-        onDeal={(product, store) =>
+        onDeal={(product, store, selectedVariant) =>
           setDealModal({
             product: { ...product, id: product.id || storeNav.productId },
             store,
+            preselectedVariantId: selectedVariant?.id || null,
           })
         }
-        onReserve={(product, store) =>
+        onReserve={(product, store, selectedVariant) =>
           setReserveModal({
             product: { ...product, id: product.id || storeNav.productId },
             store,
+            preselectedVariantId: selectedVariant?.id || null,
           })
         }
       />
@@ -542,21 +848,36 @@ export default function MapScreen({
   } else {
     screenContent = (
       <View style={styles.container}>
-      <View style={styles.mapArea} pointerEvents="box-none">
+      <View
+        style={[styles.mapArea, { flex: mapFlex }]}
+        pointerEvents="box-none"
+      >
         <LeafletMap
           currentLocation={currentLocation}
-          radiusCircle={directionsSession ? null : radiusCircleProp}
+          radiusCircle={radiusCircleProp}
           recenterRequest={recenterRequest}
-          routeRequest={routeRequest}
+          scanLocation={
+            usingCustomScan && hasValidLocation(scanLocation) ? scanLocation : null
+          }
           restaurants={visibleRestaurants}
           onEvent={handleMapEvent}
         />
 
         <View style={styles.searchOverlay} pointerEvents="box-none">
-          <AddressSearchBar
-            placeholder="Tìm đường Phúc Diễn, địa điểm..."
-            onSelectResult={handleSearchSelect}
-          />
+          <View style={styles.searchRow}>
+            <View style={styles.searchBarWrap}>
+              <AddressSearchBar
+                placeholder="Tìm đường Phúc Diễn, địa điểm..."
+                onSelectResult={handleSearchSelect}
+              />
+            </View>
+            <BuyerQuickMenu
+              sellerButtonLabel={sellerButtonLabel}
+              onEditAccount={onEditAccount}
+              onSellerAction={onSellerAction}
+              onLogout={onLogout}
+            />
+          </View>
         </View>
 
         <Pressable
@@ -564,24 +885,34 @@ export default function MapScreen({
           accessibilityLabel="Bộ lọc bản đồ"
           pointerEvents="auto"
           style={({ pressed }) => [
-            styles.mapFab,
             styles.settingsFab,
             pressed && styles.mapFabPressed,
             menuVisible && styles.settingsFabActive,
           ]}
-          onPress={() => setMenuVisible(!menuVisible)}
+          onPress={toggleFilterMenu}
         >
           <Text style={[styles.settingsFabIcon, menuVisible && styles.settingsFabIconActive]}>
-            {menuVisible ? '✕' : '⚙️'}
+            ⚙️
           </Text>
         </Pressable>
 
-        {menuVisible && (
-          <View style={styles.filterPanel} pointerEvents="auto">
+        {menuVisible ? (
+          <View style={styles.inlineFilterPanel} pointerEvents="auto">
+            <View style={styles.filterPanelHeader}>
+              <Text style={styles.menuHeader}>Tọa độ quét & danh mục</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Đóng bộ lọc"
+                onPress={closeFilterMenu}
+                style={({ pressed }) => [styles.filterCloseButton, pressed && styles.mapFabPressed]}
+              >
+                <Text style={styles.filterCloseButtonText}>✕</Text>
+              </Pressable>
+            </View>
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-              <Text style={styles.menuHeader}>Bộ lọc bản đồ</Text>
+              <Text style={styles.menuSummary}>{scanLocationLabel}</Text>
               <Text style={styles.menuSummary}>
-                Danh mục: {restaurantCategories.find((c) => c.key === selectedCategory)?.label || 'Tất cả'}
+                Danh mục: {selectedCategoryLabel}
                 {' · '}
                 Bán kính: {selectedRadiusLabel}
               </Text>
@@ -598,128 +929,143 @@ export default function MapScreen({
                     <Text style={[styles.categoryText, isSelected && styles.categoryTextActive]}>
                       {opt.label}
                     </Text>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    {isSelected ? <Text style={styles.checkmark}>✓</Text> : null}
                   </Pressable>
                 );
               })}
 
               <View style={styles.divider} />
 
-              <Text style={styles.menuSubHeader}>Loại hiển thị</Text>
+              <Text style={styles.menuSubHeader}>Danh mục gian hàng</Text>
               {restaurantCategories.map((cat) => {
                 const isSelected = selectedCategory === cat.key;
                 return (
-                  <Pressable
+                  <MapCategoryOption
                     key={cat.key}
-                    style={[styles.categoryItem, isSelected && styles.categoryItemActive]}
+                    category={cat}
+                    selected={isSelected}
                     onPress={() => setSelectedCategory(cat.key)}
-                  >
-                    <Text style={[styles.categoryText, isSelected && styles.categoryTextActive]}>
-                      {cat.label}
-                    </Text>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </Pressable>
+                  />
                 );
               })}
             </ScrollView>
           </View>
-        )}
+        ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Về vị trí của tôi"
-          pointerEvents="auto"
-          style={({ pressed }) => [
-            styles.recenterButton,
-            pressed && styles.mapFabPressed,
-          ]}
-          onPress={handleRecenterPress}
-        >
-          <Text style={styles.recenterButtonText}>Về vị trí của tôi</Text>
-        </Pressable>
+        <View style={styles.locationBar} pointerEvents="box-none">
+          <Text style={styles.locationBarText} numberOfLines={2}>
+            {scanLocationLabel}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Về vị trí của tôi"
+            pointerEvents="auto"
+            style={({ pressed }) => [
+              styles.recenterButton,
+              pressed && styles.mapFabPressed,
+            ]}
+            onPress={handleRecenterPress}
+          >
+            <Text style={styles.recenterButtonText}>Về vị trí của tôi</Text>
+          </Pressable>
+        </View>
 
         {children}
       </View>
 
-      {directionsSession ? (
-        <View style={styles.directionsCard}>
-          <View style={styles.directionsCardHeader}>
-            <Text style={styles.directionsCardIcon}>🧭</Text>
-            <View style={styles.directionsCardTitles}>
-              <Text style={styles.directionsTitle}>Chỉ đường đến {directionsSession.storeName}</Text>
-              {routeInfo ? (
-                <Text style={styles.directionsMeta}>
-                  {formatDistanceMeters(routeInfo.distance)} • {formatDurationSeconds(routeInfo.duration)}
-                </Text>
-              ) : (
-                <Text style={styles.directionsMeta}>Đang tính lộ trình...</Text>
-              )}
-            </View>
-          </View>
-          <View style={styles.directionsActions}>
-            <Pressable style={styles.directionsSecondaryBtn} onPress={handleStopDirections}>
-              <Text style={styles.directionsSecondaryText}>Tắt chỉ đường</Text>
-            </Pressable>
+      <>
+          <View style={styles.panelResizeHandleWrap}>
             <Pressable
-              style={[styles.directionsPrimaryBtn, isCompletingPickup && styles.directionsPrimaryBtnDisabled]}
-              disabled={isCompletingPickup}
-              onPress={handleCompletePickup}
+              accessibilityRole="button"
+              accessibilityLabel={isShopPanelExpanded ? 'Thu gọn danh sách gian hàng' : 'Mở rộng danh sách gian hàng'}
+              onPress={() => setIsShopPanelExpanded((current) => !current)}
+              style={({ pressed }) => [
+                styles.panelResizeButton,
+                pressed && styles.panelResizeButtonPressed,
+              ]}
             >
-              <Text style={styles.directionsPrimaryText}>
-                {isCompletingPickup ? 'Đang cập nhật...' : '✓ Đã lấy hàng'}
-              </Text>
+              <Ionicons
+                name={isShopPanelExpanded ? 'chevron-down' : 'chevron-up'}
+                size={18}
+                color="#64748b"
+              />
             </Pressable>
           </View>
-        </View>
-      ) : (
-        <View style={styles.nearbyPanel}>
+          <View style={[styles.nearbyPanel, { flex: shopFlex }]} onTouchStart={closeFilterMenu}>
           <Text style={styles.nearbyTitle}>
             {showNearbyPanel
-              ? `${visibleRestaurants.length} điểm trong ${selectedRadiusLabel} — chạm để xem`
+              ? `${displayRestaurants.length} điểm trong ${selectedRadiusLabel} — chạm để xem`
               : selectedCategory === 'none'
                 ? 'Chọn loại hiển thị để xem danh sách'
-                : !hasValidLocation(currentLocation)
+                : !hasValidLocation(scanLocation || currentLocation)
                   ? 'Đang lấy vị trí để quét gian hàng gần bạn...'
                   : `Không có điểm nào trong bán kính ${selectedRadiusLabel}`}
           </Text>
           {showNearbyPanel ? (
             <FlatList
-              data={visibleRestaurants}
+              data={displayRestaurants}
               keyExtractor={(item) => String(item.id)}
-              numColumns={2}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.nearbyList}
-              columnWrapperStyle={styles.nearbyRow}
-              renderItem={({ item: restaurant }) => (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.nearbyCard,
-                    pressed && styles.nearbyCardPressed,
-                  ]}
-                  onPress={() => openStore(restaurant.id)}
-                >
-                  {restaurant.image_url ? (
-                    <Image
-                      source={{ uri: restaurant.image_url }}
-                      style={styles.nearbyThumb}
-                    />
-                  ) : (
-                    <View style={styles.nearbyThumbPlaceholder}>
-                      <Text style={styles.nearbyThumbEmoji}>
-                        {TYPE_EMOJI[restaurant.type] || '🏪'}
+              renderItem={({ item: restaurant }) => {
+                const username = restaurant.shop_username
+                  ? `@${String(restaurant.shop_username).replace(/^@/, '')}`
+                  : '';
+                const categoryLabel =
+                  restaurant.category_name ||
+                  TYPE_LABEL[restaurant.type] ||
+                  'Gian hàng';
+                const systemAddress =
+                  restaurant.system_address || restaurant.address || 'Chưa có địa chỉ hệ thống';
+                const productCount = Number(restaurant.total_products ?? restaurant.product_count ?? 0);
+                const reviewCount = Number(restaurant.review_count ?? 0);
+                const distanceLabel = formatDistance(restaurant.distance_meters);
+
+                return (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.nearbyCard,
+                      pressed && styles.nearbyCardPressed,
+                    ]}
+                    onPress={() => openStore(restaurant.id)}
+                  >
+                    {restaurant.image_url ? (
+                      <Image
+                        source={{ uri: restaurant.image_url }}
+                        style={styles.nearbyThumb}
+                      />
+                    ) : (
+                      <View style={styles.nearbyThumbPlaceholder}>
+                        <Text style={styles.nearbyThumbEmoji}>
+                          {TYPE_EMOJI[restaurant.type] || '🏪'}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.nearbyCardBody}>
+                      <View style={styles.nearbyCardTitleRow}>
+                        <Text style={styles.nearbyName} numberOfLines={1}>
+                          {restaurant.name}
+                        </Text>
+                        <Text style={styles.nearbyDistance}>{distanceLabel}</Text>
+                      </View>
+                      <Text style={styles.nearbyMetaLine} numberOfLines={1}>
+                        {[username, categoryLabel].filter(Boolean).join(' · ') || 'Chưa có username'}
+                      </Text>
+                      <Text style={styles.nearbyAddress} numberOfLines={2}>
+                        {systemAddress}
+                      </Text>
+                      <Text style={styles.nearbyStats} numberOfLines={1}>
+                        {productCount} sản phẩm · {reviewCount} đánh giá
                       </Text>
                     </View>
-                  )}
-                  <Text style={styles.nearbyName} numberOfLines={2}>
-                    {restaurant.name}
-                  </Text>
-                </Pressable>
-              )}
+                  </Pressable>
+                );
+              }}
             />
           ) : null}
-        </View>
-      )}
-    </View>
+          </View>
+        </>
+      </View>
     );
   }
 
@@ -730,6 +1076,7 @@ export default function MapScreen({
         visible={Boolean(dealModal)}
         product={dealModal?.product}
         store={dealModal?.store}
+        preselectedVariantId={dealModal?.preselectedVariantId}
         onClose={() => setDealModal(null)}
         onSuccess={() => setDealModal(null)}
       />
@@ -737,6 +1084,7 @@ export default function MapScreen({
         visible={Boolean(reserveModal)}
         product={reserveModal?.product}
         store={reserveModal?.store}
+        preselectedVariantId={reserveModal?.preselectedVariantId}
         onClose={() => setReserveModal(null)}
         onSuccess={() => setReserveModal(null)}
       />
@@ -752,21 +1100,57 @@ const styles = StyleSheet.create({
   mapArea: {
     flex: 1,
     position: 'relative',
+    minHeight: 0,
   },
   searchOverlay: {
     position: 'absolute',
-    top: 8,
+    top: 4,
     left: 0,
     right: 0,
     zIndex: 15,
   },
-  nearbyPanel: {
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 14,
+  },
+  searchBarWrap: {
     flex: 1,
+    minWidth: 0,
+  },
+  nearbyPanel: {
+    minHeight: 0,
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 8,
+  },
+  panelResizeHandleWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: PANEL_HANDLE_HEIGHT,
+    marginTop: -10,
+    zIndex: 25,
+  },
+  panelResizeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  panelResizeButtonPressed: {
+    opacity: 0.82,
   },
   nearbyTitle: {
     fontSize: 12,
@@ -777,51 +1161,84 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   nearbyList: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingBottom: 8,
-  },
-  nearbyRow: {
     gap: 8,
-    marginBottom: 8,
   },
   nearbyCard: {
-    flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    padding: 8,
+    borderRadius: 12,
+    padding: 10,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    gap: 8,
-    minHeight: 56,
+    gap: 10,
   },
   nearbyCardPressed: {
     opacity: 0.85,
     backgroundColor: '#f0fdfa',
   },
   nearbyThumb: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+    width: 56,
+    height: 56,
+    borderRadius: 10,
     backgroundColor: '#e2e8f0',
   },
   nearbyThumbPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
+    width: 56,
+    height: 56,
+    borderRadius: 10,
     backgroundColor: '#ccfbf1',
     alignItems: 'center',
     justifyContent: 'center',
   },
   nearbyThumbEmoji: {
-    fontSize: 20,
+    fontSize: 24,
+  },
+  nearbyCardBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  nearbyCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   nearbyName: {
     flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    lineHeight: 18,
+  },
+  nearbyDistance: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0f766e',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  nearbyMetaLine: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0f766e',
+    lineHeight: 16,
+  },
+  nearbyAddress: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 16,
+  },
+  nearbyStats: {
+    marginTop: 2,
     fontSize: 12,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#334155',
     lineHeight: 16,
   },
   mapFab: {
@@ -844,7 +1261,22 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   settingsFab: {
+    position: 'absolute',
     top: '42%',
+    right: 14,
+    marginTop: -22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 6,
+    zIndex: 30,
   },
   settingsFabActive: {
     backgroundColor: '#0f766e',
@@ -859,9 +1291,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   recenterButton: {
-    position: 'absolute',
-    right: 14,
-    bottom: 14,
     minHeight: 38,
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -873,28 +1302,103 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 4,
     elevation: 5,
-    zIndex: 20,
+    flexShrink: 0,
   },
   recenterButtonText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '800',
   },
-  filterPanel: {
+  locationBar: {
     position: 'absolute',
-    right: 66,
-    top: '24%',
-    width: 240,
-    maxHeight: '52%',
+    left: 14,
+    right: 14,
+    bottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    zIndex: 20,
+  },
+  locationBarText: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: 'rgba(255,255,255,0.94)',
     borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    color: '#334155',
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '600',
+  },
+  inlineFilterPanel: {
+    position: 'absolute',
+    top: 56,
+    left: 18,
+    right: 64,
+    bottom: 74,
+    borderRadius: 16,
     backgroundColor: '#ffffff',
-    padding: 12,
+    padding: 14,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 10,
     elevation: 8,
-    zIndex: 25,
+    zIndex: 28,
+  },
+  filterPanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  filterCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
+  },
+  filterCloseButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  categoryOptionRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minWidth: 0,
+  },
+  categoryOptionImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+  },
+  categoryOptionImagePlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  categoryOptionEmoji: {
+    fontSize: 18,
+  },
+  categoryOptionName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334155',
   },
   menuHeader: {
     fontSize: 15,
@@ -997,6 +1501,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f1f5f9',
+  },
+  directionsSecondaryBtnFull: {
+    flex: 1,
   },
   directionsSecondaryText: {
     color: '#475569',

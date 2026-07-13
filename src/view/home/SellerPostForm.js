@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 52,
+    paddingTop: 12,
     paddingBottom: 32,
   },
   header: {
@@ -665,6 +665,7 @@ const styles = StyleSheet.create({
   },
   thumbnailWrap: {
     position: 'relative',
+    overflow: 'visible',
   },
   thumbnailImage: {
     width: 120,
@@ -698,10 +699,14 @@ const styles = StyleSheet.create({
   },
   imageRow: {
     flexGrow: 0,
+    paddingTop: 8,
+    paddingRight: 8,
+    paddingBottom: 4,
   },
   imageThumbWrap: {
     position: 'relative',
     marginRight: 10,
+    overflow: 'visible',
   },
   imageThumb: {
     width: 88,
@@ -713,18 +718,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -6,
     right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#ef4444',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    zIndex: 2,
   },
   removeImageText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '900',
-    lineHeight: 16,
+    lineHeight: 18,
+    marginTop: -1,
   },
   addImageButton: {
     width: 88,

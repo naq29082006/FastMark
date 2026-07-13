@@ -19,6 +19,7 @@ const ProductVariantSchema = new mongoose.Schema({
   VariantName: { type: String, required: true, trim: true },
   Price: { type: Number, required: true, min: 0 },
   Quantity: { type: Number, required: true, min: 0, default: 0 },
+  SoldCount: { type: Number, default: 0, min: 0 },
   Images: { type: [VariantImageSchema], default: [] },
 
   Status: { type: Number, default: 1 },
