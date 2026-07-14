@@ -39,6 +39,40 @@ export async function getProductCategoriesOnBackend() {
   })).filter((category) => category.id && category.categoryName);
 }
 
+export async function discoverProductsOnBackend({
+  latitude,
+  longitude,
+  radiusMeters = 5000,
+  categoryId = '',
+  search = '',
+  limit = 80,
+}) {
+  const params = new URLSearchParams({
+    lat: String(latitude),
+    lng: String(longitude),
+    radius: String(radiusMeters),
+    limit: String(limit),
+  });
+
+  const trimmedSearch = String(search || '').trim();
+  const trimmedCategoryId = String(categoryId || '').trim();
+  if (trimmedSearch) {
+    params.set('search', trimmedSearch);
+  }
+  if (trimmedCategoryId) {
+    params.set('categoryId', trimmedCategoryId);
+  }
+
+  const response = await apiRequest(
+    `${API_ENDPOINTS.productsDiscover}?${params.toString()}`,
+    { method: 'GET' },
+    AUTH_TIMEOUT_MS
+  );
+
+  const payload = await parseApiResponse(response);
+  return payload.data?.products || [];
+}
+
 export async function getShopCategoriesOnBackend() {
   const response = await apiRequest(
     API_ENDPOINTS.shopCategories,

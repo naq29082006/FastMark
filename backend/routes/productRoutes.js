@@ -7,6 +7,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const router = express.Router();
 
 router.get("/categories", asyncHandler(productController.listCategories));
+router.get("/discover", asyncHandler(productController.discoverProducts));
 
 router.get(
   "/mine/:id",

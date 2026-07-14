@@ -1,5 +1,6 @@
 const FavoriteProduct = require("../models/FavoriteProduct");
 const Product = require("../models/Product");
+const ProductVariant = require("../models/ProductVariant");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
 const { PRODUCT_STATUS } = require("../constants/productStatus");
@@ -35,9 +36,8 @@ function pickShopLocation(shop) {
   return address;
 }
 
-function toClientFavorite({ favorite, product, shop, seller }) {
-  const variants = product?.variants || [];
-  const prices = variants.map((variant) => Number(variant.price) || 0);
+function toClientFavorite({ favorite, product, shop, seller, isUnavailable = false, variants = [] }) {
+  const prices = variants.map((variant) => Number(variant.Price ?? variant.price) || 0);
   const minPrice =
     prices.length > 0
       ? Math.min(...prices)
@@ -46,6 +46,17 @@ function toClientFavorite({ favorite, product, shop, seller }) {
     prices.length > 0
       ? Math.max(...prices)
       : Number(product?.maxPrice ?? product?.MaxPrice) || minPrice;
+
+  const status =
+    typeof product?.Status === "number"
+      ? product.Status
+      : PRODUCT_STATUS.ACTIVE;
+
+  const remainingQuantity = variants.reduce(
+    (sum, variant) => sum + Math.max(0, Number(variant.Quantity ?? variant.quantity) || 0),
+    0
+  );
+  const isOutOfStock = variants.length > 0 && remainingQuantity <= 0;
 
   return {
     id: String(favorite._id),
@@ -59,6 +70,15 @@ function toClientFavorite({ favorite, product, shop, seller }) {
     location: pickShopLocation(shop),
     shopName: pickString(shop?.shopName) || pickString(seller?.UserName) || "Gian hàng",
     savedAt: favorite.CreatedAt,
+    status,
+    isUnavailable: Boolean(isUnavailable) || status === PRODUCT_STATUS.HIDDEN,
+    isOutOfStock: Boolean(isUnavailable) ? false : isOutOfStock,
+    remainingQuantity,
+    variantCount: variants.length,
+    variants: variants.map((variant) => ({
+      id: String(variant._id || variant.id || ""),
+      quantity: Math.max(0, Number(variant.Quantity ?? variant.quantity) || 0),
+    })),
   };
 }
 
@@ -80,8 +100,18 @@ async function listFavorites(user) {
   }
 
   const productIds = rows.map((row) => row.productId);
-  const products = await Product.find(activeProductFilter({ _id: { $in: productIds } })).lean();
+  const products = await Product.find({ _id: { $in: productIds } }).lean();
   const productById = new Map(products.map((product) => [String(product._id), product]));
+
+  const variants = await ProductVariant.find({ ProductId: { $in: productIds } }).lean();
+  const variantsByProduct = variants.reduce((map, variant) => {
+    const key = String(variant.ProductId);
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(variant);
+    return map;
+  }, new Map());
 
   const shopIds = [...new Set(products.map((product) => String(product.ShopId)).filter(Boolean))];
   const shops = shopIds.length
@@ -97,11 +127,30 @@ async function listFavorites(user) {
     .map((favorite) => {
       const product = productById.get(String(favorite.productId));
       if (!product) {
-        return null;
+        return toClientFavorite({
+          favorite,
+          product: {
+            _id: favorite.productId,
+            ProductName: "Sản phẩm",
+            Status: PRODUCT_STATUS.HIDDEN,
+          },
+          shop: null,
+          seller: null,
+          isUnavailable: true,
+        });
       }
       const shop = shopById.get(String(product.ShopId));
       const seller = shop ? sellerById.get(String(shop.userId)) : null;
-      return toClientFavorite({ favorite, product, shop, seller });
+      const isUnavailable =
+        Number(product.Status) === PRODUCT_STATUS.HIDDEN || Boolean(product.IsDeleted);
+      return toClientFavorite({
+        favorite,
+        product,
+        shop,
+        seller,
+        isUnavailable,
+        variants: variantsByProduct.get(String(product._id)) || [],
+      });
     })
     .filter(Boolean);
 }
@@ -117,12 +166,26 @@ async function addFavorite(user, productId) {
     throw createServiceError("Không tìm thấy sản phẩm.", 404);
   }
 
+  const existing = await FavoriteProduct.findOne({
+    userId: user._id,
+    productId: product._id,
+  });
+  if (existing) {
+    const shop = await ShopProfile.findById(product.ShopId).lean();
+    const seller = shop?.userId ? await User.findById(shop.userId).lean() : null;
+    return toClientFavorite({ favorite: existing, product, shop, seller });
+  }
+
   const now = new Date();
-  const favorite = await FavoriteProduct.findOneAndUpdate(
-    { userId: user._id, productId: product._id },
-    { $set: { UpdatedAt: now }, $setOnInsert: { CreatedAt: now } },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+  const favorite = await FavoriteProduct.create({
+    userId: user._id,
+    productId: product._id,
+    CreatedAt: now,
+    UpdatedAt: now,
+  });
+
+  await Product.findByIdAndUpdate(product._id, { $inc: { LikeCount: 1 } });
+  product.LikeCount = Math.max(0, Number(product.LikeCount) || 0) + 1;
 
   const shop = await ShopProfile.findById(product.ShopId).lean();
   const seller = shop?.userId ? await User.findById(shop.userId).lean() : null;
@@ -144,6 +207,11 @@ async function removeFavorite(user, productId) {
   if (!result) {
     throw createServiceError("Sản phẩm chưa có trong danh sách yêu thích.", 404);
   }
+
+  await Product.updateOne(
+    { _id: normalizedId, LikeCount: { $gt: 0 } },
+    { $inc: { LikeCount: -1 } }
+  );
 
   return { productId: normalizedId };
 }

@@ -19,8 +19,10 @@ const ReservationSchema = new mongoose.Schema({
   confirmedAt: Date,
   completedAt: Date,
   cancelledAt: Date,
+  cancelReason: String,
   buyerPriceAcceptedAt: Date,
   cancelLockedAt: Date,
+  inventoryHeld: { type: Boolean, default: false },
 
   CreatedAt: { type: Date, default: Date.now },
   UpdatedAt: { type: Date, default: Date.now },

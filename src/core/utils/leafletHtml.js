@@ -85,7 +85,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       .shop-marker {
         width: 36px;
         height: 36px;
-        border-radius: 10px;
+        border-radius: 999px;
         border: 1px solid #e2e8f0;
         background: #f8fafc;
         box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
@@ -98,16 +98,17 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       .shop-marker img {
         width: 36px;
         height: 36px;
-        object-fit: contain;
+        object-fit: cover;
         object-position: center;
         display: block;
         background: #f8fafc;
+        border-radius: 999px;
       }
 
       .shop-marker-emoji {
         width: 36px;
         height: 36px;
-        border-radius: 10px;
+        border-radius: 999px;
         border: 1px solid #e2e8f0;
         background: #f1f5f9;
         box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
@@ -528,7 +529,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           return (
             '<div class="shop-marker">' +
             '<img src="' + escapeHtmlAttr(iconValue) + '" alt="" ' +
-            'style="width:36px;height:36px;object-fit:contain;object-position:center;display:block;background:#f8fafc;" />' +
+            'style="width:36px;height:36px;object-fit:cover;object-position:center;display:block;background:#f8fafc;border-radius:999px;" />' +
             '</div>'
           );
         }

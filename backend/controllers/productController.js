@@ -63,3 +63,23 @@ exports.listCategories = async (req, res) => {
     data: { categories },
   });
 };
+
+exports.discoverProducts = async (req, res) => {
+  const shopDiscoveryService = require("../services/shopDiscoveryService");
+  const products = await shopDiscoveryService.discoverProducts({
+    latitude: req.query.lat ?? req.query.latitude,
+    longitude: req.query.lng ?? req.query.longitude,
+    radiusMeters: req.query.radius ?? req.query.radiusMeters ?? 5000,
+    categoryId:
+      req.query.categoryId ?? req.query.productCategoryId ?? req.query.product_category_id ?? "",
+    search: req.query.search ?? req.query.q ?? req.query.product ?? "",
+    limit: req.query.limit ?? 80,
+  });
+
+  return success(res, {
+    data: {
+      products,
+      count: products.length,
+    },
+  });
+};

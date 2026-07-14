@@ -171,11 +171,19 @@ function toPublicProduct(product, variants = [], category = null) {
     maxPrice = Math.max(...prices);
   }
 
+  const status =
+    typeof product.Status === "number"
+      ? product.Status
+      : product.IsDeleted
+        ? PRODUCT_STATUS.HIDDEN
+        : PRODUCT_STATUS.ACTIVE;
+
   return {
     id: product._id,
     shopId: product.ShopId,
     categoryId: product.CategoryId,
     categoryName: category?.name || category?.categoryName || product.CategoryName || "",
+    categoryIcon: String(category?.icon || "").trim(),
     productName: product.ProductName,
     description: product.Description || "",
     donVi: product.DonVi || "",
@@ -184,12 +192,8 @@ function toPublicProduct(product, variants = [], category = null) {
     likeCount: product.LikeCount || 0,
     soldCount: product.SoldCount || 0,
     isOutOfStock,
-    status:
-      typeof product.Status === "number"
-        ? product.Status
-        : product.IsDeleted
-          ? PRODUCT_STATUS.HIDDEN
-          : PRODUCT_STATUS.ACTIVE,
+    status,
+    isUnavailable: status === PRODUCT_STATUS.HIDDEN,
     minPrice,
     maxPrice: maxPrice || minPrice,
     variants: normalizedVariants,
@@ -368,7 +372,11 @@ async function listMyProducts(user) {
 }
 
 async function getProductById(productId) {
-  const product = await Product.findOne(activeProductFilter({ _id: productId }));
+  const product = await Product.findByIdAndUpdate(
+    productId,
+    { $inc: { ViewCount: 1 } },
+    { new: true }
+  );
   if (!product) {
     throw createServiceError("Không tìm thấy sản phẩm.", 404);
   }

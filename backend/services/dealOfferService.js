@@ -6,6 +6,7 @@ const User = require("../models/User");
 const { DEAL_OFFER_STATUS } = require("../constants/dealOfferStatus");
 const { MESSAGE_TYPE } = require("../constants/messageType");
 const { formatSellerCounterMessageContent } = require("../utils/offerMessageFormat");
+const { resolveDealMoney } = require("../utils/dealPricing");
 const { getShopForSeller } = require("./shopSettingsService");
 const { createNotification } = require("./notificationService");
 const messageService = require("./messageService");
@@ -43,6 +44,7 @@ async function listSellerDeals(user, { status } = {}) {
     status: deal.status,
     originalPrice: deal.originalPrice || 0,
     offeredPrice: deal.offeredPrice || 0,
+    quantity: Number(deal.quantity) || 1,
     sellerCounterPrice: deal.sellerCounterPrice || null,
     discountPercent: deal.discountPercent || 0,
     note: deal.note || "",
@@ -68,7 +70,7 @@ async function acceptDealOffer(user, dealId) {
     throw createServiceError("Biến thể sản phẩm không tồn tại.");
   }
 
-  const finalPrice = deal.offeredPrice;
+  const finalPrice = resolveDealMoney(deal).agreedTotal;
   const now = new Date();
 
   deal.status = DEAL_OFFER_STATUS.ACCEPTED;
@@ -81,7 +83,7 @@ async function acceptDealOffer(user, dealId) {
   if (buyer) {
     await createNotification(buyer._id, {
       title: "Shop chấp nhận deal giá",
-      content: `Shop đã chấp nhận mức giá ${Number(finalPrice).toLocaleString("vi-VN")}đ. Hãy chọn giờ lấy hàng trong mục Đơn hàng.`,
+      content: `Shop đã chấp nhận mức giá ${Number(finalPrice).toLocaleString("vi-VN")}đ. Hãy giữ hàng hoặc deal giá lại trong mục Đơn hàng.`,
     });
   }
 
@@ -117,12 +119,13 @@ async function rejectDealOffer(user, dealId, { reason } = {}) {
 
 async function sendSellerCounterChatMessage(sellerUser, shop, deal) {
   const product = await Product.findById(deal.productId);
+  const money = resolveDealMoney(deal);
   const content = formatSellerCounterMessageContent({
     productName: product?.ProductName || "",
-    originalPrice: deal.originalPrice,
-    offeredPrice: deal.offeredPrice,
-    sellerCounterPrice: deal.sellerCounterPrice,
-    quantity: deal.quantity || 1,
+    originalPrice: money.originalTotal,
+    offeredPrice: money.offeredTotal,
+    sellerCounterPrice: money.sellerCounterTotal,
+    quantity: money.qty,
     note: deal.sellerNote || "",
   });
 
@@ -165,12 +168,14 @@ async function counterDealOffer(user, dealId, payload) {
     throw createServiceError("Giá đề xuất không hợp lệ.");
   }
 
-  if (counterPrice <= deal.offeredPrice) {
-    throw createServiceError("Giá đề xuất phải cao hơn giá khách đề nghị.");
+  const money = resolveDealMoney(deal);
+
+  if (counterPrice <= money.offeredTotal) {
+    throw createServiceError("Giá đề xuất phải cao hơn tổng giá khách đề nghị.");
   }
 
-  if (counterPrice >= deal.originalPrice) {
-    throw createServiceError("Giá đề xuất phải thấp hơn giá niêm yết.");
+  if (counterPrice >= money.originalTotal) {
+    throw createServiceError("Giá đề xuất phải thấp hơn tổng niêm yết.");
   }
 
   const now = new Date();
@@ -184,7 +189,7 @@ async function counterDealOffer(user, dealId, payload) {
   if (buyer) {
     await createNotification(buyer._id, {
       title: "Shop trả giá",
-      content: `Shop đề xuất mức giá ${Number(counterPrice).toLocaleString("vi-VN")}đ. Bạn có thể chấp nhận hoặc đề nghị lại trong mục Đơn hàng.`,
+      content: `Shop đề xuất tổng ${Number(counterPrice).toLocaleString("vi-VN")}đ. Bạn có thể chấp nhận hoặc đề nghị lại trong mục Đơn hàng.`,
     });
   }
 

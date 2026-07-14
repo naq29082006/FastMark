@@ -16,6 +16,7 @@ import { createBuyerReservationOnBackend } from '../../api/buyerOpsApi';
 import { formatPrice } from '../../core/utils/productFormat';
 import { formatPickupInputs, parsePickupInputs } from '../../core/utils/pickupDateTime';
 import SelectedVariantCard from './SelectedVariantCard';
+import QuantityStepper from './QuantityStepper';
 
 function buildDefaultPickupDate() {
   const d = new Date();
@@ -35,12 +36,15 @@ export default function ReservationModal({
   store,
   dealOfferId,
   agreedPrice,
+  agreedTotal,
+  lockedQuantity,
   preselectedVariantId = null,
   onClose,
   onSuccess,
 }) {
   const insets = useSafeAreaInsets();
   const hasPresetVariant = Boolean(preselectedVariantId);
+  const isFromDeal = Boolean(dealOfferId);
   const variants = useMemo(() => {
     const list = (product?.variants || []).filter((v) => (v.quantity ?? 0) > 0);
     if (list.length > 0) {
@@ -60,7 +64,7 @@ export default function ReservationModal({
   }, [product]);
 
   const [selectedVariantId, setSelectedVariantId] = useState(null);
-  const [quantity, setQuantity] = useState('1');
+  const [quantity, setQuantity] = useState(1);
   const [dateInput, setDateInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
   const [note, setNote] = useState('');
@@ -68,9 +72,20 @@ export default function ReservationModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedVariant = variants.find((v) => String(v.id) === String(selectedVariantId));
-  const unitPrice = agreedPrice ?? selectedVariant?.price ?? 0;
-  const qtyNum = Number(quantity) || 0;
-  const totalAmount = unitPrice * qtyNum;
+  const maxQty = Math.max(0, Number(selectedVariant?.quantity) || 0);
+  const qtyNum = lockedQuantity != null ? Number(lockedQuantity) || 0 : Number(quantity) || 0;
+  const dealTotal =
+    agreedTotal != null
+      ? Number(agreedTotal) || 0
+      : agreedPrice != null
+        ? (Number(agreedPrice) || 0) * (qtyNum || 1)
+        : 0;
+  const unitPrice = isFromDeal
+    ? qtyNum > 0
+      ? Math.round(dealTotal / qtyNum)
+      : 0
+    : agreedPrice ?? selectedVariant?.price ?? 0;
+  const totalAmount = isFromDeal ? dealTotal : unitPrice * qtyNum;
   const pickupTime = parsePickupInputs(dateInput, timeInput);
 
   const pickupOptions = useMemo(
@@ -87,13 +102,26 @@ export default function ReservationModal({
       return;
     }
     setSelectedVariantId(preselectedVariantId || variants[0]?.id || null);
-    setQuantity('1');
+    setQuantity(lockedQuantity != null ? Number(lockedQuantity) || 1 : 1);
     setNote('');
     setError('');
     const defaults = formatPickupInputs(buildDefaultPickupDate());
     setDateInput(defaults.dateInput);
     setTimeInput(defaults.timeInput);
-  }, [visible, variants, preselectedVariantId]);
+  }, [visible, variants, preselectedVariantId, lockedQuantity]);
+
+  useEffect(() => {
+    if (!selectedVariant || lockedQuantity != null) {
+      return;
+    }
+    const stock = Math.max(0, Number(selectedVariant.quantity) || 0);
+    setQuantity((prev) => {
+      if (stock <= 0) {
+        return 0;
+      }
+      return Math.max(1, Math.min(Number(prev) || 1, stock));
+    });
+  }, [selectedVariantId, selectedVariant?.quantity, lockedQuantity]);
 
   function applyPickupDate(date) {
     const formatted = formatPickupInputs(date);
@@ -162,7 +190,7 @@ export default function ReservationModal({
             <Text style={styles.titleIcon}>{dealOfferId ? '🕐' : '📦'}</Text>
             <View>
               <Text style={styles.title}>
-                {dealOfferId ? 'Chọn giờ lấy hàng' : 'Yêu cầu giữ hàng'}
+                {dealOfferId ? 'Giữ hàng theo deal' : 'Yêu cầu giữ hàng'}
               </Text>
               <Text style={styles.subtitle}>{product?.name || product?.productName}</Text>
             </View>
@@ -170,7 +198,9 @@ export default function ReservationModal({
           {store?.name ? <Text style={styles.shopName}>🏪 {store.name}</Text> : null}
           {dealOfferId ? (
             <View style={styles.dealBadge}>
-              <Text style={styles.dealBadgeText}>Giá đã thỏa thuận: {formatPrice(unitPrice)}</Text>
+              <Text style={styles.dealBadgeText}>
+                Giá đã thỏa thuận: {formatPrice(totalAmount)} ({qtyNum} sp)
+              </Text>
             </View>
           ) : null}
 
@@ -193,24 +223,39 @@ export default function ReservationModal({
                     </Pressable>
                   );
                 })}
+                {selectedVariant ? (
+                  <SelectedVariantCard
+                    variant={selectedVariant}
+                    productThumbnail={product?.thumbnail || ''}
+                  />
+                ) : null}
               </>
             ) : null}
 
-            {!dealOfferId && hasPresetVariant && selectedVariant ? (
+            {(dealOfferId || hasPresetVariant) && selectedVariant ? (
               <SelectedVariantCard
                 variant={selectedVariant}
                 productThumbnail={product?.thumbnail || ''}
               />
             ) : null}
 
+            {selectedVariant && qtyNum > 0 ? (
+              <Text style={styles.totalUnderVariant}>Tổng: {formatPrice(totalAmount)}</Text>
+            ) : null}
+
             <Text style={styles.label}>Số lượng</Text>
-            <TextInput
-              style={styles.input}
-              value={quantity}
-              onChangeText={(value) => setQuantity(value.replace(/\D/g, ''))}
-              keyboardType="number-pad"
-              placeholder="1"
-            />
+            {dealOfferId && lockedQuantity != null ? (
+              <Text style={styles.lockedQty}>{lockedQuantity} sp (theo deal)</Text>
+            ) : (
+              <QuantityStepper
+                value={qtyNum}
+                max={maxQty}
+                onChange={(next) => {
+                  setQuantity(next);
+                  setError('');
+                }}
+              />
+            )}
 
             <Text style={styles.label}>Giờ nhận hàng</Text>
             <View style={styles.datetimeRow}>
@@ -236,6 +281,19 @@ export default function ReservationModal({
               </View>
             </View>
 
+            {pickupTime ? (
+              <Text style={styles.selectedTime}>
+                Đã chọn:{' '}
+                {pickupTime.toLocaleString('vi-VN', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            ) : null}
+
             <Text style={styles.suggestLabel}>Gợi ý nhanh</Text>
             <View style={styles.timeRow}>
               {pickupOptions.map((option) => {
@@ -256,19 +314,6 @@ export default function ReservationModal({
               })}
             </View>
 
-            {pickupTime ? (
-              <Text style={styles.selectedTime}>
-                Đã chọn:{' '}
-                {pickupTime.toLocaleString('vi-VN', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
-            ) : null}
-
             <Text style={styles.label}>Ghi chú (tuỳ chọn)</Text>
             <TextInput
               style={[styles.input, styles.noteInput]}
@@ -278,10 +323,6 @@ export default function ReservationModal({
               placeholder="Yêu cầu đóng gói, ghi chú thêm..."
               placeholderTextColor="#94a3b8"
             />
-
-            {qtyNum > 0 ? (
-              <Text style={styles.totalText}>Tổng tạm tính: {formatPrice(totalAmount)}</Text>
-            ) : null}
 
             {error ? (
               <View style={styles.errorBox}>
@@ -303,7 +344,7 @@ export default function ReservationModal({
                 <ActivityIndicator color="#ffffff" />
               ) : (
                 <Text style={styles.submitBtnText}>
-                  {dealOfferId ? 'Xác nhận giờ lấy' : 'Gửi yêu cầu'}
+                  {dealOfferId ? 'Xác nhận giữ hàng' : 'Gửi yêu cầu'}
                 </Text>
               )}
             </Pressable>
@@ -375,6 +416,12 @@ const styles = StyleSheet.create({
     color: '#b45309',
     fontSize: 12,
     fontWeight: '800',
+  },
+  lockedQty: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+    paddingVertical: 10,
   },
   scroll: {
     marginTop: 16,
@@ -472,9 +519,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f766e',
   },
-  totalText: {
-    marginTop: 12,
-    fontSize: 15,
+  totalUnderVariant: {
+    marginTop: 8,
+    marginBottom: 4,
+    fontSize: 16,
     fontWeight: '900',
     color: '#0f766e',
   },

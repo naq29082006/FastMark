@@ -45,15 +45,24 @@ export async function createBuyerDealOnBackend({
   productId,
   variantId,
   offeredPrice,
+  offeredTotal,
   quantity = 1,
   note,
 }) {
+  const totalOffer = offeredTotal ?? offeredPrice;
   const response = await apiRequest(
     API_ENDPOINTS.buyerDeals,
     {
       method: 'POST',
       headers: await authHeaders(idToken),
-      body: JSON.stringify({ productId, variantId, offeredPrice, quantity, note }),
+      body: JSON.stringify({
+        productId,
+        variantId,
+        offeredPrice: totalOffer,
+        offeredTotal: totalOffer,
+        quantity: Number(quantity) || 1,
+        note,
+      }),
     },
     AUTH_TIMEOUT_MS
   );
@@ -152,9 +161,27 @@ export async function completeBuyerReservationOnBackend(idToken, reservationId) 
   return payload.data?.reservation;
 }
 
-export async function getBuyerReservationOnBackend(idToken, reservationId) {
+export async function getBuyerDealOnBackend(idToken, dealId) {
+  const id = encodeURIComponent(String(dealId || '').trim());
+  if (!id) {
+    throw new Error('Không tìm thấy mã deal.');
+  }
   const response = await apiRequest(
-    API_ENDPOINTS.buyerReservation(reservationId),
+    API_ENDPOINTS.buyerDeal(id),
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.deal;
+}
+
+export async function getBuyerReservationOnBackend(idToken, reservationId) {
+  const id = encodeURIComponent(String(reservationId || '').trim());
+  if (!id) {
+    throw new Error('Không tìm thấy mã đơn giữ hàng.');
+  }
+  const response = await apiRequest(
+    API_ENDPOINTS.buyerReservation(id),
     { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
     AUTH_TIMEOUT_MS
   );

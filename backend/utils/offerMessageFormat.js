@@ -14,8 +14,8 @@ function formatOfferMessageContent({
     "💰 Đề nghị deal giá",
     productName ? `Sản phẩm: ${productName}` : "",
     `Số lượng: ${quantity}`,
-    `Giá gốc: ${formatPriceVnd(originalPrice)}`,
-    `Giá đề nghị: ${formatPriceVnd(offeredPrice)}`,
+    `Tổng niêm yết: ${formatPriceVnd(originalPrice)}`,
+    `Tổng đề nghị: ${formatPriceVnd(offeredPrice)}`,
     `Giảm: ${discountPercent || 0}%`,
   ].filter(Boolean);
 
@@ -39,9 +39,9 @@ function formatBuyerCounterMessageContent({
     "💰 Khách trả giá lại",
     productName ? `Sản phẩm: ${productName}` : "",
     `Số lượng: ${quantity}`,
-    `Giá gốc: ${formatPriceVnd(originalPrice)}`,
+    `Tổng niêm yết: ${formatPriceVnd(originalPrice)}`,
     `Shop đề xuất: ${formatPriceVnd(sellerCounterPrice)}`,
-    `Giá đề nghị mới: ${formatPriceVnd(offeredPrice)}`,
+    `Tổng đề nghị mới: ${formatPriceVnd(offeredPrice)}`,
     `Giảm: ${discountPercent || 0}%`,
   ].filter(Boolean);
 
@@ -64,9 +64,9 @@ function formatSellerCounterMessageContent({
     "🏪 Shop trả giá",
     productName ? `Sản phẩm: ${productName}` : "",
     `Số lượng: ${quantity}`,
-    `Giá gốc: ${formatPriceVnd(originalPrice)}`,
+    `Tổng niêm yết: ${formatPriceVnd(originalPrice)}`,
     `Khách đề nghị: ${formatPriceVnd(offeredPrice)}`,
-    `Giá shop đề xuất: ${formatPriceVnd(sellerCounterPrice)}`,
+    `Shop đề xuất: ${formatPriceVnd(sellerCounterPrice)}`,
   ].filter(Boolean);
 
   if (note) {

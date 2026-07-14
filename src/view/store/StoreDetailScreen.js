@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   loadProductsByStoreId,
@@ -24,14 +25,15 @@ import {
 } from '../../api/favoriteApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { formatPriceRange } from '../../core/utils/productFormat';
+import { getProductImageOverlayLabel } from '../../core/utils/productAvailability';
+import { formatDistance, calculateDistanceMeters, hasValidLocation } from '../../core/utils/geo';
+import { storeLogger as log } from '../../core/utils/logger';
+import CircularBackButton from '../shared/components/CircularBackButton';
+import FollowConnectionsScreen from '../profile/FollowConnectionsScreen';
 import ContactActions from './components/ContactActions';
 import StarRating from './components/StarRating';
 import ReportSheet from '../shared/components/ReportSheet';
-import CircularBackButton from '../shared/components/CircularBackButton';
-import FollowConnectionsScreen from '../profile/FollowConnectionsScreen';
-import { formatPriceRange } from '../../core/utils/productFormat';
-import { formatDistance, calculateDistanceMeters, hasValidLocation } from '../../core/utils/geo';
-import { storeLogger as log } from '../../core/utils/logger';
 const TABS = [
   { key: 'products', label: 'Sản phẩm' },
   { key: 'reviews', label: 'Đánh giá' },
@@ -208,12 +210,30 @@ export default function StoreDetailScreen({
     const wasLiked = Boolean(likedProducts[normalizedId]);
 
     setLikedProducts((prev) => ({ ...prev, [normalizedId]: !wasLiked }));
+    setProducts((prev) =>
+      prev.map((item) => {
+        if (String(item.id) !== normalizedId) {
+          return item;
+        }
+        const nextCount = Math.max(0, (Number(item.likeCount) || 0) + (wasLiked ? -1 : 1));
+        return { ...item, likeCount: nextCount };
+      })
+    );
 
     try {
       const idToken = await getCurrentUserIdToken();
       if (!idToken) {
         setLikedProducts((prev) => ({ ...prev, [normalizedId]: wasLiked }));
-        Alert.alert('Đăng nhập', 'Vui lòng đăng nhập để lưu sản phẩm yêu thích.');
+        setProducts((prev) =>
+          prev.map((item) => {
+            if (String(item.id) !== normalizedId) {
+              return item;
+            }
+            const nextCount = Math.max(0, (Number(item.likeCount) || 0) + (wasLiked ? 1 : -1));
+            return { ...item, likeCount: nextCount };
+          })
+        );
+        Alert.alert('Đăng nhập', 'Vui lòng đăng nhập để thích sản phẩm.');
         return;
       }
 
@@ -224,6 +244,15 @@ export default function StoreDetailScreen({
       }
     } catch {
       setLikedProducts((prev) => ({ ...prev, [normalizedId]: wasLiked }));
+      setProducts((prev) =>
+        prev.map((item) => {
+          if (String(item.id) !== normalizedId) {
+            return item;
+          }
+          const nextCount = Math.max(0, (Number(item.likeCount) || 0) + (wasLiked ? 1 : -1));
+          return { ...item, likeCount: nextCount };
+        })
+      );
     }
   };
   useEffect(() => {
@@ -466,40 +495,58 @@ export default function StoreDetailScreen({
             {products.length === 0 ? (
               <Text style={styles.emptyText}>Chưa có sản phẩm nào</Text>
             ) : (
-              products.map((product) => (
+              products.map((product) => {
+                const overlayLabel = getProductImageOverlayLabel(product);
+
+                return (
                 <Pressable
                   key={product.id}
                   style={({ pressed }) => [styles.productCard, pressed && styles.pressed]}
                   onPress={() => onProductPress?.(product.id)}
                 >
-                  <View style={styles.productImage}>
-                    {product.thumbnail ? (
-                      <Image source={{ uri: product.thumbnail }} style={styles.productThumb} />
-                    ) : (
-                      <Text style={styles.productEmoji}>{product.image_emoji}</Text>
-                    )}
+                  <View style={styles.productImageWrap}>
+                    <View style={styles.productImage}>
+                      {product.thumbnail ? (
+                        <Image source={{ uri: product.thumbnail }} style={styles.productThumb} />
+                      ) : (
+                        <View style={styles.productEmojiWrap}>
+                          <Text style={styles.productEmoji}>{product.image_emoji}</Text>
+                        </View>
+                      )}
+                      {overlayLabel ? (
+                        <View style={styles.soldOutMask} pointerEvents="none">
+                          <Text style={styles.soldOutText}>{overlayLabel}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                     <Pressable
                       onPress={() => toggleLikeProduct(product.id)}
                       hitSlop={8}
-                      style={styles.productLikeBtn}
+                      style={styles.productLikeBadge}
                     >
-                      <Text style={styles.productLikeIcon}>
-                        {likedProducts[product.id] ? '❤️' : '🤍'}
-                      </Text>
+                      <Ionicons
+                        name={likedProducts[product.id] ? 'heart' : 'heart-outline'}
+                        size={14}
+                        color={likedProducts[product.id] ? '#ef4444' : '#64748b'}
+                      />
+                      <Text style={styles.productLikeCount}>{Number(product.likeCount) || 0}</Text>
                     </Pressable>
                   </View>
-                  <Text style={styles.productName} numberOfLines={2}>
-                    {product.name}
-                  </Text>
-                  <Text style={styles.productPrice}>
-                    {formatPriceRange(
-                      product.minPrice ?? product.price,
-                      product.maxPrice ?? product.price
-                    )}
-                  </Text>
-                  <Text style={styles.productSold}>Đã bán: {product.soldCount || 0}</Text>
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productName} numberOfLines={2}>
+                      {product.name}
+                    </Text>
+                    <Text style={styles.productPrice} numberOfLines={1}>
+                      {formatPriceRange(
+                        product.minPrice ?? product.price,
+                        product.maxPrice ?? product.price
+                      )}
+                    </Text>
+                    <Text style={styles.productSold}>Đã bán: {product.soldCount || 0}</Text>
+                  </View>
                 </Pressable>
-              ))
+                );
+              })
             )}
           </View>
         ) : (
@@ -830,56 +877,93 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.85,
   },
-  productImage: {
-    height: 110,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
+  productImageWrap: {
     position: 'relative',
+    width: '100%',
+  },
+  productImage: {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
   },
   productThumb: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
-  productLikeBtn: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+  productEmojiWrap: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  productLikeIcon: {
+  soldOutMask: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  soldOutText: {
+    color: '#ffffff',
     fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  productLikeBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 6,
+    elevation: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  productLikeCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
   },
   productEmoji: {
     fontSize: 40,
+  },
+  productInfo: {
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   productName: {
     fontSize: 13,
     fontWeight: '700',
     color: '#0f172a',
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    minHeight: 36,
+    marginBottom: 3,
   },
   productPrice: {
-    fontSize: 15,
-    fontWeight: '900',
+    fontSize: 11,
+    fontWeight: '800',
     color: '#0d7377',
-    paddingHorizontal: 10,
-    paddingTop: 4,
+    marginBottom: 3,
   },
   productSold: {
     fontSize: 11,
     color: '#94a3b8',
     fontWeight: '600',
-    paddingHorizontal: 10,
-    paddingTop: 2,
-    paddingBottom: 8,
   },
   reviewsList: {
     paddingHorizontal: 16,

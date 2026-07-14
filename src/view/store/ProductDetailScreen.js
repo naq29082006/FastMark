@@ -12,12 +12,22 @@ import {
   View,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
+
 import { formatPrice, formatPriceRange } from '../../core/utils/productFormat';
+import {
+  addFavoriteProductOnBackend,
+  getFavoriteProductIdsOnBackend,
+  removeFavoriteProductOnBackend,
+} from '../../api/favoriteApi';
 import { loadProductById, loadStoreById } from '../../viewmodel/store/storeViewModel';
 import { submitReportOnBackend } from '../../api/reportApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import DealOfferModal from '../buyer/DealOfferModal';
+import ReservationModal from '../buyer/ReservationModal';
 import ReportSheet from '../shared/components/ReportSheet';
+import OutOfStockOverlay from '../shared/components/OutOfStockOverlay';
 import CircularBackButton from '../shared/components/CircularBackButton';
 import { storeLogger as log } from '../../core/utils/logger';
 
@@ -30,6 +40,10 @@ const VARIANT_TILE_WIDTH =
 function getVariantThumb(variant, fallback = '') {
   const firstImage = (variant?.images || []).find((image) => image?.imageUrl);
   return firstImage?.imageUrl || fallback;
+}
+
+function isRemoteIcon(value) {
+  return /^https?:\/\//i.test(String(value || '').trim());
 }
 
 export default function ProductDetailScreen({
@@ -48,8 +62,12 @@ export default function ProductDetailScreen({
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [dealModalVisible, setDealModalVisible] = useState(false);
+  const [reserveModalVisible, setReserveModalVisible] = useState(false);
+  const [actionVariantId, setActionVariantId] = useState(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -63,6 +81,7 @@ export default function ProductDetailScreen({
       .then(async (productData) => {
         if (!isCurrent) return;
         setProduct(productData);
+        setLikeCount(Number(productData?.likeCount) || 0);
         if (productData?.store_id) {
           const storeData = await loadStoreById(productData.store_id);
           if (isCurrent) setStore(storeData);
@@ -84,10 +103,35 @@ export default function ProductDetailScreen({
     };
   }, [productId]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadFavoriteState() {
+      try {
+        const idToken = await getCurrentUserIdToken();
+        if (!idToken || !active) {
+          return;
+        }
+        const productIds = await getFavoriteProductIdsOnBackend(idToken);
+        if (!active) {
+          return;
+        }
+        setIsLiked((productIds || []).some((id) => String(id) === String(productId)));
+      } catch {
+        // Ignore favorite preload errors.
+      }
+    }
+
+    loadFavoriteState();
+    return () => {
+      active = false;
+    };
+  }, [productId]);
+
   const variants = product?.variants || [];
 
   const selectedVariant = useMemo(
-    () => variants.find((variant) => variant.id === selectedVariantId) || null,
+    () => variants.find((variant) => String(variant.id) === String(selectedVariantId)) || null,
     [variants, selectedVariantId]
   );
 
@@ -158,32 +202,99 @@ export default function ProductDetailScreen({
   }, [product, selectedVariant]);
 
   function handleSelectVariant(variant) {
-    if (selectedVariantId === variant.id) {
+    if (product?.isUnavailable) {
+      return;
+    }
+    if ((Number(variant.quantity) || 0) <= 0) {
+      return;
+    }
+
+    if (String(selectedVariantId) === String(variant.id)) {
       setSelectedVariantId(null);
       setActiveImageIndex(0);
       galleryRef.current?.scrollToOffset({ offset: 0, animated: false });
       return;
     }
 
-    setSelectedVariantId(variant.id);
+    setSelectedVariantId(String(variant.id));
     setActiveImageIndex(0);
     galleryRef.current?.scrollToOffset({ offset: 0, animated: false });
   }
 
-  function handleReservePress() {
-    if (requiresVariantSelection && !selectedVariant) {
+  function resolveActionVariant() {
+    if (selectedVariant) {
+      return selectedVariant;
+    }
+    return null;
+  }
+
+  function openReserveFlow() {
+    if (product?.isUnavailable || Number(product?.status) === 0) {
+      Alert.alert('Không có sẵn', 'Sản phẩm này đã bị người bán xóa hoặc ẩn.');
+      return;
+    }
+    const variantForAction = resolveActionVariant();
+    if (requiresVariantSelection && !variantForAction) {
       Alert.alert('Chọn biến thể', 'Vui lòng chọn phân loại sản phẩm trước khi giữ hàng.');
       return;
     }
-    onReserve?.(product, store, selectedVariant);
+    if (onReserve) {
+      onReserve(product, store, variantForAction);
+      return;
+    }
+    setActionVariantId(variantForAction?.id || null);
+    setReserveModalVisible(true);
   }
 
-  function handleDealPress() {
-    if (requiresVariantSelection && !selectedVariant) {
+  function openDealFlow() {
+    if (product?.isUnavailable || Number(product?.status) === 0) {
+      Alert.alert('Không có sẵn', 'Sản phẩm này đã bị người bán xóa hoặc ẩn.');
+      return;
+    }
+    const variantForAction = resolveActionVariant();
+    if (requiresVariantSelection && !variantForAction) {
       Alert.alert('Chọn biến thể', 'Vui lòng chọn phân loại sản phẩm trước khi deal giá.');
       return;
     }
-    onDeal?.(product, store, selectedVariant);
+    if (onDeal) {
+      onDeal(product, store, variantForAction);
+      return;
+    }
+    setActionVariantId(variantForAction?.id || null);
+    setDealModalVisible(true);
+  }
+
+  function handleReservePress() {
+    openReserveFlow();
+  }
+
+  function handleDealPress() {
+    openDealFlow();
+  }
+
+  async function handleToggleLike() {
+    const wasLiked = isLiked;
+    setIsLiked(!wasLiked);
+    setLikeCount((current) => Math.max(0, current + (wasLiked ? -1 : 1)));
+
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        setIsLiked(wasLiked);
+        setLikeCount((current) => Math.max(0, current + (wasLiked ? 1 : -1)));
+        Alert.alert('Đăng nhập', 'Vui lòng đăng nhập để thích sản phẩm.');
+        return;
+      }
+
+      if (wasLiked) {
+        await removeFavoriteProductOnBackend(idToken, product.id);
+      } else {
+        await addFavoriteProductOnBackend({ idToken, productId: product.id });
+      }
+    } catch {
+      setIsLiked(wasLiked);
+      setLikeCount((current) => Math.max(0, current + (wasLiked ? 1 : -1)));
+    }
   }
 
   if (loading) {
@@ -231,6 +342,8 @@ export default function ProductDetailScreen({
     }
   }
 
+  const productUnavailable = Boolean(product.isUnavailable) || Number(product.status) === 0;
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -270,14 +383,25 @@ export default function ProductDetailScreen({
             </View>
           )}
 
+          {productUnavailable ? (
+            <View style={styles.heroOutOfStockOverlay} pointerEvents="none">
+              <OutOfStockOverlay label="Không có sẵn" />
+            </View>
+          ) : null}
+
           {galleryImages.length > 1 ? (
-            <View style={styles.galleryDots}>
-              {galleryImages.map((uri, index) => (
-                <View
-                  key={`${uri}-${index}`}
-                  style={[styles.galleryDot, index === activeImageIndex && styles.galleryDotActive]}
-                />
-              ))}
+            <View style={styles.galleryDotsWrap}>
+              <View style={styles.galleryDots}>
+                {galleryImages.map((uri, index) => (
+                  <View
+                    key={`${uri}-${index}`}
+                    style={[styles.galleryDot, index === activeImageIndex && styles.galleryDotActive]}
+                  />
+                ))}
+              </View>
+              <Text style={styles.galleryCounter}>
+                {activeImageIndex + 1}/{galleryImages.length}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -285,84 +409,124 @@ export default function ProductDetailScreen({
         <View style={styles.infoSection}>
           <View style={styles.nameRow}>
             <Text style={styles.productName}>{product.name}</Text>
-            <Pressable
-              onPress={() => setIsLiked((prev) => !prev)}
-              hitSlop={8}
-              style={styles.likeBtn}
-            >
-              <Text style={styles.likeIcon}>{isLiked ? '❤️' : '🤍'}</Text>
+            <Pressable onPress={handleToggleLike} hitSlop={8} style={styles.likeBtn}>
+              <Ionicons
+                name={isLiked ? 'heart' : 'heart-outline'}
+                size={16}
+                color={isLiked ? '#ef4444' : '#64748b'}
+              />
+              <Text style={styles.likeCountText}>{likeCount}</Text>
             </Pressable>
           </View>
 
-          <Text style={styles.sectionLabel}>Mô tả sản phẩm</Text>
-          <Text style={styles.description}>
-            {product.description || 'Chưa có mô tả cho sản phẩm này.'}
-          </Text>
-
           <Text style={styles.productPrice}>{priceLabel}</Text>
 
+          {store?.system_address ? (
+            <Pressable
+              style={styles.locationChip}
+              onPress={() => onStorePress?.(store.id)}
+              disabled={!onStorePress}
+            >
+              <Ionicons name="location" size={14} color="#ea580c" />
+              <Text style={styles.locationChipText} numberOfLines={2}>
+                {store.system_address}
+              </Text>
+            </Pressable>
+          ) : null}
+
           {product.categoryName ? (
-            <View style={styles.categoryRow}>
-              <Text style={styles.metaLabel}>Danh mục:</Text>
-              <View style={styles.categoryChip}>
-                <Text style={styles.categoryChipText}>{product.categoryName}</Text>
-              </View>
+            <View style={styles.categoryChip}>
+              {isRemoteIcon(product.categoryIcon) ? (
+                <Image source={{ uri: product.categoryIcon }} style={styles.categoryChipImage} />
+              ) : product.categoryIcon ? (
+                <Text style={styles.categoryChipEmoji}>{product.categoryIcon}</Text>
+              ) : (
+                <Ionicons name="pricetag" size={14} color="#0f766e" />
+              )}
+              <Text style={styles.categoryChipText} numberOfLines={1}>
+                {product.categoryName}
+              </Text>
             </View>
           ) : null}
 
-          <View style={styles.metaBlock}>
-            <Text style={styles.metaLine}>
-              <Text style={styles.metaLabel}>Số lượng còn lại: </Text>
+          <View style={styles.statsRow}>
+            {product.donVi ? (
+              <>
+                <Text style={styles.statsText}>
+                  <Text style={styles.metaLabel}>Đơn vị tính: </Text>
+                  <Text style={styles.metaValue}>{product.donVi}</Text>
+                </Text>
+                <Text style={styles.statsDivider}>|</Text>
+              </>
+            ) : null}
+            <Text style={styles.statsText}>
+              <Text style={styles.metaLabel}>Còn lại: </Text>
               <Text style={styles.metaValue}>
                 {displayRemaining > 0 ? displayRemaining : 'Hết hàng'}
               </Text>
-              <Text style={styles.metaLabel}> · Đã bán: </Text>
+            </Text>
+            <Text style={styles.statsDivider}>|</Text>
+            <Text style={styles.statsText}>
+              <Text style={styles.metaLabel}>Đã bán: </Text>
               <Text style={styles.metaValue}>{displaySold}</Text>
             </Text>
-            {product.donVi ? (
-              <Text style={styles.metaLine}>
-                <Text style={styles.metaLabel}>Đơn vị tính: </Text>
-                <Text style={styles.metaValue}>{product.donVi}</Text>
-              </Text>
-            ) : null}
-            {product.isOutOfStock ? (
-              <Text style={styles.outOfStockBadge}>Hết hàng</Text>
-            ) : null}
           </View>
-
           {variants.length > 0 ? (
             <>
               <Text style={styles.sectionTitle}>Phân loại sản phẩm</Text>
               <View style={styles.variantGrid}>
                 {variants.map((variant) => {
-                  const isSelected = selectedVariantId === variant.id;
+                  const isSelected = String(selectedVariantId) === String(variant.id);
+                  const stockLeft = Math.max(0, Number(variant.quantity ?? variant.Quantity) || 0);
+                  const variantOutOfStock = stockLeft <= 0 || totalRemaining <= 0;
+                  const variantDisabled = Boolean(product.isUnavailable) || variantOutOfStock;
                   const thumb = getVariantThumb(variant, product.thumbnail);
 
                   return (
                     <Pressable
                       key={variant.id}
-                      style={[styles.variantTile, isSelected && styles.variantTileActive]}
+                      disabled={variantDisabled}
+                      style={[
+                        styles.variantTile,
+                        isSelected && styles.variantTileActive,
+                        variantDisabled && styles.variantTileDisabled,
+                      ]}
                       onPress={() => handleSelectVariant(variant)}
                     >
                       <View style={styles.variantThumbWrap}>
                         {thumb ? (
                           <Image source={{ uri: thumb }} style={styles.variantThumb} />
                         ) : (
-                          <Text style={styles.variantThumbEmoji}>{product.image_emoji}</Text>
+                          <View style={styles.variantThumbFallback}>
+                            <Text style={styles.variantThumbEmoji}>{product.image_emoji || '📦'}</Text>
+                          </View>
                         )}
+                        {variantOutOfStock ? (
+                          <View style={styles.variantSoldOutMask} pointerEvents="none">
+                            <Text style={styles.variantSoldOutText}>Hết hàng</Text>
+                          </View>
+                        ) : null}
                       </View>
-                      <View style={styles.variantTileInfo}>
-                        <Text style={styles.variantTileName} numberOfLines={2}>
-                          {variant.variantName || 'Loại'}
-                        </Text>
-                        <Text style={styles.variantTilePrice}>{formatPrice(variant.price)}</Text>
-                      </View>
+                      <Text
+                        style={[
+                          styles.variantTileName,
+                          variantDisabled && styles.variantTileNameDisabled,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {variant.variantName || 'Loại'}
+                      </Text>
                     </Pressable>
                   );
                 })}
               </View>
             </>
           ) : null}
+
+          <Text style={styles.sectionLabel}>Mô tả sản phẩm</Text>
+          <Text style={styles.description}>
+            {product.description || 'Chưa có mô tả cho sản phẩm này.'}
+          </Text>
         </View>
       </ScrollView>
 
@@ -386,6 +550,23 @@ export default function ProductDetailScreen({
         title="Báo cáo sản phẩm"
         onClose={() => setReportVisible(false)}
         onSubmit={handleReportSubmit}
+      />
+
+      <DealOfferModal
+        visible={dealModalVisible}
+        product={product}
+        store={store}
+        preselectedVariantId={actionVariantId}
+        onClose={() => setDealModalVisible(false)}
+        onSuccess={() => setDealModalVisible(false)}
+      />
+      <ReservationModal
+        visible={reserveModalVisible}
+        product={product}
+        store={store}
+        preselectedVariantId={actionVariantId}
+        onClose={() => setReserveModalVisible(false)}
+        onSuccess={() => setReserveModalVisible(false)}
       />
     </View>
   );
@@ -423,6 +604,10 @@ const styles = StyleSheet.create({
   imageSection: {
     position: 'relative',
     backgroundColor: '#e2e8f0',
+  },
+  heroOutOfStockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
   },
   backBtn: {
     position: 'absolute',
@@ -471,14 +656,32 @@ const styles = StyleSheet.create({
   productEmoji: {
     fontSize: 80,
   },
-  galleryDots: {
+  galleryDotsWrap: {
     position: 'absolute',
-    bottom: 12,
+    bottom: 28,
     left: 0,
     right: 0,
+    alignItems: 'center',
+    gap: 6,
+  },
+  galleryDots: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  galleryCounter: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffffff',
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
   },
   galleryDot: {
     width: 6,
@@ -511,71 +714,98 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   likeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    borderRadius: 999,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  likeIcon: {
-    fontSize: 20,
+  likeCountText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  locationChip: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff7ed',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 12,
+    maxWidth: '100%',
+  },
+  locationChipText: {
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ea580c',
   },
   sectionLabel: {
     fontSize: 14,
     fontWeight: '800',
     color: '#0f172a',
+    marginTop: 4,
     marginBottom: 6,
   },
   description: {
     fontSize: 14,
     color: '#475569',
     lineHeight: 22,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   productPrice: {
     fontSize: 24,
     fontWeight: '900',
     color: '#0f766e',
-    marginBottom: 12,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     marginBottom: 10,
   },
   categoryChip: {
-    backgroundColor: '#e0f2f1',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 10,
+    maxWidth: '100%',
+  },
+  categoryChipImage: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    resizeMode: 'cover',
+  },
+  categoryChipEmoji: {
+    fontSize: 14,
   },
   categoryChipText: {
-    fontSize: 12,
-    fontWeight: '700',
+    flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '800',
     color: '#0f766e',
   },
-  metaBlock: {
+  statsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 6,
-    marginBottom: 18,
+    marginBottom: 16,
   },
-  metaLine: {
+  statsText: {
     fontSize: 13,
     lineHeight: 20,
   },
-  metaLabel: {
-    color: '#64748b',
+  statsDivider: {
+    fontSize: 13,
+    color: '#cbd5e1',
     fontWeight: '600',
-  },
-  metaValue: {
-    color: '#0f172a',
-    fontWeight: '700',
-  },
-  outOfStockBadge: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#dc2626',
   },
   pressed: {
     opacity: 0.85,
@@ -585,6 +815,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f172a',
     marginBottom: 10,
+  },
+  metaLabel: {
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  metaValue: {
+    color: '#0f172a',
+    fontWeight: '700',
   },
   variantGrid: {
     flexDirection: 'row',
@@ -605,12 +843,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#ecfdf5',
   },
   variantThumbWrap: {
+    position: 'relative',
     width: '100%',
     height: 78,
     borderRadius: 8,
     backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
     overflow: 'hidden',
     marginBottom: 6,
   },
@@ -619,13 +856,33 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  variantThumbFallback: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   variantThumbEmoji: {
     fontSize: 22,
   },
-  variantTileInfo: {
-    width: '100%',
-    alignItems: 'flex-start',
-    gap: 2,
+  variantSoldOutMask: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  variantSoldOutText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  variantTileDisabled: {
+    opacity: 1,
   },
   variantTileName: {
     width: '100%',
@@ -635,18 +892,15 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     lineHeight: 14,
   },
-  variantTilePrice: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0f766e',
-    lineHeight: 14,
-    textAlign: 'left',
+  variantTileNameDisabled: {
+    color: '#94a3b8',
   },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    zIndex: 20,
     flexDirection: 'row',
     alignItems: 'stretch',
     gap: 10,

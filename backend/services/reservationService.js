@@ -9,7 +9,9 @@ const {
   BUYER_CANCEL_LOCK_MINUTES,
 } = require("../constants/reservationStatus");
 const { DEAL_OFFER_STATUS } = require("../constants/dealOfferStatus");
-const { getShopForSeller } = require("./shopSettingsService");
+const { createNotification } = require("./notificationService");
+
+const NO_SHOW_CANCEL_REASON = "Người dùng không đến lấy hàng";
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -24,15 +26,17 @@ function computeTotal(reservation) {
 }
 
 async function toPublicReservation(doc) {
-  const [buyer, product, variant, deal] = await Promise.all([
+  const [buyer, product, variant, deal, shop] = await Promise.all([
     User.findById(doc.userId),
     Product.findById(doc.productId),
     ProductVariant.findById(doc.variantId),
     doc.dealOfferId ? DealOffer.findById(doc.dealOfferId) : null,
+    doc.shopId ? ShopProfile.findById(doc.shopId) : null,
   ]);
 
   return {
     id: doc._id,
+    orderCode: `ID: ${String(doc._id).slice(-8).toUpperCase()}`,
     status: doc.status,
     quantity: doc.quantity || 0,
     reservedPrice: doc.reservedPrice || 0,
@@ -43,12 +47,15 @@ async function toPublicReservation(doc) {
     confirmedAt: doc.confirmedAt || null,
     completedAt: doc.completedAt || null,
     cancelledAt: doc.cancelledAt || null,
+    cancelReason: doc.cancelReason || "",
     buyerPriceAcceptedAt: doc.buyerPriceAcceptedAt || null,
     cancelLockedAt: doc.cancelLockedAt || null,
     buyerCancelLocked: doc.cancelLockedAt ? new Date() >= new Date(doc.cancelLockedAt) : false,
     createdAt: doc.CreatedAt,
     updatedAt: doc.UpdatedAt,
     dealOfferId: doc.dealOfferId || null,
+    shopId: doc.shopId ? String(doc.shopId) : "",
+    storeName: shop?.shopName || shop?.description || "",
     buyer: buyer
       ? {
           id: buyer._id,
@@ -92,7 +99,77 @@ async function getOwnedReservation(user, reservationId) {
   return { shop, reservation };
 }
 
+async function reserveVariantInventory(variantId, quantity, session = null) {
+  const normalizedQuantity = Number(quantity) || 1;
+  const now = new Date();
+  const query = ProductVariant.findOneAndUpdate(
+    { _id: variantId, Quantity: { $gte: normalizedQuantity } },
+    { $inc: { Quantity: -normalizedQuantity }, $set: { UpdatedAt: now } },
+    { new: true }
+  );
+
+  const updatedVariant = session ? await query.session(session) : await query;
+  if (!updatedVariant) {
+    throw createServiceError("Số lượng vượt quá tồn kho.", 400);
+  }
+
+  return updatedVariant;
+}
+
+async function releaseVariantInventory(reservation, session = null) {
+  if (!reservation?.inventoryHeld || !reservation.variantId) {
+    return;
+  }
+
+  const quantity = Number(reservation.quantity) || 1;
+  const now = new Date();
+  const query = ProductVariant.findByIdAndUpdate(
+    reservation.variantId,
+    { $inc: { Quantity: quantity }, $set: { UpdatedAt: now } }
+  );
+
+  if (session) {
+    await query.session(session);
+  } else {
+    await query;
+  }
+
+  reservation.inventoryHeld = false;
+}
+
+async function markReservationSold(reservation, session = null) {
+  const soldQuantity = Number(reservation.quantity) || 1;
+  const now = new Date();
+
+  if (reservation.productId) {
+    const productQuery = Product.findByIdAndUpdate(
+      reservation.productId,
+      { $inc: { SoldCount: soldQuantity }, $set: { UpdatedAt: now } }
+    );
+    if (session) {
+      await productQuery.session(session);
+    } else {
+      await productQuery;
+    }
+  }
+
+  if (reservation.variantId) {
+    const variantQuery = ProductVariant.findByIdAndUpdate(
+      reservation.variantId,
+      { $inc: { SoldCount: soldQuantity }, $set: { UpdatedAt: now } }
+    );
+    if (session) {
+      await variantQuery.session(session);
+    } else {
+      await variantQuery;
+    }
+  }
+
+  reservation.inventoryHeld = false;
+}
+
 async function listSellerReservations(user, { tab = "holding" } = {}) {
+  await expireOverdueReservations();
   const shop = await getShopForSeller(user);
   let statusFilter = [];
 
@@ -121,6 +198,7 @@ async function listSellerReservations(user, { tab = "holding" } = {}) {
 }
 
 async function getSellerReservationDetail(user, reservationId) {
+  await expireOverdueReservations();
   const { reservation } = await getOwnedReservation(user, reservationId);
   return toPublicReservation(reservation);
 }
@@ -155,6 +233,7 @@ async function rejectReservation(user, reservationId, { reason } = {}) {
   if (reason) {
     reservation.note = `${reservation.note || ""}\n[Từ chối] ${reason}`.trim();
   }
+  await releaseVariantInventory(reservation);
   reservation.UpdatedAt = now;
   await reservation.save();
 
@@ -174,6 +253,7 @@ async function cancelReservationBySeller(user, reservationId, { reason } = {}) {
   if (reason) {
     reservation.note = `${reservation.note || ""}\n[Hủy bởi shop] ${reason}`.trim();
   }
+  await releaseVariantInventory(reservation);
   reservation.UpdatedAt = now;
   await reservation.save();
 
@@ -191,26 +271,14 @@ async function completeReservation(user, reservationId) {
   reservation.status = RESERVATION_STATUS.COMPLETED;
   reservation.completedAt = now;
   reservation.UpdatedAt = now;
-  await reservation.save();
 
   const soldQuantity = Number(reservation.quantity) || 1;
   shop.soldCount = (shop.soldCount || 0) + soldQuantity;
   shop.UpdatedAt = now;
   await shop.save();
 
-  if (reservation.productId) {
-    await Product.findByIdAndUpdate(reservation.productId, {
-      $inc: { SoldCount: soldQuantity },
-      $set: { UpdatedAt: now },
-    });
-  }
-
-  if (reservation.variantId) {
-    await ProductVariant.findByIdAndUpdate(reservation.variantId, {
-      $inc: { SoldCount: soldQuantity, Quantity: -soldQuantity },
-      $set: { UpdatedAt: now },
-    });
-  }
+  await markReservationSold(reservation);
+  await reservation.save();
 
   return toPublicReservation(reservation);
 }
@@ -237,6 +305,7 @@ async function listPendingPriceDeals(user) {
         status: deal.status,
         originalPrice: deal.originalPrice || 0,
         offeredPrice: deal.offeredPrice || 0,
+        quantity: Number(deal.quantity) || 1,
         sellerCounterPrice: deal.sellerCounterPrice || null,
         discountPercent: deal.discountPercent || 0,
         note: deal.note || "",
@@ -269,6 +338,51 @@ async function listPendingPriceDeals(user) {
   );
 }
 
+async function expireOverdueReservations() {
+  const now = new Date();
+  const overdue = await Reservation.find({
+    status: { $in: [RESERVATION_STATUS.PENDING, RESERVATION_STATUS.CONFIRMED] },
+    pickupTime: { $ne: null, $lte: now },
+  }).limit(200);
+
+  let cancelledCount = 0;
+
+  for (const reservation of overdue) {
+    try {
+      const product = await Product.findById(reservation.productId);
+      const shop = await ShopProfile.findById(reservation.shopId);
+      const productName = product?.ProductName || "sản phẩm";
+
+      reservation.status = RESERVATION_STATUS.CANCELLED;
+      reservation.cancelledAt = now;
+      reservation.cancelReason = NO_SHOW_CANCEL_REASON;
+      reservation.note = `${reservation.note || ""}\n[Hủy tự động] ${NO_SHOW_CANCEL_REASON}`.trim();
+      await releaseVariantInventory(reservation);
+      reservation.UpdatedAt = now;
+      await reservation.save();
+      cancelledCount += 1;
+
+      if (reservation.userId) {
+        await createNotification(reservation.userId, {
+          title: "Đơn giữ hàng đã bị hủy",
+          content: `Đơn giữ ${productName} đã bị hủy vì quá giờ lấy hàng (${NO_SHOW_CANCEL_REASON.toLowerCase()}).`,
+        });
+      }
+
+      if (shop?.userId) {
+        await createNotification(shop.userId, {
+          title: "Đơn giữ hàng hết hạn",
+          content: `Đơn giữ ${productName} đã tự hủy vì khách không đến lấy. Tồn kho đã được cộng lại.`,
+        });
+      }
+    } catch (error) {
+      console.error("expireOverdueReservations failed:", reservation._id, error.message);
+    }
+  }
+
+  return { cancelledCount, checkedAt: now };
+}
+
 module.exports = {
   listSellerReservations,
   getSellerReservationDetail,
@@ -279,4 +393,9 @@ module.exports = {
   listPendingPriceDeals,
   toPublicReservation,
   computeTotal,
+  reserveVariantInventory,
+  releaseVariantInventory,
+  markReservationSold,
+  expireOverdueReservations,
+  NO_SHOW_CANCEL_REASON,
 };

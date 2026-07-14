@@ -16,6 +16,7 @@ import {
 } from '../../api/favoriteApi';
 import { formatPriceRange } from '../../core/utils/productFormat';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
+import { getProductImageOverlayLabel } from '../../core/utils/productAvailability';
 
 function formatLocation(location) {
   const value = String(location || '').trim();
@@ -111,7 +112,10 @@ export default function FavoriteProductsScreen({ onOpenProduct }) {
         </View>
       ) : (
         <View style={styles.productGrid}>
-          {favorites.map((product) => (
+          {favorites.map((product) => {
+            const overlayLabel = getProductImageOverlayLabel(product);
+
+            return (
             <Pressable
               key={product.id}
               style={({ pressed }) => [styles.productCard, pressed && styles.productCardPressed]}
@@ -121,8 +125,15 @@ export default function FavoriteProductsScreen({ onOpenProduct }) {
                 {product.thumbnail ? (
                   <Image source={{ uri: product.thumbnail }} style={styles.productThumb} />
                 ) : (
-                  <Text style={styles.productEmoji}>📦</Text>
+                  <View style={styles.productEmojiWrap}>
+                    <Text style={styles.productEmoji}>📦</Text>
+                  </View>
                 )}
+                {overlayLabel ? (
+                  <View style={styles.soldOutMask} pointerEvents="none">
+                    <Text style={styles.soldOutText}>{overlayLabel}</Text>
+                  </View>
+                ) : null}
                 <Pressable
                   onPress={() => handleRemoveFavorite(product.productId)}
                   hitSlop={8}
@@ -139,7 +150,8 @@ export default function FavoriteProductsScreen({ onOpenProduct }) {
               </Text>
               <Text style={styles.productLocation}>⌖ {formatLocation(product.location)}</Text>
             </Pressable>
-          ))}
+            );
+          })}
         </View>
       )}
     </ScrollView>
@@ -246,8 +258,6 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     marginBottom: 10,
     borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#f4f8f7',
     overflow: 'hidden',
   },
@@ -256,13 +266,36 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  productEmojiWrap: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   productEmoji: {
     fontSize: 52,
+  },
+  soldOutMask: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  soldOutText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   heartBadge: {
     position: 'absolute',
     top: 8,
     right: 8,
+    zIndex: 6,
     width: 30,
     height: 30,
     borderRadius: 15,
@@ -273,7 +306,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 5,
-    elevation: 2,
+    elevation: 6,
   },
   heartText: {
     color: '#e85d75',

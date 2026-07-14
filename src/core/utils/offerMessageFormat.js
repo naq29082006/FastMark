@@ -2,14 +2,16 @@ export function formatOfferMessageContent({
   productName = '',
   originalPrice = 0,
   offeredPrice = 0,
+  quantity = 1,
   discountPercent = 0,
   note = '',
 } = {}) {
   const lines = [
     '💰 Đề nghị deal giá',
     productName ? `Sản phẩm: ${productName}` : '',
-    `Giá gốc: ${Number(originalPrice || 0).toLocaleString('vi-VN')}đ`,
-    `Giá đề nghị: ${Number(offeredPrice || 0).toLocaleString('vi-VN')}đ`,
+    `Số lượng: ${quantity}`,
+    `Tổng niêm yết: ${Number(originalPrice || 0).toLocaleString('vi-VN')}đ`,
+    `Tổng đề nghị: ${Number(offeredPrice || 0).toLocaleString('vi-VN')}đ`,
     `Giảm: ${discountPercent || 0}%`,
   ].filter(Boolean);
 
@@ -37,6 +39,7 @@ export function parseOfferMessageContent(content) {
         productName: parsed.productName || '',
         originalPrice: parsed.originalPrice,
         offeredPrice: parsed.offeredPrice,
+        quantity: parsed.quantity || 1,
         discountPercent: parsed.discountPercent,
         note: parsed.note || '',
       });

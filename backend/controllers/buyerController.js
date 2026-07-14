@@ -19,7 +19,7 @@ exports.listConversations = async (req, res) => {
 };
 
 exports.listShops = async (req, res) => {
-  const shops = await messageService.listShopsForBuyer();
+  const shops = await messageService.listShopsForBuyer(req.currentUser);
   return success(res, { data: { shops } });
 };
 

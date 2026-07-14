@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
   adminProductCategories: '/api/categories/products',
   adminShopCategories: '/api/categories/shops',
   products: '/api/products',
+  productsDiscover: '/api/products/discover',
   productById: (id) => `/api/products/${id}`,
   myProductById: (id) => `/api/products/mine/${id}`,
   sellerShop: '/api/seller/shop',

@@ -12,7 +12,6 @@ import { useSelector } from 'react-redux';
 
 import {
   getBuyerConversationsOnBackend,
-  getBuyerShopsOnBackend,
 } from '../../api/messageApi';
 import { getMyNotificationsOnBackend } from '../../api/notificationApi';
 import { getSellerConversationsOnBackend } from '../../api/sellerOpsApi';
@@ -84,23 +83,8 @@ function filterConversations(conversations, query) {
   });
 }
 
-function buildShopSuggestions(conversations, shops) {
-  const existingShopIds = new Set(
-    conversations.map((item) => String(item.shop?.id || '')).filter(Boolean)
-  );
-
-  return shops
-    .filter((entry) => entry?.shop?.id && !existingShopIds.has(String(entry.shop.id)))
-    .slice(0, 6)
-    .map((entry) => ({
-      id: `shop-${entry.shop.id}`,
-      shopId: entry.shop.id,
-      shop: entry.shop,
-      lastMessage: 'Bắt đầu trò chuyện với gian hàng',
-      timeLabel: '',
-      unreadCount: 0,
-      isNew: true,
-    }));
+function hasRealMessage(conversation) {
+  return Boolean(String(conversation?.lastMessage || '').trim());
 }
 
 export default function InboxScreen({
@@ -114,7 +98,6 @@ export default function InboxScreen({
   const [activeTab, setActiveTab] = useState('messages');
   const [searchQuery, setSearchQuery] = useState('');
   const [conversations, setConversations] = useState([]);
-  const [shopSuggestions, setShopSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [selectedChat, setSelectedChat] = useState(null);
@@ -131,11 +114,11 @@ export default function InboxScreen({
       try {
         const idToken = await getCurrentUserIdToken();
         const data = await getSellerConversationsOnBackend(idToken);
-        setConversations(Array.isArray(data) ? data : []);
-        setShopSuggestions([]);
+        setConversations(
+          (Array.isArray(data) ? data : []).filter((item) => hasRealMessage(item))
+        );
       } catch {
         setConversations([]);
-        setShopSuggestions([]);
         setLoadError('Không tải được hộp thư người bán.');
       } finally {
         setIsLoading(false);
@@ -144,16 +127,14 @@ export default function InboxScreen({
     }
 
     try {
-      const [conversationRows, shopRows] = await Promise.all([
-        getBuyerConversationsOnBackend(),
-        getBuyerShopsOnBackend(),
-      ]);
-
-      setConversations(Array.isArray(conversationRows) ? conversationRows : []);
-      setShopSuggestions(buildShopSuggestions(conversationRows || [], shopRows || []));
+      const conversationRows = await getBuyerConversationsOnBackend();
+      setConversations(
+        (Array.isArray(conversationRows) ? conversationRows : []).filter((item) =>
+          hasRealMessage(item)
+        )
+      );
     } catch (error) {
       setConversations([]);
-      setShopSuggestions([]);
       setLoadError(error.message || 'Không tải được hộp thư. Vui lòng đăng nhập lại.');
     } finally {
       setIsLoading(false);
@@ -205,12 +186,8 @@ export default function InboxScreen({
   }, [onNavigationStateChange, selectedChat]);
 
   const messageConversations = useMemo(() => {
-    if (showSellerInbox) {
-      return conversations;
-    }
-    const merged = [...conversations, ...shopSuggestions];
-    return filterConversations(merged, searchQuery);
-  }, [conversations, searchQuery, shopSuggestions, showSellerInbox]);
+    return filterConversations(conversations, searchQuery);
+  }, [conversations, searchQuery]);
 
   if (selectedNotification) {
     return (
@@ -308,7 +285,7 @@ export default function InboxScreen({
                 </Text>
                 {!showSellerInbox ? (
                   <Text style={styles.emptySubtitle}>
-                    Hãy chọn gian hàng bên dưới để bắt đầu nhắn tin.
+                    Khi bạn nhắn tin với gian hàng, hội thoại sẽ hiện ở đây.
                   </Text>
                 ) : null}
               </View>
@@ -349,7 +326,7 @@ export default function InboxScreen({
                   style={styles.listItem}
                   onPress={() =>
                     setSelectedChat({
-                      conversationId: item.isNew ? null : item.id,
+                      conversationId: item.id,
                       shopId: item.shop?.id || item.shopId,
                       shopName: getConversationName(item),
                     })
@@ -365,10 +342,7 @@ export default function InboxScreen({
                       </Text>
                       <Text style={styles.listTime}>{item.timeLabel || ''}</Text>
                     </View>
-                    <Text
-                      style={[styles.listPreview, item.isNew && styles.listPreviewNew]}
-                      numberOfLines={1}
-                    >
+                    <Text style={styles.listPreview} numberOfLines={1}>
                       {item.lastMessage || 'Chưa có tin nhắn'}
                     </Text>
                   </View>

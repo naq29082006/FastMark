@@ -101,19 +101,30 @@ export default function SellerOrdersScreen({ onBack, onOpenReservation, onRefres
 
   function renderDealItem({ item }) {
     const canSellerCounter = !item.sellerCounterPrice;
+    const qty = Number(item.quantity) || 1;
+    const originalUnit = Number(item.originalPrice) || 0;
+    const originalTotal = originalUnit * qty;
+    let offeredTotal = Number(item.offeredPrice) || 0;
+    let sellerCounter = item.sellerCounterPrice != null ? Number(item.sellerCounterPrice) : null;
+    if (originalUnit > 0 && offeredTotal > 0 && offeredTotal <= originalUnit) {
+      offeredTotal *= qty;
+      if (sellerCounter != null && sellerCounter <= originalUnit) {
+        sellerCounter *= qty;
+      }
+    }
     return (
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{item.product?.productName || 'Sản phẩm'}</Text>
         <Text style={styles.cardMeta}>
-          {item.variant?.variantName || ''} • Khách: {item.buyer?.fullName || 'N/A'}
+          {item.variant?.variantName || ''} • SL: {qty} • Khách: {item.buyer?.fullName || 'N/A'}
         </Text>
         <Text style={styles.priceText}>
-          Giá gốc: {formatPrice(item.originalPrice)} → Đề xuất: {formatPrice(item.offeredPrice)}
+          Tổng gốc: {formatPrice(originalTotal)} → Đề xuất: {formatPrice(offeredTotal)}
         </Text>
-        {item.sellerCounterPrice ? (
-          <Text style={styles.counterText}>Giá shop đề xuất: {formatPrice(item.sellerCounterPrice)}</Text>
+        {sellerCounter != null ? (
+          <Text style={styles.counterText}>Shop đề xuất tổng: {formatPrice(sellerCounter)}</Text>
         ) : null}
-        {item.sellerCounterPrice ? (
+        {sellerCounter != null ? (
           <Text style={styles.waitText}>Đang chờ khách phản hồi</Text>
         ) : null}
         <View style={styles.actionRow}>
@@ -199,12 +210,12 @@ export default function SellerOrdersScreen({ onBack, onOpenReservation, onRefres
 
       {counterDealId ? (
         <View style={styles.counterModal}>
-          <Text style={styles.counterTitle}>Đề xuất giá khác</Text>
+          <Text style={styles.counterTitle}>Đề xuất tổng khác</Text>
           <TextInput
             value={counterPrice}
             onChangeText={setCounterPrice}
             keyboardType="numeric"
-            placeholder="Nhập giá (đ)"
+            placeholder="Nhập tổng giá (đ)"
             placeholderTextColor="#94a3b8"
             style={styles.counterInput}
           />

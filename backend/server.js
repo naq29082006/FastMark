@@ -10,6 +10,9 @@ require('./config/firebaseAdmin');
 
 connectDB();
 
+const { startReservationExpiryJob } = require("./jobs/reservationExpiryJob");
+startReservationExpiryJob();
+
 const server = http.createServer(app);
 initSocket(server);
 

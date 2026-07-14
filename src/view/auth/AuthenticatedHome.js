@@ -286,7 +286,11 @@ export default function AuthenticatedHome() {
             isScreenActive={activeTab === 'home'}
           />
         ),
-        products: <ProductsScreen />,
+        products: (
+          <ProductsScreen
+            onNavigationStateChange={(isNested) => updateNestedTabState('products', isNested)}
+          />
+        ),
         favorites: <FavoriteProductsScreen />,
         notifications: <NotificationsScreen />,
         inbox: (

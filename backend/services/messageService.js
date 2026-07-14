@@ -3,6 +3,7 @@ const Message = require("../models/Message");
 const MessageImage = require("../models/MessageImage");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
+const UserFollow = require("../models/UserFollow");
 const { MESSAGE_TYPE } = require("../constants/messageType");
 const { parseOfferMessageContent } = require("../utils/offerMessageFormat");
 const { MESSAGE_READ, MESSAGE_STATUS } = require("../constants/messageStatus");
@@ -542,7 +543,10 @@ async function markOpponentMessagesRead(conversation, viewer) {
 
 async function listSellerConversations(user) {
   const shop = await getShopForSeller(user);
-  const conversations = await Conversation.find({ shopId: shop._id })
+  const conversations = await Conversation.find({
+    shopId: shop._id,
+    lastMessage: { $exists: true, $nin: [null, ""] },
+  })
     .sort({ lastMessageAt: -1, UpdatedAt: -1 })
     .limit(100);
 
@@ -709,7 +713,10 @@ async function getBuyerConversationPeer(user, conversationId) {
 }
 
 async function listBuyerConversations(user) {
-  const conversations = await Conversation.find({ userId: user._id })
+  const conversations = await Conversation.find({
+    userId: user._id,
+    lastMessage: { $exists: true, $nin: [null, ""] },
+  })
     .sort({ lastMessageAt: -1, UpdatedAt: -1 })
     .limit(100);
 
@@ -740,8 +747,19 @@ async function listBuyerConversations(user) {
   return result;
 }
 
-async function listShopsForBuyer() {
-  const shops = await ShopProfile.find().sort({ UpdatedAt: -1 }).limit(30);
+async function listShopsForBuyer(user) {
+  const follows = await UserFollow.find({ userId: user._id }).select("followedUserId").lean();
+  const followedUserIds = follows
+    .map((row) => row.followedUserId)
+    .filter(Boolean);
+
+  if (followedUserIds.length === 0) {
+    return [];
+  }
+
+  const shops = await ShopProfile.find({ userId: { $in: followedUserIds } })
+    .sort({ UpdatedAt: -1 })
+    .limit(30);
   const result = [];
 
   for (const shop of shops) {

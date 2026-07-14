@@ -12,6 +12,32 @@ const { PRODUCT_STATUS } = require("../constants/productStatus");
 const EARTH_RADIUS_METERS = 6371000;
 const MAX_SEARCH_RADIUS_METERS = 10000;
 
+function computeIsOutOfStock(variants = []) {
+  if (!Array.isArray(variants) || variants.length === 0) {
+    return false;
+  }
+
+  return computeRemainingQuantity(variants) <= 0;
+}
+
+function computeRemainingQuantity(variants = []) {
+  if (!Array.isArray(variants) || variants.length === 0) {
+    return 0;
+  }
+
+  return variants.reduce(
+    (sum, variant) => sum + Math.max(0, Number(variant.Quantity ?? variant.quantity ?? 0)),
+    0
+  );
+}
+
+function toListVariants(variants = []) {
+  return variants.map((variant) => ({
+    id: String(variant._id || variant.id || ""),
+    quantity: Math.max(0, Number(variant.Quantity ?? variant.quantity ?? 0)),
+  }));
+}
+
 function toRadians(value) {
   return (Number(value) * Math.PI) / 180;
 }
@@ -542,13 +568,172 @@ async function listPublicProductsByShopId(shopId) {
       minPrice,
       maxPrice: maxPrice || minPrice,
       soldCount: Number(product.SoldCount) || 0,
+      likeCount: Number(product.LikeCount) || 0,
       donVi: product.DonVi || "",
       description: product.Description || "",
       image_emoji: product.Thumbnail ? "🖼️" : "🛒",
       thumbnail: product.Thumbnail || "",
       variantCount: productVariants.length,
+      isOutOfStock: computeIsOutOfStock(productVariants),
+      remainingQuantity: computeRemainingQuantity(productVariants),
+      variants: toListVariants(productVariants),
     };
   });
+}
+
+async function discoverProducts({
+  latitude,
+  longitude,
+  radiusMeters = 5000,
+  categoryId = "",
+  search = "",
+  limit = 80,
+}) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  const radius = clampSearchRadius(radiusMeters, 5000);
+  const maxResults = Math.min(Math.max(Number(limit) || 80, 1), 200);
+  const keyword = normalizeSearchText(search);
+  const normalizedCategoryId = String(categoryId || "").trim();
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    const error = new Error("Thiếu tọa độ hợp lệ.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const shops = await ShopProfile.find({
+    latitude: { $ne: null },
+    longitude: { $ne: null },
+    status: { $ne: 0 },
+  }).lean();
+
+  const sellerIds = shops
+    .map((shop) => shop.userId)
+    .filter(Boolean)
+    .map((id) => new mongoose.Types.ObjectId(String(id)));
+  const sellers = await User.find({
+    _id: { $in: sellerIds },
+    Role: USER_ROLE.SELLER,
+  }).lean();
+  const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
+
+  const shopDistanceMap = new Map();
+  const eligibleShopIds = [];
+
+  for (const shop of shops) {
+    if (!Number.isFinite(Number(shop.latitude)) || !Number.isFinite(Number(shop.longitude))) {
+      continue;
+    }
+
+    const seller = sellerMap.get(String(shop.userId));
+    if (!seller) {
+      continue;
+    }
+
+    const distanceMeters = calculateDistanceMeters(
+      lat,
+      lng,
+      Number(shop.latitude),
+      Number(shop.longitude)
+    );
+
+    if (distanceMeters > radius) {
+      continue;
+    }
+
+    shopDistanceMap.set(String(shop._id), {
+      shop,
+      distanceMeters,
+    });
+    eligibleShopIds.push(shop._id);
+  }
+
+  if (eligibleShopIds.length === 0) {
+    return [];
+  }
+
+  const productFilter = activeProductFilter({ ShopId: { $in: eligibleShopIds } });
+  if (normalizedCategoryId) {
+    productFilter.CategoryId = normalizedCategoryId;
+  }
+  if (keyword) {
+    productFilter.ProductName = {
+      $regex: escapeRegex(keyword),
+      $options: "i",
+    };
+  }
+
+  const products = await Product.find(productFilter)
+    .sort({ CreatedAt: -1 })
+    .limit(maxResults)
+    .lean();
+
+  if (products.length === 0) {
+    return [];
+  }
+
+  const productIds = products.map((product) => product._id);
+  const variants = await ProductVariant.find({ ProductId: { $in: productIds } }).lean();
+  const variantsByProduct = variants.reduce((map, variant) => {
+    const key = String(variant.ProductId);
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(variant);
+    return map;
+  }, new Map());
+
+  const { getProductCategoryNameMap } = require("./productCategoryService");
+  const categoryNameMap = await getProductCategoryNameMap(
+    products.map((product) => product.CategoryId)
+  );
+
+  const enriched = products.map((product) => {
+    const shopMeta = shopDistanceMap.get(String(product.ShopId));
+    const shop = shopMeta?.shop;
+    const productVariants = variantsByProduct.get(String(product._id)) || [];
+    const variantPrices = productVariants.map((variant) => Number(variant.Price) || 0);
+    const minPrice =
+      variantPrices.length > 0 ? Math.min(...variantPrices) : Number(product.MinPrice) || 0;
+    const maxPrice =
+      variantPrices.length > 0 ? Math.max(...variantPrices) : Number(product.MaxPrice) || minPrice;
+
+    return {
+      id: String(product._id),
+      store_id: String(product.ShopId),
+      name: product.ProductName,
+      price: minPrice,
+      minPrice,
+      maxPrice: maxPrice || minPrice,
+      soldCount: Number(product.SoldCount) || 0,
+      likeCount: Number(product.LikeCount) || 0,
+      donVi: product.DonVi || "",
+      description: product.Description || "",
+      image_emoji: product.Thumbnail ? "🖼️" : "🛒",
+      thumbnail: product.Thumbnail || "",
+      variantCount: productVariants.length,
+      categoryId: String(product.CategoryId || ""),
+      categoryName: categoryNameMap.get(String(product.CategoryId)) || "",
+      storeName: shop?.shopName || shop?.description || "",
+      location: shop?.address || "",
+      distanceMeters: shopMeta?.distanceMeters ?? null,
+      isOutOfStock: computeIsOutOfStock(productVariants),
+      remainingQuantity: computeRemainingQuantity(productVariants),
+      variants: toListVariants(productVariants),
+    };
+  });
+
+  enriched.sort((left, right) => {
+    const leftDistance = Number(left.distanceMeters) || Number.MAX_SAFE_INTEGER;
+    const rightDistance = Number(right.distanceMeters) || Number.MAX_SAFE_INTEGER;
+    if (leftDistance !== rightDistance) {
+      return leftDistance - rightDistance;
+    }
+    return String(right.id).localeCompare(String(left.id));
+  });
+
+  return enriched.filter((product) => !product.isOutOfStock);
 }
 
 async function listPublicReviewsByShopId(shopId) {
@@ -585,4 +770,5 @@ module.exports = {
   MAX_SEARCH_RADIUS_METERS,
   listPublicProductsByShopId,
   listPublicReviewsByShopId,
+  discoverProducts,
 };

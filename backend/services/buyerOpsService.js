@@ -9,8 +9,18 @@ const { RESERVATION_STATUS } = require("../constants/reservationStatus");
 const { PRODUCT_STATUS } = require("../constants/productStatus");
 const { SHOP_STATUS, SHOP_OPEN } = require("../constants/shopStatus");
 const { MESSAGE_TYPE } = require("../constants/messageType");
-const { toPublicReservation } = require("./reservationService");
+const {
+  toPublicReservation,
+  reserveVariantInventory,
+  releaseVariantInventory,
+  expireOverdueReservations,
+} = require("./reservationService");
 const { formatOfferMessageContent, formatBuyerCounterMessageContent } = require("../utils/offerMessageFormat");
+const {
+  computeDiscountPercent,
+  assertDealDiscountAllowed,
+  resolveDealMoney,
+} = require("../utils/dealPricing");
 const { createNotification } = require("./notificationService");
 const messageService = require("./messageService");
 
@@ -29,26 +39,11 @@ function pickString(value) {
   return String(value || "").trim();
 }
 
-const MAX_DEAL_DISCOUNT_PERCENT = 50;
-
-function computeDiscountPercent(originalPrice, offeredPrice) {
-  if (!originalPrice || originalPrice <= 0) {
-    return 0;
-  }
-  const discount = ((originalPrice - offeredPrice) / originalPrice) * 100;
-  return Math.max(0, Math.round(discount * 100) / 100);
-}
-
-function assertDealDiscountAllowed(originalPrice, offeredPrice) {
-  if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
-    throw createServiceError("Giá đề nghị không hợp lệ.");
-  }
-  if (offeredPrice >= originalPrice) {
-    throw createServiceError("Giá đề nghị phải thấp hơn giá niêm yết.");
-  }
-  const discountPercent = computeDiscountPercent(originalPrice, offeredPrice);
-  if (discountPercent > MAX_DEAL_DISCOUNT_PERCENT) {
-    throw createServiceError(`Không được deal giảm quá ${MAX_DEAL_DISCOUNT_PERCENT}%.`);
+function guardDealDiscount(originalTotal, offeredTotal) {
+  try {
+    assertDealDiscountAllowed(originalTotal, offeredTotal);
+  } catch (error) {
+    throw createServiceError(error.message, error.statusCode || 400);
   }
 }
 
@@ -89,6 +84,7 @@ async function toPublicDeal(deal) {
 
   return {
     id: deal._id,
+    orderCode: `ID: ${String(deal._id).slice(-8).toUpperCase()}`,
     status: deal.status,
     originalPrice: deal.originalPrice || 0,
     offeredPrice: deal.offeredPrice || 0,
@@ -113,15 +109,20 @@ async function toPublicDeal(deal) {
 
 async function sendBuyerCounterChatMessage(user, shop, deal, previousSellerCounter) {
   const product = await Product.findById(deal.productId);
+  const money = resolveDealMoney({
+    ...deal.toObject?.() || deal,
+    sellerCounterPrice: previousSellerCounter,
+  });
   const content = formatBuyerCounterMessageContent({
     productName: product?.ProductName || "",
-    originalPrice: deal.originalPrice,
-    sellerCounterPrice: previousSellerCounter,
-    offeredPrice: deal.offeredPrice,
-    quantity: deal.quantity || 1,
+    originalPrice: money.originalTotal,
+    sellerCounterPrice: money.sellerCounterTotal,
+    offeredPrice: money.offeredTotal,
+    quantity: money.qty,
     discountPercent: deal.discountPercent,
     note: deal.note || "",
   });
+
 
   const { conversation } = await messageService.findOrCreateBuyerConversation(
     user,
@@ -139,14 +140,16 @@ async function sendBuyerCounterChatMessage(user, shop, deal, previousSellerCount
 
 async function sendOfferChatMessage(user, shop, deal) {
   const product = await Product.findById(deal.productId);
+  const money = resolveDealMoney(deal);
   const content = formatOfferMessageContent({
     productName: product?.ProductName || "",
-    originalPrice: deal.originalPrice,
-    offeredPrice: deal.offeredPrice,
-    quantity: deal.quantity || 1,
+    originalPrice: money.originalTotal,
+    offeredPrice: money.offeredTotal,
+    quantity: money.qty,
     discountPercent: deal.discountPercent,
     note: deal.note || "",
   });
+
 
   const { conversation } = await messageService.findOrCreateBuyerConversation(
     user,
@@ -172,28 +175,32 @@ async function notifyShopOwner(shop, { title, content }) {
 async function createDealOffer(user, payload) {
   const productId = pickString(payload.productId);
   const variantId = pickString(payload.variantId);
-  const offeredPrice = pickNumber(payload.offeredPrice ?? payload.offered_price);
-  const quantity = pickNumber(payload.quantity) || 1;
+  // Deal is always on ORDER TOTAL for the selected quantity (not per unit).
+  const offeredTotal = pickNumber(
+    payload.offeredTotal ?? payload.offeredPrice ?? payload.offered_price
+  );
+  const quantity = Math.round(pickNumber(payload.quantity) || 1);
   const note = pickString(payload.note);
 
   if (!productId || !variantId) {
     throw createServiceError("Thiếu sản phẩm hoặc biến thể.");
   }
-  if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
-    throw createServiceError("Giá đề nghị không hợp lệ.");
+  if (!Number.isFinite(offeredTotal) || offeredTotal <= 0) {
+    throw createServiceError("Tổng đề nghị không hợp lệ.");
   }
-  if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
+  if (!Number.isFinite(quantity) || quantity <= 0) {
     throw createServiceError("Số lượng không hợp lệ.");
   }
 
   const { product, variant, shop } = await validateProductAndShop(productId, variantId);
-  const originalPrice = Number(variant.Price) || 0;
+  const originalUnit = Number(variant.Price) || 0;
+  const originalTotal = originalUnit * quantity;
 
   if ((variant.Quantity ?? 0) < quantity) {
     throw createServiceError(`Chỉ còn ${variant.Quantity} sản phẩm trong kho.`);
   }
 
-  assertDealDiscountAllowed(originalPrice, offeredPrice);
+  guardDealDiscount(originalTotal, offeredTotal);
 
   const existingPending = await DealOffer.findOne({
     userId: user._id,
@@ -206,15 +213,15 @@ async function createDealOffer(user, payload) {
   }
 
   const now = new Date();
-  const discountPercent = computeDiscountPercent(originalPrice, offeredPrice);
+  const discountPercent = computeDiscountPercent(originalTotal, offeredTotal);
 
   const deal = await DealOffer.create({
     productId: product._id,
     variantId: variant._id,
     userId: user._id,
     shopId: shop._id,
-    originalPrice,
-    offeredPrice,
+    originalPrice: originalUnit,
+    offeredPrice: offeredTotal,
     quantity,
     discountPercent,
     note,
@@ -227,11 +234,12 @@ async function createDealOffer(user, payload) {
 
   await notifyShopOwner(shop, {
     title: "Đề nghị deal giá mới",
-    content: `${user.FullName || user.UserName} đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ x${quantity} cho ${product.ProductName}.`,
+    content: `${user.FullName || user.UserName} đề nghị tổng ${offeredTotal.toLocaleString("vi-VN")}đ cho ${quantity} ${product.ProductName} (gốc ${originalTotal.toLocaleString("vi-VN")}đ).`,
   });
 
   return toPublicDeal(deal);
 }
+
 
 async function listBuyerDeals(user, { status, search } = {}) {
   const query = { userId: user._id };
@@ -269,26 +277,36 @@ async function resubmitDealOffer(user, dealId, payload) {
   if (!deal) {
     throw createServiceError("Không tìm thấy deal giá.", 404);
   }
-  if (deal.status !== DEAL_OFFER_STATUS.REJECTED) {
-    throw createServiceError("Chỉ có thể gửi lại đề nghị đã bị từ chối.");
+
+  const canResubmitRejected = deal.status === DEAL_OFFER_STATUS.REJECTED;
+  const canRedealAccepted =
+    deal.status === DEAL_OFFER_STATUS.ACCEPTED && !deal.reservationId;
+  if (!canResubmitRejected && !canRedealAccepted) {
+    throw createServiceError(
+      "Chỉ có thể deal lại khi bị từ chối hoặc đã chấp nhận nhưng chưa giữ hàng."
+    );
   }
 
-  const offeredPrice = pickNumber(payload.offeredPrice ?? payload.offered_price);
+  const offeredPrice = pickNumber(
+    payload.offeredTotal ?? payload.offeredPrice ?? payload.offered_price
+  );
   const note = pickString(payload.note ?? deal.note);
 
   if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
-    throw createServiceError("Giá đề nghị không hợp lệ.");
+    throw createServiceError("Tổng đề nghị không hợp lệ.");
   }
 
   const { product, variant, shop } = await validateProductAndShop(deal.productId, deal.variantId);
-  const originalPrice = Number(variant.Price) || 0;
+  const originalUnit = Number(variant.Price) || 0;
+  const quantity = Math.max(1, Number(deal.quantity) || 1);
+  const originalTotal = originalUnit * quantity;
 
-  assertDealDiscountAllowed(originalPrice, offeredPrice);
+  guardDealDiscount(originalTotal, offeredPrice);
 
   const now = new Date();
   deal.offeredPrice = offeredPrice;
-  deal.originalPrice = originalPrice;
-  deal.discountPercent = computeDiscountPercent(originalPrice, offeredPrice);
+  deal.originalPrice = originalUnit;
+  deal.discountPercent = computeDiscountPercent(originalTotal, offeredPrice);
   deal.note = note;
   deal.sellerCounterPrice = null;
   deal.sellerNote = "";
@@ -302,11 +320,12 @@ async function resubmitDealOffer(user, dealId, payload) {
 
   await notifyShopOwner(shop, {
     title: "Đề nghị deal giá mới",
-    content: `${user.FullName || user.UserName} gửi lại đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ cho ${product.ProductName}.`,
+    content: `${user.FullName || user.UserName} đề nghị lại ${offeredPrice.toLocaleString("vi-VN")}đ cho ${quantity} ${product.ProductName}.`,
   });
 
   return toPublicDeal(deal);
 }
+
 
 async function counterDealOfferByBuyer(user, dealId, payload) {
   const deal = await DealOffer.findOne({ _id: dealId, userId: user._id });
@@ -320,23 +339,27 @@ async function counterDealOfferByBuyer(user, dealId, payload) {
     throw createServiceError("Shop chưa đề xuất giá để trả giá lại.");
   }
 
-  const offeredPrice = pickNumber(payload.offeredPrice ?? payload.offered_price);
+  const offeredPrice = pickNumber(
+    payload.offeredTotal ?? payload.offeredPrice ?? payload.offered_price
+  );
   const note = pickString(payload.note ?? deal.note);
 
   if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
-    throw createServiceError("Giá đề nghị không hợp lệ.");
+    throw createServiceError("Tổng đề nghị không hợp lệ.");
   }
 
   const { product, variant, shop } = await validateProductAndShop(deal.productId, deal.variantId);
-  const originalPrice = Number(variant.Price) || 0;
+  const originalUnit = Number(variant.Price) || 0;
+  const quantity = Math.max(1, Number(deal.quantity) || 1);
+  const originalTotal = originalUnit * quantity;
 
-  assertDealDiscountAllowed(originalPrice, offeredPrice);
+  guardDealDiscount(originalTotal, offeredPrice);
 
   const now = new Date();
   const previousSellerCounter = deal.sellerCounterPrice;
   deal.offeredPrice = offeredPrice;
-  deal.originalPrice = originalPrice;
-  deal.discountPercent = computeDiscountPercent(originalPrice, offeredPrice);
+  deal.originalPrice = originalUnit;
+  deal.discountPercent = computeDiscountPercent(originalTotal, offeredPrice);
   deal.note = note;
   deal.sellerCounterPrice = null;
   deal.sellerNote = "";
@@ -348,11 +371,12 @@ async function counterDealOfferByBuyer(user, dealId, payload) {
 
   await notifyShopOwner(shop, {
     title: "Khách trả giá lại",
-    content: `${user.FullName || user.UserName} đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ (shop đề xuất ${Number(previousSellerCounter).toLocaleString("vi-VN")}đ) cho ${product.ProductName}.`,
+    content: `${user.FullName || user.UserName} đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ (shop đề xuất ${Number(previousSellerCounter).toLocaleString("vi-VN")}đ) cho ${quantity} ${product.ProductName}.`,
   });
 
   return toPublicDeal(deal);
 }
+
 
 async function acceptCounterOffer(user, dealId) {
   const deal = await DealOffer.findOne({ _id: dealId, userId: user._id });
@@ -436,9 +460,17 @@ async function createReservation(user, payload) {
     if (deal.reservationId) {
       throw createServiceError("Deal này đã có yêu cầu giữ hàng.", 400);
     }
-    agreedPrice = deal.sellerCounterPrice || deal.offeredPrice || agreedPrice;
+    const money = resolveDealMoney(deal);
+    if (quantity !== money.qty) {
+      throw createServiceError(
+        `Số lượng giữ hàng phải khớp deal (${money.qty} sp).`,
+        400
+      );
+    }
+    agreedPrice = money.agreedUnitPrice;
     linkedDealId = deal._id;
   }
+
 
   const now = new Date();
   const session = await mongoose.startSession();
@@ -446,6 +478,8 @@ async function createReservation(user, payload) {
   try {
     let reservation;
     await session.withTransaction(async () => {
+      await reserveVariantInventory(variant._id, quantity, session);
+
       reservation = await Reservation.create(
         [
           {
@@ -460,6 +494,7 @@ async function createReservation(user, payload) {
             pickupTime,
             note,
             status: RESERVATION_STATUS.PENDING,
+            inventoryHeld: true,
             CreatedAt: now,
             UpdatedAt: now,
           },
@@ -489,6 +524,7 @@ async function createReservation(user, payload) {
 }
 
 async function listBuyerReservations(user, { tab = "holding", search } = {}) {
+  await expireOverdueReservations();
   let statusFilter = [];
 
   switch (tab) {
@@ -529,7 +565,8 @@ async function listBuyerReservations(user, { tab = "holding", search } = {}) {
     mapped = mapped.filter(
       (item) =>
         (item.product?.productName || "").toLowerCase().includes(keyword) ||
-        (item.variant?.variantName || "").toLowerCase().includes(keyword)
+        (item.variant?.variantName || "").toLowerCase().includes(keyword) ||
+        (item.storeName || "").toLowerCase().includes(keyword)
     );
   }
 
@@ -547,11 +584,18 @@ async function listBuyerOrders(user, { tab = "holding", search } = {}) {
 }
 
 async function getBuyerReservation(user, reservationId) {
+  await expireOverdueReservations();
   const reservation = await Reservation.findOne({ _id: reservationId, userId: user._id });
   if (!reservation) {
     throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
   }
-  return toPublicReservation(reservation);
+  const publicReservation = await toPublicReservation(reservation);
+  const shop = await ShopProfile.findById(reservation.shopId);
+  return {
+    ...publicReservation,
+    shopId: reservation.shopId ? String(reservation.shopId) : "",
+    storeName: shop?.shopName || shop?.description || "",
+  };
 }
 
 async function cancelReservationByBuyer(user, reservationId) {
@@ -566,7 +610,13 @@ async function cancelReservationByBuyer(user, reservationId) {
   if (reservation.status === RESERVATION_STATUS.CANCELLED) {
     throw createServiceError("Đơn đã được hủy.");
   }
-  if (![RESERVATION_STATUS.PENDING, RESERVATION_STATUS.CONFIRMED].includes(reservation.status)) {
+  if (reservation.status === RESERVATION_STATUS.CONFIRMED) {
+    throw createServiceError(
+      "Shop đã xác nhận giữ hàng. Bạn không thể hủy — hãy đến lấy hàng.",
+      403
+    );
+  }
+  if (reservation.status !== RESERVATION_STATUS.PENDING) {
     throw createServiceError("Không thể hủy đơn ở trạng thái này.");
   }
 
@@ -583,6 +633,7 @@ async function cancelReservationByBuyer(user, reservationId) {
   const now = new Date();
   reservation.status = RESERVATION_STATUS.CANCELLED;
   reservation.cancelledAt = now;
+  await releaseVariantInventory(reservation);
   reservation.UpdatedAt = now;
   await reservation.save();
 

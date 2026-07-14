@@ -20,27 +20,22 @@ import {
   getBuyerOrdersOnBackend,
   resubmitBuyerDealOnBackend,
 } from '../../api/buyerOpsApi';
-import { RESERVATION_TAB, RESERVATION_TAB_LABELS, DEAL_OFFER_STATUS, RESERVATION_STATUS } from '../../constants/sellerOrders';
+import { RESERVATION_TAB, DEAL_OFFER_STATUS, RESERVATION_STATUS } from '../../constants/sellerOrders';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { formatPrice } from '../../core/utils/productFormat';
+import { formatOrderCode } from '../../core/utils/orderCode';
 import { submitShopReview } from '../../core/utils/orderReview';
 import { useReviewedOrderCodes } from '../../hooks/useReviewedOrderCodes';
 import ShopReviewModal from '../shared/components/ShopReviewModal';
 import ReservationModal from './ReservationModal';
+import BuyerOrderDetailScreen from './BuyerOrderDetailScreen';
 
 const TABS = [
-  RESERVATION_TAB.PENDING_PRICE,
-  RESERVATION_TAB.HOLDING,
-  RESERVATION_TAB.CANCELLED,
-  RESERVATION_TAB.COMPLETED,
+  { key: 'pending_price', label: 'Deal giá' },
+  { key: 'holding', label: 'Giữ hàng' },
+  { key: 'completed', label: 'Hoàn thành' },
+  { key: 'cancelled', label: 'Đã hủy' },
 ];
-
-const TAB_ICONS = {
-  [RESERVATION_TAB.PENDING_PRICE]: '💬',
-  [RESERVATION_TAB.HOLDING]: '📦',
-  [RESERVATION_TAB.CANCELLED]: '🚫',
-  [RESERVATION_TAB.COMPLETED]: '✅',
-};
 
 const DEAL_STATUS_LABELS = {
   [DEAL_OFFER_STATUS.PENDING]: 'Đang chờ',
@@ -89,6 +84,28 @@ function formatDateTime(iso) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function pickStoreName(...candidates) {
+  for (const value of candidates) {
+    const text = String(value || '').trim();
+    if (text) {
+      return text;
+    }
+  }
+  return '—';
+}
+
+function normalizeOrderItem(item) {
+  if (!item) {
+    return item;
+  }
+  return {
+    ...item,
+    id: String(item.id || item._id || '').trim(),
+    shopId: item.shopId ? String(item.shopId) : '',
+    storeName: pickStoreName(item.storeName, item.shopUsername, item.shop?.shopName),
+  };
 }
 
 function ReservationProgress({ status }) {
@@ -151,14 +168,17 @@ function BuyerOrdersContent({
   onNavigatePickup,
   onReserveFromDeal,
   onReviewStore,
+  onOpenDetail,
+  pendingDealModal = null,
+  onClearPendingDealModal,
   reviewedOrderCodes,
+  refreshKey = 0,
 }) {
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [dealFilter, setDealFilter] = useState('all');
   const [resubmitDeal, setResubmitDeal] = useState(null);
   const [resubmitPrice, setResubmitPrice] = useState('');
   const [priceModalMode, setPriceModalMode] = useState('resubmit');
@@ -178,11 +198,7 @@ function BuyerOrdersContent({
         search: search.trim() || undefined,
       });
       if (activeTab === RESERVATION_TAB.PENDING_PRICE) {
-        let deals = data.deals || [];
-        if (dealFilter !== 'all') {
-          deals = deals.filter((deal) => String(deal.status) === dealFilter);
-        }
-        setItems(deals);
+        setItems(data.deals || []);
       } else {
         setItems(data.reservations || []);
       }
@@ -193,7 +209,7 @@ function BuyerOrdersContent({
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [activeTab, search, dealFilter]);
+  }, [activeTab, search, refreshKey]);
 
   useEffect(() => {
     loadOrders();
@@ -202,7 +218,7 @@ function BuyerOrdersContent({
   function handleAcceptCounter(deal) {
     Alert.alert(
       'Chấp nhận giá shop',
-      `Bạn đồng ý mua với giá ${formatPrice(deal.sellerCounterPrice)}?`,
+      `Bạn đồng ý mua với tổng ${formatPrice(deal.sellerCounterPrice)} (${deal.quantity || 1} sp)?`,
       [
         { text: 'Huỷ', style: 'cancel' },
         {
@@ -241,6 +257,18 @@ function BuyerOrdersContent({
     setResubmitDeal(deal);
     setResubmitPrice('');
   }
+
+  useEffect(() => {
+    if (!pendingDealModal?.deal) {
+      return;
+    }
+    if (pendingDealModal.mode === 'counter') {
+      handleCounterDeal(pendingDealModal.deal);
+    } else {
+      handleResubmitDeal(pendingDealModal.deal);
+    }
+    onClearPendingDealModal?.();
+  }, [pendingDealModal]);
 
   async function submitResubmitDeal() {
     const offeredPrice = Number(String(resubmitPrice || '').replace(/\D/g, ''));
@@ -300,9 +328,19 @@ function BuyerOrdersContent({
   function renderDealItem({ item }) {
     const statusLabel = DEAL_STATUS_LABELS[item.status] || 'Không rõ';
     const statusStyle = getDealStatusStyle(item.status);
+    const qty = Number(item.quantity) || 1;
+    const originalUnit = Number(item.originalPrice) || 0;
+    const originalTotal = originalUnit * qty;
+    let offeredTotal = Number(item.offeredPrice) || 0;
+    // Legacy deals stored unit offers
+    if (originalUnit > 0 && offeredTotal > 0 && offeredTotal <= originalUnit) {
+      offeredTotal *= qty;
+    }
     const canReserve =
       item.status === DEAL_OFFER_STATUS.ACCEPTED && !item.reservationId;
-    const canResubmit = item.status === DEAL_OFFER_STATUS.REJECTED;
+    const canResubmit =
+      item.status === DEAL_OFFER_STATUS.REJECTED ||
+      (item.status === DEAL_OFFER_STATUS.ACCEPTED && !item.reservationId);
     const canAcceptCounter =
       item.status === DEAL_OFFER_STATUS.PENDING && item.sellerCounterPrice;
     const canCounter =
@@ -310,41 +348,54 @@ function BuyerOrdersContent({
 
     return (
       <View style={styles.card}>
-        <View style={styles.cardTopRow}>
-          <View style={styles.cardIconWrap}>
-            <Text style={styles.cardIcon}>💬</Text>
-          </View>
-          <View style={styles.cardMain}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.productName}</Text>
-              <View style={[styles.statusBadge, statusStyle.badge]}>
-                <Text style={[styles.statusBadgeText, statusStyle.text]}>{statusLabel}</Text>
-              </View>
+        <Pressable onPress={() => onOpenDetail?.({ kind: 'deal', item: normalizeOrderItem(item) })}>
+          <Text style={styles.orderCode}>{formatOrderCode(item.id)}</Text>
+          <View style={styles.cardTopRow}>
+            <View style={styles.cardIconWrap}>
+              <Text style={styles.cardIcon}>💬</Text>
             </View>
-            <Text style={styles.cardMeta}>
-              {item.variantName} • {item.storeName}
-            </Text>
-            <Text style={styles.priceText}>
-              {formatPrice(item.originalPrice)} → {formatPrice(item.offeredPrice)}
-            </Text>
-            <Text style={styles.cardMeta}>
-              Giảm {item.discountPercent || 0}% • {formatDateTime(item.createdAt)}
-            </Text>
-            {item.sellerCounterPrice ? (
-              <View style={styles.highlightBox}>
-                <Text style={styles.counterText}>
-                  Shop đề xuất: {formatPrice(item.sellerCounterPrice)}
-                </Text>
+            <View style={styles.cardMain}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{item.productName}</Text>
+                <View style={[styles.statusBadge, statusStyle.badge]}>
+                  <Text style={[styles.statusBadgeText, statusStyle.text]}>{statusLabel}</Text>
+                </View>
               </View>
-            ) : item.status === DEAL_OFFER_STATUS.PENDING ? (
-              <Text style={styles.waitText}>Đang chờ shop phản hồi</Text>
-            ) : null}
+              <Text style={styles.cardMeta}>
+                {item.variantName} • {pickStoreName(item.storeName, item.shopUsername)} • SL: {qty}
+              </Text>
+              <Text style={styles.priceText}>
+                Tổng {formatPrice(originalTotal)} → {formatPrice(offeredTotal)}
+              </Text>
+              <Text style={styles.cardMeta}>
+                Giảm {item.discountPercent || 0}% • {formatDateTime(item.createdAt)}
+              </Text>
+              {item.sellerCounterPrice ? (
+                <View style={styles.highlightBox}>
+                  <Text style={styles.counterText}>
+                    Shop đề xuất tổng:{' '}
+                    {formatPrice(
+                      Number(item.originalPrice) > 0 &&
+                        Number(item.sellerCounterPrice) <= Number(item.originalPrice)
+                        ? Number(item.sellerCounterPrice) * qty
+                        : item.sellerCounterPrice
+                    )}
+                  </Text>
+                </View>
+              ) : item.status === DEAL_OFFER_STATUS.PENDING ? (
+                <Text style={styles.waitText}>Đang chờ shop phản hồi</Text>
+              ) : null}
+              <Text style={styles.detailLink}>Xem chi tiết →</Text>
+            </View>
           </View>
-        </View>
+        </Pressable>
 
         <View style={styles.actionRow}>
           {canAcceptCounter ? (
-            <Pressable style={[styles.actionButton, styles.actionButtonFlex]} onPress={() => handleAcceptCounter(item)}>
+            <Pressable
+              style={[styles.actionButton, styles.actionButtonFlex]}
+              onPress={() => handleAcceptCounter(item)}
+            >
               <Text style={styles.actionButtonText}>Chấp nhận giá</Text>
             </Pressable>
           ) : null}
@@ -360,12 +411,10 @@ function BuyerOrdersContent({
           ) : null}
           {canReserve ? (
             <Pressable
-              style={[styles.actionButton, styles.actionButtonSecondary, styles.actionButtonFlex]}
+              style={[styles.actionButton, styles.actionButtonFlex]}
               onPress={() => onReserveFromDeal?.(item)}
             >
-              <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
-                Chọn giờ lấy
-              </Text>
+              <Text style={styles.actionButtonText}>Giữ hàng</Text>
             </Pressable>
           ) : null}
           {canResubmit ? (
@@ -374,7 +423,7 @@ function BuyerOrdersContent({
               onPress={() => handleResubmitDeal(item)}
             >
               <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
-                Gửi lại deal
+                Deal giá lại
               </Text>
             </Pressable>
           ) : null}
@@ -387,42 +436,50 @@ function BuyerOrdersContent({
     const isHolding = activeTab === RESERVATION_TAB.HOLDING;
     const statusStyle = getReservationStatusStyle(item.status);
     const canCancel =
-      isHolding &&
-      [RESERVATION_STATUS.PENDING, RESERVATION_STATUS.CONFIRMED].includes(item.status) &&
-      !item.buyerCancelLocked;
+      isHolding && item.status === RESERVATION_STATUS.PENDING && !item.buyerCancelLocked;
     const canReview =
       activeTab === RESERVATION_TAB.COMPLETED &&
       !reviewedOrderCodes?.has(String(item.id));
     const canNavigate = isHolding && item.status === RESERVATION_STATUS.CONFIRMED;
+    const storeName = pickStoreName(item.storeName, item.shopUsername, item.shop?.shopName);
 
     return (
       <View style={styles.card}>
-        <View style={styles.cardTopRow}>
-          <View style={styles.cardIconWrap}>
-            <Text style={styles.cardIcon}>📦</Text>
-          </View>
-          <View style={styles.cardMain}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.product?.productName}</Text>
-              <View style={[styles.statusBadge, statusStyle.badge]}>
-                <Text style={[styles.statusBadgeText, statusStyle.text]}>
-                  {RESERVATION_STATUS_LABELS[item.status] || 'Không rõ'}
-                </Text>
-              </View>
+        <Pressable
+          onPress={() => onOpenDetail?.({ kind: 'reservation', item: normalizeOrderItem(item) })}
+        >
+          <Text style={styles.orderCode}>{formatOrderCode(item.id)}</Text>
+          <View style={styles.cardTopRow}>
+            <View style={styles.cardIconWrap}>
+              <Text style={styles.cardIcon}>📦</Text>
             </View>
-            <Text style={styles.cardMeta}>
-              {item.variant?.variantName} • SL: {item.quantity} • {item.storeName}
-            </Text>
-            <Text style={styles.priceText}>
-              {formatPrice(item.agreedPrice)}/sp • Tổng {formatPrice(item.totalAmount)}
-            </Text>
-            {item.pickupTime ? (
-              <Text style={styles.pickupText}>🕐 Lấy: {formatDateTime(item.pickupTime)}</Text>
-            ) : (
-              <Text style={styles.cardMeta}>Giữ lúc: {formatDateTime(item.createdAt)}</Text>
-            )}
+            <View style={styles.cardMain}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>{item.product?.productName}</Text>
+                <View style={[styles.statusBadge, statusStyle.badge]}>
+                  <Text style={[styles.statusBadgeText, statusStyle.text]}>
+                    {RESERVATION_STATUS_LABELS[item.status] || 'Không rõ'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.cardMeta}>
+                {item.variant?.variantName} • SL: {item.quantity} • {storeName}
+              </Text>
+              <Text style={styles.priceText}>
+                {formatPrice(item.agreedPrice)}/sp • Tổng {formatPrice(item.totalAmount)}
+              </Text>
+              {item.pickupTime ? (
+                <Text style={styles.pickupText}>🕐 Lấy: {formatDateTime(item.pickupTime)}</Text>
+              ) : (
+                <Text style={styles.cardMeta}>Giữ lúc: {formatDateTime(item.createdAt)}</Text>
+              )}
+              {item.status === RESERVATION_STATUS.CANCELLED && item.cancelReason ? (
+                <Text style={styles.cancelReasonText}>Lý do: {item.cancelReason}</Text>
+              ) : null}
+              <Text style={styles.detailLink}>Xem chi tiết →</Text>
+            </View>
           </View>
-        </View>
+        </Pressable>
 
         <ReservationProgress status={item.status} />
 
@@ -455,7 +512,7 @@ function BuyerOrdersContent({
               onPress={() =>
                 onReviewStore?.({
                   storeId: item.shopId ? String(item.shopId) : '',
-                  storeName: item.storeName,
+                  storeName,
                   productName: item.product?.productName,
                   orderCode: item.id ? String(item.id) : '',
                 })
@@ -496,32 +553,6 @@ function BuyerOrdersContent({
         </Pressable>
       </View>
 
-      {activeTab === RESERVATION_TAB.PENDING_PRICE ? (
-        <View style={styles.filterRow}>
-          {[
-            { key: 'all', label: 'Tất cả' },
-            { key: String(DEAL_OFFER_STATUS.PENDING), label: 'Chờ' },
-            { key: String(DEAL_OFFER_STATUS.ACCEPTED), label: 'Chấp nhận' },
-            { key: String(DEAL_OFFER_STATUS.REJECTED), label: 'Từ chối' },
-          ].map((filter) => (
-            <Pressable
-              key={filter.key}
-              style={[styles.filterChip, dealFilter === filter.key && styles.filterChipActive]}
-              onPress={() => setDealFilter(filter.key)}
-            >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  dealFilter === filter.key && styles.filterChipTextActive,
-                ]}
-              >
-                {filter.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
       {error ? (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>{error}</Text>
@@ -550,11 +581,21 @@ function BuyerOrdersContent({
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>
-              {priceModalMode === 'counter' ? 'Đề nghị giá mới' : 'Gửi lại đề nghị'}
+              {priceModalMode === 'counter' ? 'Đề nghị tổng mới' : 'Deal giá lại'}
             </Text>
+            {resubmitDeal ? (
+              <Text style={styles.modalHint}>
+                Tổng niêm yết:{' '}
+                {formatPrice(
+                  (Number(resubmitDeal.originalPrice) || 0) * (resubmitDeal.quantity || 1)
+                )}
+                {' • '}
+                SL: {resubmitDeal.quantity || 1}
+              </Text>
+            ) : null}
             {priceModalMode === 'counter' && resubmitDeal?.sellerCounterPrice ? (
               <Text style={styles.modalHint}>
-                Shop đề xuất: {formatPrice(resubmitDeal.sellerCounterPrice)}
+                Shop đề xuất tổng: {formatPrice(resubmitDeal.sellerCounterPrice)}
               </Text>
             ) : null}
             <TextInput
@@ -562,7 +603,9 @@ function BuyerOrdersContent({
               value={resubmitPrice}
               onChangeText={(value) => setResubmitPrice(value.replace(/\D/g, ''))}
               keyboardType="number-pad"
-              placeholder={priceModalMode === 'counter' ? 'Giá bạn muốn đề nghị' : 'Giá đề nghị mới'}
+              placeholder={
+                priceModalMode === 'counter' ? 'Tổng bạn muốn đề nghị' : 'Tổng đề nghị mới'
+              }
             />
             <View style={styles.modalActions}>
               <Pressable style={styles.modalCancel} onPress={() => setResubmitDeal(null)}>
@@ -589,21 +632,23 @@ export default function BuyerOrdersScreen({
   const [activeTab, setActiveTab] = useState(RESERVATION_TAB.HOLDING);
   const [reservationModal, setReservationModal] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
+  const [listRefreshKey, setListRefreshKey] = useState(0);
+  const [detailTarget, setDetailTarget] = useState(null);
+  const [pendingDealModal, setPendingDealModal] = useState(null);
   const { reviewedOrderCodes, markReviewed } = useReviewedOrderCodes();
 
   const tabBar = (
     <View style={styles.tabRow}>
       {TABS.map((tab) => {
-        const isActive = activeTab === tab;
+        const isActive = activeTab === tab.key;
         return (
           <Pressable
-            key={tab}
-            onPress={() => setActiveTab(tab)}
+            key={tab.key}
+            onPress={() => setActiveTab(tab.key)}
             style={[styles.tabItem, isActive && styles.tabItemActive]}
           >
-            <Text style={styles.tabIcon}>{TAB_ICONS[tab]}</Text>
-            <Text style={[styles.tabText, isActive && styles.tabTextActive]} numberOfLines={2}>
-              {RESERVATION_TAB_LABELS[tab]}
+            <Text style={[styles.tabText, isActive && styles.tabTextActive]} numberOfLines={1}>
+              {tab.label}
             </Text>
           </Pressable>
         );
@@ -612,6 +657,12 @@ export default function BuyerOrdersScreen({
   );
 
   function handleReserveFromDeal(deal) {
+    const qty = Number(deal.quantity) || 1;
+    const originalUnit = Number(deal.originalPrice) || 0;
+    let agreedTotal = Number(deal.sellerCounterPrice || deal.offeredPrice) || 0;
+    if (originalUnit > 0 && agreedTotal > 0 && agreedTotal <= originalUnit) {
+      agreedTotal *= qty;
+    }
     setReservationModal({
       product: {
         id: deal.productId,
@@ -622,13 +673,15 @@ export default function BuyerOrdersScreen({
             name: deal.variantName,
             variantName: deal.variantName,
             price: deal.originalPrice,
-            quantity: 999,
+            quantity: qty,
           },
         ],
       },
       store: { id: deal.shopId, name: deal.storeName },
       dealOfferId: deal.id,
-      agreedPrice: deal.sellerCounterPrice || deal.offeredPrice,
+      agreedTotal,
+      dealQuantity: qty,
+      preselectedVariantId: deal.variantId,
     });
   }
 
@@ -643,18 +696,25 @@ export default function BuyerOrdersScreen({
           setReviewTarget(target);
           onReviewStore?.(target);
         }}
+        onOpenDetail={setDetailTarget}
+        pendingDealModal={pendingDealModal}
+        onClearPendingDealModal={() => setPendingDealModal(null)}
         reviewedOrderCodes={reviewedOrderCodes}
+        refreshKey={listRefreshKey}
       />
       <ReservationModal
         visible={Boolean(reservationModal)}
         product={reservationModal?.product}
         store={reservationModal?.store}
         dealOfferId={reservationModal?.dealOfferId}
-        agreedPrice={reservationModal?.agreedPrice}
+        agreedTotal={reservationModal?.agreedTotal}
+        lockedQuantity={reservationModal?.dealQuantity}
+        preselectedVariantId={reservationModal?.preselectedVariantId}
         onClose={() => setReservationModal(null)}
         onSuccess={() => {
           setReservationModal(null);
           setActiveTab(RESERVATION_TAB.HOLDING);
+          setListRefreshKey((value) => value + 1);
         }}
       />
       <ShopReviewModal
@@ -684,6 +744,46 @@ export default function BuyerOrdersScreen({
       />
     </>
   );
+
+  if (detailTarget) {
+    return (
+      <View style={styles.screen}>
+        <BuyerOrderDetailScreen
+          kind={detailTarget.kind}
+          orderId={String(detailTarget.item?.id || '')}
+          initialItem={normalizeOrderItem(detailTarget.item)}
+          onBack={() => setDetailTarget(null)}
+          onChanged={() => setListRefreshKey((value) => value + 1)}
+          onReserveFromDeal={(deal) => {
+            setDetailTarget(null);
+            handleReserveFromDeal(deal);
+          }}
+          onNavigatePickup={(payload) => {
+            setDetailTarget(null);
+            onNavigatePickup?.(payload);
+          }}
+          onReviewStore={(target) => {
+            setDetailTarget(null);
+            setReviewTarget(target);
+            onReviewStore?.(target);
+          }}
+          onCounterDeal={(deal) => {
+            setDetailTarget(null);
+            setPendingDealModal({ mode: 'counter', deal });
+          }}
+          onResubmitDeal={(deal) => {
+            setDetailTarget(null);
+            setPendingDealModal({ mode: 'resubmit', deal });
+          }}
+          canReview={
+            detailTarget.kind === 'reservation' &&
+            activeTab === RESERVATION_TAB.COMPLETED &&
+            !reviewedOrderCodes?.has(String(detailTarget.item?.id))
+          }
+        />
+      </View>
+    );
+  }
 
   if (embedded) {
     return (
@@ -743,36 +843,35 @@ const styles = StyleSheet.create({
   topBarSpacer: { width: 36 },
   tabRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    padding: 12,
+    width: '100%',
+    alignItems: 'stretch',
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
   tabItem: {
-    flexBasis: '48%',
     flexGrow: 1,
-    minHeight: 52,
-    borderRadius: 12,
+    flexShrink: 1,
+    flexBasis: 0,
+    minHeight: 38,
+    marginHorizontal: 3,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 2,
     paddingVertical: 8,
     backgroundColor: '#ffffff',
-    gap: 2,
-  },
-  tabIcon: {
-    fontSize: 16,
   },
   tabItemActive: {
     borderColor: '#0d7377',
     backgroundColor: '#ecfdf5',
   },
   tabText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#64748b',
     textAlign: 'center',
@@ -818,33 +917,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 13,
   },
-  filterRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-  },
-  filterChip: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#ffffff',
-  },
-  filterChipActive: {
-    borderColor: '#0f766e',
-    backgroundColor: '#ecfdf5',
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  filterChipTextActive: {
-    color: '#0f766e',
-  },
   listContent: {
     padding: 16,
     paddingBottom: 24,
@@ -867,6 +939,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
+  },
+  orderCode: {
+    marginBottom: 10,
+    color: '#0f766e',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  detailLink: {
+    marginTop: 8,
+    color: '#0f766e',
+    fontSize: 12,
+    fontWeight: '800',
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -962,6 +1047,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: '#0f766e',
     fontSize: 13,
+    fontWeight: '700',
+  },
+  cancelReasonText: {
+    marginTop: 4,
+    color: '#b91c1c',
+    fontSize: 12,
     fontWeight: '700',
   },
   waitText: {

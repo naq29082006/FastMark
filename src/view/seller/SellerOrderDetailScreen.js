@@ -116,6 +116,9 @@ export default function SellerOrderDetailScreen({ reservationId, onBack, onChang
           </Text>
         ) : null}
         {reservation.note ? <Text style={styles.meta}>Ghi chú: {reservation.note}</Text> : null}
+        {reservation.cancelReason ? (
+          <Text style={styles.meta}>Lý do hủy: {reservation.cancelReason}</Text>
+        ) : null}
         {reservation.buyerCancelLocked ? (
           <Text style={styles.lockHint}>Khách không thể hủy sau khi chấp nhận giá (15 phút).</Text>
         ) : null}

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Keyboard,
   Modal,
   Pressable,
   ScrollView,
@@ -15,6 +17,7 @@ import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { createBuyerDealOnBackend } from '../../api/buyerOpsApi';
 import { formatPrice } from '../../core/utils/productFormat';
 import SelectedVariantCard from './SelectedVariantCard';
+import QuantityStepper from './QuantityStepper';
 
 function parsePriceInput(value) {
   const digits = String(value || '').replace(/\D/g, '');
@@ -52,37 +55,47 @@ export default function DealOfferModal({
   }, [product]);
 
   const [selectedVariantId, setSelectedVariantId] = useState(null);
-  const [quantity, setQuantity] = useState('1');
+  const [quantity, setQuantity] = useState(1);
   const [priceInput, setPriceInput] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [confirmVisible, setConfirmVisible] = useState(false);
 
   const selectedVariant = variants.find((v) => String(v.id) === String(selectedVariantId));
+  const maxQty = Math.max(0, Number(selectedVariant?.quantity) || 0);
 
   useEffect(() => {
     if (!visible) {
       return;
     }
     setSelectedVariantId(preselectedVariantId || variants[0]?.id || null);
-    setQuantity('1');
+    setQuantity(1);
     setPriceInput('');
     setNote('');
     setError('');
-    setConfirmVisible(false);
   }, [visible, variants, preselectedVariantId]);
 
-  const originalPrice = Number(selectedVariant?.price) || 0;
-  const offeredPrice = parsePriceInput(priceInput);
+  useEffect(() => {
+    if (!selectedVariant) {
+      return;
+    }
+    const stock = Math.max(0, Number(selectedVariant.quantity) || 0);
+    setQuantity((prev) => {
+      if (stock <= 0) {
+        return 0;
+      }
+      return Math.max(1, Math.min(Number(prev) || 1, stock));
+    });
+  }, [selectedVariantId, selectedVariant?.quantity]);
+
+  const unitPrice = Number(selectedVariant?.price) || 0;
   const qtyNum = Number(quantity) || 0;
-  const originalTotal = originalPrice * (qtyNum > 0 ? qtyNum : 0);
-  const offeredTotal =
-    Number.isFinite(offeredPrice) && qtyNum > 0 ? offeredPrice * qtyNum : 0;
-  const minOfferedUnitPrice = Math.ceil(originalPrice * (1 - MAX_DEAL_DISCOUNT_PERCENT / 100));
+  const originalTotal = unitPrice * (qtyNum > 0 ? qtyNum : 0);
+  const offeredTotal = parsePriceInput(priceInput);
+  const minOfferedTotal = Math.ceil(originalTotal * (1 - MAX_DEAL_DISCOUNT_PERCENT / 100));
   const discountPercent =
-    originalPrice > 0 && Number.isFinite(offeredPrice)
-      ? Math.max(0, Math.round(((originalPrice - offeredPrice) / originalPrice) * 10000) / 100)
+    originalTotal > 0 && Number.isFinite(offeredTotal)
+      ? Math.max(0, Math.round(((originalTotal - offeredTotal) / originalTotal) * 10000) / 100)
       : 0;
 
   function validateForm() {
@@ -95,14 +108,14 @@ export default function DealOfferModal({
     if (qtyNum > (selectedVariant.quantity ?? 0)) {
       return `Chỉ còn ${selectedVariant.quantity} sản phẩm trong kho.`;
     }
-    if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
-      return 'Giá đề nghị không hợp lệ.';
+    if (!Number.isFinite(offeredTotal) || offeredTotal <= 0) {
+      return 'Tổng giá đề nghị không hợp lệ.';
     }
-    if (offeredPrice >= originalPrice) {
-      return 'Giá đề nghị phải thấp hơn giá niêm yết.';
+    if (offeredTotal >= originalTotal) {
+      return 'Tổng đề nghị phải thấp hơn tổng niêm yết.';
     }
     if (discountPercent > MAX_DEAL_DISCOUNT_PERCENT) {
-      return `Không được deal giảm quá ${MAX_DEAL_DISCOUNT_PERCENT}%. Giá tối thiểu ${formatPrice(minOfferedUnitPrice)} /sp.`;
+      return `Không được deal giảm quá ${MAX_DEAL_DISCOUNT_PERCENT}%. Tổng tối thiểu ${formatPrice(minOfferedTotal)}.`;
     }
     return '';
   }
@@ -122,7 +135,8 @@ export default function DealOfferModal({
         idToken,
         productId: product.id,
         variantId: selectedVariant.id,
-        offeredPrice,
+        offeredPrice: offeredTotal,
+        offeredTotal,
         quantity: qtyNum,
         note: note.trim(),
       });
@@ -130,10 +144,27 @@ export default function DealOfferModal({
       onClose?.();
     } catch (submitError) {
       setError(submitError.message || 'Không gửi được đề nghị deal giá.');
+      Alert.alert('Lỗi', submitError.message || 'Không gửi được đề nghị deal giá.');
     } finally {
       setIsSubmitting(false);
-      setConfirmVisible(false);
     }
+  }
+
+  function askConfirmAndSubmit() {
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    Keyboard.dismiss();
+    Alert.alert(
+      'Xác nhận gửi deal?',
+      `Đề nghị ${formatPrice(offeredTotal)} cho ${qtyNum} sp (tổng ${formatPrice(originalTotal)}).`,
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        { text: 'Gửi', onPress: () => handleSubmit() },
+      ]
+    );
   }
 
   if (!visible) {
@@ -142,161 +173,135 @@ export default function DealOfferModal({
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
-          <View style={styles.handle} />
-          <View style={styles.titleRow}>
-            <Text style={styles.titleIcon}>💬</Text>
-            <View>
-              <Text style={styles.title}>Đề nghị deal giá</Text>
-              <Text style={styles.subtitle}>{product?.name || product?.productName}</Text>
-            </View>
-          </View>
-          {store?.name ? <Text style={styles.shopName}>🏪 {store.name}</Text> : null}
-
-          <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
-            {!hasPresetVariant ? (
-              <>
-                <Text style={styles.label}>Chọn biến thể</Text>
-                {variants.length === 0 ? (
-                  <Text style={styles.hint}>Sản phẩm hết hàng.</Text>
-                ) : (
-                  variants.map((variant) => {
-                    const isActive = String(variant.id) === String(selectedVariantId);
-                    return (
-                      <Pressable
-                        key={variant.id}
-                        style={[styles.variantChip, isActive && styles.variantChipActive]}
-                        onPress={() => setSelectedVariantId(variant.id)}
-                      >
-                        <Text style={[styles.variantText, isActive && styles.variantTextActive]}>
-                          {variant.name || variant.variantName} — {formatPrice(variant.price)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })
-                )}
-              </>
-            ) : selectedVariant ? (
-              <SelectedVariantCard
-                variant={selectedVariant}
-                productThumbnail={product?.thumbnail || ''}
-              />
-            ) : null}
-
-            {selectedVariant ? (
-              <>
-                <Text style={styles.label}>Số lượng</Text>
-                <TextInput
-                  style={styles.input}
-                  value={quantity}
-                  onChangeText={(value) => {
-                    setQuantity(value.replace(/\D/g, ''));
-                    setError('');
-                  }}
-                  keyboardType="number-pad"
-                  placeholder="1"
-                  placeholderTextColor="#94a3b8"
-                />
-
-                <Text style={styles.label}>Giá niêm yết (1 sp)</Text>
-                <Text style={styles.originalPrice}>{formatPrice(originalPrice)}</Text>
-                {qtyNum > 0 ? (
-                  <Text style={styles.totalHint}>
-                    Tổng niêm yết: {formatPrice(originalTotal)} ({qtyNum} sp)
-                  </Text>
-                ) : null}
-
-                <Text style={styles.label}>Giá bạn đề nghị (1 sp)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={priceInput}
-                  onChangeText={(value) => {
-                    setPriceInput(value.replace(/\D/g, ''));
-                    setError('');
-                  }}
-                  keyboardType="number-pad"
-                  placeholder="Nhập giá đề nghị /sp"
-                  placeholderTextColor="#94a3b8"
-                />
-                {Number.isFinite(offeredPrice) && offeredPrice > 0 && qtyNum > 0 ? (
-                  <>
-                    <Text style={styles.totalHint}>
-                      Tổng đề nghị: {formatPrice(offeredTotal)} ({qtyNum} sp)
-                    </Text>
-                    <Text style={styles.discountText}>Giảm ~{discountPercent}% /sp</Text>
-                  </>
-                ) : null}
-
-                <Text style={styles.label}>Ghi chú (tuỳ chọn)</Text>
-                <TextInput
-                  style={[styles.input, styles.noteInput]}
-                  value={note}
-                  onChangeText={setNote}
-                  multiline
-                  placeholder="Lý do hoặc yêu cầu thêm..."
-                  placeholderTextColor="#94a3b8"
-                />
-              </>
-            ) : null}
-
-            {error ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{error}</Text>
+      <View style={styles.modalRoot}>
+        <View style={styles.overlay}>
+          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
+            <View style={styles.handle} />
+            <View style={styles.titleRow}>
+              <Text style={styles.titleIcon}>💬</Text>
+              <View>
+                <Text style={styles.title}>Đề nghị deal giá</Text>
+                <Text style={styles.subtitle}>{product?.name || product?.productName}</Text>
               </View>
-            ) : null}
-          </ScrollView>
+            </View>
+            {store?.name ? <Text style={styles.shopName}>🏪 {store.name}</Text> : null}
 
-          <View style={styles.actions}>
-            <Pressable style={styles.cancelBtn} onPress={onClose} disabled={isSubmitting}>
-              <Text style={styles.cancelBtnText}>Huỷ</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
-              disabled={isSubmitting || !selectedVariant}
-              onPress={() => {
-                const validationError = validateForm();
-                if (validationError) {
-                  setError(validationError);
-                  return;
-                }
-                setConfirmVisible(true);
-              }}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.submitBtnText}>Gửi đề nghị</Text>
-              )}
-            </Pressable>
+            <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
+              {!hasPresetVariant ? (
+                <>
+                  <Text style={styles.label}>Chọn biến thể</Text>
+                  {variants.length === 0 ? (
+                    <Text style={styles.hint}>Sản phẩm hết hàng.</Text>
+                  ) : (
+                    variants.map((variant) => {
+                      const isActive = String(variant.id) === String(selectedVariantId);
+                      return (
+                        <Pressable
+                          key={variant.id}
+                          style={[styles.variantChip, isActive && styles.variantChipActive]}
+                          onPress={() => setSelectedVariantId(variant.id)}
+                        >
+                          <Text style={[styles.variantText, isActive && styles.variantTextActive]}>
+                            {variant.name || variant.variantName} — {formatPrice(variant.price)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })
+                  )}
+                  {selectedVariant ? (
+                    <SelectedVariantCard
+                      variant={selectedVariant}
+                      productThumbnail={product?.thumbnail || ''}
+                    />
+                  ) : null}
+                </>
+              ) : selectedVariant ? (
+                <SelectedVariantCard
+                  variant={selectedVariant}
+                  productThumbnail={product?.thumbnail || ''}
+                />
+              ) : null}
+
+              {selectedVariant && qtyNum > 0 ? (
+                <Text style={styles.totalUnderVariant}>Tổng: {formatPrice(originalTotal)}</Text>
+              ) : null}
+
+              {selectedVariant ? (
+                <>
+                  <Text style={styles.label}>Số lượng</Text>
+                  <QuantityStepper
+                    value={qtyNum}
+                    max={maxQty}
+                    onChange={(next) => {
+                      setQuantity(next);
+                      setError('');
+                    }}
+                  />
+
+                  <Text style={styles.label}>
+                    Tổng đề nghị{qtyNum > 0 ? ` cho ${qtyNum} sp` : ''}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={priceInput}
+                    onChangeText={(value) => {
+                      setPriceInput(value.replace(/\D/g, ''));
+                      setError('');
+                    }}
+                    keyboardType="number-pad"
+                    placeholder="Nhập tổng bạn muốn trả"
+                    placeholderTextColor="#94a3b8"
+                  />
+                  {Number.isFinite(offeredTotal) && offeredTotal > 0 && qtyNum > 0 ? (
+                    <Text style={styles.discountText}>Giảm ~{discountPercent}%</Text>
+                  ) : null}
+
+                  <Text style={styles.label}>Ghi chú (tuỳ chọn)</Text>
+                  <TextInput
+                    style={[styles.input, styles.noteInput]}
+                    value={note}
+                    onChangeText={setNote}
+                    multiline
+                    placeholder="Lý do hoặc yêu cầu thêm..."
+                    placeholderTextColor="#94a3b8"
+                  />
+                </>
+              ) : null}
+
+              {error ? (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+            </ScrollView>
+
+            <View style={styles.actions}>
+              <Pressable style={styles.cancelBtn} onPress={onClose} disabled={isSubmitting}>
+                <Text style={styles.cancelBtnText}>Huỷ</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
+                disabled={isSubmitting || !selectedVariant}
+                onPress={askConfirmAndSubmit}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>Gửi đề nghị</Text>
+                )}
+              </Pressable>
+            </View>
           </View>
         </View>
       </View>
-
-      {confirmVisible ? (
-        <View style={styles.confirmOverlay}>
-          <View style={styles.confirmBox}>
-            <Text style={styles.confirmTitle}>Xác nhận gửi deal giá?</Text>
-            <Text style={styles.confirmBody}>
-              Bạn đề nghị {formatPrice(offeredPrice)} /sp × {qtyNum} = {formatPrice(offeredTotal)} cho{' '}
-              {selectedVariant?.name || selectedVariant?.variantName} (giảm {discountPercent}% /sp).
-            </Text>
-            <View style={styles.confirmActions}>
-              <Pressable style={styles.cancelBtn} onPress={() => setConfirmVisible(false)}>
-                <Text style={styles.cancelBtnText}>Quay lại</Text>
-              </Pressable>
-              <Pressable style={styles.submitBtn} onPress={handleSubmit} disabled={isSubmitting}>
-                <Text style={styles.submitBtnText}>Xác nhận</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      ) : null}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalRoot: {
+    flex: 1,
+  },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -386,11 +391,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f766e',
   },
-  totalHint: {
-    marginTop: 4,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
+  totalUnderVariant: {
+    marginTop: 8,
+    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f766e',
   },
   input: {
     borderWidth: 1,
@@ -467,36 +473,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
-  },
-  confirmOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,23,42,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    zIndex: 10,
-  },
-  confirmBox: {
-    width: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-  },
-  confirmTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginBottom: 8,
-  },
-  confirmBody: {
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-    fontWeight: '600',
-  },
-  confirmActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 18,
   },
 });
