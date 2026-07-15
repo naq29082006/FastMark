@@ -6,8 +6,16 @@ const adminAccountController = require("../controllers/adminAccountController");
 const adminReportController = require("../controllers/adminReportController");
 const adminReviewController = require("../controllers/adminReviewController");
 const adminNotificationController = require("../controllers/adminNotificationController");
+const adminDashboardController = require("../controllers/adminDashboardController");
 
 const router = express.Router();
+
+router.get(
+  "/dashboard",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminDashboardController.getDashboard)
+);
 
 router.get(
   "/accounts",

@@ -1,7 +1,8 @@
 const Reservation = require("../models/Reservation");
-const ShopProfile = require("../models/ShopProfile");
+const Product = require("../models/Product");
 const User = require("../models/User");
 const { RESERVATION_STATUS } = require("../constants/reservationStatus");
+const { PRODUCT_STATUS } = require("../constants/productStatus");
 const { getShopForSeller } = require("./shopSettingsService");
 const { computeTotal } = require("./reservationService");
 
@@ -46,12 +47,23 @@ async function getSellerStats(user) {
     }
   }
 
-  const [pendingCount, confirmedCount, cancelledCount, completedCount] = await Promise.all([
-    Reservation.countDocuments({ shopId: shop._id, status: RESERVATION_STATUS.PENDING }),
-    Reservation.countDocuments({ shopId: shop._id, status: RESERVATION_STATUS.CONFIRMED }),
-    Reservation.countDocuments({ shopId: shop._id, status: RESERVATION_STATUS.CANCELLED }),
-    Reservation.countDocuments({ shopId: shop._id, status: RESERVATION_STATUS.COMPLETED }),
-  ]);
+  const [pendingCount, confirmedCount, cancelledCount, completedCount, productLikeAgg] =
+    await Promise.all([
+      Reservation.countDocuments({ shopId: shop._id, status: RESERVATION_STATUS.PENDING }),
+      Reservation.countDocuments({ shopId: shop._id, status: RESERVATION_STATUS.CONFIRMED }),
+      Reservation.countDocuments({ shopId: shop._id, status: RESERVATION_STATUS.CANCELLED }),
+      Reservation.countDocuments({ shopId: shop._id, status: RESERVATION_STATUS.COMPLETED }),
+      Product.aggregate([
+        {
+          $match: {
+            ShopId: shop._id,
+            IsDeleted: { $ne: true },
+            Status: PRODUCT_STATUS.ACTIVE,
+          },
+        },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$LikeCount", 0] } } } },
+      ]),
+    ]);
 
   return {
     dailyRevenue,
@@ -66,7 +78,8 @@ async function getSellerStats(user) {
     },
     followersCount: freshUser?.FollowersCount || 0,
     followingCount: freshUser?.FollowingCount || 0,
-    productLikes: shop.totalLikes || 0,
+    productLikes: Number(productLikeAgg?.[0]?.total) || 0,
+    shopLikes: shop.totalLikes || 0,
     totalProducts: shop.totalProducts || 0,
     soldCount: shop.soldCount || 0,
     averageRating: shop.averageRating || 0,

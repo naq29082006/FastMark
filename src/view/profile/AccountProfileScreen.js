@@ -464,13 +464,13 @@ export default function AccountProfileScreen({
           ) : null}
 
           <View style={styles.followRow}>
-            <Pressable onPress={() => onOpenFollowConnections?.()}>
+            <Pressable onPress={() => onOpenFollowConnections?.('following')}>
               <Text style={styles.followText}>
                 <Text style={styles.followValue}>{formatCount(stats.following)}</Text> đang theo dõi
               </Text>
             </Pressable>
             <Text style={styles.followDivider}>•</Text>
-            <Pressable onPress={() => onOpenFollowConnections?.()}>
+            <Pressable onPress={() => onOpenFollowConnections?.('followers')}>
               <Text style={styles.followText}>
                 <Text style={styles.followValue}>{formatCount(stats.followers)}</Text> người theo dõi
               </Text>

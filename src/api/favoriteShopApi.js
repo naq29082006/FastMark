@@ -32,42 +32,43 @@ function toQuery(params = {}) {
   return text ? `?${text}` : '';
 }
 
-export async function getFavoriteProductsOnBackend(idToken, params = {}) {
+export async function getFavoriteShopsOnBackend(idToken, params = {}) {
   const response = await apiRequest(
-    `${API_ENDPOINTS.buyerFavorites}${toQuery(params)}`,
+    `${API_ENDPOINTS.buyerFavoriteShops}${toQuery(params)}`,
     { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
     AUTH_TIMEOUT_MS
   );
   const payload = await parseApiResponse(response);
-  if (Array.isArray(payload.data?.favorites)) {
-    return {
-      favorites: payload.data.favorites,
-      pagination: payload.data.pagination || null,
-    };
-  }
-  return {
-    favorites: payload.data?.favorites || [],
-    pagination: payload.data?.pagination || null,
-  };
+  return payload.data || { items: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 1 } };
 }
 
-export async function getFavoriteProductIdsOnBackend(idToken) {
+export async function getFavoriteShopIdsOnBackend(idToken) {
   const response = await apiRequest(
-    API_ENDPOINTS.buyerFavoriteIds,
+    API_ENDPOINTS.buyerFavoriteShopIds,
     { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
     AUTH_TIMEOUT_MS
   );
   const payload = await parseApiResponse(response);
-  return payload.data?.productIds || [];
+  return payload.data?.shopIds || [];
 }
 
-export async function addFavoriteProductOnBackend({ idToken, productId }) {
+export async function getFavoriteShopStatusOnBackend(idToken, shopId) {
   const response = await apiRequest(
-    API_ENDPOINTS.buyerFavorites,
+    `${API_ENDPOINTS.buyerFavoriteShopStatus}${toQuery({ shopId })}`,
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data || { isFavorite: false, totalLikes: 0 };
+}
+
+export async function addFavoriteShopOnBackend({ idToken, shopId }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.buyerFavoriteShops,
     {
       method: 'POST',
       headers: await authHeaders(idToken),
-      body: JSON.stringify({ productId }),
+      body: JSON.stringify({ shopId }),
     },
     AUTH_TIMEOUT_MS
   );
@@ -75,14 +76,15 @@ export async function addFavoriteProductOnBackend({ idToken, productId }) {
   return payload.data?.favorite;
 }
 
-export async function removeFavoriteProductOnBackend(idToken, productId) {
+export async function removeFavoriteShopOnBackend(idToken, shopId) {
   const response = await apiRequest(
-    API_ENDPOINTS.buyerFavorite(productId),
+    API_ENDPOINTS.buyerFavoriteShop(shopId),
     {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${idToken}` },
     },
     AUTH_TIMEOUT_MS
   );
-  await parseApiResponse(response);
+  const payload = await parseApiResponse(response);
+  return payload.data;
 }

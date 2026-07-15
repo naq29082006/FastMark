@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { getSellerStatsOnBackend } from '../../api/sellerOpsApi';
 import { formatPrice } from '../../core/utils/productFormat';
@@ -17,10 +17,15 @@ function StatCard({ label, value, highlight }) {
 export default function SellerStatsScreen({ onBack, embedded = false }) {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const loadStats = useCallback(async () => {
-    setIsLoading(true);
+  const loadStats = useCallback(async ({ refresh = false } = {}) => {
+    if (refresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     setError('');
     try {
       const idToken = await getCurrentUserIdToken();
@@ -28,16 +33,27 @@ export default function SellerStatsScreen({ onBack, embedded = false }) {
       setStats(data);
     } catch (loadError) {
       setError(loadError.message || 'Không tải được thống kê.');
+      if (!refresh) {
+        setStats(null);
+      }
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     loadStats();
-  }, [loadStats]);
+    if (!embedded) {
+      return undefined;
+    }
+    const timer = setInterval(() => {
+      loadStats({ refresh: true });
+    }, 20000);
+    return () => clearInterval(timer);
+  }, [embedded, loadStats]);
 
-  if (isLoading) {
+  if (isLoading && !stats) {
     return (
       <ProfileSubScreen title="Thống kê" onBack={onBack} embedded={embedded}>
         <View style={styles.centered}>
@@ -56,7 +72,14 @@ export default function SellerStatsScreen({ onBack, embedded = false }) {
   }
 
   return (
-    <ProfileSubScreen title="Thống kê" onBack={onBack} embedded={embedded}>
+    <ProfileSubScreen
+      title="Thống kê"
+      onBack={onBack}
+      embedded={embedded}
+      refreshControl={
+        <RefreshControl refreshing={isRefreshing} onRefresh={() => loadStats({ refresh: true })} />
+      }
+    >
       <Text style={styles.groupTitle}>Doanh thu</Text>
       <View style={styles.grid}>
         <StatCard label="Hôm nay" value={formatPrice(stats.dailyRevenue)} highlight />
@@ -75,7 +98,9 @@ export default function SellerStatsScreen({ onBack, embedded = false }) {
       <Text style={styles.groupTitle}>Tương tác</Text>
       <View style={styles.grid}>
         <StatCard label="Người theo dõi" value={String(stats.followersCount || 0)} />
+        <StatCard label="Đang theo dõi" value={String(stats.followingCount || 0)} />
         <StatCard label="Lượt thích SP" value={String(stats.productLikes || 0)} />
+        <StatCard label="Yêu thích gian hàng" value={String(stats.shopLikes || 0)} />
         <StatCard label="Đã bán" value={String(stats.soldCount || 0)} />
         <StatCard label="Sản phẩm" value={String(stats.totalProducts || 0)} />
       </View>

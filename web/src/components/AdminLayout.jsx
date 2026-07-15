@@ -11,6 +11,9 @@ export default function AdminLayout() {
         <div className="brand">FastMark Admin</div>
         <nav>
           <NavLink to="/" end>
+            Dashboard
+          </NavLink>
+          <NavLink to="/verifications">
             Duyệt người bán
           </NavLink>
           <NavLink to="/accounts">
