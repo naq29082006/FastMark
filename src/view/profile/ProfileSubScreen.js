@@ -3,7 +3,13 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import CircularBackButton from '../shared/components/CircularBackButton';
 
-export default function ProfileSubScreen({ title, onBack, embedded = false, children }) {
+export default function ProfileSubScreen({
+  title,
+  onBack,
+  embedded = false,
+  refreshControl,
+  children,
+}) {
   const insets = useScreenInsets();
 
   return (
@@ -30,6 +36,7 @@ export default function ProfileSubScreen({ title, onBack, embedded = false, chil
         style={styles.body}
         contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottomSpacing + 16 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={refreshControl}
       >
         {children}
       </ScrollView>

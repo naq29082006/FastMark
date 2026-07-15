@@ -295,7 +295,7 @@ function CategoryPanel({ type, title, subtitle, showIcon = false }) {
                   <td>
                     <strong>{item.name || item.categoryName}</strong>
                   </td>
-                  <td>{item.description || '—'}</td>
+                  <td className="category-desc-cell">{item.description || '—'}</td>
                   <td>{Number(item.isDeleted ?? item.IsDeleted) === 0 ? 'Ẩn' : 'Active'}</td>
                   <td>{formatDate(item.createdAt)}</td>
                   <td>

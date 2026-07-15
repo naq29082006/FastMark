@@ -99,6 +99,14 @@ export function mergeProfile(authUser, baseProfile, updates = {}) {
       patch.likesCount !== undefined
         ? Number(patch.likesCount) || 0
         : Number(baseProfile?.likesCount) || 0,
+    followersCount:
+      patch.followersCount !== undefined
+        ? Number(patch.followersCount) || 0
+        : Number(baseProfile?.followersCount) || 0,
+    followingCount:
+      patch.followingCount !== undefined
+        ? Number(patch.followingCount) || 0
+        : Number(baseProfile?.followingCount) || 0,
     soldCount:
       patch.soldCount !== undefined
         ? Number(patch.soldCount) || 0
@@ -222,6 +230,8 @@ export function mapBackendUserToProfile(backendUser, authUser) {
     sellerPhoneVerified: Boolean(backendUser?.sellerPhoneVerified),
     totalProducts: backendUser?.totalProducts ?? 0,
     likesCount: backendUser?.likesCount ?? 0,
+    followersCount: backendUser?.followersCount ?? 0,
+    followingCount: backendUser?.followingCount ?? 0,
     soldCount: backendUser?.soldCount ?? 0,
     totalReviews: backendUser?.totalReviews ?? 0,
     averageRating: backendUser?.averageRating ?? 0,

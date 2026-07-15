@@ -52,16 +52,70 @@ router.delete(
   verifyFirebaseToken,
   asyncHandler(buyerController.removeFavorite)
 );
+
+router.get(
+  "/favorite-shops",
+  verifyFirebaseToken,
+  asyncHandler(buyerController.listFavoriteShops)
+);
+router.get(
+  "/favorite-shops/ids",
+  verifyFirebaseToken,
+  asyncHandler(buyerController.listFavoriteShopIds)
+);
+router.get(
+  "/favorite-shops/status",
+  verifyFirebaseToken,
+  asyncHandler(buyerController.getFavoriteShopStatus)
+);
+router.post(
+  "/favorite-shops",
+  verifyFirebaseToken,
+  asyncHandler(buyerController.addFavoriteShop)
+);
+router.delete(
+  "/favorite-shops/:shopId",
+  verifyFirebaseToken,
+  asyncHandler(buyerController.removeFavoriteShop)
+);
+
+router.get("/follows/status", verifyFirebaseToken, asyncHandler(buyerController.getFollowStatus));
+router.get("/follows/following", verifyFirebaseToken, asyncHandler(buyerController.listFollowing));
+router.get("/follows/followers", verifyFirebaseToken, asyncHandler(buyerController.listFollowers));
+router.post("/follows", verifyFirebaseToken, asyncHandler(buyerController.followUser));
+router.delete(
+  "/follows/:targetId",
+  verifyFirebaseToken,
+  asyncHandler(buyerController.unfollowUser)
+);
+router.delete("/follows", verifyFirebaseToken, asyncHandler(buyerController.unfollowUser));
+
 router.get("/orders", verifyFirebaseToken, asyncHandler(buyerOpsController.listOrders));
 router.post("/deals", verifyFirebaseToken, asyncHandler(buyerOpsController.createDeal));
 router.get("/deals", verifyFirebaseToken, asyncHandler(buyerOpsController.listDeals));
 router.get("/deals/:id", verifyFirebaseToken, asyncHandler(buyerOpsController.getDeal));
 router.post("/deals/:id/resubmit", verifyFirebaseToken, asyncHandler(buyerOpsController.resubmitDeal));
 router.post("/deals/:id/counter", verifyFirebaseToken, asyncHandler(buyerOpsController.counterDeal));
-router.post("/deals/:id/accept-counter", verifyFirebaseToken, asyncHandler(buyerOpsController.acceptCounter));
+router.post(
+  "/deals/:id/accept-counter",
+  verifyFirebaseToken,
+  asyncHandler(buyerOpsController.acceptCounter)
+);
 router.post("/reservations", verifyFirebaseToken, asyncHandler(buyerOpsController.createReservation));
-router.get("/reservations/:id", verifyFirebaseToken, asyncHandler(buyerOpsController.getReservation));
-router.post("/reservations/:id/cancel", verifyFirebaseToken, asyncHandler(buyerOpsController.cancelReservation));
-router.post("/reservations/:id/complete", verifyFirebaseToken, asyncHandler(buyerOpsController.completeReservation));
+router.get(
+  "/reservations/:id",
+  verifyFirebaseToken,
+  asyncHandler(buyerOpsController.getReservation)
+);
+router.post(
+  "/reservations/:id/cancel",
+  verifyFirebaseToken,
+  asyncHandler(buyerOpsController.cancelReservation)
+);
+router.post(
+  "/reservations/:id/complete",
+  verifyFirebaseToken,
+  asyncHandler(buyerOpsController.completeReservation)
+);
 
 module.exports = router;

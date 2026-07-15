@@ -16,7 +16,7 @@ import { selectCanSwitchToSeller } from '../../viewmodel/auth/authSelectors';
 import { logoutUser } from '../../viewmodel/auth/authSlice';
 
 import ProductsScreen from '../home/ProductsScreen';
-import FavoriteProductsScreen from '../buyer/FavoriteProductsScreen';
+import FavoriteHubScreen from '../buyer/FavoriteHubScreen';
 import InboxScreen from '../inbox/InboxScreen';
 import NotificationsScreen from '../inbox/NotificationsScreen';
 import MapScreen from '../map/MapScreen';
@@ -32,7 +32,7 @@ const ICON_SIZE = 28;
 const BUYER_TABS = [
   { key: 'home', label: 'Trang chủ', icon: 'home-outline', activeIcon: 'home' },
   { key: 'products', label: 'Sản phẩm', icon: 'basket-outline', activeIcon: 'basket' },
-  { key: 'favorites', label: 'Sản phẩm yêu thích', icon: 'heart-outline', activeIcon: 'heart' },
+  { key: 'favorites', label: 'Yêu thích', icon: 'heart-outline', activeIcon: 'heart' },
   { key: 'inbox', label: 'Tin nhắn', icon: 'chatbubble-outline', activeIcon: 'chatbubble', badgeKey: 'messages' },
   { key: 'notifications', label: 'Thông báo', icon: 'notifications-outline', activeIcon: 'notifications', badgeKey: 'notifications' },
   { key: 'profile', label: 'Tài khoản', icon: 'person-outline', activeIcon: 'person' },
@@ -311,7 +311,12 @@ export default function AuthenticatedHome() {
             onNavigationStateChange={(isNested) => updateNestedTabState('products', isNested)}
           />
         ),
-        favorites: <FavoriteProductsScreen />,
+        favorites: (
+          <FavoriteHubScreen
+            onOpenProduct={handleOpenProductDetail}
+            onOpenStore={handleOpenStoreFromProfile}
+          />
+        ),
         notifications: <NotificationsScreen />,
         inbox: (
           <InboxScreen

@@ -23,6 +23,16 @@ import {
   getFavoriteProductIdsOnBackend,
   removeFavoriteProductOnBackend,
 } from '../../api/favoriteApi';
+import {
+  addFavoriteShopOnBackend,
+  getFavoriteShopStatusOnBackend,
+  removeFavoriteShopOnBackend,
+} from '../../api/favoriteShopApi';
+import {
+  followUserOnBackend,
+  getFollowStatusOnBackend,
+  unfollowUserOnBackend,
+} from '../../api/followApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { formatPriceRange } from '../../core/utils/productFormat';
@@ -121,6 +131,10 @@ export default function StoreDetailScreen({
   const [loading, setLoading] = useState(true);
   const [reportVisible, setReportVisible] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [sellerUserId, setSellerUserId] = useState('');
+  const [isShopFavorite, setIsShopFavorite] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [shopFavoriteBusy, setShopFavoriteBusy] = useState(false);
   const [showFollowScreen, setShowFollowScreen] = useState(false);
   const [likedProducts, setLikedProducts] = useState({});
   const [routeDistanceMeters, setRouteDistanceMeters] = useState(null);
@@ -180,31 +194,187 @@ export default function StoreDetailScreen({
   useEffect(() => {
     let active = true;
 
-    async function loadFavoriteIds() {
+    async function loadSocialState() {
       try {
         const idToken = await getCurrentUserIdToken();
-        if (!idToken || !active) {
+        if (!idToken || !active || !storeId) {
           return;
         }
-        const productIds = await getFavoriteProductIdsOnBackend(idToken);
+
+        const [productIds, followStatus, shopFavoriteStatus] = await Promise.all([
+          getFavoriteProductIdsOnBackend(idToken),
+          getFollowStatusOnBackend(idToken, { shopId: storeId }),
+          getFavoriteShopStatusOnBackend(idToken, storeId),
+        ]);
+
         if (!active) {
           return;
         }
+
         const likedMap = {};
         (productIds || []).forEach((productId) => {
           likedMap[String(productId)] = true;
         });
         setLikedProducts(likedMap);
+        setIsFollowing(Boolean(followStatus?.isFollowing));
+        setSellerUserId(String(followStatus?.sellerUserId || ''));
+        setIsShopFavorite(Boolean(shopFavoriteStatus?.isFavorite));
+
+        if (Number.isFinite(Number(followStatus?.followersCount))) {
+          setStore((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  follow_count: Number(followStatus.followersCount),
+                }
+              : prev
+          );
+        }
+        if (Number.isFinite(Number(shopFavoriteStatus?.totalLikes))) {
+          setStore((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  total_likes: Number(shopFavoriteStatus.totalLikes),
+                }
+              : prev
+          );
+        }
       } catch {
-        // Ignore favorite preload errors.
+        // Ignore social preload errors.
       }
     }
 
-    loadFavoriteIds();
+    loadSocialState();
     return () => {
       active = false;
     };
-  }, [storeId]);
+  }, [storeId, store?.id]);
+
+  async function toggleFollow() {
+    if (followBusy || previewMode) {
+      return;
+    }
+
+    const wasFollowing = isFollowing;
+    setFollowBusy(true);
+    setIsFollowing(!wasFollowing);
+    setStore((prev) =>
+      prev
+        ? {
+            ...prev,
+            follow_count: Math.max(
+              0,
+              (Number(prev.follow_count) || 0) + (wasFollowing ? -1 : 1)
+            ),
+          }
+        : prev
+    );
+
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        throw new Error('Vui lòng đăng nhập để theo dõi gian hàng.');
+      }
+
+      const result = wasFollowing
+        ? await unfollowUserOnBackend({
+            idToken,
+            shopId: storeId,
+            sellerUserId: sellerUserId || undefined,
+          })
+        : await followUserOnBackend({ idToken, shopId: storeId });
+
+      if (result?.sellerUserId) {
+        setSellerUserId(String(result.sellerUserId));
+      }
+      if (result?.seller?.id) {
+        setSellerUserId(String(result.seller.id));
+      }
+      if (Number.isFinite(Number(result?.followersCount))) {
+        setStore((prev) =>
+          prev ? { ...prev, follow_count: Number(result.followersCount) } : prev
+        );
+      }
+      setIsFollowing(Boolean(result?.isFollowing ?? !wasFollowing));
+    } catch (error) {
+      setIsFollowing(wasFollowing);
+      setStore((prev) =>
+        prev
+          ? {
+              ...prev,
+              follow_count: Math.max(
+                0,
+                (Number(prev.follow_count) || 0) + (wasFollowing ? 1 : -1)
+              ),
+            }
+          : prev
+      );
+      Alert.alert('Theo dõi', error.message || 'Không thể cập nhật theo dõi.');
+    } finally {
+      setFollowBusy(false);
+    }
+  }
+
+  async function toggleShopFavorite() {
+    if (shopFavoriteBusy || previewMode) {
+      return;
+    }
+
+    const wasFavorite = isShopFavorite;
+    setShopFavoriteBusy(true);
+    setIsShopFavorite(!wasFavorite);
+    setStore((prev) =>
+      prev
+        ? {
+            ...prev,
+            total_likes: Math.max(
+              0,
+              (Number(prev.total_likes) || 0) + (wasFavorite ? -1 : 1)
+            ),
+          }
+        : prev
+    );
+
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        throw new Error('Vui lòng đăng nhập để yêu thích gian hàng.');
+      }
+
+      if (wasFavorite) {
+        const result = await removeFavoriteShopOnBackend(idToken, storeId);
+        if (Number.isFinite(Number(result?.totalLikes))) {
+          setStore((prev) =>
+            prev ? { ...prev, total_likes: Number(result.totalLikes) } : prev
+          );
+        }
+      } else {
+        const favorite = await addFavoriteShopOnBackend({ idToken, shopId: storeId });
+        if (Number.isFinite(Number(favorite?.totalLikes))) {
+          setStore((prev) =>
+            prev ? { ...prev, total_likes: Number(favorite.totalLikes) } : prev
+          );
+        }
+      }
+    } catch (error) {
+      setIsShopFavorite(wasFavorite);
+      setStore((prev) =>
+        prev
+          ? {
+              ...prev,
+              total_likes: Math.max(
+                0,
+                (Number(prev.total_likes) || 0) + (wasFavorite ? 1 : -1)
+              ),
+            }
+          : prev
+      );
+      Alert.alert('Yêu thích', error.message || 'Không thể cập nhật yêu thích gian hàng.');
+    } finally {
+      setShopFavoriteBusy(false);
+    }
+  }
 
   const toggleLikeProduct = async (productId) => {
     const normalizedId = String(productId);
@@ -362,8 +532,19 @@ export default function StoreDetailScreen({
     });
   }
 
-  if (showFollowScreen && previewMode) {
-    return <FollowConnectionsScreen onBack={() => setShowFollowScreen(false)} />;
+  if (showFollowScreen) {
+    return (
+      <FollowConnectionsScreen
+        onBack={() => setShowFollowScreen(false)}
+        onOpenStore={(nextShopId) => {
+          setShowFollowScreen(false);
+          // Stay on current detail if same shop; parent navigation handles other shops elsewhere.
+          if (String(nextShopId) !== String(storeId)) {
+            // no-op here; parent can open via profile flow
+          }
+        }}
+      />
+    );
   }
 
   return (
@@ -397,20 +578,37 @@ export default function StoreDetailScreen({
               <Text style={styles.shopName} numberOfLines={2}>
                 {shopTitle}
               </Text>
-              <Pressable
-                onPress={() => setIsFollowing((prev) => !prev)}
-                style={({ pressed }) => [
-                  styles.followBtn,
-                  isFollowing && styles.followBtnActive,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text
-                  style={[styles.followBtnText, isFollowing && styles.followBtnTextActive]}
+              <View style={styles.actionBtnRow}>
+                <Pressable
+                  onPress={toggleFollow}
+                  disabled={followBusy || previewMode}
+                  style={({ pressed }) => [
+                    styles.followBtn,
+                    isFollowing && styles.followBtnActive,
+                    pressed && styles.pressed,
+                    (followBusy || previewMode) && styles.actionBtnDisabled,
+                  ]}
                 >
-                  {isFollowing ? '✓ Đang theo dõi' : '+ Theo dõi'}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={[styles.followBtnText, isFollowing && styles.followBtnTextActive]}
+                  >
+                    {isFollowing ? '✓ Đang theo dõi' : '+ Theo dõi'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={toggleShopFavorite}
+                  disabled={shopFavoriteBusy || previewMode}
+                  style={({ pressed }) => [
+                    styles.shopFavoriteBtn,
+                    isShopFavorite && styles.shopFavoriteBtnActive,
+                    pressed && styles.pressed,
+                    (shopFavoriteBusy || previewMode) && styles.actionBtnDisabled,
+                  ]}
+                  accessibilityLabel="Yêu thích gian hàng"
+                >
+                  <Text style={styles.shopFavoriteBtnText}>{isShopFavorite ? '♥' : '♡'}</Text>
+                </Pressable>
+              </View>
             </View>
             {username ? <Text style={styles.shopUsername}>{username}</Text> : null}
             {store.intro ? (
@@ -430,7 +628,7 @@ export default function StoreDetailScreen({
               <StatCard
                 label="Theo dõi"
                 value={store.follow_count}
-                onPress={previewMode ? () => setShowFollowScreen(true) : undefined}
+                onPress={() => setShowFollowScreen(true)}
               />
               <View style={styles.statDivider} />
               <StatCard label="Sản phẩm" value={store.total_products || products.length} />
@@ -697,6 +895,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0f172a',
   },
+  actionBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   followBtn: {
     marginTop: 2,
     paddingHorizontal: 14,
@@ -714,6 +917,29 @@ const styles = StyleSheet.create({
   },
   followBtnTextActive: {
     color: '#475569',
+  },
+  shopFavoriteBtn: {
+    marginTop: 2,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+  },
+  shopFavoriteBtnActive: {
+    backgroundColor: '#ffe4e6',
+    borderColor: '#fb7185',
+  },
+  shopFavoriteBtnText: {
+    fontSize: 18,
+    color: '#e11d48',
+    fontWeight: '800',
+  },
+  actionBtnDisabled: {
+    opacity: 0.55,
   },
   shopUsername: {
     fontSize: 14,

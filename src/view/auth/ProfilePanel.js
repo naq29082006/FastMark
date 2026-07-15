@@ -23,6 +23,7 @@ import NotificationSettingsScreen from '../profile/NotificationSettingsScreen';
 import PurchasedProductsScreen from '../profile/PurchasedProductsScreen';
 import ReservationHistoryScreen from '../profile/ReservationHistoryScreen';
 import VisitedStoresScreen from '../profile/VisitedStoresScreen';
+import FavoriteShopsScreen from '../buyer/FavoriteShopsScreen';
 import SellerPhoneSetupScreen from '../seller/SellerPhoneSetupScreen';
 import SellerPhoneVerifyScreen from '../seller/SellerPhoneVerifyScreen';
 import SellerRegistrationScreen from '../seller/SellerRegistrationScreen';
@@ -63,6 +64,7 @@ export default function ProfilePanel({
   const user = useSelector(selectAuthUser);
   const isSeller = useSelector(selectIsSeller);
   const [profileNav, setProfileNav] = useState(null);
+  const [followConnectionsTab, setFollowConnectionsTab] = useState('following');
   const [sellerStep, setSellerStep] = useState(null);
   const [sellerPhone, setSellerPhone] = useState('');
   const [sellerVerification, setSellerVerification] = useState(null);
@@ -98,11 +100,14 @@ export default function ProfilePanel({
   }, [loadShopSettings, shopContactRefreshKey]);
 
   useEffect(() => {
-    if (!user || profile) {
+    if (!user) {
       return;
     }
-    dispatch(loadUserProfile());
-  }, [dispatch, user, profile]);
+    // Luôn refresh khi mở lại tab Tài khoản để số follow/following mới nhất.
+    if (isProfileVisible) {
+      dispatch(loadUserProfile());
+    }
+  }, [dispatch, user, isProfileVisible]);
 
   async function startSellerRegistration() {
     if (canSwitchToSeller) {
@@ -336,7 +341,25 @@ export default function ProfilePanel({
   }
 
   if (profileNav === 'follow-connections') {
-    return <FollowConnectionsScreen onBack={() => setProfileNav(null)} />;
+    return (
+      <FollowConnectionsScreen
+        initialTab={followConnectionsTab}
+        onBack={() => {
+          setProfileNav(null);
+          dispatch(loadUserProfile());
+        }}
+        onOpenStore={onOpenStore}
+      />
+    );
+  }
+
+  if (profileNav === 'favorite-shops') {
+    return (
+      <FavoriteShopsScreen
+        onBack={() => setProfileNav(null)}
+        onOpenStore={onOpenStore}
+      />
+    );
   }
 
   if (profileNav === 'my-activity') {
@@ -464,7 +487,10 @@ export default function ProfilePanel({
         onSwitchToSellerMode={onSwitchToSellerMode}
         onSwitchToBuyerMode={onSwitchToBuyerMode}
         onLogout={() => dispatch(logoutUser())}
-        onOpenFollowConnections={() => setProfileNav('follow-connections')}
+        onOpenFollowConnections={(tab = 'following') => {
+          setFollowConnectionsTab(tab === 'followers' ? 'followers' : 'following');
+          setProfileNav('follow-connections');
+        }}
       />
     </View>
   );

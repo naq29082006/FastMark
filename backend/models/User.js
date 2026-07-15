@@ -95,6 +95,8 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     status: this.Status,
     verifyAccount: this.VerifyAccount,
     sellerPhoneVerified: Boolean(this.SellerPhoneVerified),
+    followersCount: Number(this.FollowersCount) || 0,
+    followingCount: Number(this.FollowingCount) || 0,
     createdAt: this.CreatedAt,
     updatedAt: this.UpdatedAt,
   };

@@ -5,6 +5,7 @@ import ConfigErrorScreen from './components/ConfigErrorScreen';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { configError } from './firebase';
 import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SellerVerificationsPage from './pages/SellerVerificationsPage';
 import AccountsPage from './pages/AccountsPage';
@@ -35,7 +36,8 @@ function ProtectedRoutes() {
   return (
     <Routes>
       <Route element={<AdminLayout />}>
-        <Route index element={<SellerVerificationsPage />} />
+        <Route index element={<DashboardPage />} />
+        <Route path="verifications" element={<SellerVerificationsPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="accounts/:accountId" element={<AccountDetailPage />} />
         <Route path="reports" element={<ReportManagement />} />

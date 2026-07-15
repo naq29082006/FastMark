@@ -253,7 +253,7 @@ async function buildVariantDocs(user, variantsInput) {
 async function syncShopProductStats(shop) {
   const products = await Product.find(activeProductFilter({ ShopId: shop._id }));
   shop.totalProducts = products.length;
-  shop.totalLikes = products.reduce((sum, product) => sum + (product.LikeCount || 0), 0);
+  // totalLikes = số lượt yêu thích gian hàng (FavoriteShop), không ghi đè bằng tổng LikeCount sản phẩm.
   shop.UpdatedAt = new Date();
   await shop.save();
   return shop;
