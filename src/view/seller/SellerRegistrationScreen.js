@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
   Image,
   Platform,
   Pressable,

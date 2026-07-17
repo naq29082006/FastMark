@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 import { getBuyerConversationsOnBackend } from '../../api/messageApi';
 import { getMyNotificationsOnBackend } from '../../api/notificationApi';
@@ -14,7 +14,6 @@ import { useSellerAccessSync } from '../../hooks/useSellerAccessSync';
 import { RESERVATION_TAB } from '../../constants/sellerOrders';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { selectCanSwitchToSeller } from '../../viewmodel/auth/authSelectors';
-import { logoutUser } from '../../viewmodel/auth/authSlice';
 
 import ProductsScreen from '../home/ProductsScreen';
 import BuyerOrdersScreen from '../buyer/BuyerOrdersScreen';
@@ -73,7 +72,6 @@ function TabIcon({ icon, color, badgeCount = 0 }) {
 }
 
 export default function AuthenticatedHome() {
-  const dispatch = useDispatch();
   const canSwitchToSeller = useSelector(selectCanSwitchToSeller);
   const { appMode, setAppMode, isReady, isBuyerMode, isSellerMode } = useAppMode(canSwitchToSeller);
 
@@ -92,8 +90,6 @@ export default function AuthenticatedHome() {
   const [tabInstanceKeys, setTabInstanceKeys] = useState({});
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-
-  const [profileNavRequest, setProfileNavRequest] = useState(null);
 
   const updateNestedTabState = useCallback((tabKey, isNested) => {
     setNestedTabState((current) => {
@@ -319,23 +315,6 @@ export default function AuthenticatedHome() {
     await setAppMode(APP_MODE_BUYER);
   }
 
-  function handleHomeEditAccount() {
-    setProfileNavRequest({ screen: 'edit-account', at: Date.now() });
-    handleSelectTab('profile');
-  }
-
-  function handleHomeSellerAction() {
-    if (canSwitchToSeller) {
-      handleSwitchToSellerMode();
-      return;
-    }
-    handleStartSellerRegister();
-  }
-
-  function handleHomeLogout() {
-    dispatch(logoutUser());
-  }
-
   const tabPanes = useMemo(() => {
     if (isBuyerMode) {
       return {
@@ -347,9 +326,6 @@ export default function AuthenticatedHome() {
             onPickupCompleted={handlePickupCompleted}
             onOpenBuyerOrders={handleOpenBuyerOrders}
             onNavigationStateChange={(isNested) => updateNestedTabState('home', isNested)}
-            onEditAccount={handleHomeEditAccount}
-            onSellerAction={handleHomeSellerAction}
-            onLogout={handleHomeLogout}
             isScreenActive={activeTab === 'home'}
           />
         ),
@@ -396,7 +372,6 @@ export default function AuthenticatedHome() {
             onProductChanged={handleProductChanged}
             onSwitchToSellerMode={handleSwitchToSellerMode}
             canSwitchToSeller={canSwitchToSeller}
-            profileNavRequest={profileNavRequest}
             onNavigationStateChange={(isNested) => updateNestedTabState('profile', isNested)}
           />
         ),
@@ -452,9 +427,6 @@ export default function AuthenticatedHome() {
     handleOpenStoreFromProfile,
     handleSwitchToBuyerMode,
     handleSwitchToSellerMode,
-    handleHomeEditAccount,
-    handleHomeLogout,
-    handleHomeSellerAction,
     isBuyerMode,
     canSwitchToSeller,
     inboxChatRequest,
@@ -462,7 +434,6 @@ export default function AuthenticatedHome() {
     openBuyerOrdersRequest,
     productDetailId,
     productRefreshKey,
-    profileNavRequest,
     sellerRegisterRequest,
     activeTab,
     updateNestedTabState,

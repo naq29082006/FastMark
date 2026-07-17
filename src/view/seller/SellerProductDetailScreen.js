@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -274,10 +276,18 @@ export default function SellerProductDetailScreen({ productId, onBack, onChanged
   }
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {renderTopBar({ showEdit: true })}
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottomSpacing + 24 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
         {successMessage ? <Text style={styles.successBanner}>{successMessage}</Text> : null}
 
@@ -461,7 +471,7 @@ export default function SellerProductDetailScreen({ productId, onBack, onChanged
           </View>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -503,7 +513,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
   },
-  content: { padding: 16, paddingBottom: 32, gap: 12 },
+  scroll: { flex: 1 },
+  content: { padding: 16, gap: 12 },
   heroImage: { width: '100%', height: 220, borderRadius: 16, backgroundColor: '#e2e8f0' },
   detailCard: {
     backgroundColor: '#ffffff',

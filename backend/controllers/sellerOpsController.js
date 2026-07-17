@@ -49,6 +49,28 @@ exports.uploadShopAvatar = async (req, res) => {
   });
 };
 
+exports.checkShopUsernameAvailability = async (req, res) => {
+  const shopUsername =
+    pickBodyValue(req.body, ["shopUsername", "username"]) ||
+    pickBodyValue(req.query, ["shopUsername", "username"]);
+
+  if (!shopUsername) {
+    return fail(res, {
+      status: 400,
+      message: "Thiếu username shop.",
+    });
+  }
+
+  const result = await shopSettingsService.checkShopUsernameAvailability(
+    req.currentUser,
+    shopUsername
+  );
+
+  return success(res, {
+    data: result,
+  });
+};
+
 exports.listOrders = async (req, res) => {
   const tab = req.query.tab || "holding";
 

@@ -9,7 +9,9 @@ import {
 import * as Location from 'expo-location';
 
 import LeafletMap from '../shared/components/LeafletMap';
+import CircularBackButton from '../shared/components/CircularBackButton';
 import AddressSearchBar from '../map/AddressSearchBar';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
 import { hasValidLocation, normalizeExpoLocation } from '../../core/utils/geo';
 
@@ -18,6 +20,7 @@ export default function SellerLocationPickerScreen({
   onBack,
   onConfirm,
 }) {
+  const insets = useScreenInsets();
   const [pickedLocation, setPickedLocation] = useState(
     hasValidLocation(initialLocation) ? initialLocation : null
   );
@@ -132,11 +135,11 @@ export default function SellerLocationPickerScreen({
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <Pressable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>‹ Quay lại</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>Chọn vị trí gian hàng</Text>
+      <View style={[styles.header, { paddingTop: insets.contentPaddingTop }]}>
+        <CircularBackButton onPress={onBack} variant="plain" style={styles.backButton} />
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          Chọn vị trí gian hàng
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -172,7 +175,7 @@ export default function SellerLocationPickerScreen({
         </Pressable>
       </View>
 
-      <View style={styles.bottomSheet}>
+      <View style={[styles.bottomSheet, { paddingBottom: insets.bottomSpacing + 12 }]}>
         <Text style={styles.hintText}>
           Chạm lên bản đồ hoặc tìm kiếm để chọn vị trí gian hàng.
         </Text>
@@ -226,31 +229,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingHorizontal: 12,
+    gap: 8,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
     backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
   backButton: {
-    minWidth: 80,
-    paddingVertical: 6,
-  },
-  backButtonText: {
-    color: '#0d7377',
-    fontSize: 15,
-    fontWeight: '800',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
   },
   headerTitle: {
     flex: 1,
-    textAlign: 'center',
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '900',
     color: '#0f172a',
   },
   headerSpacer: {
-    minWidth: 80,
+    width: 36,
+    height: 36,
   },
   mapArea: {
     flex: 1,
@@ -292,7 +291,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 18,
     paddingHorizontal: 18,
     paddingTop: 16,
-    paddingBottom: 24,
     marginTop: -18,
   },
   hintText: {

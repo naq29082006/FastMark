@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function BuyerQuickMenu({
   sellerButtonLabel = 'Đăng ký người bán',
@@ -11,9 +12,13 @@ export default function BuyerQuickMenu({
   buttonStyle,
   dropdownStyle,
   iconColor = '#0f172a',
-  activeIconColor = '#ffffff',
 }) {
+  const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
+
+  function closeMenu() {
+    setOpen(false);
+  }
 
   function closeAndRun(action) {
     setOpen(false);
@@ -26,33 +31,47 @@ export default function BuyerQuickMenu({
         accessibilityRole="button"
         accessibilityLabel="Menu tiện ích"
         onPress={() => setOpen((current) => !current)}
-        style={({ pressed }) => [
-          styles.button,
-          buttonStyle,
-          open && styles.buttonActive,
-          pressed && styles.buttonPressed,
-        ]}
+        style={({ pressed }) => [styles.button, buttonStyle, pressed && styles.buttonPressed]}
       >
-        <Ionicons
-          name={open ? 'close-outline' : 'menu-outline'}
-          size={22}
-          color={open ? activeIconColor : iconColor}
-        />
+        <Ionicons name="menu-outline" size={22} color={iconColor} />
       </Pressable>
 
-      {open ? (
-        <View style={[styles.dropdown, dropdownStyle]}>
-          <Pressable onPress={() => closeAndRun(onEditAccount)} style={styles.menuItem}>
-            <Text style={styles.menuItemText}>Sửa thông tin tài khoản</Text>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={closeMenu}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Đóng menu"
+          onPress={closeMenu}
+          style={styles.backdrop}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={[
+              styles.dropdown,
+              dropdownStyle,
+              { top: insets.top + 72, right: 34 },
+            ]}
+          >
+            <Pressable onPress={() => closeAndRun(onEditAccount)} style={styles.menuItem}>
+              <Text style={styles.menuItemText}>Sửa thông tin tài khoản</Text>
+            </Pressable>
+            <Pressable onPress={() => closeAndRun(onSellerAction)} style={styles.menuItem}>
+              <Text style={styles.menuItemText}>{sellerButtonLabel}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => closeAndRun(onLogout)}
+              style={[styles.menuItem, styles.menuItemLast]}
+            >
+              <Text style={[styles.menuItemText, styles.menuItemDanger]}>Đăng xuất</Text>
+            </Pressable>
           </Pressable>
-          <Pressable onPress={() => closeAndRun(onSellerAction)} style={styles.menuItem}>
-            <Text style={styles.menuItemText}>{sellerButtonLabel}</Text>
-          </Pressable>
-          <Pressable onPress={() => closeAndRun(onLogout)} style={[styles.menuItem, styles.menuItemLast]}>
-            <Text style={[styles.menuItemText, styles.menuItemDanger]}>Đăng xuất</Text>
-          </Pressable>
-        </View>
-      ) : null}
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -75,16 +94,15 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
-  buttonActive: {
-    backgroundColor: '#0f766e',
-  },
   buttonPressed: {
     opacity: 0.85,
   },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.25)',
+  },
   dropdown: {
     position: 'absolute',
-    top: 50,
-    right: 0,
     minWidth: 220,
     borderRadius: 12,
     backgroundColor: '#ffffff',
@@ -94,7 +112,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.16,
     shadowRadius: 10,
-    elevation: 8,
+    elevation: 12,
     overflow: 'hidden',
   },
   menuItem: {

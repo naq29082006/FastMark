@@ -13,24 +13,17 @@ export default function AdminLayout() {
           <NavLink to="/" end>
             Dashboard
           </NavLink>
-          <NavLink to="/verifications">
-            Duyệt người bán
-          </NavLink>
-          <NavLink to="/accounts">
-            Quản lý người dùng
-          </NavLink>
-          <NavLink to="/reports">
-            Quản lý báo cáo vi phạm
-          </NavLink>
-          <NavLink to="/reviews">
-            Quản lý đánh giá
-          </NavLink>
-          <NavLink to="/notifications">
-            Gửi thông báo hệ thống
-          </NavLink>
-          <NavLink to="/categories">
-            Quản lý danh mục SP/CH
-          </NavLink>
+          <NavLink to="/accounts">Người dùng</NavLink>
+          <NavLink to="/verifications">Duyệt người bán</NavLink>
+          <NavLink to="/shops">Gian hàng</NavLink>
+          <NavLink to="/products">Sản phẩm</NavLink>
+          <NavLink to="/categories">Danh mục</NavLink>
+          <NavLink to="/reservations">Đơn giữ hàng</NavLink>
+          <NavLink to="/deals">Deal giá</NavLink>
+          <NavLink to="/reports">Báo cáo & Khiếu nại</NavLink>
+          <NavLink to="/reviews">Đánh giá</NavLink>
+          <NavLink to="/notifications">Thông báo</NavLink>
+          <NavLink to="/stats">Thống kê</NavLink>
         </nav>
         <div className="sidebar-footer">
           <div className="admin-email">{user?.email}</div>

@@ -5,7 +5,6 @@ import { formatDistance } from '../../../core/utils/geo';
 import { formatPriceRange } from '../../../core/utils/productFormat';
 import { getProductImageOverlayLabel } from '../../../core/utils/productAvailability';
 
-
 function formatProductDistance(product) {
   const meters = Number(product.distanceMeters);
   if (Number.isFinite(meters) && meters >= 0) {

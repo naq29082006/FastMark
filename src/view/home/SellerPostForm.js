@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -228,9 +231,8 @@ export default function SellerPostForm({ onProductCreated }) {
   const [thumbnail, setThumbnail] = useState(null);
   const [variants, setVariants] = useState([createVariant()]);
   const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -289,7 +291,6 @@ export default function SellerPostForm({ onProductCreated }) {
 
   async function handleSubmit() {
     setError('');
-    setSuccessMessage('');
 
     if (!productName.trim()) {
       setError('Vui lòng nhập tên sản phẩm.');
@@ -354,7 +355,6 @@ export default function SellerPostForm({ onProductCreated }) {
       });
 
       const createdProductId = result?.product?.id;
-      setSuccessMessage('Đăng sản phẩm thành công.');
       setProductName('');
       setDescription('');
       setDonVi('');
@@ -362,24 +362,30 @@ export default function SellerPostForm({ onProductCreated }) {
       setThumbnail(null);
       setVariants([createVariant()]);
       dispatch(syncSellerAccess());
+      Alert.alert('Thành công', 'Đăng sản phẩm thành công.');
 
       if (createdProductId) {
         onProductCreated?.(createdProductId);
       }
     } catch (submitError) {
-      setError(submitError.message || 'Không đăng được sản phẩm.');
+      Alert.alert('Lỗi', submitError.message || 'Không đăng được sản phẩm.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={styles.keyboardRoot}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <View style={styles.header}>
         <Text style={styles.title}>Đăng tin</Text>
         <Text style={styles.subtitle}>Tạo sản phẩm mới với ảnh, mô tả và biến thể</Text>
@@ -479,7 +485,6 @@ export default function SellerPostForm({ onProductCreated }) {
         </Pressable>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
 
         <Pressable
           disabled={isSubmitting}
@@ -498,10 +503,14 @@ export default function SellerPostForm({ onProductCreated }) {
         </Pressable>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardRoot: {
+    flex: 1,
+  },
   scroll: {
     flex: 1,
     backgroundColor: '#f4f7f6',
@@ -768,12 +777,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#b91c1c',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  successText: {
-    color: '#047857',
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 12,

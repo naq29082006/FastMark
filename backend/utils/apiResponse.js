@@ -8,7 +8,7 @@ function success(res, { status = 200, message = "Success", data = null } = {}) {
   return res.status(status).json(payload);
 }
 
-function fail(res, { status = 500, message = "Đã có lỗi xảy ra.", code = "", field = "" } = {}) {
+function fail(res, { status = 500, message = "Đã có lỗi xảy ra.", code = "", field = "", data = null } = {}) {
   const payload = {
     success: false,
     message,
@@ -18,6 +18,9 @@ function fail(res, { status = 500, message = "Đã có lỗi xảy ra.", code = 
   }
   if (field) {
     payload.field = field;
+  }
+  if (data !== null && data !== undefined) {
+    payload.data = data;
   }
   return res.status(status).json(payload);
 }

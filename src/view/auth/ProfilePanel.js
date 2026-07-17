@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 
 import {
@@ -24,7 +30,6 @@ import PurchasedProductsScreen from '../profile/PurchasedProductsScreen';
 import ReservationHistoryScreen from '../profile/ReservationHistoryScreen';
 import VisitedStoresScreen from '../profile/VisitedStoresScreen';
 import SellerPhoneSetupScreen from '../seller/SellerPhoneSetupScreen';
-import SellerPhoneVerifyScreen from '../seller/SellerPhoneVerifyScreen';
 import SellerRegistrationScreen from '../seller/SellerRegistrationScreen';
 import SellerVerificationStatusScreen from '../seller/SellerVerificationStatusScreen';
 import SellerProductDetailScreen from '../seller/SellerProductDetailScreen';
@@ -67,7 +72,6 @@ export default function ProfilePanel({
   const [profileNav, setProfileNav] = useState(null);
   const [followConnectionsTab, setFollowConnectionsTab] = useState('following');
   const [sellerStep, setSellerStep] = useState(null);
-  const [sellerPhone, setSellerPhone] = useState('');
   const [sellerVerification, setSellerVerification] = useState(null);
   const [selectedReservationId, setSelectedReservationId] = useState(null);
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
@@ -121,12 +125,10 @@ export default function ProfilePanel({
       const latestProfile = result?.profile || profile;
       const verification = result?.verification || null;
       const nextStep = getSellerRegistrationStep(latestProfile, verification);
-      setSellerPhone(latestProfile?.phone || '');
       setSellerVerification(verification);
       setSellerStep(nextStep);
     } catch {
       const nextStep = getSellerRegistrationStep(profile, null);
-      setSellerPhone(profile?.phone || '');
       setSellerVerification(null);
       setSellerStep(nextStep);
     }
@@ -213,20 +215,6 @@ export default function ProfilePanel({
             setProfileNav(returnNav);
           }
         }}
-        onContinue={async (phone) => {
-          setSellerPhone(phone);
-          setSellerStep('verify');
-        }}
-      />
-    );
-  }
-
-  if (sellerStep === 'verify') {
-    return (
-      <SellerPhoneVerifyScreen
-        phone={sellerPhone || profile?.phone || ''}
-        onBack={() => setSellerStep('phone')}
-        onNeedPhone={() => setSellerStep('phone')}
         onVerified={async () => {
           if (phoneChangeReturn) {
             await dispatch(syncSellerAccess());
@@ -306,7 +294,6 @@ export default function ProfilePanel({
         onChangePhone={() => {
           setPhoneChangeReturn('seller-shop-settings');
           setProfileNav(null);
-          setSellerPhone(profile?.phone || '');
           setSellerStep('phone');
         }}
       />
@@ -345,7 +332,15 @@ export default function ProfilePanel({
   }
 
   if (profileNav === 'edit-account') {
-    return <EditAccountScreen onBack={() => setProfileNav(null)} />;
+    return (
+      <EditAccountScreen
+        onBack={() => setProfileNav(null)}
+        onChangePhone={() => {
+          setPhoneChangeReturn('edit-account');
+          setSellerStep('phone');
+        }}
+      />
+    );
   }
 
   if (profileNav === 'follow-connections') {

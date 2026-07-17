@@ -68,6 +68,8 @@ const userSchema = new mongoose.Schema({
   SellerPhoneVerified: { type: Boolean, default: false },
   SellerPhoneVerifyCode: { type: String, default: null },
   SellerPhoneVerifyCodeExpiresAt: { type: Date, default: null },
+  SellerPhoneVerifyResendAt: { type: Date, default: null },
+  SellerPhoneVerifyFailCount: { type: Number, default: 0 },
 
   CreatedAt: { type: Date, default: Date.now },
   UpdatedAt: { type: Date, default: Date.now },

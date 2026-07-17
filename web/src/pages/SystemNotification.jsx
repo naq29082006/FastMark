@@ -59,7 +59,7 @@ export default function SystemNotification() {
     <div className="page">
       <header className="page-header">
         <div>
-          <h1>Gửi thông báo hệ thống</h1>
+          <h1>Thông báo</h1>
           <p>Gửi thông báo tới người dùng qua hệ thống in-app.</p>
         </div>
       </header>

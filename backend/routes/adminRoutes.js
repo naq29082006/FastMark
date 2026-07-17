@@ -7,6 +7,7 @@ const adminReportController = require("../controllers/adminReportController");
 const adminReviewController = require("../controllers/adminReviewController");
 const adminNotificationController = require("../controllers/adminNotificationController");
 const adminDashboardController = require("../controllers/adminDashboardController");
+const adminCatalogController = require("../controllers/adminCatalogController");
 
 const router = express.Router();
 
@@ -40,6 +41,96 @@ router.post(
   verifyFirebaseToken,
   requireAdmin,
   asyncHandler(adminAccountController.unblockAccount)
+);
+
+router.get("/shops", verifyFirebaseToken, requireAdmin, asyncHandler(adminCatalogController.listShops));
+router.get(
+  "/shops/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.getShopDetail)
+);
+router.post(
+  "/shops/:id/block",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.blockShop)
+);
+router.post(
+  "/shops/:id/unblock",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.unblockShop)
+);
+router.delete(
+  "/shops/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.deleteShop)
+);
+
+router.get(
+  "/products",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.listProducts)
+);
+router.get(
+  "/products/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.getProductDetail)
+);
+router.post(
+  "/products/:id/hide",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.hideProduct)
+);
+router.post(
+  "/products/:id/show",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.showProduct)
+);
+router.delete(
+  "/products/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.deleteProduct)
+);
+
+router.get(
+  "/reservations",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.listReservations)
+);
+router.get(
+  "/reservations/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.getReservationDetail)
+);
+router.post(
+  "/reservations/:id/cancel",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.cancelReservation)
+);
+
+router.get("/deals", verifyFirebaseToken, requireAdmin, asyncHandler(adminCatalogController.listDeals));
+router.get(
+  "/deals/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.getDealDetail)
+);
+router.post(
+  "/deals/:id/lock",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminCatalogController.lockDeal)
 );
 
 router.get(

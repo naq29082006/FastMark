@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   FlatList,
   Image,
@@ -90,7 +91,6 @@ export default function FollowConnectionsScreen({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
-  const [snackbar, setSnackbar] = useState('');
 
   const tabs = useMemo(() => {
     if (shopId || resolvedMode === 'followers') {
@@ -156,14 +156,6 @@ export default function FollowConnectionsScreen({
     loadData({ nextPage: 1 });
   }, [loadData]);
 
-  useEffect(() => {
-    if (!snackbar) {
-      return undefined;
-    }
-    const timer = setTimeout(() => setSnackbar(''), 2200);
-    return () => clearTimeout(timer);
-  }, [snackbar]);
-
   async function handleUnfollow(item) {
     try {
       const idToken = await getCurrentUserIdToken();
@@ -178,9 +170,9 @@ export default function FollowConnectionsScreen({
       setItems((current) =>
         current.filter((row) => String(row.shopId || row.id) !== String(targetShopId))
       );
-      setSnackbar('Đã bỏ theo dõi gian hàng.');
+      Alert.alert('Thành công', 'Đã bỏ theo dõi gian hàng.');
     } catch (unfollowError) {
-      setSnackbar(unfollowError.message || 'Không thể bỏ theo dõi.');
+      Alert.alert('Lỗi', unfollowError.message || 'Không thể bỏ theo dõi.');
     }
   }
 
@@ -292,12 +284,6 @@ export default function FollowConnectionsScreen({
           )}
         />
       )}
-
-      {snackbar ? (
-        <View style={styles.snackbar}>
-          <Text style={styles.snackbarText}>{snackbar}</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -488,20 +474,5 @@ const styles = StyleSheet.create({
   retryText: {
     color: '#ffffff',
     fontWeight: '800',
-  },
-  snackbar: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 24,
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  snackbarText: {
-    color: '#ffffff',
-    textAlign: 'center',
-    fontWeight: '700',
   },
 });

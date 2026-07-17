@@ -25,13 +25,13 @@ async function authHeaders(idToken) {
   };
 }
 
-export async function requestSellerPhoneCodeOnBackend(idToken) {
+export async function requestSellerPhoneCodeOnBackend(idToken, phone) {
   const response = await apiRequest(
     API_ENDPOINTS.sellerPhoneCodeRequest,
     {
       method: 'POST',
       headers: await authHeaders(idToken),
-      body: JSON.stringify({}),
+      body: JSON.stringify(phone ? { phone } : {}),
     },
     AUTH_TIMEOUT_MS
   );
@@ -40,13 +40,13 @@ export async function requestSellerPhoneCodeOnBackend(idToken) {
   return payload.data;
 }
 
-export async function confirmSellerPhoneCodeOnBackend({ idToken, code }) {
+export async function confirmSellerPhoneCodeOnBackend({ idToken, code, phone }) {
   const response = await apiRequest(
     API_ENDPOINTS.sellerPhoneCodeConfirm,
     {
       method: 'POST',
       headers: await authHeaders(idToken),
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, phone }),
     },
     AUTH_TIMEOUT_MS
   );

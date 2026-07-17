@@ -142,8 +142,16 @@ export async function confirmEmailVerificationOnBackend({ idToken, code }) {
   return payload.data;
 }
 
-export async function updateProfileOnBackend({ idToken, fullName, phone }) {
+export async function updateProfileOnBackend({ idToken, fullName, userName }) {
   ensureBackendApiConfigured();
+
+  const body = {};
+  if (fullName !== undefined) {
+    body.fullName = fullName;
+  }
+  if (userName !== undefined) {
+    body.userName = userName;
+  }
 
   const response = await apiRequest(
     API_ENDPOINTS.authUpdateMe,
@@ -153,7 +161,7 @@ export async function updateProfileOnBackend({ idToken, fullName, phone }) {
         Authorization: `Bearer ${idToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ fullName, phone }),
+      body: JSON.stringify(body),
     },
     AUTH_TIMEOUT_MS
   );

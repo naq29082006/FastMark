@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,13 +13,28 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { searchMapAddresses } from '../../viewmodel/map/mapViewModel';
 
-export default function AddressSearchBar({ onSelectResult, placeholder }) {
+export default function AddressSearchBar({ onSelectResult, onFocusChange, placeholder }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const requestIdRef = useRef(0);
+  const blurTimerRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    onFocusChange?.(isFocused);
+  }, [isFocused, onFocusChange]);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+      }
+      onFocusChange?.(false);
+    };
+  }, [onFocusChange]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -65,38 +81,62 @@ export default function AddressSearchBar({ onSelectResult, placeholder }) {
     return () => clearTimeout(timer);
   }, [query]);
 
-  function handleSelectResult(result) {
-    setQuery(result.label);
-    setResults([]);
-    setError('');
-    setIsFocused(false);
-    onSelectResult?.(result);
+  function cancelBlurTimer() {
+    if (blurTimerRef.current) {
+      clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
   }
 
-  function handleClear() {
+  function handleSelectResult(result) {
+    cancelBlurTimer();
+    // Cancel in-flight search and reset field so the next search starts clean.
     requestIdRef.current += 1;
     setQuery('');
     setResults([]);
     setError('');
     setIsSearching(false);
+    setIsFocused(false);
+    Keyboard.dismiss();
+    inputRef.current?.blur?.();
+    onSelectResult?.(result);
   }
 
-  const showDropdown = isFocused && (isSearching || results.length > 0 || error);
+  function handleClear() {
+    cancelBlurTimer();
+    requestIdRef.current += 1;
+    setQuery('');
+    setResults([]);
+    setError('');
+    setIsSearching(false);
+    setIsFocused(true);
+    inputRef.current?.focus?.();
+  }
+
+  const showDropdown = isFocused && (isSearching || results.length > 0 || Boolean(error));
 
   return (
-    <View style={styles.wrapper}>
+    <View style={styles.wrapper} collapsable={false}>
       <View style={styles.inputRow}>
         <Ionicons name="search" size={18} color="#94a3b8" style={styles.searchIcon} />
         <TextInput
+          ref={inputRef}
           value={query}
           onChangeText={setQuery}
           placeholder={placeholder || 'Tìm đường, địa điểm...'}
           placeholderTextColor="#9ca3af"
           style={styles.input}
           returnKeyType="search"
-          onFocus={() => setIsFocused(true)}
+          onFocus={() => {
+            cancelBlurTimer();
+            setIsFocused(true);
+          }}
           onBlur={() => {
-            setTimeout(() => setIsFocused(false), 150);
+            cancelBlurTimer();
+            // Delay blur so dropdown presses still register before focus drops.
+            blurTimerRef.current = setTimeout(() => {
+              setIsFocused(false);
+            }, 220);
           }}
         />
         {isSearching ? <ActivityIndicator size="small" color="#0d7377" /> : null}
@@ -110,11 +150,12 @@ export default function AddressSearchBar({ onSelectResult, placeholder }) {
       {showDropdown ? (
         <View style={styles.dropdown}>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+          <ScrollView keyboardShouldPersistTaps="always" nestedScrollEnabled>
             {results.map((result) => (
               <Pressable
                 key={result.id}
                 style={({ pressed }) => [styles.resultItem, pressed && styles.resultItemPressed]}
+                onPressIn={cancelBlurTimer}
                 onPress={() => handleSelectResult(result)}
               >
                 <Text style={styles.resultLabel} numberOfLines={2}>
@@ -131,7 +172,8 @@ export default function AddressSearchBar({ onSelectResult, placeholder }) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    zIndex: 20,
+    zIndex: 40,
+    elevation: 12,
   },
   inputRow: {
     flexDirection: 'row',
@@ -163,6 +205,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
     overflow: 'hidden',
+    elevation: 10,
+    zIndex: 41,
   },
   resultItem: {
     paddingHorizontal: 14,

@@ -175,32 +175,6 @@ function rejectWithReadableError(error, rejectWithValue) {
   return rejectWithValue(toAuthErrorPayload(error));
 }
 
-export const hydrateAuthSession = createAsyncThunk(
-  'auth/hydrateSession',
-  async (_, { rejectWithValue }) => {
-    try {
-      const configError = getFirebaseInitConfigError();
-
-      if (configError) {
-        throw new Error(configError);
-      }
-
-      const firebaseUser = getCurrentFirebaseUser();
-
-      if (!firebaseUser) {
-        return { user: null, profile: null };
-      }
-
-      const user = serializeAuthUser(firebaseUser);
-      const profile = await readUserProfile(user);
-
-      return { user, profile };
-    } catch (error) {
-      return rejectWithReadableError(error, rejectWithValue);
-    }
-  }
-);
-
 export const loadUserProfile = createAsyncThunk(
   'auth/loadProfile',
   async (_, { getState }) => {
@@ -406,7 +380,7 @@ export const updateUserProfile = createAsyncThunk(
 
     const updates = {
       fullName: payload.fullName?.trim() || '',
-      phone: payload.phone?.trim() || '',
+      userName: payload.userName?.trim() || '',
       photoUrl: payload.photoUrl?.trim() || '',
     };
 
@@ -429,7 +403,7 @@ export const updateUserProfile = createAsyncThunk(
         const backendData = await updateProfileOnBackend({
           idToken,
           fullName: updates.fullName,
-          phone: updates.phone,
+          userName: updates.userName,
         });
         const profile = mapBackendUserToProfile(backendData.user, authUser);
         await writeCachedProfile(profile);
@@ -444,7 +418,12 @@ export const updateUserProfile = createAsyncThunk(
     try {
       const profile = await upsertUserProfile(
         authUser,
-        { ...currentProfile, ...updates },
+        {
+          ...currentProfile,
+          fullName: updates.fullName,
+          userName: updates.userName,
+          photoUrl: updates.photoUrl,
+        },
         { existingProfile: currentProfile }
       );
       await writeCachedProfile(profile);
@@ -685,14 +664,14 @@ const authSlice = createSlice({
       state.profile = action.payload;
     },
     applyProfileLocally(state, action) {
-      const { fullName, phone, photoUrl } = action.payload;
+      const { fullName, userName, phone, photoUrl } = action.payload;
 
       if (!state.user) {
         return;
       }
 
       const trimmedName = fullName?.trim() || '';
-      const trimmedPhone = phone?.trim() || '';
+      const trimmedUserName = userName?.trim() || '';
       const trimmedPhoto = photoUrl?.trim() || '';
       const timestamp = new Date().toISOString();
 
@@ -707,14 +686,18 @@ const authSlice = createSlice({
         id: state.user.uid,
         email: state.user.email || state.profile?.email || '',
         fullName: trimmedName,
-        phone: trimmedPhone,
+        userName: trimmedUserName || state.profile?.userName || '',
+        // Phone chỉ cập nhật sau OTP — không ghi đè từ form hồ sơ.
+        phone:
+          phone !== undefined && String(phone).trim()
+            ? String(phone).trim()
+            : state.profile?.phone || '',
         photoUrl: trimmedPhoto || state.profile?.photoUrl || '',
         createdAt: state.profile?.createdAt || timestamp,
         updatedAt: timestamp,
       };
       state.profileStatus = 'succeeded';
       state.error = null;
-      state.successMessage = 'Đã lưu.';
     },
     applyShopSettingsToProfile(state, action) {
       if (!state.user) {
@@ -760,24 +743,6 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(hydrateAuthSession.pending, (state) => {
-        state.status = 'checking';
-        state.error = null;
-      })
-      .addCase(hydrateAuthSession.fulfilled, (state, action) => {
-        state.status = action.payload.user ? 'authenticated' : 'unauthenticated';
-        state.user = action.payload.user;
-        state.profile = action.payload.profile;
-        state.error = null;
-        state.configError = null;
-      })
-      .addCase(hydrateAuthSession.rejected, (state, action) => {
-        state.status = 'unauthenticated';
-        state.user = null;
-        state.profile = null;
-        state.profileStatus = 'idle';
-        state.error = action.payload;
-      })
       .addCase(loadUserProfile.pending, (state) => {
         if (!state.profile) {
           state.profileStatus = 'loading';
@@ -873,7 +838,7 @@ const authSlice = createSlice({
           };
         }
         state.error = null;
-        state.successMessage = 'Đã lưu.';
+        state.successMessage = null;
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
         state.actionStatus = 'idle';

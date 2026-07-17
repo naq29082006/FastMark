@@ -1,42 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
-import { useSelector } from 'react-redux';
 
-import { selectAuthProfile } from '../../viewmodel/auth/authSelectors';
-import { getPhoneGateStep } from '../../core/utils/phoneVerification';
 import SellerPhoneSetupScreen from '../seller/SellerPhoneSetupScreen';
-import SellerPhoneVerifyScreen from '../seller/SellerPhoneVerifyScreen';
 
 export default function PhoneVerifyGateFlow({ visible, onCancel, onVerified }) {
-  const profile = useSelector(selectAuthProfile);
-  const [step, setStep] = useState('setup');
+  const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
     if (!visible) {
       return;
     }
-    const gate = getPhoneGateStep(profile);
-    setStep(gate === 'verify' ? 'verify' : 'setup');
-  }, [visible, profile?.phone, profile?.sellerPhoneVerified]);
+    setResetKey((value) => value + 1);
+  }, [visible]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
       <View style={styles.container}>
-        {step === 'setup' ? (
-          <SellerPhoneSetupScreen
-            mode="transaction"
-            onBack={onCancel}
-            onContinue={() => setStep('verify')}
-          />
-        ) : (
-          <SellerPhoneVerifyScreen
-            mode="transaction"
-            phone={profile?.phone || ''}
-            onBack={() => setStep('setup')}
-            onNeedPhone={() => setStep('setup')}
-            onVerified={onVerified}
-          />
-        )}
+        <SellerPhoneSetupScreen
+          key={resetKey}
+          mode="transaction"
+          onBack={onCancel}
+          onVerified={onVerified}
+        />
       </View>
     </Modal>
   );

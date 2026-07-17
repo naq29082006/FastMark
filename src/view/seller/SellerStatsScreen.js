@@ -16,7 +16,6 @@ import DatePickerField from '../shared/components/DatePickerField';
 
 const RANGE_PRESETS = [
   { key: '1d', label: '1 ngày' },
-  { key: '2d', label: '2 ngày' },
   { key: '7d', label: '7 ngày' },
   { key: '1m', label: '1 tháng' },
   { key: 'custom', label: 'Tùy chọn' },

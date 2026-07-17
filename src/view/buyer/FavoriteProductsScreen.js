@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -63,7 +63,6 @@ export default function FavoriteProductsScreen({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState('');
-  const [snackbar, setSnackbar] = useState('');
 
   const loadLocation = useCallback(async () => {
     try {
@@ -153,14 +152,6 @@ export default function FavoriteProductsScreen({
     loadFavorites({ nextPage: 1 });
   }, [loadFavorites]);
 
-  useEffect(() => {
-    if (!snackbar) {
-      return undefined;
-    }
-    const timer = setTimeout(() => setSnackbar(''), 2200);
-    return () => clearTimeout(timer);
-  }, [snackbar]);
-
   function confirmRemove(productId, name) {
     Alert.alert('Bỏ yêu thích', `Bỏ thích sản phẩm "${name || 'này'}"?`, [
       { text: 'Hủy', style: 'cancel' },
@@ -177,9 +168,9 @@ export default function FavoriteProductsScreen({
             setFavorites((current) =>
               current.filter((item) => String(item.productId) !== String(productId))
             );
-            setSnackbar('Đã bỏ yêu thích sản phẩm.');
+            Alert.alert('Thành công', 'Đã bỏ yêu thích sản phẩm.');
           } catch {
-            setSnackbar('Không thể bỏ yêu thích sản phẩm.');
+            Alert.alert('Lỗi', 'Không thể bỏ yêu thích sản phẩm.');
           }
         },
       },
@@ -271,12 +262,6 @@ export default function FavoriteProductsScreen({
           }}
         />
       )}
-
-      {snackbar ? (
-        <View style={styles.snackbar}>
-          <Text style={styles.snackbarText}>{snackbar}</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -371,20 +356,5 @@ const styles = StyleSheet.create({
   productGrid: {
     justifyContent: 'space-between',
     marginBottom: 12,
-  },
-  snackbar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 16,
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  snackbarText: {
-    color: '#ffffff',
-    textAlign: 'center',
-    fontWeight: '700',
   },
 });

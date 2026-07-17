@@ -1,4 +1,9 @@
 const User = require("../models/User");
+const ShopProfile = require("../models/ShopProfile");
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 async function findUserByFirebaseUid(firebaseUid) {
   return User.findOne({ FirebaseUID: firebaseUid });
@@ -10,8 +15,46 @@ async function findUserByUserName(userName) {
     return null;
   }
   return User.findOne({
-    UserName: { $regex: `^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+    UserName: { $regex: `^${escapeRegex(value)}$`, $options: "i" },
   });
+}
+
+async function findShopByUsername(userName) {
+  const value = String(userName || "").trim().toLowerCase();
+  if (!value) {
+    return null;
+  }
+  return ShopProfile.findOne({
+    shopUsername: { $regex: `^${escapeRegex(value)}$`, $options: "i" },
+  });
+}
+
+async function assertUserNameAvailable(userName, { excludeUserId } = {}) {
+  const value = String(userName || "").trim();
+  if (!value) {
+    const error = new Error("Thiếu userName.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const existingUser = await User.findOne({
+    UserName: { $regex: `^${escapeRegex(value)}$`, $options: "i" },
+    ...(excludeUserId ? { _id: { $ne: excludeUserId } } : {}),
+  }).lean();
+  if (existingUser) {
+    const error = new Error("UserName đã được sử dụng.");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const existingShop = await findShopByUsername(value);
+  if (existingShop) {
+    const error = new Error("UserName đã được sử dụng.");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  return value;
 }
 
 async function findUserByEmail(email) {
@@ -19,6 +62,9 @@ async function findUserByEmail(email) {
 }
 
 async function createUserRecord(payload) {
+  if (payload?.UserName) {
+    await assertUserNameAvailable(payload.UserName);
+  }
   return User.create(payload);
 }
 
@@ -30,6 +76,14 @@ async function updateUserActivity(user) {
 }
 
 async function updateUserProfile(user, updates = {}) {
+  if (updates.phone !== undefined) {
+    const error = new Error(
+      "Số điện thoại chỉ được cập nhật sau khi xác minh bằng mã OTP."
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
   if (updates.fullName !== undefined) {
     const fullName = String(updates.fullName).trim();
     if (fullName.length < 2) {
@@ -40,29 +94,11 @@ async function updateUserProfile(user, updates = {}) {
     user.FullName = fullName;
   }
 
-  if (updates.phone !== undefined) {
-    const phone = String(updates.phone).trim();
-    if (phone && (phone.length !== 10 || !/^\d+$/.test(phone))) {
-      const error = new Error("Số điện thoại phải gồm đúng 10 chữ số.");
-      error.statusCode = 400;
-      throw error;
-    }
-    const previousPhone = String(user.Phone || "").trim();
-    if (phone && phone !== previousPhone) {
-      const existing = await User.findOne({
-        Phone: phone,
-        _id: { $ne: user._id },
-      }).lean();
-      if (existing) {
-        const error = new Error("Số điện thoại đã được sử dụng bởi tài khoản khác.");
-        error.statusCode = 409;
-        throw error;
-      }
-      user.SellerPhoneVerified = false;
-      user.SellerPhoneVerifyCode = null;
-      user.SellerPhoneVerifyCodeExpiresAt = null;
-    }
-    user.Phone = phone || null;
+  if (updates.userName !== undefined) {
+    const userName = await assertUserNameAvailable(updates.userName, {
+      excludeUserId: user._id,
+    });
+    user.UserName = userName;
   }
 
   if (updates.avatar !== undefined) {
@@ -76,6 +112,8 @@ async function updateUserProfile(user, updates = {}) {
 module.exports = {
   findUserByFirebaseUid,
   findUserByUserName,
+  findShopByUsername,
+  assertUserNameAvailable,
   findUserByEmail,
   createUserRecord,
   updateUserActivity,

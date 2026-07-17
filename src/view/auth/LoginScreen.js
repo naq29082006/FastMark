@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -71,18 +71,18 @@ export default function LoginScreen({ onGoRegister, onGoForgot }) {
       const payload =
         loginError && typeof loginError === 'object'
           ? loginError
-          : { message: String(loginError || 'Đăng nhập thất bại.'), field: '' };
+          : { message: String(loginError || '�ang nh?p th?t b?i.'), field: '' };
 
-      const message = payload.message || 'Đăng nhập thất bại.';
+      const message = payload.message || '�ang nh?p th?t b?i.';
       const field = payload.field || '';
 
       if (field === 'login') {
         setFieldErrors({ login: message, password: '' });
       } else if (field === 'password') {
         setFieldErrors({ login: '', password: message });
-      } else if (/không tồn tại|không tìm thấy/i.test(message)) {
+      } else if (/kh�ng t?n t?i|kh�ng t�m th?y/i.test(message)) {
         setFieldErrors({ login: message, password: '' });
-      } else if (/mật khẩu|google/i.test(message)) {
+      } else if (/m?t kh?u|google/i.test(message)) {
         setFieldErrors({ login: '', password: message });
       } else {
         setLocalError(message);
@@ -93,7 +93,7 @@ export default function LoginScreen({ onGoRegister, onGoForgot }) {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.content}
@@ -106,12 +106,12 @@ export default function LoginScreen({ onGoRegister, onGoForgot }) {
             style={styles.brandLogo}
             resizeMode="cover"
           />
-          <Text style={styles.brandTitle}>Đăng nhập tài khoản</Text>
+          <Text style={styles.brandTitle}>�ang nh?p t�i kho?n</Text>
         </View>
 
         <View style={styles.card}>
           <AuthInput
-            label="Email hoặc Username"
+            label="Email ho?c Username"
             value={login}
             onChangeText={(value) => {
               setLogin(value);
@@ -124,7 +124,7 @@ export default function LoginScreen({ onGoRegister, onGoForgot }) {
           />
 
           <AuthInput
-            label="Mật khẩu"
+            label="M?t kh?u"
             value={password}
             onChangeText={(value) => {
               setPassword(value);
@@ -159,15 +159,15 @@ export default function LoginScreen({ onGoRegister, onGoForgot }) {
             ]}
           >
             <Text style={styles.primaryButtonText}>
-              {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+              {isLoading ? '�ang dang nh?p...' : '�ang nh?p'}
             </Text>
           </Pressable>
 
           <Pressable onPress={() => onGoForgot?.()} style={styles.forgotLinkWrap} hitSlop={8}>
-            <Text style={styles.forgotLink}>Quên mật khẩu?</Text>
+            <Text style={styles.forgotLink}>Qu�n m?t kh?u?</Text>
           </Pressable>
 
-          <AuthDivider label="Hoặc đăng nhập với" />
+          <AuthDivider label="Ho?c dang nh?p v?i" />
 
           {googleSetupError ? (
             <View style={styles.hintBox}>
@@ -185,7 +185,7 @@ export default function LoginScreen({ onGoRegister, onGoForgot }) {
             pressed && styles.registerButtonPressed,
           ]}
         >
-          <Text style={styles.registerButtonText}>Đăng ký tài khoản mới</Text>
+          <Text style={styles.registerButtonText}>�ang k� t�i kho?n m?i</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>

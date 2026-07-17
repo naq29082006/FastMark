@@ -13,6 +13,12 @@ import AccountDetailPage from './pages/AccountDetailPage';
 import ReportManagement from './pages/ReportManagement';
 import ReviewManagement from './pages/ReviewManagement';
 import SystemNotification from './pages/SystemNotification';
+import ShopsPage from './pages/ShopsPage';
+import ShopDetailPage from './pages/ShopDetailPage';
+import ProductsPage from './pages/ProductsPage';
+import ReservationsPage from './pages/ReservationsPage';
+import DealsPage from './pages/DealsPage';
+import StatsPage from './pages/StatsPage';
 
 function ProtectedRoutes() {
   const { user, isAdmin, loading } = useAuth();
@@ -37,13 +43,19 @@ function ProtectedRoutes() {
     <Routes>
       <Route element={<AdminLayout />}>
         <Route index element={<DashboardPage />} />
-        <Route path="verifications" element={<SellerVerificationsPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="accounts/:accountId" element={<AccountDetailPage />} />
+        <Route path="verifications" element={<SellerVerificationsPage />} />
+        <Route path="shops" element={<ShopsPage />} />
+        <Route path="shops/:shopId" element={<ShopDetailPage />} />
+        <Route path="products" element={<ProductsPage />} />
+        <Route path="categories" element={<CategoriesPage />} />
+        <Route path="reservations" element={<ReservationsPage />} />
+        <Route path="deals" element={<DealsPage />} />
         <Route path="reports" element={<ReportManagement />} />
         <Route path="reviews" element={<ReviewManagement />} />
         <Route path="notifications" element={<SystemNotification />} />
-        <Route path="categories" element={<CategoriesPage />} />
+        <Route path="stats" element={<StatsPage />} />
       </Route>
     </Routes>
   );

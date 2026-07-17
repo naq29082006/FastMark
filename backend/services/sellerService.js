@@ -8,6 +8,8 @@ const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService
 const { ensureDefaultShopAvatar } = require("./defaultShopAvatarService");
 
 const PHONE_VERIFY_TTL_MS = 5 * 60 * 1000;
+const PHONE_RESEND_COOLDOWN_MS = 3 * 60 * 1000;
+const PHONE_VERIFY_MAX_ATTEMPTS = 5;
 const SHOP_USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 
 function normalizeShopUsername(value) {
@@ -94,9 +96,19 @@ async function assertShopUsernameAvailable(shopUsername, userId) {
     );
   }
 
+  const existingUserName = await User.findOne({
+    UserName: {
+      $regex: `^${normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+      $options: "i",
+    },
+  }).lean();
+  if (existingUserName) {
+    throw createServiceError("Username shop đã được sử dụng.");
+  }
+
   const existingShop = await ShopProfile.findOne({ shopUsername: normalized }).lean();
   if (existingShop && String(existingShop.userId) !== String(userId)) {
-    throw createServiceError("Tên shop đã được sử dụng.");
+    throw createServiceError("Username shop đã được sử dụng.");
   }
 
   const pendingVerification = await SellerVerification.findOne({
@@ -106,7 +118,7 @@ async function assertShopUsernameAvailable(shopUsername, userId) {
   }).lean();
 
   if (pendingVerification) {
-    throw createServiceError("Tên shop đã được sử dụng.");
+    throw createServiceError("Username shop đã được sử dụng.");
   }
 
   return normalized;
@@ -126,49 +138,131 @@ function ensureUserHasPhone(user) {
   return phone;
 }
 
+function normalizePhone(phone) {
+  return String(phone || "").trim();
+}
+
+function assertPhoneFormat(phone) {
+  const normalized = normalizePhone(phone);
+  if (!/^\d{10}$/.test(normalized)) {
+    throw createServiceError("Số điện thoại phải gồm đúng 10 chữ số.");
+  }
+  return normalized;
+}
+
+async function assertPhoneAvailable(phone, userId) {
+  const normalized = assertPhoneFormat(phone);
+  const existing = await User.findOne({
+    Phone: normalized,
+    _id: { $ne: userId },
+  }).lean();
+  if (existing) {
+    throw createServiceError("Số điện thoại đã được sử dụng bởi tài khoản khác.");
+  }
+  return normalized;
+}
+
 function generatePhoneVerifyCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-async function requestSellerPhoneCode(user) {
-  const phone = ensureUserHasPhone(user);
+function encodePhoneVerifyPayload(phone, code) {
+  return `${phone}|${code}`;
+}
 
-  if (user.SellerPhoneVerified) {
-    return {
-      phone,
-      alreadyVerified: true,
-      expiresAt: null,
-      expiresInSeconds: 0,
-    };
+function decodePhoneVerifyPayload(payload) {
+  const text = String(payload || "");
+  const separator = text.lastIndexOf("|");
+  if (separator <= 0 || separator === text.length - 1) {
+    return { phone: "", code: "" };
   }
-
-  const code = generatePhoneVerifyCode();
-  user.SellerPhoneVerifyCode = code;
-  user.SellerPhoneVerifyCodeExpiresAt = new Date(Date.now() + PHONE_VERIFY_TTL_MS);
-  await user.save();
-
   return {
-    phone,
-    verificationCode: code,
-    expiresAt: user.SellerPhoneVerifyCodeExpiresAt,
-    expiresInSeconds: PHONE_VERIFY_TTL_MS / 1000,
+    phone: text.slice(0, separator),
+    code: text.slice(separator + 1),
   };
 }
 
-async function confirmSellerPhoneCode(user, code) {
-  ensureUserHasPhone(user);
+function getResendWaitSeconds(user) {
+  if (!user.SellerPhoneVerifyResendAt) {
+    return 0;
+  }
+  return Math.max(0, Math.ceil((new Date(user.SellerPhoneVerifyResendAt).getTime() - Date.now()) / 1000));
+}
 
+function clearPhoneVerifySession(user) {
+  user.SellerPhoneVerifyCode = null;
+  user.SellerPhoneVerifyCodeExpiresAt = null;
+  user.SellerPhoneVerifyFailCount = 0;
+}
+
+async function requestSellerPhoneCode(user, phoneInput) {
+  const targetPhone = await assertPhoneAvailable(phoneInput, user._id);
+
+  const currentPhone = normalizePhone(user.Phone);
+  if (user.SellerPhoneVerified && currentPhone && currentPhone === targetPhone) {
+    return {
+      phone: targetPhone,
+      alreadyVerified: true,
+      expiresAt: null,
+      expiresInSeconds: 0,
+      resendAvailableAt: null,
+      resendCooldownSeconds: 0,
+    };
+  }
+
+  const resendWaitSeconds = getResendWaitSeconds(user);
+  if (resendWaitSeconds > 0) {
+    const error = createServiceError(
+      `Vui lòng đợi ${resendWaitSeconds} giây trước khi gửi lại mã.`,
+      429
+    );
+    error.data = {
+      resendAvailableAt: user.SellerPhoneVerifyResendAt,
+      resendCooldownSeconds: resendWaitSeconds,
+    };
+    throw error;
+  }
+
+  const code = generatePhoneVerifyCode();
+  const now = Date.now();
+  user.SellerPhoneVerifyCode = encodePhoneVerifyPayload(targetPhone, code);
+  user.SellerPhoneVerifyCodeExpiresAt = new Date(now + PHONE_VERIFY_TTL_MS);
+  user.SellerPhoneVerifyResendAt = new Date(now + PHONE_RESEND_COOLDOWN_MS);
+  user.SellerPhoneVerifyFailCount = 0;
+  await user.save();
+
+  return {
+    phone: targetPhone,
+    verificationCode: code,
+    expiresAt: user.SellerPhoneVerifyCodeExpiresAt,
+    expiresInSeconds: PHONE_VERIFY_TTL_MS / 1000,
+    resendAvailableAt: user.SellerPhoneVerifyResendAt,
+    resendCooldownSeconds: PHONE_RESEND_COOLDOWN_MS / 1000,
+  };
+}
+
+async function confirmSellerPhoneCode(user, code, phoneInput) {
+  const phone = await assertPhoneAvailable(phoneInput, user._id);
   const normalizedCode = String(code || "").trim();
+
   if (!normalizedCode) {
     throw createServiceError("Thiếu mã xác minh.");
   }
 
-  if (!user.SellerPhoneVerifyCode || user.SellerPhoneVerifyCode !== normalizedCode) {
-    throw createServiceError(
-      user.SellerPhoneVerifyCode
-        ? "Mã xác minh không đúng."
-        : "Chưa có mã xác minh. Vui lòng gửi lại mã mới."
+  if ((Number(user.SellerPhoneVerifyFailCount) || 0) >= PHONE_VERIFY_MAX_ATTEMPTS) {
+    clearPhoneVerifySession(user);
+    user.SellerPhoneVerifyResendAt = null;
+    await user.save();
+    const error = createServiceError(
+      "Bạn đã nhập sai quá 5 lần. Phiên xác minh đã bị hủy.",
+      429
     );
+    error.data = { lockedOut: true };
+    throw error;
+  }
+
+  if (!user.SellerPhoneVerifyCode) {
+    throw createServiceError("Chưa có mã xác minh. Vui lòng gửi mã mới.");
   }
 
   if (
@@ -178,19 +272,43 @@ async function confirmSellerPhoneCode(user, code) {
     throw createServiceError("Mã xác minh đã hết hạn. Vui lòng gửi lại mã mới.");
   }
 
-  user.SellerPhoneVerifyCode = null;
-  user.SellerPhoneVerifyCodeExpiresAt = null;
+  const stored = decodePhoneVerifyPayload(user.SellerPhoneVerifyCode);
+  if (stored.phone !== phone || stored.code !== normalizedCode) {
+    const failCount = (Number(user.SellerPhoneVerifyFailCount) || 0) + 1;
+    user.SellerPhoneVerifyFailCount = failCount;
+
+    if (failCount >= PHONE_VERIFY_MAX_ATTEMPTS) {
+      clearPhoneVerifySession(user);
+      user.SellerPhoneVerifyResendAt = null;
+      await user.save();
+      const error = createServiceError(
+        "Bạn đã nhập sai quá 5 lần. Phiên xác minh đã bị hủy.",
+        429
+      );
+      error.data = { lockedOut: true };
+      throw error;
+    }
+
+    await user.save();
+    throw createServiceError(
+      `Mã xác minh không đúng. Còn ${PHONE_VERIFY_MAX_ATTEMPTS - failCount} lần thử.`
+    );
+  }
+
+  user.Phone = phone;
+  clearPhoneVerifySession(user);
+  user.SellerPhoneVerifyResendAt = null;
   user.SellerPhoneVerified = true;
   await user.save();
 
   const shop = await ShopProfile.findOne({ userId: user._id }).sort({ CreatedAt: -1 });
   if (shop) {
-    shop.phone = user.Phone;
+    shop.phone = phone;
     shop.UpdatedAt = new Date();
     await shop.save();
   }
 
-  return { verified: true, phone: user.Phone };
+  return { verified: true, phone };
 }
 
 async function uploadSellerImage({ user, imageBase64, mimeType, folder, label }) {

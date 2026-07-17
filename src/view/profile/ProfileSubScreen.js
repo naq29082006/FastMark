@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import CircularBackButton from '../shared/components/CircularBackButton';
@@ -13,7 +13,11 @@ export default function ProfileSubScreen({
   const insets = useScreenInsets();
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
       <View
         style={[
           embedded ? styles.headerPlain : styles.topBar,
@@ -33,13 +37,15 @@ export default function ProfileSubScreen({
       </View>
       <ScrollView
         style={styles.body}
-        contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottomSpacing + 16 }]}
+        contentContainerStyle={[styles.bodyContent, { paddingBottom: insets.bottomSpacing + 24 }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={refreshControl}
       >
         {children}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -81,7 +87,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bodyContent: {
-    padding: 16,
-    paddingBottom: 32,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
 });

@@ -1,6 +1,7 @@
 const authService = require("../services/authService");
 const userService = require("../services/userService");
 const User = require("../models/User");
+const ShopProfile = require("../models/ShopProfile");
 const presenceService = require("../services/presenceService");
 const { buildPublicUserProfile } = require("../services/profileService");
 const {
@@ -59,7 +60,10 @@ exports.checkRegisterAvailability = async (req, res) => {
     const existingUserName = await User.findOne({
       UserName: { $regex: `^${escapeRegex(userName)}$`, $options: "i" },
     });
-    data.userNameTaken = Boolean(existingUserName);
+    const existingShopUsername = await ShopProfile.findOne({
+      shopUsername: { $regex: `^${escapeRegex(userName)}$`, $options: "i" },
+    });
+    data.userNameTaken = Boolean(existingUserName || existingShopUsername);
   }
 
   if (email) {
@@ -270,12 +274,21 @@ exports.getMe = async (req, res) => {
 
 exports.updateMe = async (req, res) => {
   const fullName = pickBodyValue(req.body, ["fullName", "FullName"]);
-  const phone = pickBodyValue(req.body, ["phone", "Phone"]);
+  const userName = pickBodyValue(req.body, ["userName", "UserName"]);
   const hasFullNameField =
     req.body.fullName !== undefined || req.body.FullName !== undefined;
+  const hasUserNameField =
+    req.body.userName !== undefined || req.body.UserName !== undefined;
   const hasPhoneField = req.body.phone !== undefined || req.body.Phone !== undefined;
 
-  if (!hasFullNameField && !hasPhoneField) {
+  if (hasPhoneField) {
+    return fail(res, {
+      status: 400,
+      message: "Số điện thoại chỉ được cập nhật sau khi xác minh bằng mã OTP.",
+    });
+  }
+
+  if (!hasFullNameField && !hasUserNameField) {
     return fail(res, {
       status: 400,
       message: "Không có dữ liệu để cập nhật.",
@@ -283,18 +296,26 @@ exports.updateMe = async (req, res) => {
   }
 
   const updates = {};
-  if (hasFullNameField && fullName) {
+
+  if (hasFullNameField) {
+    if (!fullName || fullName.length < 2) {
+      return fail(res, {
+        status: 400,
+        message: "Họ tên phải có ít nhất 2 ký tự.",
+      });
+    }
     updates.fullName = fullName;
   }
-  if (hasPhoneField) {
-    updates.phone = phone;
-  }
 
-  if (!updates.fullName && !hasPhoneField) {
-    return fail(res, {
-      status: 400,
-      message: "Họ tên không được để trống.",
-    });
+  if (hasUserNameField) {
+    const userNameError = validateUserName(userName);
+    if (userNameError) {
+      return fail(res, {
+        status: 400,
+        message: userNameError,
+      });
+    }
+    updates.userName = userName;
   }
 
   const user = await userService.updateUserProfile(req.currentUser, updates);

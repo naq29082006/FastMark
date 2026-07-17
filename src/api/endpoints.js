@@ -28,6 +28,7 @@ export const API_ENDPOINTS = {
   myProductById: (id) => `/api/products/mine/${id}`,
   sellerShop: '/api/seller/shop',
   sellerShopAvatar: '/api/seller/shop/avatar',
+  sellerShopUsernameAvailability: '/api/seller/shop/username-availability',
   sellerOrders: '/api/seller/orders',
   sellerReservation: (id) => `/api/seller/reservations/${id}`,
   sellerReservationConfirm: (id) => `/api/seller/reservations/${id}/confirm`,

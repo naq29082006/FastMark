@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
   Image,
   Pressable,
   RefreshControl,
@@ -520,6 +520,14 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoryRow}
           >
+            <Pressable
+              style={styles.allCategoriesChip}
+              onPress={() => setShowCategoriesScreen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Tất cả danh mục"
+            >
+              <Ionicons name="grid-outline" size={20} color="#0d7377" />
+            </Pressable>
             {categories.map((category) => (
               <CategoryIconChip
                 key={category.id}
@@ -529,14 +537,6 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
                 onPress={() => handleSelectCategory(category.id)}
               />
             ))}
-            <Pressable
-              style={styles.allCategoriesChip}
-              onPress={() => setShowCategoriesScreen(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Tất cả danh mục"
-            >
-              <Ionicons name="grid-outline" size={20} color="#0d7377" />
-            </Pressable>
           </ScrollView>
 
           {locationError ? <Text style={styles.errorText}>{locationError}</Text> : null}

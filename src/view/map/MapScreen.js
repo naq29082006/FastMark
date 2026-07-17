@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { useSelector } from 'react-redux';
 
 import { getShopCategoriesOnBackend } from '../../api/productApi';
 import { fetchRouteDistancesFromOrigin } from '../../api/routingApi';
-import {
-  selectSellerVerification,
-  selectUserRole,
-} from '../../viewmodel/auth/authSelectors';
-import { getSellerRegisterButtonLabel } from '../seller/sellerRegistrationFlow';
 
 import LeafletMap from '../shared/components/LeafletMap';
-import BuyerQuickMenu from '../shared/components/BuyerQuickMenu';
 import DirectionsScreen from './DirectionsScreen';
 import AddressSearchBar from './AddressSearchBar';
 import ProductDetailScreen from '../store/ProductDetailScreen';
@@ -75,9 +76,6 @@ export default function MapScreen({
   onPickupCompleted,
   onOpenBuyerOrders,
   onNavigationStateChange,
-  onEditAccount,
-  onSellerAction,
-  onLogout,
   isScreenActive = true,
 }) {
   const watcherRef = useRef(null);
@@ -100,6 +98,11 @@ export default function MapScreen({
   const [routeDistanceById, setRouteDistanceById] = useState({});
   const [isShopPanelExpanded, setIsShopPanelExpanded] = useState(false);
   const [shopCategories, setShopCategories] = useState([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  const handleSearchFocusChange = useCallback((focused) => {
+    setIsSearchFocused(Boolean(focused));
+  }, []);
 
   const toggleFilterMenu = useCallback(() => {
     setMenuVisible((current) => {
@@ -114,9 +117,6 @@ export default function MapScreen({
     setMenuVisible(false);
   }, []);
 
-  const role = useSelector(selectUserRole);
-  const sellerVerification = useSelector(selectSellerVerification);
-  const sellerButtonLabel = getSellerRegisterButtonLabel({ role, verification: sellerVerification });
   const lastAcceptedRef = useRef(null);
   const reverseScanRequestRef = useRef(0);
   const scanFetchTimerRef = useRef(null);
@@ -679,6 +679,7 @@ export default function MapScreen({
   useEffect(() => {
     if (!isScreenActive) {
       setMenuVisible(false);
+      setIsSearchFocused(false);
     }
   }, [isScreenActive]);
 
@@ -769,7 +770,6 @@ export default function MapScreen({
   const mapFlex = isShopPanelExpanded ? MAP_FLEX_HALF : MAP_FLEX_SHOP_COLLAPSED;
   const shopFlex = isShopPanelExpanded ? SHOP_FLEX_HALF : SHOP_FLEX_COLLAPSED;
 
-
   let screenContent;
 
   if (directionsSession) {
@@ -829,21 +829,15 @@ export default function MapScreen({
           }
           restaurants={visibleRestaurants}
           onEvent={handleMapEvent}
+          interactive={!isSearchFocused}
         />
 
         <View style={styles.searchOverlay} pointerEvents="box-none">
-          <View style={styles.searchRow}>
-            <View style={styles.searchBarWrap}>
-              <AddressSearchBar
-                placeholder="Tìm đường, địa điểm..."
-                onSelectResult={handleSearchSelect}
-              />
-            </View>
-            <BuyerQuickMenu
-              sellerButtonLabel={sellerButtonLabel}
-              onEditAccount={onEditAccount}
-              onSellerAction={onSellerAction}
-              onLogout={onLogout}
+          <View style={styles.searchBarWrap} pointerEvents="auto">
+            <AddressSearchBar
+              placeholder="Tìm đường, địa điểm..."
+              onSelectResult={handleSearchSelect}
+              onFocusChange={handleSearchFocusChange}
             />
           </View>
         </View>
@@ -1081,17 +1075,13 @@ const styles = StyleSheet.create({
     top: 4,
     left: 0,
     right: 0,
-    zIndex: 15,
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingHorizontal: 14,
+    zIndex: 40,
+    elevation: 16,
   },
   searchBarWrap: {
-    flex: 1,
-    minWidth: 0,
+    paddingHorizontal: 14,
+    zIndex: 41,
+    elevation: 16,
   },
   nearbyPanel: {
     minHeight: 0,

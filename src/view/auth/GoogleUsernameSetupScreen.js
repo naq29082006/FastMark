@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -64,7 +64,7 @@ export default function GoogleUsernameSetupScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.content}
@@ -79,8 +79,8 @@ export default function GoogleUsernameSetupScreen() {
         />
 
         <AuthBrand
-          title="Hoàn tất tài khoản"
-          subtitle="Đây là lần đăng nhập Google đầu tiên. Hãy chọn tên đăng nhập để tiếp tục."
+          title="Ho�n t?t t�i kho?n"
+          subtitle="��y l� l?n dang nh?p Google d?u ti�n. H�y ch?n t�n dang nh?p d? ti?p t?c."
         />
 
         <View style={styles.card}>
@@ -92,12 +92,12 @@ export default function GoogleUsernameSetupScreen() {
             />
             <View style={styles.googleUserMeta}>
               <Text style={styles.googleEmail}>{pendingGoogle?.email || 'Google Account'}</Text>
-              <Text style={styles.googleHint}>Đăng nhập bằng Google</Text>
+              <Text style={styles.googleHint}>�ang nh?p b?ng Google</Text>
             </View>
           </View>
 
           <AuthInput
-            label="Họ và tên"
+            label="H? v� t�n"
             value={fullName}
             onChangeText={(value) => {
               setFullName(value);
@@ -105,11 +105,11 @@ export default function GoogleUsernameSetupScreen() {
             }}
             autoCapitalize="words"
             autoComplete="name"
-            placeholder="Nguyễn Văn A"
+            placeholder="Nguy?n Van A"
           />
 
           <AuthInput
-            label="Tên đăng nhập"
+            label="T�n dang nh?p"
             value={userName}
             onChangeText={(value) => {
               setUserName(value);
@@ -136,7 +136,7 @@ export default function GoogleUsernameSetupScreen() {
             ]}
           >
             <Text style={styles.primaryButtonText}>
-              {isLoading ? 'Đang lưu...' : 'Tiếp tục'}
+              {isLoading ? '�ang luu...' : 'Ti?p t?c'}
             </Text>
           </Pressable>
         </View>

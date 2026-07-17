@@ -26,6 +26,7 @@ export default function LeafletMap({
   restaurants,
   onEvent,
   navigationMode = false,
+  interactive = true,
 }) {
   const webViewRef = useRef(null);
   const onEventRef = useRef(onEvent);
@@ -146,7 +147,7 @@ export default function LeafletMap({
   }, [routeRequest, ready]);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} pointerEvents={interactive ? 'auto' : 'none'}>
       <WebView
         key={LEAFLET_HTML_REVISION}
         ref={webViewRef}
@@ -157,6 +158,7 @@ export default function LeafletMap({
         domStorageEnabled
         mixedContentMode="always"
         setSupportMultipleWindows={false}
+        pointerEvents={interactive ? 'auto' : 'none'}
         onLoadEnd={() => {
           log.ok('webview:ready');
           setReady(true);

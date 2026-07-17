@@ -1,10 +1,14 @@
 const ShopProfile = require("../models/ShopProfile");
+const SellerVerification = require("../models/SellerVerification");
 const User = require("../models/User");
 const { SHOP_OPEN } = require("../constants/shopStatus");
+const { SELLER_VERIFICATION_STATUS } = require("../constants/sellerVerification");
 const {
   resolveFileExtension,
   uploadImageToSupabase,
 } = require("./uploadService");
+
+const SHOP_USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -14,6 +18,59 @@ function createServiceError(message, statusCode = 400) {
 
 function pickString(value) {
   return String(value || "").trim();
+}
+
+function normalizeShopName(value) {
+  return pickString(value).replace(/\s+/g, " ");
+}
+
+function normalizeShopUsername(value) {
+  return pickString(value).toLowerCase();
+}
+
+function assertShopNameValid(shopName) {
+  const normalized = normalizeShopName(shopName);
+  if (normalized.length < 2 || normalized.length > 80) {
+    throw createServiceError("Tên gian hàng phải từ 2-80 ký tự.");
+  }
+  return normalized;
+}
+
+async function assertShopUsernameAvailable(shopUsername, userId) {
+  const normalized = normalizeShopUsername(shopUsername);
+
+  if (!SHOP_USERNAME_PATTERN.test(normalized)) {
+    throw createServiceError(
+      "Username shop phải từ 3-30 ký tự, chỉ chữ thường, số và dấu gạch dưới."
+    );
+  }
+
+  const existingUserName = await User.findOne({
+    UserName: {
+      $regex: `^${normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+      $options: "i",
+    },
+  }).lean();
+  if (existingUserName) {
+    throw createServiceError("Username shop đã được sử dụng.");
+  }
+
+  const existingShop = await ShopProfile.findOne({ shopUsername: normalized }).lean();
+  if (existingShop && String(existingShop.userId) !== String(userId)) {
+    throw createServiceError("Username shop đã được sử dụng.");
+  }
+
+  const pendingVerification = await SellerVerification.findOne({
+    shopUsername: normalized,
+    status: SELLER_VERIFICATION_STATUS.PENDING,
+    userId: { $ne: userId },
+  }).lean();
+
+  if (pendingVerification) {
+    throw createServiceError("Username shop đã được sử dụng.");
+  }
+
+  return normalized;
 }
 
 function toPublicShopSettings(shop, user) {
@@ -80,7 +137,10 @@ async function updateShopSettings(user, payload) {
   const freshUser = await User.findById(user._id);
 
   if (payload.shopName !== undefined) {
-    shop.shopName = pickString(payload.shopName);
+    shop.shopName = assertShopNameValid(payload.shopName);
+  }
+  if (payload.shopUsername !== undefined) {
+    shop.shopUsername = await assertShopUsernameAvailable(payload.shopUsername, user._id);
   }
   if (payload.description !== undefined || payload.shopDescription !== undefined) {
     shop.description = pickString(payload.description ?? payload.shopDescription);
@@ -167,10 +227,28 @@ async function uploadShopAvatar(user, { imageBase64, mimeType }) {
   };
 }
 
+async function checkShopUsernameAvailability(user, shopUsername) {
+  try {
+    const normalized = await assertShopUsernameAvailable(shopUsername, user._id);
+    return {
+      available: true,
+      shopUsername: normalized,
+      message: "",
+    };
+  } catch (error) {
+    return {
+      available: false,
+      shopUsername: normalizeShopUsername(shopUsername),
+      message: error.message || "Username shop đã được sử dụng.",
+    };
+  }
+}
+
 module.exports = {
   getShopSettings,
   updateShopSettings,
   uploadShopAvatar,
+  checkShopUsernameAvailability,
   getShopForSeller,
   toPublicShopSettings,
 };

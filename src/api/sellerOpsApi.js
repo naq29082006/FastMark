@@ -44,6 +44,20 @@ export async function updateSellerShopSettingsOnBackend({ idToken, payload }) {
   return parsed.data?.shop;
 }
 
+export async function checkSellerShopUsernameAvailabilityOnBackend({ idToken, shopUsername }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerShopUsernameAvailability,
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ shopUsername }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const parsed = await parseApiResponse(response);
+  return parsed.data || { available: false, message: 'Không kiểm tra được username shop.' };
+}
+
 export async function uploadSellerShopAvatarOnBackend({ idToken, imageBase64, mimeType = 'image/jpeg' }) {
   if (!imageBase64) {
     throw new Error('Thiếu dữ liệu ảnh để upload.');

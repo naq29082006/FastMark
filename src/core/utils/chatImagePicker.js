@@ -1,4 +1,7 @@
-import { Alert, Platform } from 'react-native';
+import {
+  Alert,
+  Platform,
+} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 function parseImageAsset(result) {

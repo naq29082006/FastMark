@@ -17,6 +17,7 @@ export default function LeafletMap({
   restaurants,
   onEvent,
   navigationMode = false,
+  interactive = true,
 }) {
   const iframeRef = useRef(null);
   const onEventRef = useRef(onEvent);
@@ -144,7 +145,7 @@ export default function LeafletMap({
   }, [routeRequest, ready]);
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} pointerEvents={interactive ? 'auto' : 'none'}>
       {React.createElement('iframe', {
         key: LEAFLET_HTML_REVISION,
         title: 'Fastmark map',

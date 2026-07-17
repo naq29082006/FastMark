@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -178,7 +180,10 @@ export default function MyReviewsScreen({ refreshKey = 0 }) {
       )}
 
       <Modal visible={Boolean(editingReview)} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Sửa đánh giá</Text>
             <Text style={styles.modalLabel}>Số sao</Text>
@@ -209,7 +214,7 @@ export default function MyReviewsScreen({ refreshKey = 0 }) {
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

@@ -104,7 +104,10 @@ function SkeletonDashboard() {
   );
 }
 
-export default function DashboardPage() {
+export default function DashboardPage({
+  title = 'Dashboard',
+  subtitle = 'Theo dõi toàn bộ hoạt động hệ thống theo khoảng thời gian đã chọn.',
+} = {}) {
   const { getIdToken } = useAuth();
   const [range, setRange] = useState('month');
   const [from, setFrom] = useState('');
@@ -154,8 +157,8 @@ export default function DashboardPage() {
     <div className="page dashboard-page">
       <div className="page-header">
         <div>
-          <h1>Dashboard thống kê</h1>
-          <p>Dữ liệu thời gian thực từ MongoDB theo khoảng thời gian đã chọn.</p>
+          <h1>{title}</h1>
+          <p>{subtitle}</p>
         </div>
         <button type="button" onClick={loadDashboard}>
           Làm mới
@@ -165,9 +168,9 @@ export default function DashboardPage() {
       <div className="dashboard-filters">
         <div className="filter-chips">
           {[
-            { key: 'day', label: 'Hôm nay' },
+            { key: 'day', label: '1 ngày' },
             { key: 'week', label: '7 ngày' },
-            { key: 'month', label: '30 ngày' },
+            { key: 'month', label: '1 tháng' },
             { key: 'custom', label: 'Tùy chọn' },
           ].map((item) => (
             <button

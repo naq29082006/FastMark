@@ -1,6 +1,7 @@
 const { auth } = require("../config/firebaseAdmin");
 const { firebaseApiKey } = require("../config/env");
 const {
+  assertUserNameAvailable,
   createUserRecord,
   findUserByFirebaseUid,
   updateUserActivity,
@@ -373,7 +374,11 @@ async function registerOrLoginWithGoogle({ idToken, fullName, userName }) {
     assertUserIsActive(user);
 
     if (fullName) user.FullName = fullName;
-    if (userName) user.UserName = normalizeUserName(userName);
+    if (userName) {
+      user.UserName = await assertUserNameAvailable(userName, {
+        excludeUserId: user._id,
+      });
+    }
     // Không ghi đè Avatar bằng ảnh Google. Chỉ tạo avatar hệ thống nếu chưa có.
     await user.save();
     await ensureDefaultUserAvatar(user);

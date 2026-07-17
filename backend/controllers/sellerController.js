@@ -13,16 +13,39 @@ function pickBodyValue(body, keys) {
 }
 
 exports.requestPhoneCode = async (req, res) => {
-  const verification = await sellerService.requestSellerPhoneCode(req.currentUser);
+  const phone = pickBodyValue(req.body, ["phone", "Phone"]);
+  if (!phone) {
+    return fail(res, {
+      status: 400,
+      message: "Thiếu số điện thoại.",
+    });
+  }
 
-  return success(res, {
-    message: "Đã tạo mã xác minh số điện thoại.",
-    data: verification,
-  });
+  try {
+    const verification = await sellerService.requestSellerPhoneCode(req.currentUser, phone);
+    return success(res, {
+      message: "Đã tạo mã xác minh số điện thoại.",
+      data: verification,
+    });
+  } catch (error) {
+    return fail(res, {
+      status: error.statusCode || 400,
+      message: error.message || "Không gửi được mã xác minh.",
+      data: error.data || undefined,
+    });
+  }
 };
 
 exports.confirmPhoneCode = async (req, res) => {
   const code = pickBodyValue(req.body, ["code", "verificationCode"]);
+  const phone = pickBodyValue(req.body, ["phone", "Phone"]);
+
+  if (!phone) {
+    return fail(res, {
+      status: 400,
+      message: "Thiếu số điện thoại.",
+    });
+  }
 
   if (!code) {
     return fail(res, {
@@ -31,15 +54,22 @@ exports.confirmPhoneCode = async (req, res) => {
     });
   }
 
-  const result = await sellerService.confirmSellerPhoneCode(req.currentUser, code);
-
-  return success(res, {
-    message: "Xác minh số điện thoại thành công.",
-    data: {
-      ...result,
-      sellerPhoneVerified: true,
-    },
-  });
+  try {
+    const result = await sellerService.confirmSellerPhoneCode(req.currentUser, code, phone);
+    return success(res, {
+      message: "Xác minh số điện thoại thành công.",
+      data: {
+        ...result,
+        sellerPhoneVerified: true,
+      },
+    });
+  } catch (error) {
+    return fail(res, {
+      status: error.statusCode || 400,
+      message: error.message || "Xác minh thất bại.",
+      data: error.data || undefined,
+    });
+  }
 };
 
 exports.getMyVerification = async (req, res) => {

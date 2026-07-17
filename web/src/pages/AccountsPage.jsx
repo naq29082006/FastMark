@@ -127,7 +127,7 @@ export default function AccountsPage() {
     <div className="page">
       <header className="page-header">
         <div>
-          <h1>Quản lý người dùng</h1>
+          <h1>Người dùng</h1>
           <p>Quản lý tài khoản người mua và người bán. Tài khoản quản trị không hiển thị ở đây.</p>
         </div>
         <button type="button" onClick={loadItems} disabled={loading}>

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -58,11 +58,11 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
   function validateFullNameField() {
     const value = fullName.trim();
     if (!value) {
-      setFieldError('fullName', 'Vui lòng nhập họ và tên.');
+      setFieldError('fullName', 'Vui l�ng nh?p h? v� t�n.');
       return false;
     }
     if (value.length < 2 || value.length > 50) {
-      setFieldError('fullName', 'Họ tên phải từ 2 đến 50 ký tự.');
+      setFieldError('fullName', 'H? t�n ph?i t? 2 d?n 50 k� t?.');
       return false;
     }
     setFieldError('fullName', '');
@@ -72,26 +72,26 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
   async function validateUserNameField() {
     const value = userName.trim();
     if (!value) {
-      setFieldError('userName', 'Vui lòng nhập username.');
+      setFieldError('userName', 'Vui l�ng nh?p username.');
       return false;
     }
     if (value.length < 3 || value.length > 20) {
-      setFieldError('userName', 'Username phải từ 3 đến 20 ký tự.');
+      setFieldError('userName', 'Username ph?i t? 3 d?n 20 k� t?.');
       return false;
     }
     if (!/^[a-zA-Z0-9_]+$/.test(value)) {
-      setFieldError('userName', 'Username chỉ được dùng chữ, số và dấu gạch dưới.');
+      setFieldError('userName', 'Username ch? du?c d�ng ch?, s? v� d?u g?ch du?i.');
       return false;
     }
 
     try {
       const { userNameTaken } = await checkRegisterAvailabilityOnBackend({ userName: value });
       if (userNameTaken) {
-        setFieldError('userName', 'Username này đã tồn tại.');
+        setFieldError('userName', 'Username n�y d� t?n t?i.');
         return false;
       }
     } catch {
-      // Không chặn khi API check lỗi; đăng ký sẽ kiểm tra lại phía server.
+      // Kh�ng ch?n khi API check l?i; dang k� s? ki?m tra l?i ph�a server.
     }
     setFieldError('userName', '');
     return true;
@@ -100,26 +100,26 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
   async function validateEmailField() {
     const value = email.trim();
     if (!value) {
-      setFieldError('email', 'Vui lòng nhập email.');
+      setFieldError('email', 'Vui l�ng nh?p email.');
       return false;
     }
     if (value.length < 6 || value.length > 100) {
-      setFieldError('email', 'Email phải từ 6 đến 100 ký tự.');
+      setFieldError('email', 'Email ph?i t? 6 d?n 100 k� t?.');
       return false;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setFieldError('email', 'Email không hợp lệ.');
+      setFieldError('email', 'Email kh�ng h?p l?.');
       return false;
     }
 
     try {
       const { emailTaken } = await checkRegisterAvailabilityOnBackend({ email: value });
       if (emailTaken) {
-        setFieldError('email', 'Email này đã được sử dụng.');
+        setFieldError('email', 'Email n�y d� du?c s? d?ng.');
         return false;
       }
     } catch {
-      // Không chặn khi API check lỗi; đăng ký sẽ kiểm tra lại phía server.
+      // Kh�ng ch?n khi API check l?i; dang k� s? ki?m tra l?i ph�a server.
     }
     setFieldError('email', '');
     return true;
@@ -127,11 +127,11 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
 
   function validatePasswordField() {
     if (!password) {
-      setFieldError('password', 'Vui lòng nhập mật khẩu.');
+      setFieldError('password', 'Vui l�ng nh?p m?t kh?u.');
       return false;
     }
     if (password.length < 6 || password.length > 32) {
-      setFieldError('password', 'Mật khẩu phải từ 6 đến 32 ký tự.');
+      setFieldError('password', 'M?t kh?u ph?i t? 6 d?n 32 k� t?.');
       return false;
     }
     setFieldError('password', '');
@@ -140,11 +140,11 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
 
   function validateConfirmPasswordField() {
     if (!confirmPassword) {
-      setFieldError('confirmPassword', 'Vui lòng nhập lại mật khẩu.');
+      setFieldError('confirmPassword', 'Vui l�ng nh?p l?i m?t kh?u.');
       return false;
     }
     if (confirmPassword !== password) {
-      setFieldError('confirmPassword', 'Mật khẩu xác nhận chưa khớp.');
+      setFieldError('confirmPassword', 'M?t kh?u x�c nh?n chua kh?p.');
       return false;
     }
     setFieldError('confirmPassword', '');
@@ -191,7 +191,7 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.content}
@@ -205,12 +205,12 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
             size={40}
             style={styles.backButton}
           />
-          <Text style={styles.headerTitle}>Đăng ký tài khoản mới</Text>
+          <Text style={styles.headerTitle}>�ang k� t�i kho?n m?i</Text>
         </View>
 
         <View style={styles.card}>
           <AuthInput
-            label="Họ và tên"
+            label="H? v� t�n"
             value={fullName}
             onChangeText={(value) => {
               setFullName(value);
@@ -253,7 +253,7 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
           />
 
           <AuthInput
-            label="Mật khẩu"
+            label="M?t kh?u"
             value={password}
             onChangeText={(value) => {
               setPassword(value);
@@ -268,7 +268,7 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
           />
 
           <AuthInput
-            label="Xác nhận mật khẩu"
+            label="X�c nh?n m?t kh?u"
             value={confirmPassword}
             onChangeText={(value) => {
               setConfirmPassword(value);
@@ -287,11 +287,11 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
             onPress={() => setAcceptedTerms((value) => !value)}
           >
             <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
-              {acceptedTerms ? <Text style={styles.checkmark}>✓</Text> : null}
+              {acceptedTerms ? <Text style={styles.checkmark}>?</Text> : null}
             </View>
             <Text style={styles.termsText}>
-              Tôi đồng ý với các <Text style={styles.termsLink}>Điều khoản dịch vụ</Text> và{' '}
-              <Text style={styles.termsLink}>Chính sách bảo mật</Text> của FastMark.
+              T�i d?ng � v?i c�c <Text style={styles.termsLink}>�i?u kho?n d?ch v?</Text> v�{' '}
+              <Text style={styles.termsLink}>Ch�nh s�ch b?o m?t</Text> c?a FastMark.
             </Text>
           </Pressable>
 
@@ -317,11 +317,11 @@ export default function RegisterScreen({ onGoLogin, onGoBack }) {
             ]}
           >
             <Text style={styles.primaryButtonText}>
-              {isLoading ? 'Đang đăng ký...' : 'Đăng ký'}
+              {isLoading ? '�ang dang k�...' : '�ang k�'}
             </Text>
           </Pressable>
 
-          <AuthDivider label="Hoặc đăng ký bằng" />
+          <AuthDivider label="Ho?c dang k� b?ng" />
 
           {googleSetupError ? (
             <View style={styles.hintBox}>

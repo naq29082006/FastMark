@@ -125,9 +125,15 @@ a {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px 1fr;
+  align-items: start;
 }
 
 .admin-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow-y: auto;
   background: #0f172a;
   color: #ffffff;
   padding: 24px 18px;
@@ -139,11 +145,13 @@ a {
 .brand {
   font-size: 20px;
   font-weight: 800;
+  flex-shrink: 0;
 }
 
 .admin-sidebar nav {
   display: grid;
   gap: 8px;
+  align-content: start;
 }
 
 .admin-sidebar a {
@@ -159,9 +167,10 @@ a {
 }
 
 .sidebar-footer {
-  margin-top: auto;
+  margin-top: 8px;
   display: grid;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .admin-email {
@@ -1202,7 +1211,10 @@ button.table-link {
   }
 
   .admin-sidebar {
-    min-height: auto;
+    position: static;
+    height: auto;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .verification-grid,
@@ -1486,4 +1498,98 @@ button.table-link {
     grid-template-columns: 1fr;
   }
 }
+
+/* Admin catalog pages */
+.table-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+  font-size: 14px;
+}
+
+.data-table th {
+  color: #64748b;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar-sm,
+.thumb-sm {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #e2e8f0;
+  flex-shrink: 0;
+}
+
+.avatar-fallback,
+.thumb-fallback {
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: #0f766e;
+}
+
+.muted {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.link-btn {
+  color: #0f766e;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 50;
+}
+
+.modal-card {
+  width: min(720px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+}
+
 

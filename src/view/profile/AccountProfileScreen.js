@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,11 +13,10 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  selectAuthError,
   selectAuthProfile,
-  selectAuthSuccessMessage,
   selectAuthUser,
   selectCanSwitchToSeller,
   selectSellerVerification,
@@ -152,6 +153,7 @@ export default function AccountProfileScreen({
   onLogout,
   onOpenFollowConnections,
 }) {
+  const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
   const user = useSelector(selectAuthUser);
@@ -169,11 +171,7 @@ export default function AccountProfileScreen({
     }
     onStartSellerRegister?.();
   }
-  const error = useSelector(selectAuthError);
-  const successMessage = useSelector(selectAuthSuccessMessage);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [localError, setLocalError] = useState('');
-  const [localSuccess, setLocalSuccess] = useState('');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [sellerProducts, setSellerProducts] = useState([]);
   const [shopContact, setShopContact] = useState(null);
@@ -234,11 +232,10 @@ export default function AccountProfileScreen({
     if (!isProfileVisible) {
       return;
     }
-    const msg = String(successMessage || '').toLowerCase();
-    if (msg.includes('xác minh email') || msg.includes('đăng nhập thành công')) {
-      dispatch(clearAuthFeedback());
-    }
-  }, [dispatch, isProfileVisible, successMessage]);
+    // Clear leftover auth feedback from other screens (edit account, etc.)
+    // so profile does not show stale success/error alerts.
+    dispatch(clearAuthFeedback());
+  }, [dispatch, isProfileVisible]);
 
   useEffect(() => {
     if (!isProfileVisible || !showAsBuyer || !user) {
@@ -348,8 +345,6 @@ export default function AccountProfileScreen({
 
   async function handlePickAvatar() {
     try {
-      setLocalError('');
-      setLocalSuccess('');
       const picked = await pickImageBase64();
       if (!picked) {
         return;
@@ -373,7 +368,7 @@ export default function AccountProfileScreen({
           setShopContact(shop);
           dispatch(applyShopSettingsToProfile(shop));
         }
-        setLocalSuccess(result?.message || 'Cập nhật ảnh gian hàng thành công.');
+        Alert.alert('Thành công', result?.message || 'Cập nhật ảnh gian hàng thành công.');
         return;
       }
 
@@ -383,8 +378,12 @@ export default function AccountProfileScreen({
           mimeType: picked.mimeType,
         })
       ).unwrap();
+      dispatch(clearAuthFeedback());
+      Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện.');
     } catch (pickError) {
-      setLocalError(
+      dispatch(clearAuthFeedback());
+      Alert.alert(
+        'Lỗi',
         typeof pickError === 'string'
           ? pickError
           : pickError?.message || 'Không upload được avatar.'
@@ -393,9 +392,6 @@ export default function AccountProfileScreen({
       setIsUploadingAvatar(false);
     }
   }
-
-  const feedbackMessage = localError || error;
-  const feedbackSuccess = localSuccess || successMessage;
 
   return (
     <View style={styles.screen}>
@@ -423,42 +419,6 @@ export default function AccountProfileScreen({
               />
             )}
           </View>
-
-          {menuOpen && showAsSeller ? (
-            <View style={styles.menuDropdown}>
-              {showAsSeller ? (
-                <>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onOpenSellerShopSettings?.();
-                    }}
-                    style={styles.menuItem}
-                  >
-                    <Text style={styles.menuItemText}>Cài đặt cửa hàng</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onOpenBuyerView?.();
-                    }}
-                    style={styles.menuItem}
-                  >
-                    <Text style={styles.menuItemText}>Chế độ xem</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setMenuOpen(false);
-                      onSwitchToBuyerMode?.();
-                    }}
-                    style={[styles.menuItem, styles.menuItemLast]}
-                  >
-                    <Text style={styles.menuItemText}>Chuyển sang người mua</Text>
-                  </Pressable>
-                </>
-              ) : null}
-            </View>
-          ) : null}
 
           <View style={styles.profileHeaderRow}>
             <ProfileAvatar
@@ -641,10 +601,57 @@ export default function AccountProfileScreen({
             </View>
           ) : null}
         </View>
-
-        {feedbackMessage ? <Text style={styles.errorText}>{feedbackMessage}</Text> : null}
-        {feedbackSuccess ? <Text style={styles.successText}>{feedbackSuccess}</Text> : null}
       </ScrollView>
+
+      {menuOpen && showAsSeller ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setMenuOpen(false)}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Đóng menu"
+            onPress={() => setMenuOpen(false)}
+            style={styles.menuBackdrop}
+          >
+            <Pressable
+              onPress={() => {}}
+              style={[styles.menuDropdown, { top: insets.top + 72 }]}
+            >
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  onOpenSellerShopSettings?.();
+                }}
+                style={styles.menuItem}
+              >
+                <Text style={styles.menuItemText}>Cài đặt cửa hàng</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  onOpenBuyerView?.();
+                }}
+                style={styles.menuItem}
+              >
+                <Text style={styles.menuItemText}>Chế độ xem</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  onSwitchToBuyerMode?.();
+                }}
+                style={[styles.menuItem, styles.menuItemLast]}
+              >
+                <Text style={styles.menuItemText}>Chuyển sang người mua</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
     </View>
   );
 }
@@ -698,17 +705,24 @@ const styles = StyleSheet.create({
   iconButtonText: {
     fontSize: 18,
   },
+  menuBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.25)',
+  },
   menuDropdown: {
     position: 'absolute',
-    top: 58,
-    right: 18,
+    right: 34,
     backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     minWidth: 220,
-    zIndex: 20,
     overflow: 'hidden',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 12,
   },
   menuItem: {
     paddingHorizontal: 14,
