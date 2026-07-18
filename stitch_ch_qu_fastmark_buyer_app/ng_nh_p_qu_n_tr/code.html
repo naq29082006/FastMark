@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Đăng nhập - FastMark Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary": "#ffffff",
+                      "tertiary-fixed-dim": "#ffb2bf",
+                      "tertiary": "#a72d51",
+                      "tertiary-fixed": "#ffd9de",
+                      "on-primary-fixed": "#002109",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#0b1c30",
+                      "outline": "#6e7b6c",
+                      "secondary": "#006e2f",
+                      "on-primary-container": "#f7fff2",
+                      "secondary-fixed": "#6bff8f",
+                      "on-background": "#0b1c30",
+                      "secondary-container": "#6bff8f",
+                      "on-primary": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "primary-container": "#00873a",
+                      "surface": "#f8f9ff",
+                      "inverse-primary": "#62df7d",
+                      "on-tertiary-container": "#fffbff",
+                      "on-secondary-container": "#007432",
+                      "surface-bright": "#f8f9ff",
+                      "primary-fixed-dim": "#62df7d",
+                      "on-error": "#ffffff",
+                      "surface-variant": "#d3e4fe",
+                      "surface-container": "#e5eeff",
+                      "surface-container-highest": "#d3e4fe",
+                      "on-secondary-fixed": "#002109",
+                      "tertiary-container": "#c74668",
+                      "background": "#f8f9ff",
+                      "primary-fixed": "#7ffc97",
+                      "primary": "#006b2c",
+                      "outline-variant": "#bdcaba",
+                      "surface-container-low": "#eff4ff",
+                      "surface-dim": "#cbdbf5",
+                      "on-tertiary-fixed": "#3f0016",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-fixed-dim": "#4ae176",
+                      "surface-container-high": "#dce9ff",
+                      "on-surface-variant": "#3e4a3d",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-secondary": "#ffffff",
+                      "error": "#ba1a1a",
+                      "on-tertiary-fixed-variant": "#8a143c",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-secondary-fixed-variant": "#005321",
+                      "inverse-surface": "#213145",
+                      "surface-tint": "#006e2d"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "space-lg": "24px",
+                      "container-max-width": "1440px",
+                      "space-xl": "32px",
+                      "margin-page": "32px",
+                      "space-xs": "4px",
+                      "sidebar-width": "260px",
+                      "header-height": "64px",
+                      "space-sm": "8px",
+                      "space-md": "16px",
+                      "gutter": "24px"
+              },
+              "fontFamily": {
+                      "body-md": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "h1": ["Inter"],
+                      "caption": ["Inter"],
+                      "h6": ["Inter"],
+                      "h2": ["Inter"],
+                      "h4": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "h5": ["Inter"],
+                      "h3": ["Inter"]
+              },
+              "fontSize": {
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                      "h1": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                      "h6": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                      "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "h4": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "h5": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "h3": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+              }
+            },
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-icons-filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface antialiased min-h-screen flex selection:bg-primary-container selection:text-on-primary-container">
+<!-- Split Screen Container -->
+<div class="flex min-h-screen w-full">
+<!-- Left Pane: Brand Image (Hidden on Mobile) -->
+<div class="relative hidden lg:flex lg:w-[55%] xl:w-[60%] flex-col overflow-hidden bg-primary-container">
+<!-- Background Image -->
+<div class="absolute inset-0 bg-cover bg-center" data-alt="A highly professional and cinematic aerial view of a vibrant, modernized Vietnamese outdoor market at early morning. The scene features clean, organized stalls with fresh produce illuminated by bright, soft, natural daylight. The overall color palette is lush, emphasizing rich agricultural greens, crisp whites, and warm earthy tones, reflecting a premium, trustworthy corporate aesthetic suitable for a high-end management platform's login screen." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDj-Zy6aFRFO52w2CCqv6009tZA-b6vkDuyNRCoqfJV0cv7m3l2SfFXvpJKRt6jhiKBxm54lU581YGfl841opKsL7l0zbVHVEb2sYTXv301p4fqG3ChoORwBWVLmOdMnvdB9L19tjg01Ay4TTITH8SbrodjzZsPDLosKkKgOo7MUu4GiJ-MobLNPFrvi_rVVppmrLEWxTXZGVLjEBx2k12-QQ_3JZJi9oGjPaXyeDZ1LkUwBwTYD0AARbDMYVBtPAHHq5AdSKOdZgbz')">
+</div>
+<!-- Overlay Gradients for readability -->
+<div class="absolute inset-0 bg-gradient-to-t from-on-primary-fixed/80 via-on-primary-fixed/20 to-transparent"></div>
+<div class="absolute inset-0 bg-gradient-to-r from-on-primary-fixed/60 to-transparent"></div>
+<!-- Content overlay -->
+<div class="relative z-10 flex flex-col h-full justify-between p-12 xl:p-16 text-on-primary">
+<!-- Logo Area -->
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary-fixed rounded-lg flex items-center justify-center shadow-lg">
+<span class="material-symbols-outlined text-on-primary-fixed" style="font-variation-settings: 'FILL' 1;">storefront</span>
+</div>
+<div>
+<h1 class="font-h3 text-h3 font-bold text-on-primary tracking-tight">Chợ Quê FastMark</h1>
+<span class="font-caption text-caption text-primary-fixed opacity-90 uppercase tracking-wider font-medium">Management Console</span>
+</div>
+</div>
+<!-- Messaging -->
+<div class="max-w-xl">
+<h2 class="font-h1 text-h1 mb-4 leading-tight">Quản trị hệ thống toàn diện.</h2>
+<p class="font-body-lg text-body-lg text-surface-container-lowest/80">
+                        Nền tảng điều hành trung tâm dành cho đối tác và quản trị viên FastMark. Theo dõi, phân tích và tối ưu hóa hoạt động giao thương hàng ngày một cách an toàn và hiệu quả.
+                    </p>
+</div>
+</div>
+</div>
+<!-- Right Pane: Login Form -->
+<div class="flex w-full flex-col justify-center bg-surface-container-lowest px-4 py-12 sm:px-6 lg:w-[45%] xl:w-[40%] lg:px-20 xl:px-24">
+<div class="mx-auto w-full max-w-sm lg:w-96">
+<!-- Mobile Logo (Visible only on small screens) -->
+<div class="flex lg:hidden items-center gap-2 mb-8">
+<div class="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary text-sm" style="font-variation-settings: 'FILL' 1;">storefront</span>
+</div>
+<span class="font-h4 text-h4 font-bold text-primary">FastMark Admin</span>
+</div>
+<!-- Form Header -->
+<div>
+<h2 class="font-h2 text-h2 text-on-surface mb-2">Đăng nhập</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                        Vui lòng nhập thông tin để truy cập hệ thống.
+                    </p>
+</div>
+<!-- Form -->
+<div class="mt-8">
+<form action="#" class="space-y-6" method="POST">
+<!-- Username -->
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface mb-1.5" for="username">
+                                Tên đăng nhập
+                            </label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline-variant text-lg">person</span>
+</div>
+<input autocomplete="username" class="block w-full rounded-lg border-0 py-2.5 pl-10 pr-3 text-on-surface bg-surface-container-lowest ring-1 ring-inset ring-outline-variant placeholder:text-outline focus:ring-2 focus:ring-inset focus:ring-primary sm:text-body-md sm:leading-6 transition-shadow duration-200" id="username" name="username" placeholder="admin@fastmark.vn" required="" type="text"/>
+</div>
+</div>
+<!-- Password -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="block font-label-sm text-label-sm text-on-surface" for="password">
+                                    Mật khẩu
+                                </label>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline-variant text-lg">lock</span>
+</div>
+<input autocomplete="current-password" class="block w-full rounded-lg border-0 py-2.5 pl-10 pr-10 text-on-surface bg-surface-container-lowest ring-1 ring-inset ring-outline-variant placeholder:text-outline focus:ring-2 focus:ring-inset focus:ring-primary sm:text-body-md sm:leading-6 transition-shadow duration-200" id="password" name="password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface transition-colors focus:outline-none" id="togglePassword" type="button">
+<span class="material-symbols-outlined text-lg" id="toggleIcon">visibility_off</span>
+</button>
+</div>
+</div>
+<!-- Forgot Password Link -->
+<div class="flex items-center justify-end">
+<a class="font-label-sm text-label-sm text-primary hover:text-primary-fixed-dim transition-colors" href="#">
+                                Quên mật khẩu?
+                            </a>
+</div>
+<!-- Submit Button -->
+<div>
+<button class="flex w-full justify-center items-center rounded-lg bg-primary px-3 py-3 font-h5 text-h5 text-on-primary shadow-sm hover:bg-surface-tint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 hover:shadow-md active:scale-[0.98]" type="submit">
+                                Đăng nhập
+                                <span class="material-symbols-outlined ml-2 text-lg">arrow_forward</span>
+</button>
+</div>
+</form>
+</div>
+<!-- Footer -->
+<div class="mt-12 pt-8 border-t border-outline-variant/30 flex flex-col sm:flex-row justify-between items-center gap-2">
+<p class="font-caption text-caption text-on-surface-variant">
+                        Phiên bản 2.4.1
+                    </p>
+<p class="font-caption text-caption text-on-surface-variant">
+                        © 2024 Chợ Quê FastMark
+                    </p>
+</div>
+</div>
+</div>
+</div>
+<script>
+        // Simple password toggle logic
+        document.getElementById('togglePassword').addEventListener('click', function (e) {
+            const passwordInput = document.getElementById('password');
+            const icon = document.getElementById('toggleIcon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.textContent = 'visibility';
+            } else {
+                passwordInput.type = 'password';
+                icon.textContent = 'visibility_off';
+            }
+        });
+    </script>
+</body></html>

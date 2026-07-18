@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VietMarket Admin - Hồ sơ &amp; Bảo mật</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#e5eeff",
+                        "surface-container-low": "#eff4ff",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-primary-container": "#f7fff2",
+                        "on-primary-fixed-variant": "#005320",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#3e4a3d",
+                        "surface": "#f8f9ff",
+                        "secondary": "#006e2f",
+                        "on-tertiary-fixed-variant": "#8a143c",
+                        "surface-container-high": "#dce9ff",
+                        "inverse-primary": "#62df7d",
+                        "tertiary-container": "#c74668",
+                        "surface-variant": "#d3e4fe",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#4ae176",
+                        "outline": "#6e7b6c",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary": "#ffffff",
+                        "surface-bright": "#f8f9ff",
+                        "secondary-container": "#6bff8f",
+                        "inverse-surface": "#213145",
+                        "surface-container-highest": "#d3e4fe",
+                        "secondary-fixed": "#6bff8f",
+                        "primary-fixed": "#7ffc97",
+                        "on-secondary-fixed": "#002109",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-tint": "#006e2d",
+                        "primary-container": "#00873a",
+                        "on-secondary-container": "#007432",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#3f0016",
+                        "tertiary-fixed-dim": "#ffb2bf",
+                        "on-background": "#0b1c30",
+                        "on-primary-fixed": "#002109",
+                        "on-surface": "#0b1c30",
+                        "background": "#f8f9ff",
+                        "on-secondary-fixed-variant": "#005321",
+                        "tertiary": "#a72d51",
+                        "on-secondary": "#ffffff",
+                        "surface-dim": "#cbdbf5",
+                        "primary": "#006b2c",
+                        "outline-variant": "#bdcaba",
+                        "tertiary-fixed": "#ffd9de",
+                        "on-tertiary-container": "#fffbff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-page": "32px",
+                        "space-lg": "24px",
+                        "sidebar-width": "260px",
+                        "gutter": "24px",
+                        "container-max-width": "1440px",
+                        "space-xl": "32px",
+                        "space-xs": "4px",
+                        "space-md": "16px",
+                        "space-sm": "8px",
+                        "header-height": "64px"
+                    },
+                    "fontFamily": {
+                        "h5": ["Inter"],
+                        "h4": ["Inter"],
+                        "h2": ["Inter"],
+                        "caption": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "h3": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h1": ["Inter"],
+                        "body-md": ["Inter"],
+                        "h6": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h5": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "h4": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+                        "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "h3": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "h1": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "h6": ["14px", {"lineHeight": "20px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #F8FAF8; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased overflow-hidden flex h-screen">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[260px] flex flex-col overflow-y-auto bg-surface-container-lowest border-r border-outline-variant z-20">
+<div class="p-space-lg flex flex-col items-center border-b border-outline-variant/30">
+<img alt="Marketplace Admin Logo" class="w-16 h-16 rounded-lg mb-space-sm object-cover shadow-sm" data-alt="A highly detailed 3D rendering of a modern, sleek marketplace logo featuring stylized geometric shapes representing commerce and connectivity. The color palette incorporates vibrant greens against a pristine white background. The lighting is studio-quality, creating subtle shadows and highlights that emphasize the professional and trustworthy nature of the brand. The overall mood is corporate, clean, and forward-looking." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbPMNM-4XSquBiH19OYkJ1TT4y-fH_oc_BJcYFtBNN7glzMWYRSQJLYxkrDB2fYKlJkO8KEoQbxJT65sA8zdlNqBUeOM2YgwQ6SRMkoNryaCaeYByFlOpwSBKX-nKcGDSicBtXK1SfNYi0p0dVaYS7cLvjAT5895w10-L6CB9mnXMPK-eBK33w_IYXVAJarepBty28DSWHOCjosg0Ir-3dKKq-yCDd-0_2m31IGQGG5E88UPVgTv-GgZT2LXRjDoJdJFeMaPi5AXLL"/>
+<h1 class="font-h3 text-h3 font-bold text-primary">VietMarket</h1>
+<p class="font-caption text-caption text-on-surface-variant">Admin Console</p>
+</div>
+<div class="flex-1 py-space-md">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-h6 text-h6">Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-h6 text-h6">Users</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="storefront">storefront</span>
+<span class="font-h6 text-h6">Sellers</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-h6 text-h6">Products</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="category">category</span>
+<span class="font-h6 text-h6">Categories</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="font-h6 text-h6">Orders</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-h6 text-h6">Financials</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="campaign">campaign</span>
+<span class="font-h6 text-h6">Ads</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-h6 text-h6">Reports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container/10 text-primary font-semibold border-l-4 border-primary" href="#">
+<span class="material-symbols-outlined" data-icon="settings" data-weight="fill" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="font-h6 text-h6">Settings</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- Main Content Area Wrapper -->
+<div class="ml-[260px] flex-1 flex flex-col h-screen overflow-hidden">
+<!-- TopNavBar -->
+<header class="h-[64px] bg-surface-container-lowest border-b border-outline-variant flex justify-between items-center px-space-xl flex-shrink-0 z-10">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="font-body-md text-body-md cursor-pointer hover:text-primary transition-colors">Settings</span>
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Profile &amp; Security</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden md:flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-outline">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-full font-body-md text-body-md focus:ring-2 focus:ring-primary w-64 transition-all" placeholder="Search settings..." type="text"/>
+</div>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-all">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-all relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full border border-surface-container-lowest"></span>
+</button>
+<div class="w-px h-8 bg-outline-variant/50 mx-2"></div>
+<img alt="Administrator Profile" class="w-10 h-10 rounded-full object-cover border border-outline-variant cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all" data-alt="A professional, high-quality headshot of an executive administrator. The subject is wearing a tailored, dark navy blazer over a crisp white shirt, projecting authority and competence. The background is a slightly blurred, modern office environment with subtle, cool-toned lighting. The image is evenly lit, sharp, and styled in a polished, corporate aesthetic suitable for a professional profile picture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvzlXtbYy5mxrSv-c0x1YlpOGvQyeoK8XRfqzUeF6c81dpIn1_ICWSZbt6pkLgUNf4ewtX1s0O3p-wysoWOaxetPvSW8lXEJp-GkoAoBJrQr8UvASKOJKAn2kR5HCtTuKcfstoK7O_U-0NnYjsgbC_1VG73ExgwzM75xuxW__v9jLQOp0aBQEboRYf9NEQSCyB8CKpSH4_kYVCw0sxm1sfPneY39WsqqAbd54qOsTmS7RvilqPAsNAI8KZJ-ZGBaaDTaK-1QRDFueE"/>
+</div>
+</header>
+<!-- Scrollable Canvas -->
+<main class="flex-1 overflow-y-auto p-margin-page bg-background">
+<div class="max-w-5xl mx-auto space-y-gutter">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-space-lg">
+<div>
+<h2 class="font-h2 text-h2 text-on-surface mb-1">Hồ sơ &amp; Bảo mật</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Quản lý thông tin cá nhân và thiết lập an toàn tài khoản.</p>
+</div>
+<button class="bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all shadow-sm hover:shadow-md">
+<span class="material-symbols-outlined text-sm">save</span>
+                        Lưu thay đổi
+                    </button>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Col 1: Profile Info -->
+<div class="lg:col-span-1 space-y-gutter">
+<!-- Profile Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/50 p-space-lg shadow-sm">
+<div class="flex flex-col items-center text-center pb-6 border-b border-outline-variant/30">
+<div class="relative mb-4 group cursor-pointer">
+<img alt="Avatar" class="w-24 h-24 rounded-full object-cover border-4 border-surface-container-lowest shadow-md" data-alt="A professional, high-quality headshot of an executive administrator. The subject is wearing a tailored, dark navy blazer over a crisp white shirt, projecting authority and competence. The background is a slightly blurred, modern office environment with subtle, cool-toned lighting. The image is evenly lit, sharp, and styled in a polished, corporate aesthetic suitable for a professional profile picture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCixn7QaWlN-tmnZ3Dh5XSNTwMC5AMbhklORp0rclBSqgCXfKVg2gnzcYNxkdtnDlVin0n8UcR6-1kW6zH2sjI3EAgnftZpMMS7OU77-2yiAAdFihJzaVA9dK5Y_G9YzMYn6d0zAORsp-sbKMEyQ6KRwj9Sgy6Jgwa7UmSCnqRx38OOKDslXFYwtaoR9-0foYQCHuRpojJcWIBPnBNW1AlaRiV4J6VHgCMvcelgJG9MoSKGE9LvrA14K8i2PjaLnG5z_mNb-GFzAacC"/>
+<div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-white">photo_camera</span>
+</div>
+<div class="absolute bottom-0 right-0 bg-primary text-on-primary w-8 h-8 rounded-full flex items-center justify-center border-2 border-surface-container-lowest">
+<span class="material-symbols-outlined text-[16px]">shield_person</span>
+</div>
+</div>
+<h3 class="font-h4 text-h4 text-on-surface">Nguyễn Văn A</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-2">admin.a@vietmarket.vn</p>
+<span class="bg-surface-container-low text-primary font-label-sm text-label-sm px-3 py-1 rounded-full border border-primary/20">Super Admin</span>
+</div>
+<div class="pt-6 space-y-4">
+<div>
+<label class="block font-caption text-caption text-on-surface-variant mb-1">Mã nhân viên (Employee ID)</label>
+<div class="font-body-md text-body-md text-on-surface font-medium flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">badge</span>
+                                        VM-ADM-001
+                                    </div>
+</div>
+<div>
+<label class="block font-caption text-caption text-on-surface-variant mb-1">Ngày tham gia</label>
+<div class="font-body-md text-body-md text-on-surface font-medium flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">calendar_today</span>
+                                        15/08/2021
+                                    </div>
+</div>
+</div>
+</div>
+<!-- System Preferences Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/50 p-space-lg shadow-sm">
+<h3 class="font-h5 text-h5 text-on-surface mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">tune</span>
+                                Tùy chọn hệ thống
+                            </h3>
+<div class="space-y-6">
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-2">Ngôn ngữ hiển thị</label>
+<div class="relative">
+<select class="w-full bg-surface border border-outline-variant text-on-surface font-body-md text-body-md rounded-lg pl-4 pr-10 py-2.5 appearance-none focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+<option selected="" value="vi">Tiếng Việt (Mặc định)</option>
+<option value="en">English</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none">expand_more</span>
+</div>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-2">Kênh nhận thông báo cảnh báo</label>
+<div class="space-y-3">
+<label class="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface cursor-pointer transition-colors">
+<input checked="" class="w-4 h-4 text-primary bg-surface border-outline rounded focus:ring-primary focus:ring-2" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface flex-1">Email Hệ Thống</span>
+<span class="material-symbols-outlined text-outline text-[20px]">mail</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded-lg border border-outline-variant/50 hover:bg-surface cursor-pointer transition-colors">
+<input checked="" class="w-4 h-4 text-primary bg-surface border-outline rounded focus:ring-primary focus:ring-2" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface flex-1">Slack Channel (#admin-alerts)</span>
+<span class="material-symbols-outlined text-outline text-[20px]">tag</span>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Col 2 & 3: Security & Logs -->
+<div class="lg:col-span-2 space-y-gutter">
+<!-- Security Settings Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/50 p-space-lg shadow-sm">
+<div class="flex items-center gap-3 mb-6 border-b border-outline-variant/30 pb-4">
+<span class="material-symbols-outlined text-primary text-2xl">shield_lock</span>
+<div>
+<h3 class="font-h4 text-h4 text-on-surface">Bảo mật tài khoản</h3>
+<p class="font-caption text-caption text-on-surface-variant mt-1">Cập nhật mật khẩu và các lớp bảo vệ bổ sung.</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Password Change -->
+<div class="space-y-4">
+<h4 class="font-h6 text-h6 text-on-surface mb-4">Đổi mật khẩu</h4>
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1">Mật khẩu hiện tại</label>
+<input class="w-full bg-surface border border-outline-variant text-on-surface font-body-md text-body-md rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="••••••••" type="password"/>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1">Mật khẩu mới</label>
+<input class="w-full bg-surface border border-outline-variant text-on-surface font-body-md text-body-md rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="Nhập mật khẩu mới" type="password"/>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1">Xác nhận mật khẩu mới</label>
+<input class="w-full bg-surface border border-outline-variant text-on-surface font-body-md text-body-md rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="Nhập lại mật khẩu mới" type="password"/>
+</div>
+<button class="w-full md:w-auto mt-2 bg-surface border border-outline text-on-surface font-label-sm text-label-sm px-4 py-2 rounded-lg hover:bg-surface-container-low transition-colors">
+                                        Cập nhật mật khẩu
+                                    </button>
+</div>
+<!-- 2FA -->
+<div>
+<h4 class="font-h6 text-h6 text-on-surface mb-4">Xác thực 2 yếu tố (2FA)</h4>
+<div class="bg-surface-container-low border border-primary/20 rounded-lg p-4 mb-4">
+<div class="flex items-start justify-between">
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-primary mt-0.5">verified_user</span>
+<div>
+<p class="font-body-md text-body-md text-on-surface font-semibold">Đang bật</p>
+<p class="font-caption text-caption text-on-surface-variant mt-1">Sử dụng Google Authenticator để tạo mã đăng nhập.</p>
+</div>
+</div>
+<!-- Toggle Switch (Checked state visually) -->
+<button class="relative inline-flex h-6 w-11 items-center rounded-full bg-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+<span class="inline-block h-4 w-4 translate-x-6 transform rounded-full bg-white transition-transform"></span>
+</button>
+</div>
+</div>
+<button class="text-primary font-label-sm text-label-sm hover:underline flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+                                        Hiển thị lại mã QR
+                                    </button>
+</div>
+</div>
+</div>
+<!-- Session Logs Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/50 shadow-sm overflow-hidden">
+<div class="p-space-lg border-b border-outline-variant/30 flex justify-between items-center bg-surface-container-lowest">
+<div>
+<h3 class="font-h5 text-h5 text-on-surface">Lịch sử đăng nhập gần đây</h3>
+<p class="font-caption text-caption text-on-surface-variant mt-1">Kiểm tra các phiên bản hoạt động để phát hiện bất thường.</p>
+</div>
+<button class="text-error hover:bg-error-container/20 font-label-sm text-label-sm px-3 py-1.5 rounded-lg border border-error/30 transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">logout</span>
+                                    Đăng xuất tất cả thiết bị khác
+                                </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container border-b border-outline-variant/50">
+<th class="py-3 px-space-lg font-label-sm text-label-sm text-on-surface font-semibold uppercase tracking-wider">Trạng thái</th>
+<th class="py-3 px-space-lg font-label-sm text-label-sm text-on-surface font-semibold uppercase tracking-wider">Thiết bị / Trình duyệt</th>
+<th class="py-3 px-space-lg font-label-sm text-label-sm text-on-surface font-semibold uppercase tracking-wider">Địa chỉ IP</th>
+<th class="py-3 px-space-lg font-label-sm text-label-sm text-on-surface font-semibold uppercase tracking-wider">Thời gian</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/30 font-body-md text-body-md">
+<tr class="hover:bg-surface/50 transition-colors">
+<td class="py-4 px-space-lg">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#16A34A]/10 text-[#16A34A] font-medium text-[12px]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#16A34A]"></span>
+                                                    Hiện tại
+                                                </span>
+</td>
+<td class="py-4 px-space-lg text-on-surface">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">laptop_mac</span>
+                                                    MacBook Pro - Chrome
+                                                </div>
+</td>
+<td class="py-4 px-space-lg text-on-surface-variant">113.190.23.45</td>
+<td class="py-4 px-space-lg text-on-surface-variant">Vừa xong</td>
+</tr>
+<tr class="hover:bg-surface/50 transition-colors">
+<td class="py-4 px-space-lg">
+<span class="text-on-surface-variant font-caption text-caption">Đã kết thúc</span>
+</td>
+<td class="py-4 px-space-lg text-on-surface">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">smartphone</span>
+                                                    iPhone 13 - Safari
+                                                </div>
+</td>
+<td class="py-4 px-space-lg text-on-surface-variant">113.190.23.45</td>
+<td class="py-4 px-space-lg text-on-surface-variant">Hôm qua, 14:30</td>
+</tr>
+<tr class="hover:bg-surface/50 transition-colors">
+<td class="py-4 px-space-lg">
+<span class="text-on-surface-variant font-caption text-caption">Đã kết thúc</span>
+</td>
+<td class="py-4 px-space-lg text-on-surface">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">desktop_windows</span>
+                                                    Windows PC - Edge
+                                                </div>
+</td>
+<td class="py-4 px-space-lg text-on-surface-variant">27.72.105.18</td>
+<td class="py-4 px-space-lg text-on-surface-variant">20/10/2023, 09:15</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

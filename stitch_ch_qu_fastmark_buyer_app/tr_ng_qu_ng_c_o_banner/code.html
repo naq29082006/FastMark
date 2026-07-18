@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý Quảng cáo - Chợ Việt</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#ffffff",
+                        "on-primary-container": "#f7fff2",
+                        "tertiary-container": "#cea700",
+                        "inverse-primary": "#62df7d",
+                        "outline-variant": "#bdcaba",
+                        "on-primary-fixed-variant": "#005320",
+                        "surface-container-high": "#dee9fc",
+                        "on-surface": "#121c2a",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-secondary-fixed": "#002109",
+                        "tertiary-fixed": "#ffe083",
+                        "on-secondary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "surface-container": "#e6eeff",
+                        "surface-container-low": "#eff4ff",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "background": "#f8f9ff",
+                        "outline": "#6e7b6c",
+                        "primary-container": "#00873a",
+                        "secondary": "#006e2f",
+                        "on-primary-fixed": "#002109",
+                        "on-tertiary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#006e2d",
+                        "on-secondary-container": "#007432",
+                        "surface-dim": "#d0dbed",
+                        "secondary-fixed": "#6bff8f",
+                        "primary-fixed": "#7ffc97",
+                        "surface": "#f8f9ff",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-tertiary-fixed": "#231b00",
+                        "surface-container-highest": "#d9e3f6",
+                        "primary-fixed-dim": "#62df7d",
+                        "secondary-container": "#6bff8f",
+                        "primary": "#006b2c",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-secondary-fixed-variant": "#005321",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#eec200",
+                        "surface-bright": "#f8f9ff",
+                        "tertiary": "#735c00",
+                        "inverse-surface": "#27313f",
+                        "on-background": "#121c2a",
+                        "surface-variant": "#d9e3f6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-lg": "32px",
+                        "container-margin": "24px",
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "gutter": "16px",
+                        "stack-gap-md": "16px"
+                    },
+                    "fontFamily": {
+                        "price-display": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md">
+<!-- TopAppBar (Web & Mobile) -->
+<header class="bg-surface dark:bg-surface-dim docked full-width top-0 bg-surface dark:bg-surface-dim flat no shadows flex justify-between items-center w-full px-container-margin h-touch-target-min sticky z-40 md:border-b-0">
+<div class="flex items-center gap-gutter">
+<button class="md:hidden text-primary dark:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest p-2 rounded-full w-[48px] h-[48px] flex items-center justify-center transition-transform duration-150 active:scale-95">
+<span class="material-symbols-outlined text-[24px]">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim hidden md:block">Chợ Việt</h1>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim md:hidden">Chợ Việt</h1>
+</div>
+<!-- Desktop Navigation -->
+<nav class="hidden md:flex items-center gap-stack-gap-md h-full">
+<a class="h-full flex items-center px-4 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-highest font-label-md text-label-md transition-colors rounded-lg" href="#">Trang chủ</a>
+<a class="h-full flex items-center px-4 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-highest font-label-md text-label-md transition-colors rounded-lg" href="#">Sản phẩm</a>
+<a class="h-full flex items-center px-4 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-highest font-label-md text-label-md transition-colors rounded-lg" href="#">Đơn hàng</a>
+<a class="h-full flex items-center px-4 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-highest font-label-md text-label-md transition-colors rounded-lg" href="#">Ví</a>
+<a class="h-full flex items-center px-4 text-primary dark:text-primary-fixed-dim font-bold border-b-2 border-primary hover:bg-surface-container-high dark:hover:bg-surface-container-highest font-label-md text-label-md transition-colors" href="#">Tiếp thị</a>
+</nav>
+<button class="text-primary dark:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest p-2 rounded-full w-[48px] h-[48px] flex items-center justify-center transition-transform duration-150 active:scale-95">
+<span class="material-symbols-outlined text-[24px]">account_circle</span>
+</button>
+</header>
+<!-- Main Content - Empty State Canvas -->
+<main class="flex-grow flex flex-col items-center justify-center px-container-margin py-stack-gap-lg pb-32 md:pb-stack-gap-lg w-full max-w-4xl mx-auto">
+<div class="w-full bg-surface-container-lowest rounded-xl p-8 flex flex-col items-center text-center border border-outline-variant/30">
+<!-- Illustration Area -->
+<div class="mb-stack-gap-lg w-full max-w-sm aspect-video bg-surface-container-low rounded-xl flex items-center justify-center overflow-hidden border border-outline-variant relative">
+<img class="w-full h-full object-cover opacity-80 mix-blend-multiply" data-alt="A clean, minimalist 3D illustration of an empty market stall or billboard in a bright, modern setting. The stall has a blank white sign indicating it's ready for an advertisement. The color palette features soft greens and off-whites, matching a modern Vietnamese country market aesthetic. The lighting is soft and welcoming, casting gentle shadows." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZ3Pk51MoRtjMaJQP0C4E2cRXIyMPBQb1CB-yY7y0UrGHXCnHABytb7-pXYVuQVLReh5QCxOX1rPlsB9euIHC2v1DJ_xh4J05F_4Wjb4yiw1hapo6racgw4_TvS5RLuVN5bybIuZWf8QRD_5Ox7niOPZLbmQbtWos7xOggq_lQWzEt4TEaOqtzoEh-wrUq6l6rdrH2KHv5MVwg5K4K3YAd1pVLppXNnE0UQremREUFkptQ2j2RC_tpVOqQxi-69JlXgaeb1hiCzPZc"/>
+<!-- Decorative elements overlaying the image placeholder for a polished empty state feel -->
+<div class="absolute inset-0 flex flex-col items-center justify-center p-6 bg-surface/40 backdrop-blur-[2px]">
+<span class="material-symbols-outlined text-[64px] text-primary/40 mb-4" style="font-variation-settings: 'FILL' 0;">campaign</span>
+<div class="w-24 h-2 bg-outline-variant/50 rounded-full mb-2"></div>
+<div class="w-16 h-2 bg-outline-variant/50 rounded-full"></div>
+</div>
+</div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-stack-gap-md">
+                Bạn chưa có quảng cáo nào
+            </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mb-stack-gap-lg">
+                Bắt đầu chiến dịch tiếp thị ngay hôm nay để thu hút thêm nhiều khách hàng đến gian hàng của bạn. Quảng cáo giúp tăng hiển thị và thúc đẩy doanh thu hiệu quả.
+            </p>
+<button class="bg-primary text-on-primary w-full md:w-auto min-h-[56px] px-8 rounded-full font-headline-md text-headline-md flex items-center justify-center gap-unit hover:bg-primary/90 transition-colors active:scale-95 shadow-sm">
+<span class="material-symbols-outlined">add_circle</span>
+                Tạo Quảng cáo mới
+            </button>
+<!-- Benefit Cards Mini Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter mt-stack-gap-lg pt-stack-gap-lg border-t border-outline-variant/30 w-full">
+<div class="flex flex-col items-center text-center p-4 bg-surface rounded-lg">
+<span class="material-symbols-outlined text-[32px] text-secondary mb-2 bg-secondary/10 p-3 rounded-full">visibility</span>
+<h3 class="font-label-lg text-label-lg text-on-surface mb-1">Tăng hiển thị</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Tiếp cận hàng ngàn người mua tiềm năng trong khu vực.</p>
+</div>
+<div class="flex flex-col items-center text-center p-4 bg-surface rounded-lg">
+<span class="material-symbols-outlined text-[32px] text-secondary mb-2 bg-secondary/10 p-3 rounded-full">trending_up</span>
+<h3 class="font-label-lg text-label-lg text-on-surface mb-1">Đẩy mạnh doanh thu</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Thu hút khách hàng mới và tăng trưởng đơn hàng.</p>
+</div>
+<div class="flex flex-col items-center text-center p-4 bg-surface rounded-lg">
+<span class="material-symbols-outlined text-[32px] text-secondary mb-2 bg-secondary/10 p-3 rounded-full">analytics</span>
+<h3 class="font-label-lg text-label-lg text-on-surface mb-1">Dễ dàng theo dõi</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Xem báo cáo hiệu quả quảng cáo chi tiết mỗi ngày.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-surface dark:bg-surface-container-lowest docked full-width bottom-0 rounded-t-xl border-t border-outline-variant dark:border-outline flat no shadows fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-2 bg-surface dark:bg-surface-container-lowest pb-safe">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors rounded-xl min-w-[64px] min-h-[56px]" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">dashboard</span>
+<span class="font-label-md text-label-md text-[12px]">Trang chủ</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors rounded-xl min-w-[64px] min-h-[56px]" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">inventory_2</span>
+<span class="font-label-md text-label-md text-[12px]">Sản phẩm</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors rounded-xl min-w-[64px] min-h-[56px]" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">shopping_bag</span>
+<span class="font-label-md text-label-md text-[12px]">Đơn hàng</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors rounded-xl min-w-[64px] min-h-[56px]" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">account_balance_wallet</span>
+<span class="font-label-md text-label-md text-[12px]">Ví</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-full px-gutter py-2 hover:bg-surface-container-high dark:hover:bg-surface-container-highest active:scale-90 transition-transform duration-200 min-w-[64px] min-h-[56px]" href="#">
+<span class="material-symbols-outlined text-[24px] mb-1">campaign</span>
+<span class="font-label-md text-label-md text-[12px] font-bold">Tiếp thị</span>
+</a>
+</nav>
+<style>
+        /* Safe area padding for bottom nav on newer mobile devices */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .pb-safe {
+                padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+            }
+        }
+    </style>
+</body></html>

@@ -23,7 +23,7 @@ function CategoryTile({ label, icon, active, onPress, showGridIcon = false }) {
     >
       <View style={[styles.categoryIconBox, active && styles.categoryIconBoxActive]}>
         {showGridIcon ? (
-          <Ionicons name="grid-outline" size={24} color={active ? '#0d7377' : '#64748b'} />
+          <Ionicons name="grid-outline" size={24} color={active ? '#076F32' : '#64748b'} />
         ) : showRemoteImage ? (
           <Image source={{ uri: iconValue }} style={styles.categoryIconImage} />
         ) : iconValue ? (
@@ -122,8 +122,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryTileActive: {
-    borderColor: '#0d7377',
-    backgroundColor: '#ecfdf5',
+    borderColor: '#076F32',
+    backgroundColor: '#E6F4EC',
   },
   categoryTilePressed: {
     opacity: 0.9,
@@ -157,6 +157,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   categoryTileNameActive: {
-    color: '#0d7377',
+    color: '#076F32',
   },
 });

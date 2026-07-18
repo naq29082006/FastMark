@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,21 +12,13 @@ import {
 
 import CircularBackButton from '../shared/components/CircularBackButton';
 import {
-  acceptBuyerCounterOnBackend,
   cancelBuyerReservationOnBackend,
-  getBuyerDealOnBackend,
   getBuyerReservationOnBackend,
 } from '../../api/buyerOpsApi';
-import { DEAL_OFFER_STATUS, DEAL_OFFER_BY, RESERVATION_STATUS } from '../../constants/sellerOrders';
+import { RESERVATION_STATUS } from '../../constants/sellerOrders';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { formatOrderCode } from '../../core/utils/orderCode';
 import { formatPrice } from '../../core/utils/productFormat';
-
-const DEAL_STATUS_LABELS = {
-  [DEAL_OFFER_STATUS.PENDING]: 'Đang chờ',
-  [DEAL_OFFER_STATUS.ACCEPTED]: 'Đã chấp nhận',
-  [DEAL_OFFER_STATUS.REJECTED]: 'Đã từ chối',
-};
 
 const RESERVATION_STATUS_LABELS = {
   [RESERVATION_STATUS.PENDING]: 'Chờ xác nhận',
@@ -45,26 +38,6 @@ function formatDateTime(iso) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function resolveDealTotals(deal) {
-  const qty = Number(deal?.quantity) || 1;
-  const originalUnit = Number(deal?.originalPrice) || 0;
-  const originalTotal = originalUnit * qty;
-  let offeredTotal = Number(deal?.offeredPrice) || 0;
-  if (originalUnit > 0 && offeredTotal > 0 && offeredTotal <= originalUnit) {
-    offeredTotal *= qty;
-  }
-  const lastOfferBy = Number(deal?.lastOfferBy) || DEAL_OFFER_BY.BUYER;
-  return { qty, originalTotal, offeredTotal, lastOfferBy };
-}
-
-function getDealOfferLabel(status, lastOfferBy) {
-  const fromSeller = lastOfferBy === DEAL_OFFER_BY.SELLER;
-  if (status === DEAL_OFFER_STATUS.ACCEPTED) {
-    return fromSeller ? 'Bạn đã chấp nhận' : 'Shop đã chấp nhận';
-  }
-  return fromSeller ? 'Giá shop đề nghị' : 'Giá bạn đề nghị';
 }
 
 function DetailRow({ label, value, emphasize = false }) {
@@ -105,16 +78,12 @@ function mergeLoadedItem(previous, next) {
 }
 
 export default function BuyerOrderDetailScreen({
-  kind,
   orderId,
   initialItem = null,
   onBack,
   onChanged,
-  onReserveFromDeal,
   onNavigatePickup,
   onReviewStore,
-  onCounterDeal,
-  onResubmitDeal,
   canReview = false,
 }) {
   const resolvedId = String(orderId || initialItem?.id || '').trim();
@@ -133,37 +102,30 @@ export default function BuyerOrderDetailScreen({
     setError('');
     try {
       const idToken = await getCurrentUserIdToken();
-      if (kind === 'deal') {
-        const deal = await getBuyerDealOnBackend(idToken, resolvedId);
-        setItem((prev) => mergeLoadedItem(prev, deal));
-      } else {
-        const reservation = await getBuyerReservationOnBackend(idToken, resolvedId);
-        setItem((prev) => mergeLoadedItem(prev, reservation));
-      }
+      const reservation = await getBuyerReservationOnBackend(idToken, resolvedId);
+      setItem((prev) => mergeLoadedItem(prev, reservation));
     } catch (loadError) {
       setError(loadError.message || 'Không tải được chi tiết đơn.');
       setItem((prev) => prev || initialItem);
     } finally {
       setIsLoading(false);
     }
-  }, [kind, resolvedId, initialItem]);
+  }, [resolvedId, initialItem]);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  const title = kind === 'deal' ? 'Chi tiết deal giá' : 'Chi tiết đơn hàng';
 
   if (isLoading && !item) {
     return (
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <CircularBackButton onPress={onBack} variant="light" />
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title}>Chi tiết đơn hàng</Text>
           <View style={styles.topBarSpacer} />
         </View>
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" size="large" />
+          <ActivityIndicator color="#076F32" size="large" />
         </View>
       </View>
     );
@@ -174,135 +136,10 @@ export default function BuyerOrderDetailScreen({
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <CircularBackButton onPress={onBack} variant="light" />
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title}>Chi tiết đơn hàng</Text>
           <View style={styles.topBarSpacer} />
         </View>
         <Text style={styles.errorText}>{error || 'Không tìm thấy đơn.'}</Text>
-      </View>
-    );
-  }
-
-  if (kind === 'deal') {
-    const { qty, originalTotal, offeredTotal, lastOfferBy } = resolveDealTotals(item);
-    const offerLabel = getDealOfferLabel(item.status, lastOfferBy);
-    const canReserve = item.status === DEAL_OFFER_STATUS.ACCEPTED && !item.reservationId;
-    const canResubmit =
-      item.status === DEAL_OFFER_STATUS.REJECTED ||
-      (item.status === DEAL_OFFER_STATUS.ACCEPTED && !item.reservationId);
-    const waitingForBuyer =
-      item.status === DEAL_OFFER_STATUS.PENDING && lastOfferBy === DEAL_OFFER_BY.SELLER;
-    const canAcceptCounter = waitingForBuyer;
-    const canCounter = waitingForBuyer;
-
-    async function handleAcceptCounter() {
-      Alert.alert(
-        'Chấp nhận giá shop',
-        `Bạn đồng ý mua với tổng ${formatPrice(offeredTotal)} (${qty} sp)?`,
-        [
-          { text: 'Huỷ', style: 'cancel' },
-          {
-            text: 'Đồng ý',
-            onPress: async () => {
-              setIsActing(true);
-              try {
-                const idToken = await getCurrentUserIdToken();
-                const updated = await acceptBuyerCounterOnBackend(idToken, item.id);
-                setItem(updated);
-                onChanged?.();
-                onReserveFromDeal?.(updated || item);
-              } catch (actionError) {
-                Alert.alert('Lỗi', actionError.message || 'Không thể chấp nhận giá.');
-              } finally {
-                setIsActing(false);
-              }
-            },
-          },
-        ]
-      );
-    }
-
-    return (
-      <View style={styles.screen}>
-        <View style={styles.topBar}>
-          <CircularBackButton onPress={onBack} variant="light" />
-          <Text style={styles.title}>{title}</Text>
-          <View style={styles.topBarSpacer} />
-        </View>
-
-        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-          <View style={styles.card}>
-            <Text style={styles.codeLabel}>Mã đơn hàng</Text>
-            <Text style={styles.code}>{formatOrderCode(item.id || resolvedId)}</Text>
-
-            <DetailRow label="Trạng thái" value={DEAL_STATUS_LABELS[item.status] || 'Không rõ'} />
-            <DetailRow label="Sản phẩm" value={item.productName || '—'} />
-            <DetailRow label="Phân loại" value={item.variantName || '—'} />
-            <DetailRow label="Gian hàng" value={pickStoreName(item.storeName, item.shopUsername)} />
-            <DetailRow label="Số lượng" value={String(qty)} />
-            <DetailRow label="Giá niêm yết" value={formatPrice(originalTotal)} />
-            <DetailRow label={offerLabel} value={formatPrice(offeredTotal)} emphasize />
-            {String(
-              Number(item.lastOfferBy) === DEAL_OFFER_BY.SELLER
-                ? item.sellerNote || ''
-                : item.note || ''
-            ).trim() ? (
-              <DetailRow
-                label="Lời nhắn"
-                value={String(
-                  Number(item.lastOfferBy) === DEAL_OFFER_BY.SELLER
-                    ? item.sellerNote || ''
-                    : item.note || ''
-                ).trim()}
-              />
-            ) : null}
-            <DetailRow
-              label="Giảm"
-              value={`${Math.max(0, Math.round(((originalTotal - offeredTotal) / (originalTotal || 1)) * 100))}%`}
-            />
-            <DetailRow label="Thời gian" value={formatDateTime(item.createdAt)} />
-          </View>
-
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <View style={styles.actionCol}>
-            {canAcceptCounter ? (
-              <Pressable
-                style={[styles.actionBtn, styles.actionBtnPrimary]}
-                disabled={isActing}
-                onPress={handleAcceptCounter}
-              >
-                <Text style={styles.actionBtnText}>Chấp nhận giá</Text>
-              </Pressable>
-            ) : null}
-            {canCounter ? (
-              <Pressable
-                style={[styles.actionBtn, styles.actionBtnSecondary]}
-                disabled={isActing}
-                onPress={() => onCounterDeal?.(item)}
-              >
-                <Text style={styles.actionBtnTextSecondary}>Đề nghị lại</Text>
-              </Pressable>
-            ) : null}
-            {canReserve ? (
-              <Pressable
-                style={[styles.actionBtn, styles.actionBtnPrimary]}
-                disabled={isActing}
-                onPress={() => onReserveFromDeal?.(item)}
-              >
-                <Text style={styles.actionBtnText}>Giữ hàng</Text>
-              </Pressable>
-            ) : null}
-            {canResubmit ? (
-              <Pressable
-                style={[styles.actionBtn, styles.actionBtnSecondary]}
-                disabled={isActing}
-                onPress={() => onResubmitDeal?.(item)}
-              >
-                <Text style={styles.actionBtnTextSecondary}>Deal giá lại</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </ScrollView>
       </View>
     );
   }
@@ -339,7 +176,7 @@ export default function BuyerOrderDetailScreen({
     <View style={styles.screen}>
       <View style={styles.topBar}>
         <CircularBackButton onPress={onBack} variant="light" />
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title}>Chi tiết đơn hàng</Text>
         <View style={styles.topBarSpacer} />
       </View>
 
@@ -381,6 +218,27 @@ export default function BuyerOrderDetailScreen({
           ) : null}
           {reservation.note ? <DetailRow label="Ghi chú" value={reservation.note} /> : null}
         </View>
+
+        {reservation.status === RESERVATION_STATUS.CONFIRMED &&
+        (reservation.qrPayload || reservation.pickupCode) ? (
+          <View style={styles.qrCard}>
+            <Text style={styles.qrTitle}>Mã nhận hàng</Text>
+            <Text style={styles.qrHint}>
+              Đưa mã này cho shop quét khi bạn đến lấy hàng.
+            </Text>
+            {reservation.qrPayload ? (
+              <Image
+                source={{
+                  uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(
+                    reservation.qrPayload
+                  )}`,
+                }}
+                style={styles.qrImage}
+              />
+            ) : null}
+            <Text style={styles.pickupCode}>{reservation.pickupCode || '—'}</Text>
+          </View>
+        ) : null}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -442,7 +300,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   title: {
     flex: 1,
@@ -471,6 +329,41 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 12,
+  },
+  qrCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#A7D9B8',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  qrTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#055528',
+    marginBottom: 6,
+  },
+  qrHint: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  qrImage: {
+    width: 220,
+    height: 220,
+    marginBottom: 12,
+    backgroundColor: '#f8fafc',
+  },
+  pickupCode: {
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 4,
+    color: '#076F32',
   },
   codeLabel: {
     color: '#64748b',
@@ -507,7 +400,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   rowValueEmphasize: {
-    color: '#0f766e',
+    color: '#076F32',
     fontWeight: '900',
   },
   actionCol: {
@@ -522,12 +415,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   actionBtnPrimary: {
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   actionBtnSecondary: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#E6F4EC',
     borderWidth: 1,
-    borderColor: '#99f6e4',
+    borderColor: '#A7D9B8',
   },
   actionBtnDanger: {
     backgroundColor: '#fef2f2',
@@ -540,7 +433,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   actionBtnTextSecondary: {
-    color: '#0f766e',
+    color: '#076F32',
     fontSize: 14,
     fontWeight: '800',
   },

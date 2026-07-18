@@ -36,7 +36,7 @@ function formatDateTime(iso) {
 
 const STATUS_COLORS = {
   [RESERVATION_STATUS.PENDING]: { bg: '#fef3c7', text: '#b45309' },
-  [RESERVATION_STATUS.CONFIRMED]: { bg: '#d1fae5', text: '#047857' },
+  [RESERVATION_STATUS.CONFIRMED]: { bg: '#d1fae5', text: '#076F32' },
   [RESERVATION_STATUS.COMPLETED]: { bg: '#e0e7ff', text: '#4338ca' },
   [RESERVATION_STATUS.CANCELLED]: { bg: '#fee2e2', text: '#b91c1c' },
 };
@@ -193,7 +193,7 @@ export default function ReservationHistoryScreen({
   const content = (
     <>
       {isLoading ? (
-        <ActivityIndicator size="large" color="#0f766e" style={styles.loader} />
+        <ActivityIndicator size="large" color="#076F32" style={styles.loader} />
       ) : (
         <ReservationList
           items={reservations}
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   actionButtonPressed: {
     opacity: 0.82,

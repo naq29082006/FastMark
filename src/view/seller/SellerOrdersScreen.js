@@ -3,30 +3,20 @@ import {
   Alert,
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import {
-  acceptSellerDealOnBackend,
   confirmSellerReservationOnBackend,
-  counterSellerDealOnBackend,
   getSellerOrdersOnBackend,
-  rejectSellerDealOnBackend,
   rejectSellerReservationOnBackend,
 } from '../../api/sellerOpsApi';
 import {
   RESERVATION_TAB,
   RESERVATION_STATUS,
-  DEAL_OFFER_BY,
-  DEAL_OFFER_STATUS,
 } from '../../constants/sellerOrders';
 import CircularBackButton from '../shared/components/CircularBackButton';
 import ClearableSearchField from '../shared/components/ClearableSearchField';
@@ -34,17 +24,10 @@ import OrderItemHeader from '../shared/components/OrderItemHeader';
 import { formatPrice } from '../../core/utils/productFormat';
 
 const TABS = [
-  { key: RESERVATION_TAB.PENDING_PRICE, label: 'Deal giá' },
   { key: RESERVATION_TAB.HOLDING, label: 'Giữ hàng' },
   { key: RESERVATION_TAB.COMPLETED, label: 'Hoàn thành' },
   { key: RESERVATION_TAB.CANCELLED, label: 'Đã hủy' },
 ];
-
-const DEAL_STATUS_LABELS = {
-  [DEAL_OFFER_STATUS.PENDING]: 'Đang chờ',
-  [DEAL_OFFER_STATUS.ACCEPTED]: 'Đã chấp nhận',
-  [DEAL_OFFER_STATUS.REJECTED]: 'Đã từ chối',
-};
 
 const RESERVATION_STATUS_LABELS = {
   [RESERVATION_STATUS.PENDING]: 'Chờ xác nhận',
@@ -52,16 +35,6 @@ const RESERVATION_STATUS_LABELS = {
   [RESERVATION_STATUS.COMPLETED]: 'Hoàn thành',
   [RESERVATION_STATUS.CANCELLED]: 'Đã hủy',
 };
-
-function getDealStatusStyle(status) {
-  if (status === DEAL_OFFER_STATUS.ACCEPTED) {
-    return { badge: styles.statusBadgeSuccess, text: styles.statusBadgeTextSuccess };
-  }
-  if (status === DEAL_OFFER_STATUS.REJECTED) {
-    return { badge: styles.statusBadgeDanger, text: styles.statusBadgeTextDanger };
-  }
-  return { badge: styles.statusBadgePending, text: styles.statusBadgeTextPending };
-}
 
 function getReservationStatusStyle(status) {
   if (status === RESERVATION_STATUS.CONFIRMED) {
@@ -76,7 +49,7 @@ function getReservationStatusStyle(status) {
   return { badge: styles.statusBadgePending, text: styles.statusBadgeTextPending };
 }
 
-function formatDealTime(iso) {
+function formatOrderTime(iso) {
   if (!iso) {
     return '';
   }
@@ -92,68 +65,17 @@ function formatDealTime(iso) {
   return `${hours}:${minutes} · ${day}/${month}/${year}`;
 }
 
-function resolveSellerDealMoney(item) {
-  const qty = Number(item.quantity) || 1;
-  const originalUnit = Number(item.originalPrice) || 0;
-  const originalTotal = originalUnit * qty;
-  let offeredTotal = Number(item.offeredPrice) || 0;
-  if (originalUnit > 0 && offeredTotal > 0 && offeredTotal <= originalUnit) {
-    offeredTotal *= qty;
-  }
-  return {
-    qty,
-    originalTotal,
-    offeredTotal,
-    lastOfferBy: Number(item.lastOfferBy) || DEAL_OFFER_BY.BUYER,
-  };
-}
-
-/** Seller-facing labels for the active offer line */
-function getSellerDealOfferLine(item, money) {
-  const fromSeller = money.lastOfferBy === DEAL_OFFER_BY.SELLER;
-
-  if (item.status === DEAL_OFFER_STATUS.ACCEPTED) {
-    if (fromSeller) {
-      return { label: 'Khách đã chấp nhận', amount: money.offeredTotal };
-    }
-    return { label: 'Bạn đã chấp nhận', amount: money.offeredTotal };
-  }
-
-  if (fromSeller) {
-    return { label: 'Giá bạn đề nghị', amount: money.offeredTotal };
-  }
-  return { label: 'Giá khách đề nghị', amount: money.offeredTotal };
-}
-
-function computeDealDiscountPercent(originalTotal, dealAmount) {
-  if (!originalTotal || originalTotal <= 0 || dealAmount == null) {
-    return 0;
-  }
-  return Math.max(0, Math.round(((originalTotal - dealAmount) / originalTotal) * 100));
-}
-
-function getActiveDealMessage(item) {
-  const lastOfferBy = Number(item?.lastOfferBy) || DEAL_OFFER_BY.BUYER;
-  if (lastOfferBy === DEAL_OFFER_BY.SELLER) {
-    return String(item?.sellerNote || '').trim();
-  }
-  return String(item?.note || '').trim();
-}
-
 export default function SellerOrdersScreen({
   onBack,
   onOpenReservation,
   onRefreshKey = 0,
   embedded = false,
 }) {
-  const [activeTab, setActiveTab] = useState(RESERVATION_TAB.PENDING_PRICE);
+  const [activeTab, setActiveTab] = useState(RESERVATION_TAB.HOLDING);
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [counterDeal, setCounterDeal] = useState(null);
-  const [counterPrice, setCounterPrice] = useState('');
-  const [counterNote, setCounterNote] = useState('');
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
@@ -161,11 +83,7 @@ export default function SellerOrdersScreen({
     try {
       const idToken = await getCurrentUserIdToken();
       const data = await getSellerOrdersOnBackend({ idToken, tab: activeTab });
-      if (activeTab === RESERVATION_TAB.PENDING_PRICE) {
-        setItems(data.deals || []);
-      } else {
-        setItems(data.reservations || []);
-      }
+      setItems(data.reservations || []);
     } catch (loadError) {
       setError(loadError.message || 'Không tải được đơn hàng.');
       setItems([]);
@@ -178,11 +96,6 @@ export default function SellerOrdersScreen({
     setSearch('');
     loadOrders();
   }, [loadOrders, onRefreshKey]);
-
-  const counterMoney = useMemo(
-    () => (counterDeal ? resolveSellerDealMoney(counterDeal) : null),
-    [counterDeal]
-  );
 
   const filteredItems = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -200,7 +113,7 @@ export default function SellerOrdersScreen({
         item.buyer?.fullName || item.buyer?.name || item.buyerName || ''
       ).toLowerCase();
       const id = String(item.id || item.orderCode || '').toLowerCase();
-      const note = String(item.note || item.sellerNote || '').toLowerCase();
+      const note = String(item.note || '').toLowerCase();
       return (
         productName.includes(keyword) ||
         variantName.includes(keyword) ||
@@ -210,49 +123,6 @@ export default function SellerOrdersScreen({
       );
     });
   }, [items, search]);
-
-  async function handleAcceptDeal(deal) {
-    const money = resolveSellerDealMoney(deal);
-    Alert.alert(
-      'Chấp nhận deal',
-      `Bạn chấp nhận tổng ${formatPrice(money.offeredTotal)} (${money.qty} sp)?`,
-      [
-        { text: 'Huỷ', style: 'cancel' },
-        {
-          text: 'Chấp nhận',
-          onPress: async () => {
-            try {
-              const idToken = await getCurrentUserIdToken();
-              await acceptSellerDealOnBackend(idToken, deal.id);
-              Alert.alert('Thành công', 'Đã chấp nhận deal. Khách không thể hủy sau 15 phút.');
-              loadOrders();
-            } catch (actionError) {
-              Alert.alert('Lỗi', actionError.message || 'Không chấp nhận được deal.');
-            }
-          },
-        },
-      ]
-    );
-  }
-
-  async function handleRejectDeal(deal) {
-    Alert.alert('Từ chối deal', 'Bạn chắc chắn từ chối đề nghị này?', [
-      { text: 'Huỷ', style: 'cancel' },
-      {
-        text: 'Từ chối',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const idToken = await getCurrentUserIdToken();
-            await rejectSellerDealOnBackend({ idToken, dealId: deal.id, reason: 'Shop từ chối' });
-            loadOrders();
-          } catch (actionError) {
-            Alert.alert('Lỗi', actionError.message || 'Không từ chối được deal.');
-          }
-        },
-      },
-    ]);
-  }
 
   function handleConfirmReservation(reservation) {
     Alert.alert('Xác nhận giữ hàng', 'Bạn xác nhận giữ hàng cho khách này?', [
@@ -296,113 +166,6 @@ export default function SellerOrdersScreen({
     ]);
   }
 
-  function openCounterModal(deal) {
-    setCounterDeal(deal);
-    setCounterPrice('');
-    setCounterNote('');
-  }
-
-  async function handleCounterDeal() {
-    if (!counterDeal) {
-      return;
-    }
-    const nextTotal = Number(String(counterPrice || '').replace(/\D/g, ''));
-    const note = String(counterNote || '').trim();
-    if (!nextTotal) {
-      Alert.alert('Thiếu giá', 'Vui lòng nhập tổng giá đề xuất.');
-      return;
-    }
-    try {
-      const idToken = await getCurrentUserIdToken();
-      await counterSellerDealOnBackend({
-        idToken,
-        dealId: counterDeal.id,
-        counterPrice: nextTotal,
-        note,
-      });
-      setCounterDeal(null);
-      setCounterPrice('');
-      setCounterNote('');
-      loadOrders();
-    } catch (actionError) {
-      Alert.alert('Lỗi', actionError.message || 'Không gửi được giá đề xuất.');
-    }
-  }
-
-  function renderDealItem({ item }) {
-    const statusLabel = DEAL_STATUS_LABELS[item.status] || 'Không rõ';
-    const statusStyle = getDealStatusStyle(item.status);
-    const money = resolveSellerDealMoney(item);
-    const offerLine = getSellerDealOfferLine(item, money);
-    const discountPercent = computeDealDiscountPercent(money.originalTotal, offerLine.amount);
-    const dealNote = getActiveDealMessage(item);
-    const thumb = item.product?.thumbnail || '';
-    const productName = item.product?.productName || 'Sản phẩm';
-    const variantName = item.variant?.variantName || '';
-    const buyerName = item.buyer?.fullName || 'Khách';
-    const waitingForShop =
-      item.status === DEAL_OFFER_STATUS.PENDING && money.lastOfferBy === DEAL_OFFER_BY.BUYER;
-    const waitingForBuyer =
-      item.status === DEAL_OFFER_STATUS.PENDING && money.lastOfferBy === DEAL_OFFER_BY.SELLER;
-
-    return (
-      <View style={styles.card}>
-        <OrderItemHeader
-          id={item.id}
-          statusLabel={statusLabel}
-          statusBadgeStyle={statusStyle.badge}
-          statusTextStyle={statusStyle.text}
-          thumbnail={thumb}
-          productName={productName}
-          variantName={variantName}
-          quantity={money.qty}
-          unitPriceText={formatPrice(
-            money.qty > 0 ? Math.round(offerLine.amount / money.qty) : offerLine.amount
-          )}
-          partyLine={`Khách: ${buyerName}`}
-        >
-          <Text style={styles.infoLine}>
-            Giá niêm yết: {formatPrice(money.originalTotal)}
-          </Text>
-          <Text style={styles.infoLineStrong}>
-            {offerLine.label}: {formatPrice(offerLine.amount)}
-          </Text>
-          {dealNote ? <Text style={styles.infoLineNote}>Lời nhắn: {dealNote}</Text> : null}
-          <Text style={styles.infoLineDiscount}>Giảm {discountPercent}%</Text>
-          <Text style={styles.infoLineMuted}>{formatDealTime(item.createdAt)}</Text>
-          {waitingForBuyer ? (
-            <Text style={styles.waitText}>Đang chờ người mua phản hồi</Text>
-          ) : null}
-        </OrderItemHeader>
-
-        {waitingForShop ? (
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[styles.actionButton, styles.actionButtonFlex]}
-              onPress={() => handleAcceptDeal(item)}
-            >
-              <Text style={styles.actionButtonText}>Chấp nhận</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.actionButton, styles.actionButtonSecondary, styles.actionButtonFlex]}
-              onPress={() => openCounterModal(item)}
-            >
-              <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
-                Trả giá
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.actionButton, styles.actionButtonDanger, styles.actionButtonFlex]}
-              onPress={() => handleRejectDeal(item)}
-            >
-              <Text style={styles.actionButtonTextDanger}>Từ chối</Text>
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
-    );
-  }
-
   function renderReservationItem({ item }) {
     const statusLabel = RESERVATION_STATUS_LABELS[item.status] || 'Không rõ';
     const statusStyle = getReservationStatusStyle(item.status);
@@ -438,12 +201,18 @@ export default function SellerOrdersScreen({
             <Text style={styles.infoLineStrong}>
               Tổng tiền: {formatPrice(item.totalAmount)}
             </Text>
+            {Number(item.depositAmount) > 0 ? (
+              <Text style={styles.infoLineDeposit}>
+                Đã cọc {formatPrice(item.depositAmount)}
+                {item.depositPaidAt ? '' : ' (chưa trừ ví)'}
+              </Text>
+            ) : null}
             {item.pickupTime ? (
               <Text style={styles.infoLineMuted}>
-                Giờ lấy: {formatDealTime(item.pickupTime)}
+                Giờ lấy: {formatOrderTime(item.pickupTime)}
               </Text>
             ) : (
-              <Text style={styles.infoLineMuted}>Giữ: {formatDealTime(item.createdAt)}</Text>
+              <Text style={styles.infoLineMuted}>Giữ: {formatOrderTime(item.createdAt)}</Text>
             )}
             {item.status === RESERVATION_STATUS.CANCELLED && item.cancelReason ? (
               <Text style={styles.infoLineDanger}>Lý do: {item.cancelReason}</Text>
@@ -513,7 +282,7 @@ export default function SellerOrdersScreen({
 
       {isLoading ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" />
+          <ActivityIndicator color="#076F32" />
         </View>
       ) : (
         <FlatList
@@ -522,9 +291,7 @@ export default function SellerOrdersScreen({
           contentContainerStyle={styles.listContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          renderItem={
-            activeTab === RESERVATION_TAB.PENDING_PRICE ? renderDealItem : renderReservationItem
-          }
+          renderItem={renderReservationItem}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Text style={styles.emptyText}>
@@ -534,69 +301,6 @@ export default function SellerOrdersScreen({
           }
         />
       )}
-
-      <Modal visible={Boolean(counterDeal)} transparent animationType="fade">
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <ScrollView
-            contentContainerStyle={styles.modalScroll}
-            keyboardShouldPersistTaps="handled"
-            bounces={false}
-          >
-            <View style={styles.modalBox}>
-              <Text style={styles.modalTitle}>Trả giá khác</Text>
-              {counterMoney ? (
-                <>
-                  <Text style={styles.modalHint}>
-                    Giá niêm yết: {formatPrice(counterMoney.originalTotal)}
-                  </Text>
-                  <Text style={styles.modalHint}>
-                    Giá khách đề nghị: {formatPrice(counterMoney.offeredTotal)}
-                  </Text>
-                </>
-              ) : null}
-
-              <Text style={styles.modalFieldLabel}>Tổng giá shop đề nghị</Text>
-              <TextInput
-                value={counterPrice}
-                onChangeText={(value) => setCounterPrice(value.replace(/\D/g, ''))}
-                keyboardType="number-pad"
-                placeholder="Nhập tổng giá"
-                placeholderTextColor="#94a3b8"
-                style={styles.modalInput}
-              />
-
-              <Text style={styles.modalFieldLabel}>Lời nhắn (tuỳ chọn)</Text>
-              <TextInput
-                value={counterNote}
-                onChangeText={setCounterNote}
-                placeholder="Ví dụ: giá đó mới bán được..."
-                placeholderTextColor="#94a3b8"
-                style={[styles.modalInput, styles.modalNoteInput]}
-                multiline
-              />
-
-              <View style={styles.modalActions}>
-                <Pressable
-                  style={styles.modalCancel}
-                  onPress={() => {
-                    setCounterDeal(null);
-                    setCounterPrice('');
-                    setCounterNote('');
-                  }}
-                >
-                  <Text style={styles.modalCancelText}>Huỷ</Text>
-                </Pressable>
-                <Pressable style={styles.modalSubmit} onPress={handleCounterDeal}>
-                  <Text style={styles.modalSubmitText}>Gửi</Text>
-                </Pressable>
-              </View>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }
@@ -645,8 +349,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   tabItemActive: {
-    borderColor: '#0d7377',
-    backgroundColor: '#ecfdf5',
+    borderColor: '#076F32',
+    backgroundColor: '#E6F4EC',
   },
   tabText: {
     fontSize: 11,
@@ -655,7 +359,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tabTextActive: {
-    color: '#0d7377',
+    color: '#076F32',
     fontWeight: '800',
   },
   listContent: { padding: 16, paddingBottom: 32 },
@@ -673,28 +377,6 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     marginBottom: 12,
   },
-  dealIdRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 12,
-  },
-  orderCode: {
-    color: '#0f766e',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
-  statusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
   statusBadgePending: {
     backgroundColor: '#fef3c7',
   },
@@ -702,10 +384,10 @@ const styles = StyleSheet.create({
     color: '#b45309',
   },
   statusBadgeSuccess: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#E6F4EC',
   },
   statusBadgeTextSuccess: {
-    color: '#0f766e',
+    color: '#076F32',
   },
   statusBadgeInfo: {
     backgroundColor: '#e0f2fe',
@@ -719,114 +401,16 @@ const styles = StyleSheet.create({
   statusBadgeTextDanger: {
     color: '#b91c1c',
   },
-  cancelReasonText: {
-    marginTop: 6,
-    color: '#b91c1c',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dealProductRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
-  },
-  dealThumb: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    backgroundColor: '#e2e8f0',
-  },
-  dealThumbFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0d7377',
-  },
-  dealThumbFallbackText: {
-    color: '#ffffff',
-    fontSize: 22,
-    fontWeight: '900',
-  },
-  dealProductInfo: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-  },
-  dealProductTitle: {
-    color: '#0f172a',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  cardMeta: {
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  buyerMeta: {
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dealListedPrice: {
-    marginTop: 2,
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  priceText: {
-    color: '#0d7377',
-    fontSize: 14,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  dealDiscountText: {
-    marginTop: 4,
-    color: '#b45309',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  dealTimeText: {
-    marginTop: 4,
-    color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dealNoteText: {
-    marginTop: 2,
-    marginBottom: 2,
-    color: '#334155',
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  waitText: {
-    marginTop: 6,
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  infoLine: {
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 2,
-  },
   infoLineStrong: {
     color: '#0f172a',
     fontSize: 14,
     fontWeight: '800',
     marginTop: 2,
   },
-  infoLineNote: {
-    color: '#475569',
+  infoLineDeposit: {
+    color: '#055528',
     fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  infoLineDiscount: {
-    color: '#0f766e',
-    fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     marginTop: 2,
   },
   infoLineMuted: {
@@ -853,14 +437,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   actionButtonFlex: {
     flexGrow: 1,
     flexBasis: '30%',
-  },
-  actionButtonSecondary: {
-    backgroundColor: '#e8f3f1',
   },
   actionButtonDanger: {
     backgroundColor: '#fee2e2',
@@ -869,9 +450,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '800',
     fontSize: 13,
-  },
-  actionButtonTextSecondary: {
-    color: '#0d7377',
   },
   actionButtonTextDanger: {
     color: '#b91c1c',
@@ -886,84 +464,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    justifyContent: 'center',
-  },
-  modalScroll: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginBottom: 10,
-  },
-  modalHint: {
-    color: '#64748b',
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  modalFieldLabel: {
-    marginTop: 12,
-    marginBottom: 6,
-    color: '#64748b',
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  modalInput: {
-    minHeight: 44,
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    color: '#0f172a',
-    fontWeight: '700',
-  },
-  modalNoteInput: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-    fontWeight: '500',
-    paddingVertical: 10,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
-  },
-  modalCancel: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 10,
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalCancelText: {
-    color: '#334155',
-    fontWeight: '800',
-  },
-  modalSubmit: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 10,
-    backgroundColor: '#0d7377',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalSubmitText: {
-    color: '#ffffff',
-    fontWeight: '800',
   },
 });

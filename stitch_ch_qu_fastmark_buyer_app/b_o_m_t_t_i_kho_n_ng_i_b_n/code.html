@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bảo mật tài khoản - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#6bff8f",
+                    "background": "#f8f9ff",
+                    "primary-fixed": "#7ffc97",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container": "#e6eeff",
+                    "surface": "#f8f9ff",
+                    "surface-variant": "#d9e3f6",
+                    "tertiary-fixed-dim": "#eec200",
+                    "surface-dim": "#d0dbed",
+                    "on-background": "#121c2a",
+                    "outline-variant": "#bdcaba",
+                    "tertiary-fixed": "#ffe083",
+                    "on-tertiary-fixed": "#231b00",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed-variant": "#005321",
+                    "secondary": "#006e2f",
+                    "primary-container": "#00873a",
+                    "inverse-primary": "#62df7d",
+                    "outline": "#6e7b6c",
+                    "on-primary-container": "#f7fff2",
+                    "on-primary-fixed-variant": "#005320",
+                    "on-tertiary": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "secondary-fixed-dim": "#4ae176",
+                    "on-surface": "#121c2a",
+                    "on-secondary-container": "#007432",
+                    "surface-tint": "#006e2d",
+                    "on-tertiary-container": "#4e3e00",
+                    "tertiary-container": "#cea700",
+                    "on-tertiary-fixed-variant": "#574500",
+                    "surface-container-low": "#eff4ff",
+                    "surface-container-highest": "#d9e3f6",
+                    "on-secondary": "#ffffff",
+                    "tertiary": "#735c00",
+                    "secondary-fixed": "#6bff8f",
+                    "on-error-container": "#93000a",
+                    "on-error": "#ffffff",
+                    "surface-container-high": "#dee9fc",
+                    "on-primary-fixed": "#002109",
+                    "error": "#ba1a1a",
+                    "primary-fixed-dim": "#62df7d",
+                    "inverse-on-surface": "#eaf1ff",
+                    "primary": "#006b2c",
+                    "inverse-surface": "#27313f",
+                    "on-secondary-fixed": "#002109",
+                    "surface-bright": "#f8f9ff",
+                    "on-surface-variant": "#3e4a3d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-gap-md": "16px",
+                    "gutter": "16px",
+                    "container-margin": "24px",
+                    "stack-gap-lg": "32px",
+                    "unit": "8px",
+                    "touch-target-min": "56px"
+            },
+            "fontFamily": {
+                    "label-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "price-display": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-md": ["Inter"]
+            },
+            "fontSize": {
+                    "label-lg": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}],
+                    "price-display": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "label-md": ["16px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen pb-safe">
+<!-- Top App Bar -->
+<header class="w-full sticky top-0 z-50 bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-outline flex justify-between items-center px-gutter h-touch-target-min">
+<button aria-label="Quay lại" class="text-on-surface-variant p-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-on-surface text-center flex-1 pr-10">Bảo mật tài khoản</h1>
+</header>
+<main class="px-container-margin py-stack-gap-lg max-w-2xl mx-auto space-y-stack-gap-lg">
+<!-- Section: Đổi mật khẩu -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-0 overflow-hidden">
+<button class="w-full flex items-center justify-between p-4 h-touch-target-min hover:bg-surface-container-high transition-colors active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[28px]">lock</span>
+</div>
+<div class="text-left">
+<span class="font-label-lg text-label-lg text-on-surface block">Đổi mật khẩu</span>
+<span class="font-body-md text-sm text-on-surface-variant block mt-1">Cập nhật mật khẩu để bảo vệ tài khoản</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant">chevron_right</span>
+</button>
+</section>
+<!-- Section: Sinh trắc học -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-0 overflow-hidden">
+<div class="w-full flex items-center justify-between p-4 h-touch-target-min hover:bg-surface-container-high transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[28px]">fingerprint</span>
+</div>
+<div class="text-left flex-1">
+<span class="font-label-lg text-label-lg text-on-surface block">Xác thực vân tay/khuôn mặt</span>
+<span class="font-body-md text-sm text-on-surface-variant block mt-1">Đăng nhập nhanh hơn và an toàn</span>
+</div>
+</div>
+<!-- Toggle Switch -->
+<label class="relative inline-flex items-center cursor-pointer min-h-[48px] min-w-[48px] justify-end">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-14 h-7 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[10px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</section>
+<!-- Section: Delete Account -->
+<section class="mt-stack-gap-lg">
+<button class="w-full flex items-center justify-between p-4 h-touch-target-min rounded-xl border border-error bg-error-container text-on-error-container hover:bg-error-container/80 transition-colors active:scale-[0.98]">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-lowest/50 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[28px]">delete_forever</span>
+</div>
+<div class="text-left">
+<span class="font-label-lg text-label-lg block text-error">Xóa tài khoản</span>
+</div>
+</div>
+</button>
+<p class="font-body-md text-sm text-on-surface-variant mt-4 text-center">
+                Lưu ý: Hành động này không thể hoàn tác. Mọi dữ liệu bán hàng sẽ bị xóa vĩnh viễn.
+            </p>
+</section>
+</main>
+</body></html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Xem trước Băng-rôn - FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#d9e3f6",
+                        "on-primary-container": "#f7fff2",
+                        "background": "#f8f9ff",
+                        "surface-container": "#e6eeff",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#eec200",
+                        "secondary-container": "#6bff8f",
+                        "primary": "#006b2c",
+                        "outline": "#6e7b6c",
+                        "surface-dim": "#d0dbed",
+                        "surface-container-low": "#eff4ff",
+                        "surface": "#f8f9ff",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#006e2f",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed": "#6bff8f",
+                        "surface-tint": "#006e2d",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#27313f",
+                        "on-primary-fixed": "#002109",
+                        "tertiary-fixed": "#ffe083",
+                        "on-tertiary-fixed": "#231b00",
+                        "on-secondary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "primary-container": "#00873a",
+                        "inverse-on-surface": "#eaf1ff",
+                        "primary-fixed": "#7ffc97",
+                        "on-surface": "#121c2a",
+                        "on-secondary-fixed-variant": "#005321",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "surface-container-highest": "#d9e3f6",
+                        "on-secondary-fixed": "#002109",
+                        "on-secondary-container": "#007432",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#62df7d",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "surface-container-high": "#dee9fc",
+                        "tertiary": "#735c00",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#62df7d",
+                        "outline-variant": "#bdcaba",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#f8f9ff",
+                        "on-tertiary-container": "#4e3e00",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-surface-variant": "#3e4a3d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "stack-gap-lg": "32px",
+                        "container-margin": "24px",
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "stack-gap-md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- TopAppBar (Transactional - Hidden or Simplified based on rules, using a simple back header for this transactional screen) -->
+<header class="bg-surface-container-low flex justify-between items-center px-container-margin h-touch-target-min border-b border-outline-variant/30 sticky top-0 z-50">
+<button aria-label="Quay lại" class="text-on-surface-variant p-2 -ml-2">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary text-center flex-1">Xác nhận Băng-rôn</h1>
+<div class="w-10"></div> <!-- Spacer for centering -->
+</header>
+<main class="flex-1 px-container-margin py-stack-gap-lg max-w-3xl mx-auto w-full pb-[120px]">
+<!-- Banner Preview Section -->
+<section class="mb-stack-gap-lg">
+<h2 class="font-label-lg text-label-lg text-on-surface mb-stack-gap-md flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">visibility</span>
+                Ảnh xem trước
+            </h2>
+<div class="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/50 relative shadow-sm">
+<!-- Aspect ratio 16:9 for typical banner -->
+<div class="w-full relative pt-[56.25%]">
+<img alt="Banner Preview" class="absolute top-0 left-0 w-full h-full object-cover" data-alt="A brightly lit, high-quality promotional banner design for fresh organic vegetables and fruits. The banner features crisp, vibrant images of tomatoes, lettuce, and carrots against a clean, light green and white modern minimalist background. The style is professional and appealing to local market shoppers, conveying freshness and quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpFeBsMUOuDZetJYvoJaf_SaDyIZv6NTQ-nm4LpCRaziqtC5--Jt0Ujdu9vhHMi05Vk35Z3neTfFxZ1KMrkyVskY6DDrO2fc-HGoi6Ne16jQA044l1tMLFEsrChN_GbjY_pb3YCcvrY4zaAJPsaP7AyetX_aov8galQ3kUHNORiZr3ZrjuncZcfDkKT3gUbksIPNuo7YvW79z_7yt2Iyep3fEoNgQg3N9iGm2k9Bgmgvy1cXBubQSuu_i6pPuxgieQoeIvJzWfZNph"/>
+</div>
+<div class="p-4 bg-surface/80 backdrop-blur-sm border-t border-outline-variant/30 text-center">
+<p class="font-label-md text-label-md text-on-surface-variant">Đây là cách băng-rôn sẽ hiển thị trên ứng dụng.</p>
+</div>
+</div>
+</section>
+<!-- Campaign Details Section -->
+<section class="mb-stack-gap-lg bg-surface rounded-xl border border-outline-variant/50 p-6 shadow-sm">
+<h2 class="font-label-lg text-label-lg text-on-surface mb-6 flex items-center gap-2 border-b border-outline-variant/30 pb-4">
+<span class="material-symbols-outlined text-primary">list_alt</span>
+                Chi tiết chiến dịch
+            </h2>
+<div class="space-y-6">
+<!-- Location -->
+<div class="flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary">web</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant mb-1">Vị trí hiển thị</p>
+<p class="font-body-md text-body-md text-on-surface font-medium">Trang chủ - Banner chính (Vị trí 1)</p>
+</div>
+</div>
+<!-- Duration -->
+<div class="flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary">calendar_month</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface-variant mb-1">Thời gian áp dụng</p>
+<p class="font-body-md text-body-md text-on-surface font-medium">15/10/2023 - 30/10/2023</p>
+<p class="font-label-md text-label-md text-on-surface-variant mt-1 text-sm">(Tổng cộng: 15 ngày)</p>
+</div>
+</div>
+<!-- Cost Breakdown -->
+<div class="flex items-start gap-4 pt-4 border-t border-outline-variant/30">
+<div class="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary">payments</span>
+</div>
+<div class="flex-1">
+<p class="font-label-md text-label-md text-on-surface-variant mb-1">Tổng chi phí</p>
+<div class="flex justify-between items-end">
+<span class="font-price-display text-price-display text-error">1,500,000đ</span>
+<span class="font-label-md text-label-md text-on-surface-variant line-through">2,000,000đ</span>
+</div>
+<p class="font-label-md text-label-md text-primary mt-1 text-sm bg-primary-container/20 inline-block px-2 py-1 rounded">Đã áp dụng mã giảm giá 25%</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Terms and Conditions check -->
+<section class="flex items-center gap-3 bg-surface-container-low p-4 rounded-lg">
+<input class="w-6 h-6 rounded border-outline-variant text-primary focus:ring-primary focus:ring-offset-background" id="terms" type="checkbox"/>
+<label class="font-body-md text-body-md text-on-surface-variant cursor-pointer select-none" for="terms">
+                 Tôi xác nhận nội dung quảng cáo tuân thủ <a class="text-primary underline" href="#">quy định của FastMark</a>.
+             </label>
+</section>
+</main>
+<!-- Bottom Action Bar (Sticky) -->
+<div class="fixed bottom-0 left-0 w-full bg-surface border-t border-outline-variant/30 p-container-margin pb-[env(safe-area-inset-bottom,24px)] z-50 shadow-[0_-4px_16px_rgba(0,0,0,0.05)]">
+<div class="max-w-3xl mx-auto flex flex-col md:flex-row gap-4 items-center justify-between">
+<div class="hidden md:block">
+<p class="font-label-md text-label-md text-on-surface-variant">Tổng thanh toán</p>
+<p class="font-price-display text-price-display text-error">1,500,000đ</p>
+</div>
+<button class="w-full md:w-auto h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-xl px-8 flex justify-center items-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm w-full md:flex-1 max-w-sm ml-auto active:scale-[0.98]">
+<span>Xác nhận &amp; Thanh toán</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+</body></html>

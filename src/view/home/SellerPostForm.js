@@ -362,7 +362,13 @@ export default function SellerPostForm({ onProductCreated }) {
       setThumbnail(null);
       setVariants([createVariant()]);
       dispatch(syncSellerAccess());
-      Alert.alert('Thành công', 'Đăng sản phẩm thành công.');
+      Alert.alert(
+        'Thành công',
+        result?.publiclyVisible === false
+          ? result.message ||
+              'Đã lưu bài. Gian hàng chưa có gói active nên bài bị ẩn công khai.'
+          : result?.message || 'Đăng sản phẩm thành công.'
+      );
 
       if (createdProductId) {
         onProductCreated?.(createdProductId);
@@ -406,7 +412,7 @@ export default function SellerPostForm({ onProductCreated }) {
         <View style={styles.field}>
           <Text style={styles.label}>Danh mục</Text>
           {isLoadingCategories ? (
-            <ActivityIndicator color="#0d7377" />
+            <ActivityIndicator color="#076F32" />
           ) : categories.length > 0 ? (
             <CategoryCombobox
               categories={categories}
@@ -636,8 +642,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   modalOptionActive: {
-    borderColor: '#0d7377',
-    backgroundColor: '#e8f3f1',
+    borderColor: '#076F32',
+    backgroundColor: '#E6F4EC',
   },
   modalOptionText: {
     fontSize: 15,
@@ -645,7 +651,7 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   modalOptionTextActive: {
-    color: '#0d7377',
+    color: '#076F32',
   },
   modalOptionDescription: {
     marginTop: 4,
@@ -756,7 +762,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   addImageText: {
-    color: '#0d7377',
+    color: '#076F32',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -765,13 +771,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     borderWidth: 1,
     borderColor: '#b7dfd8',
     marginBottom: 16,
   },
   addVariantText: {
-    color: '#0d7377',
+    color: '#076F32',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -786,7 +792,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   submitButtonDisabled: {
     backgroundColor: '#94a3b8',

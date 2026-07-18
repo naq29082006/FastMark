@@ -3,6 +3,7 @@ const SellerVerification = require("../models/SellerVerification");
 const User = require("../models/User");
 const { SHOP_OPEN } = require("../constants/shopStatus");
 const { SELLER_VERIFICATION_STATUS } = require("../constants/sellerVerification");
+const { isSubscriptionActive } = require("../constants/sellerSubscription");
 const {
   resolveFileExtension,
   uploadImageToSupabase,
@@ -80,11 +81,17 @@ function toPublicShopSettings(shop, user) {
       ? String(shop.categoryId)
       : "";
 
+  const ownerName = pickString(user?.FullName) || pickString(user?.UserName) || "";
+  const ownerUsername = pickString(user?.UserName) || "";
+
   return {
     id: shop._id,
     shopId: shop._id,
-    shopUsername: shop.shopUsername || "",
-    shopName: shop.shopName || "",
+    // Identity from User — shop no longer has a separate public name/handle.
+    shopUsername: ownerUsername || shop.shopUsername || "",
+    shopName: ownerName || shop.shopName || "",
+    fullName: ownerName,
+    userName: ownerUsername,
     categoryId,
     categoryName: shop.categoryId?.categoryName || "",
     description: shop.description || "",
@@ -101,7 +108,13 @@ function toPublicShopSettings(shop, user) {
     closeTime: shop.closeTime || "",
     isOpen: Number(shop.isOpen) === SHOP_OPEN.OPEN ? 1 : 0,
     status: shop.status ?? 1,
-    followersCount: Number(shop.followersCount) || 0,
+    followersCount: Number(user?.FollowersCount) || Number(shop.followersCount) || 0,
+    allowReserve: shop.allowReserve !== false,
+    depositPercent: Math.max(0, Math.min(100, Number(shop.depositPercent) || 0)),
+    pinHours: Boolean(shop.pinHours),
+    subscriptionPlan: shop.subscriptionPlan || null,
+    subscriptionExpiresAt: shop.subscriptionExpiresAt || null,
+    subscriptionActive: isSubscriptionActive(shop),
   };
 }
 
@@ -118,6 +131,21 @@ async function getShopForSeller(user) {
 async function getShopSettings(user) {
   const shop = await getShopForSeller(user);
   const freshUser = await User.findById(user._id);
+  // Keep legacy shopName/shopUsername mirrored from User for older clients.
+  const ownerName = pickString(freshUser?.FullName) || pickString(freshUser?.UserName);
+  const ownerUsername = pickString(freshUser?.UserName);
+  let dirty = false;
+  if (ownerName && shop.shopName !== ownerName) {
+    shop.shopName = ownerName;
+    dirty = true;
+  }
+  if (ownerUsername && shop.shopUsername !== ownerUsername) {
+    shop.shopUsername = ownerUsername;
+    dirty = true;
+  }
+  if (dirty) {
+    await shop.save().catch(() => null);
+  }
   return toPublicShopSettings(shop, freshUser);
 }
 
@@ -136,12 +164,10 @@ async function updateShopSettings(user, payload) {
   const shop = await getShopForSeller(user);
   const freshUser = await User.findById(user._id);
 
-  if (payload.shopName !== undefined) {
-    shop.shopName = assertShopNameValid(payload.shopName);
-  }
-  if (payload.shopUsername !== undefined) {
-    shop.shopUsername = await assertShopUsernameAvailable(payload.shopUsername, user._id);
-  }
+  // Name / username always follow the buyer User identity.
+  shop.shopName = pickString(freshUser?.FullName) || pickString(freshUser?.UserName) || shop.shopName;
+  shop.shopUsername = pickString(freshUser?.UserName) || shop.shopUsername;
+
   if (payload.description !== undefined || payload.shopDescription !== undefined) {
     shop.description = pickString(payload.description ?? payload.shopDescription);
   }
@@ -173,6 +199,22 @@ async function updateShopSettings(user, payload) {
   }
   if (payload.isOpen !== undefined) {
     shop.isOpen = Number(payload.isOpen) === SHOP_OPEN.OPEN ? SHOP_OPEN.OPEN : SHOP_OPEN.CLOSED;
+  }
+
+  if (payload.allowReserve !== undefined) {
+    shop.allowReserve = Boolean(payload.allowReserve);
+  }
+
+  if (payload.depositPercent !== undefined) {
+    const percent = Math.round(Number(payload.depositPercent));
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+      throw createServiceError("Phần trăm đặt cọc phải từ 0 đến 100.");
+    }
+    shop.depositPercent = percent;
+  }
+
+  if (payload.pinHours !== undefined) {
+    shop.pinHours = Boolean(payload.pinHours);
   }
 
   if (payload.avatar !== undefined || payload.shopAvatar !== undefined) {

@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   },
   storeName: {
     marginTop: 6,
-    color: '#0f766e',
+    color: '#076F32',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   submitButtonDisabled: {
     opacity: 0.7,

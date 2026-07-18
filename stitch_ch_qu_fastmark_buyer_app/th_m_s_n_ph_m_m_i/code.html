@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Thêm sản phẩm mới - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-container": "#cea700",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-tertiary-fixed": "#231b00",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#00873a",
+                        "surface-variant": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "primary-fixed": "#7ffc97",
+                        "outline-variant": "#bdcaba",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-secondary-fixed-variant": "#005321",
+                        "inverse-primary": "#62df7d",
+                        "on-secondary-container": "#007432",
+                        "tertiary-fixed-dim": "#eec200",
+                        "secondary-container": "#6bff8f",
+                        "surface-container-high": "#dee9fc",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-secondary-fixed": "#002109",
+                        "surface-bright": "#f8f9ff",
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "surface-container-low": "#eff4ff",
+                        "on-primary-container": "#f7fff2",
+                        "inverse-surface": "#27313f",
+                        "tertiary": "#735c00",
+                        "secondary": "#006e2f",
+                        "surface-tint": "#006e2d",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-primary-fixed": "#002109",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#121c2a",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#6e7b6c",
+                        "surface-dim": "#d0dbed",
+                        "inverse-on-surface": "#eaf1ff",
+                        "background": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#e6eeff",
+                        "surface": "#f8f9ff",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "surface-container-highest": "#d9e3f6",
+                        "secondary-fixed": "#6bff8f",
+                        "on-error": "#ffffff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "container-margin": "24px",
+                        "stack-gap-lg": "32px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px"
+                    },
+                    fontFamily: {
+                        "headline-lg": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "label-lg": ["18px", { lineHeight: "24px", fontWeight: "600" }],
+                        "body-lg": ["20px", { lineHeight: "30px", fontWeight: "400" }],
+                        "body-md": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+                        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+                        "price-display": ["24px", { lineHeight: "32px", fontWeight: "700" }],
+                        "headline-lg-mobile": ["28px", { lineHeight: "36px", fontWeight: "700" }],
+                        "label-md": ["16px", { lineHeight: "20px", fontWeight: "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md antialiased min-h-screen flex flex-col">
+<!-- Transactional Header -->
+<header class="sticky top-0 z-50 bg-surface border-b border-outline-variant px-container-margin py-4 flex items-center gap-4">
+<button aria-label="Quay lại" class="flex items-center justify-center w-12 h-12 rounded-full hover:bg-surface-variant transition-colors" type="button">
+<span class="material-symbols-outlined text-[28px] text-on-surface" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile text-on-surface flex-1">Đăng bán sản phẩm</h1>
+</header>
+<!-- Main Form Content -->
+<main class="flex-1 px-container-margin py-stack-gap-lg pb-32 max-w-2xl mx-auto w-full">
+<form action="#" class="flex flex-col gap-stack-gap-lg" method="POST">
+<!-- Image Upload Area -->
+<section class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface">Hình ảnh sản phẩm <span class="text-error">*</span></label>
+<div class="w-full h-48 bg-surface-container-low border-2 border-dashed border-outline-variant rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-surface-container transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:outline-none" role="button" tabindex="0">
+<span class="material-symbols-outlined text-[48px] text-primary" data-icon="add_a_photo" style="font-variation-settings: 'FILL' 1;">add_a_photo</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Chụp hoặc chọn ảnh</span>
+<input accept="image/*" class="sr-only" multiple="" type="file"/>
+</div>
+</section>
+<!-- Product Details -->
+<section class="flex flex-col gap-stack-gap-md bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm">
+<!-- Product Name -->
+<div class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface" for="product_name">Tên sản phẩm <span class="text-error">*</span></label>
+<input class="h-touch-target-min px-4 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors w-full" id="product_name" name="product_name" placeholder="VD: Rau muống sạch nhà trồng" required="" type="text"/>
+</div>
+<!-- Category -->
+<div class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface" for="category">Danh mục <span class="text-error">*</span></label>
+<div class="relative w-full">
+<select class="h-touch-target-min px-4 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors w-full appearance-none pr-12" id="category" name="category" required="">
+<option disabled="" selected="" value="">Chọn loại hàng...</option>
+<option value="rau_cu">Rau củ quả</option>
+<option value="thit_ca">Thịt cá tươi sống</option>
+<option value="trai_cay">Trái cây</option>
+<option value="do_kho">Đồ khô, gia vị</option>
+<option value="khac">Khác</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<!-- Price and Quantity Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-gap-md">
+<div class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface" for="price">Giá bán (VNĐ) <span class="text-error">*</span></label>
+<input class="h-touch-target-min px-4 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors w-full" id="price" min="0" name="price" placeholder="0" required="" type="number"/>
+</div>
+<div class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface" for="quantity">Số lượng hiện có <span class="text-error">*</span></label>
+<input class="h-touch-target-min px-4 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors w-full" id="quantity" min="1" name="quantity" placeholder="1" required="" type="number"/>
+</div>
+</div>
+<!-- Description -->
+<div class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface" for="description">Mô tả sản phẩm</label>
+<textarea class="p-4 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors w-full resize-none min-h-[120px]" id="description" name="description" placeholder="Nhập thêm chi tiết về sản phẩm (ngày thu hoạch, cách bảo quản...)" rows="4"></textarea>
+</div>
+<!-- GPS Location -->
+<div class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface" for="location">Vị trí bán hàng <span class="text-error">*</span></label>
+<div class="relative w-full flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-primary" data-icon="location_on" style="font-variation-settings: 'FILL' 1;">location_on</span>
+<input class="h-touch-target-min pl-12 pr-12 bg-surface-container-lowest border border-outline-variant rounded-lg font-body-lg text-body-lg text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors w-full" id="location" name="location" readonly="" required="" type="text" value="Chợ Nghĩa Tân, Cầu Giấy, Hà Nội"/>
+<button class="absolute right-2 w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant text-primary" title="Cập nhật vị trí hiện tại" type="button">
+<span class="material-symbols-outlined" data-icon="my_location">my_location</span>
+</button>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 text-sm">Vị trí tự động lấy từ điện thoại của bạn.</p>
+</div>
+</section>
+<!-- Fixed Bottom Action Area -->
+<div class="fixed bottom-0 left-0 w-full bg-surface border-t border-outline-variant p-4 z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center">
+<div class="max-w-2xl w-full">
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-full font-headline-md text-headline-md-mobile flex items-center justify-center gap-2 hover:bg-secondary active:scale-[0.98] transition-all shadow-md" type="submit">
+                        Đăng bán sản phẩm
+                        <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</form>
+</main>
+<script>
+        // Simple interactivity for the file upload area
+        const dropZone = document.querySelector('[role="button"]');
+        const fileInput = document.querySelector('input[type="file"]');
+
+        if(dropZone && fileInput) {
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            dropZone.addEventListener('keydown', (e) => {
+                if(e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInput.click();
+                }
+            });
+            
+            fileInput.addEventListener('change', () => {
+                if(fileInput.files.length > 0) {
+                    const textSpan = dropZone.querySelector('span.text-body-md');
+                    textSpan.textContent = `Đã chọn ${fileInput.files.length} ảnh`;
+                    textSpan.classList.add('text-primary');
+                    textSpan.classList.add('font-bold');
+                }
+            });
+        }
+    </script>
+</body></html>

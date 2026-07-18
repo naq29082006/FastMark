@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Giao hàng thành công</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#735c00",
+                      "secondary-fixed": "#6bff8f",
+                      "on-error-container": "#93000a",
+                      "surface-container-low": "#eff4ff",
+                      "surface-container-highest": "#d9e3f6",
+                      "surface-tint": "#006e2d",
+                      "on-tertiary-container": "#4e3e00",
+                      "on-secondary-container": "#007432",
+                      "tertiary-container": "#cea700",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "on-tertiary": "#ffffff",
+                      "on-primary": "#ffffff",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-surface": "#121c2a",
+                      "secondary-fixed-dim": "#4ae176",
+                      "surface-bright": "#f8f9ff",
+                      "on-surface-variant": "#3e4a3d",
+                      "primary": "#006b2c",
+                      "inverse-surface": "#27313f",
+                      "primary-fixed-dim": "#62df7d",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-secondary-fixed": "#002109",
+                      "on-error": "#ffffff",
+                      "surface-container-high": "#dee9fc",
+                      "on-primary-fixed": "#002109",
+                      "error": "#ba1a1a",
+                      "tertiary-fixed-dim": "#eec200",
+                      "surface-dim": "#d0dbed",
+                      "on-background": "#121c2a",
+                      "surface-variant": "#d9e3f6",
+                      "surface-container": "#e6eeff",
+                      "surface": "#f8f9ff",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-container": "#6bff8f",
+                      "background": "#f8f9ff",
+                      "primary-fixed": "#7ffc97",
+                      "inverse-primary": "#62df7d",
+                      "secondary": "#006e2f",
+                      "primary-container": "#00873a",
+                      "on-primary-container": "#f7fff2",
+                      "outline": "#6e7b6c",
+                      "error-container": "#ffdad6",
+                      "on-secondary-fixed-variant": "#005321",
+                      "tertiary-fixed": "#ffe083",
+                      "on-tertiary-fixed": "#231b00",
+                      "outline-variant": "#bdcaba"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "container-margin": "24px",
+                      "stack-gap-md": "16px",
+                      "unit": "8px",
+                      "touch-target-min": "56px",
+                      "stack-gap-lg": "32px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Inter"],
+                      "label-lg": ["Inter"],
+                      "price-display": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "body-md": ["Inter"],
+                      "headline-md": ["Inter"]
+              },
+              "fontSize": {
+                      "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}],
+                      "label-lg": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "price-display": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                      "label-md": ["16px", {"lineHeight": "20px", "fontWeight": "500"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-lg min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface flex justify-between items-center w-full px-container-margin h-touch-target-min">
+<button aria-label="Menu" class="flex items-center justify-center w-12 h-12 rounded-full hover:bg-surface-container-high transition-colors text-primary">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Chợ Việt</h1>
+<button aria-label="Account" class="flex items-center justify-center w-12 h-12 rounded-full hover:bg-surface-container-high transition-colors text-primary">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</header>
+<!-- Main Content Canvas (Transactional/Success Screen, no Bottom Nav) -->
+<main class="flex-grow flex flex-col items-center justify-center px-container-margin py-stack-gap-lg">
+<!-- Success Animation / Icon -->
+<div class="mb-stack-gap-lg flex justify-center w-full max-w-sm">
+<div class="w-32 h-32 bg-primary-container rounded-full flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-6xl text-primary" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary text-center mb-unit">Giao hàng thành công!</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-center mb-stack-gap-lg max-w-md">
+            Đơn hàng của bạn đã được giao đến tận tay khách hàng.
+        </p>
+<!-- Order Summary Card -->
+<div class="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-xl p-container-margin mb-stack-gap-lg">
+<div class="flex justify-between items-center pb-4 border-b border-outline-variant mb-4">
+<div>
+<span class="font-label-md text-label-md text-on-surface-variant block mb-1">Mã đơn hàng</span>
+<span class="font-headline-md text-headline-md text-on-surface">#VN-2408-992</span>
+</div>
+<div class="bg-primary-container text-on-primary-container px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-sm" data-icon="task_alt">task_alt</span>
+<span class="font-label-md text-label-md">Hoàn tất</span>
+</div>
+</div>
+<div class="mb-4 pb-4 border-b border-outline-variant">
+<span class="font-label-md text-label-md text-on-surface-variant block mb-1">Khách hàng</span>
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 bg-surface-container-high rounded-full flex items-center justify-center text-primary font-headline-md text-headline-md">
+                        N
+                    </div>
+<div>
+<span class="font-label-lg text-label-lg text-on-surface block">Nguyễn Văn A</span>
+<span class="font-body-md text-body-md text-on-surface-variant block">0901 234 567</span>
+</div>
+</div>
+</div>
+<!-- Items List -->
+<div>
+<span class="font-label-md text-label-md text-on-surface-variant block mb-3">Sản phẩm đã giao (3)</span>
+<ul class="space-y-3">
+<li class="flex justify-between items-center">
+<span class="font-body-lg text-body-lg text-on-surface">Gạo ST25 (Túi 5kg)</span>
+<span class="font-label-lg text-label-lg text-on-surface">x1</span>
+</li>
+<li class="flex justify-between items-center">
+<span class="font-body-lg text-body-lg text-on-surface">Nước Mắm Phú Quốc 40N</span>
+<span class="font-label-lg text-label-lg text-on-surface">x2</span>
+</li>
+<li class="flex justify-between items-center">
+<span class="font-body-lg text-body-lg text-on-surface">Bắp Cải Sapa (1kg)</span>
+<span class="font-label-lg text-label-lg text-on-surface">x1</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Primary Action -->
+<button class="w-full max-w-md h-touch-target-min bg-primary text-on-primary rounded-full font-headline-md text-headline-md flex items-center justify-center gap-2 hover:bg-secondary transition-colors active:scale-95 duration-150">
+            Về Trang chủ
+            <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</main>
+<!-- Bottom Nav Bar deliberately omitted as this is a transactional success screen -->
+</body></html>

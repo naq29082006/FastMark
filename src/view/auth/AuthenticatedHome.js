@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,52 +6,46 @@ import { useSelector } from 'react-redux';
 
 import { getBuyerConversationsOnBackend } from '../../api/messageApi';
 import { getMyNotificationsOnBackend } from '../../api/notificationApi';
-import { getSellerConversationsOnBackend } from '../../api/sellerOpsApi';
-import { APP_MODE_BUYER, APP_MODE_SELLER, useAppMode } from '../../hooks/useAppMode';
+import { APP_MODE_BUYER, useAppMode } from '../../hooks/useAppMode';
 import { usePresence } from '../../hooks/usePresence';
 import { useShopPresence } from '../../hooks/useShopPresence';
 import { useSellerAccessSync } from '../../hooks/useSellerAccessSync';
 import { RESERVATION_TAB } from '../../constants/sellerOrders';
-import { getCurrentUserIdToken } from '../../repository/authRepository';
-import { selectCanSwitchToSeller } from '../../viewmodel/auth/authSelectors';
+import {
+  selectCanSwitchToSeller,
+  selectIsSeller,
+} from '../../viewmodel/auth/authSelectors';
 
 import ProductsScreen from '../home/ProductsScreen';
+import HomeScreen from '../home/HomeScreen';
 import BuyerOrdersScreen from '../buyer/BuyerOrdersScreen';
 import InboxScreen from '../inbox/InboxScreen';
 import NotificationsScreen from '../inbox/NotificationsScreen';
 import MapScreen from '../map/MapScreen';
 import ProfilePanel from './ProfilePanel';
-import SellerOverviewScreen from '../seller/SellerOverviewScreen';
-import SellerProductsTabScreen from '../seller/SellerProductsTabScreen';
-import SellerOrdersTabScreen from '../seller/SellerOrdersTabScreen';
+import ShopTabPanel from '../seller/ShopTabPanel';
 
-const ACTIVE_COLOR = '#0F766E';
+const ACTIVE_COLOR = '#076F32';
 const INACTIVE_COLOR = '#94A3B8';
-const ICON_SIZE = 28;
+const ICON_SIZE = 24;
 
-const BUYER_TABS = [
+const TABS = [
   { key: 'home', label: 'Trang chủ', icon: 'home-outline', activeIcon: 'home' },
-  { key: 'products', label: 'Sản phẩm', icon: 'basket-outline', activeIcon: 'basket' },
-  { key: 'orders', label: 'Quản lý đơn hàng', icon: 'receipt-outline', activeIcon: 'receipt' },
-  { key: 'inbox', label: 'Tin nhắn', icon: 'chatbubble-outline', activeIcon: 'chatbubble', badgeKey: 'messages' },
-  { key: 'notifications', label: 'Thông báo', icon: 'notifications-outline', activeIcon: 'notifications', badgeKey: 'notifications' },
+  { key: 'map', label: 'Khám phá', icon: 'compass-outline', activeIcon: 'compass' },
+  { key: 'orders', label: 'Đơn hàng', icon: 'receipt-outline', activeIcon: 'receipt' },
+  {
+    key: 'shop',
+    label: 'Gian hàng',
+    icon: 'storefront-outline',
+    activeIcon: 'storefront',
+  },
   { key: 'profile', label: 'Tài khoản', icon: 'person-outline', activeIcon: 'person' },
-];
-
-const SELLER_TABS = [
-  { key: 'overview', label: 'Thống kê', icon: 'stats-chart-outline', activeIcon: 'stats-chart' },
-  { key: 'products', label: 'Quản lý sản phẩm', icon: 'cube-outline', activeIcon: 'cube' },
-  { key: 'orders', label: 'Quản lý đơn hàng', icon: 'receipt-outline', activeIcon: 'receipt' },
-  { key: 'inbox', label: 'Tin nhắn', icon: 'chatbubble-outline', activeIcon: 'chatbubble', badgeKey: 'messages' },
-  { key: 'notifications', label: 'Thông báo', icon: 'notifications-outline', activeIcon: 'notifications', badgeKey: 'notifications' },
-  { key: 'profile', label: 'Tài khoản của tôi', icon: 'person-outline', activeIcon: 'person' },
 ];
 
 function getTabIconName(tab, isActive) {
   if (isActive && tab.activeIcon) {
     return tab.activeIcon;
   }
-
   return tab.icon;
 }
 
@@ -73,14 +67,17 @@ function TabIcon({ icon, color, badgeCount = 0 }) {
 
 export default function AuthenticatedHome() {
   const canSwitchToSeller = useSelector(selectCanSwitchToSeller);
-  const { appMode, setAppMode, isReady, isBuyerMode, isSellerMode } = useAppMode(canSwitchToSeller);
+  const isSeller = useSelector(selectIsSeller);
+  const canPost = Boolean(canSwitchToSeller && isSeller);
+  const { appMode, setAppMode, isReady } = useAppMode(false);
 
-  usePresence(appMode);
-  useShopPresence(appMode);
+  usePresence(APP_MODE_BUYER);
+  useShopPresence(canPost ? 'seller' : APP_MODE_BUYER);
 
-  const tabs = isSellerMode ? SELLER_TABS : BUYER_TABS;
-  const [activeTab, setActiveTab] = useState(BUYER_TABS[0].key);
+  const tabs = TABS;
+  const [activeTab, setActiveTab] = useState('home');
   const [mapFocusRequest, setMapFocusRequest] = useState(null);
+  const [productsFocusRequest, setProductsFocusRequest] = useState(null);
   const [sellerRegisterRequest, setSellerRegisterRequest] = useState(0);
   const [productDetailId, setProductDetailId] = useState(null);
   const [productRefreshKey, setProductRefreshKey] = useState(0);
@@ -90,6 +87,8 @@ export default function AuthenticatedHome() {
   const [tabInstanceKeys, setTabInstanceKeys] = useState({});
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [buyerOverlay, setBuyerOverlay] = useState(null);
+  const [profileNavRequest, setProfileNavRequest] = useState(null);
 
   const updateNestedTabState = useCallback((tabKey, isNested) => {
     setNestedTabState((current) => {
@@ -123,14 +122,13 @@ export default function AuthenticatedHome() {
 
       if (leavingTab === 'profile') {
         setProductDetailId(null);
+        setProfileNavRequest(null);
       }
-      if (leavingTab === 'inbox') {
-        setInboxChatRequest(null);
-      }
-      if (leavingTab === 'home') {
+      if (leavingTab === 'map') {
         setMapFocusRequest(null);
       }
 
+      setBuyerOverlay(null);
       setActiveTab(nextTab);
     },
     [activeTab]
@@ -138,75 +136,56 @@ export default function AuthenticatedHome() {
 
   const loadUnreadBadges = useCallback(async () => {
     try {
-      if (isBuyerMode) {
-        const [conversations, notifications] = await Promise.all([
-          getBuyerConversationsOnBackend(),
-          getMyNotificationsOnBackend('buyer'),
-        ]);
+      const [conversations, notifications] = await Promise.all([
+        getBuyerConversationsOnBackend(),
+        getMyNotificationsOnBackend('buyer'),
+      ]);
 
-        const messageCount = (conversations || []).filter(
-          (item) => Math.max(0, Number(item.unreadCount) || 0) > 0
-        ).length;
-        const notificationCount = (notifications || []).filter((item) => !item.isRead).length;
+      const messageCount = (conversations || []).filter(
+        (item) => Math.max(0, Number(item.unreadCount) || 0) > 0
+      ).length;
+      const notificationCount = (notifications || []).filter((item) => !item.isRead).length;
 
-        setUnreadMessagesCount(messageCount);
-        setUnreadNotificationsCount(notificationCount);
-        return;
-      }
-
-      if (isSellerMode) {
-        const idToken = await getCurrentUserIdToken();
-        if (!idToken) {
-          return;
-        }
-
-        const [conversations, notifications] = await Promise.all([
-          getSellerConversationsOnBackend(idToken),
-          getMyNotificationsOnBackend('seller'),
-        ]);
-        const messageCount = (conversations || []).filter(
-          (item) => Math.max(0, Number(item.unreadCount) || 0) > 0
-        ).length;
-        const notificationCount = (notifications || []).filter((item) => !item.isRead).length;
-        setUnreadMessagesCount(messageCount);
-        setUnreadNotificationsCount(notificationCount);
-      }
+      setUnreadMessagesCount(messageCount);
+      setUnreadNotificationsCount(notificationCount);
     } catch {
       // Keep the previous badge state on transient failures.
     }
-  }, [isBuyerMode, isSellerMode]);
+  }, []);
 
   useSellerAccessSync({
     enabled: true,
   });
 
-  const previousAppModeRef = useRef(null);
-
   useEffect(() => {
     if (!isReady) {
       return;
     }
+    setAppMode(APP_MODE_BUYER);
+  }, [isReady, setAppMode]);
 
-    if (previousAppModeRef.current === appMode) {
-      return;
-    }
-
-    previousAppModeRef.current = appMode;
-    const defaultTab = isSellerMode ? SELLER_TABS[0].key : BUYER_TABS[0].key;
-    setActiveTab(defaultTab);
-    setProductDetailId(null);
-    setInboxChatRequest(null);
-    setMapFocusRequest(null);
-    setNestedTabState({});
-    setTabInstanceKeys({});
-  }, [appMode, isReady, isSellerMode]);
-
-  // Tab cũ "favorites" đã đổi thành "orders" — tránh crash nếu state còn tab cũ.
   useEffect(() => {
-    if (isBuyerMode && activeTab === 'favorites') {
+    if (activeTab === 'post') {
+      setActiveTab('shop');
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'favorites' || activeTab === 'products') {
       setActiveTab('orders');
     }
-  }, [isBuyerMode, activeTab]);
+    if (activeTab === 'notifications') {
+      setActiveTab('home');
+      setBuyerOverlay('notifications');
+    }
+    if (activeTab === 'inbox') {
+      setActiveTab('home');
+      setBuyerOverlay('inbox');
+    }
+    if (activeTab === 'overview') {
+      setActiveTab('home');
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!isReady) {
@@ -233,8 +212,7 @@ export default function AuthenticatedHome() {
       storeId: String(storeId),
       at: Date.now(),
     });
-    setAppMode(APP_MODE_BUYER);
-    handleSelectTab('home');
+    handleSelectTab('map');
   }
 
   function handleNavigateToStore({ shopId, storeName }) {
@@ -244,8 +222,7 @@ export default function AuthenticatedHome() {
       showDirections: true,
       at: Date.now(),
     });
-    setAppMode(APP_MODE_BUYER);
-    handleSelectTab('home');
+    handleSelectTab('map');
   }
 
   function handleNavigatePickup({ shopId, reservationId, storeName }) {
@@ -256,8 +233,32 @@ export default function AuthenticatedHome() {
       showDirections: true,
       at: Date.now(),
     });
-    setAppMode(APP_MODE_BUYER);
-    handleSelectTab('home');
+    handleSelectTab('map');
+  }
+
+  function handleOpenProductsFromHome(options = {}) {
+    setProductsFocusRequest({
+      ...options,
+      at: Date.now(),
+    });
+    setBuyerOverlay('products');
+  }
+
+  function handleOpenMapFromHome() {
+    handleSelectTab('map');
+  }
+
+  function handleOpenNotificationsFromHome() {
+    setBuyerOverlay('notifications');
+  }
+
+  function handleOpenInbox() {
+    setBuyerOverlay('inbox');
+  }
+
+  function handleCloseBuyerOverlay() {
+    setBuyerOverlay(null);
+    setInboxChatRequest(null);
   }
 
   function handleClearMapFocus() {
@@ -266,7 +267,6 @@ export default function AuthenticatedHome() {
 
   function handleOpenBuyerOrders(tab = RESERVATION_TAB.HOLDING) {
     setOpenBuyerOrdersRequest({ at: Date.now(), tab });
-    setAppMode(APP_MODE_BUYER);
     handleSelectTab('orders');
   }
 
@@ -280,15 +280,18 @@ export default function AuthenticatedHome() {
 
   function handleOpenProductDetail(productId) {
     setProductDetailId(productId || null);
-    if (productId && isBuyerMode) {
+    if (productId) {
       handleSelectTab('profile');
     }
   }
 
   function handleStartSellerRegister() {
     setSellerRegisterRequest(Date.now());
-    setAppMode(APP_MODE_BUYER);
-    handleSelectTab('profile');
+    handleSelectTab('shop');
+  }
+
+  function handleOpenShopNav() {
+    handleSelectTab('shop');
   }
 
   function handleOpenChat({ shopId, shopName }) {
@@ -300,144 +303,97 @@ export default function AuthenticatedHome() {
       shopName: shopName || 'Gian hàng',
       at: Date.now(),
     });
-    handleSelectTab('inbox');
+    setBuyerOverlay('inbox');
   }
 
-  async function handleSwitchToSellerMode() {
-    if (!canSwitchToSeller) {
-      handleStartSellerRegister();
-      return;
-    }
-    await setAppMode(APP_MODE_SELLER);
+  function handleOpenProfileNav(screen) {
+    setProfileNavRequest({ screen, at: Date.now() });
+    handleSelectTab('profile');
   }
 
-  async function handleSwitchToBuyerMode() {
-    await setAppMode(APP_MODE_BUYER);
-  }
-
-  const tabPanes = useMemo(() => {
-    if (isBuyerMode) {
-      return {
-        home: (
-          <MapScreen
-            focusStoreRequest={mapFocusRequest}
-            onOpenChat={handleOpenChat}
-            onClearFocus={handleClearMapFocus}
-            onPickupCompleted={handlePickupCompleted}
-            onOpenBuyerOrders={handleOpenBuyerOrders}
-            onNavigationStateChange={(isNested) => updateNestedTabState('home', isNested)}
-            isScreenActive={activeTab === 'home'}
-          />
-        ),
-        products: (
-          <ProductsScreen
-            onOpenBuyerOrders={handleOpenBuyerOrders}
-            onNavigationStateChange={(isNested) => updateNestedTabState('products', isNested)}
-          />
-        ),
-        orders: (
-          <BuyerOrdersScreen
-            embedded
-            initialTab={
-              openBuyerOrdersRequest?.tab || RESERVATION_TAB.HOLDING
-            }
-            tabRequestKey={openBuyerOrdersRequest?.at || 0}
-            onNavigatePickup={handleNavigatePickup}
-            onOpenStore={handleOpenStoreFromProfile}
-            onNavigationStateChange={(isNested) => updateNestedTabState('orders', isNested)}
-          />
-        ),
-        notifications: <NotificationsScreen audience="buyer" />,
-        inbox: (
-          <InboxScreen
-            buyerView
-            chatRequest={inboxChatRequest}
-            onViewShop={handleOpenStoreFromProfile}
-            onNavigationStateChange={(isNested) => updateNestedTabState('inbox', isNested)}
-          />
-        ),
-        profile: (
-          <ProfilePanel
-            profileMode="buyer"
-            onOpenStore={handleOpenStoreFromProfile}
-            onNavigateToStore={handleNavigateToStore}
-            onOpenInbox={() => handleSelectTab('inbox')}
-            onNavigatePickup={handleNavigatePickup}
-            openBuyerOrdersRequest={openBuyerOrdersRequest}
-            sellerRegisterRequest={sellerRegisterRequest}
-            isProfileVisible={activeTab === 'profile'}
-            productDetailId={productDetailId}
-            productRefreshKey={productRefreshKey}
-            onOpenProductDetail={handleOpenProductDetail}
-            onProductChanged={handleProductChanged}
-            onSwitchToSellerMode={handleSwitchToSellerMode}
-            canSwitchToSeller={canSwitchToSeller}
-            onNavigationStateChange={(isNested) => updateNestedTabState('profile', isNested)}
-          />
-        ),
-      };
-    }
-
-    return {
-      overview: <SellerOverviewScreen />,
-      products: (
-        <SellerProductsTabScreen
-          productRefreshKey={productRefreshKey}
-          onProductChanged={handleProductChanged}
-          onNavigationStateChange={(isNested) => updateNestedTabState('products', isNested)}
+  const tabPanes = useMemo(
+    () => ({
+      home: (
+        <HomeScreen
+          unreadNotificationsCount={unreadNotificationsCount}
+          unreadMessagesCount={unreadMessagesCount}
+          onOpenMap={handleOpenMapFromHome}
+          onOpenProducts={handleOpenProductsFromHome}
+          onOpenNotifications={handleOpenNotificationsFromHome}
+          onOpenInbox={handleOpenInbox}
+          onOpenBuyerOrders={handleOpenBuyerOrders}
+          onEditAccount={() => handleOpenProfileNav('edit-account')}
+          onStartSellerRegister={handleStartSellerRegister}
+          onOpenShop={handleOpenShopNav}
+          onNavigationStateChange={(isNested) => updateNestedTabState('home', isNested)}
+        />
+      ),
+      map: (
+        <MapScreen
+          focusStoreRequest={mapFocusRequest}
+          onOpenChat={handleOpenChat}
+          onClearFocus={handleClearMapFocus}
+          onPickupCompleted={handlePickupCompleted}
+          onOpenBuyerOrders={handleOpenBuyerOrders}
+          onNavigationStateChange={(isNested) => updateNestedTabState('map', isNested)}
+          isScreenActive={activeTab === 'map'}
         />
       ),
       orders: (
-        <SellerOrdersTabScreen
+        <BuyerOrdersScreen
+          embedded
+          initialTab={openBuyerOrdersRequest?.tab || RESERVATION_TAB.HOLDING}
+          tabRequestKey={openBuyerOrdersRequest?.at || 0}
+          onNavigatePickup={handleNavigatePickup}
+          onOpenStore={handleOpenStoreFromProfile}
           onNavigationStateChange={(isNested) => updateNestedTabState('orders', isNested)}
         />
       ),
-      inbox: (
-        <InboxScreen
-          messagesOnly
-          onViewShop={handleOpenStoreFromProfile}
-          onNavigationStateChange={(isNested) => updateNestedTabState('inbox', isNested)}
-        />
-      ),
-      notifications: (
-        <NotificationsScreen
-          audience="seller"
-          onNavigationStateChange={(isNested) => updateNestedTabState('notifications', isNested)}
+      shop: (
+        <ShopTabPanel
+          isVisible={activeTab === 'shop'}
+          sellerRegisterRequest={sellerRegisterRequest}
+          productRefreshKey={productRefreshKey}
+          onProductChanged={handleProductChanged}
+          onNavigationStateChange={(isNested) => updateNestedTabState('shop', isNested)}
         />
       ),
       profile: (
         <ProfilePanel
-          profileMode="seller"
+          profileMode="buyer"
+          showSellerHub={false}
           onOpenStore={handleOpenStoreFromProfile}
           onNavigateToStore={handleNavigateToStore}
-          sellerRegisterRequest={sellerRegisterRequest}
+          onOpenInbox={handleOpenInbox}
+          onNavigatePickup={handleNavigatePickup}
+          openBuyerOrdersRequest={openBuyerOrdersRequest}
           isProfileVisible={activeTab === 'profile'}
           productDetailId={productDetailId}
           productRefreshKey={productRefreshKey}
           onOpenProductDetail={handleOpenProductDetail}
           onProductChanged={handleProductChanged}
-          onSwitchToBuyerMode={handleSwitchToBuyerMode}
+          canSwitchToSeller={canSwitchToSeller}
+          profileNavRequest={profileNavRequest}
+          onStartSellerRegister={handleStartSellerRegister}
+          onOpenShopTab={handleOpenShopNav}
           onNavigationStateChange={(isNested) => updateNestedTabState('profile', isNested)}
         />
       ),
-    };
-  }, [
-    activeTab,
-    handleNavigateToStore,
-    handleOpenStoreFromProfile,
-    handleSwitchToBuyerMode,
-    handleSwitchToSellerMode,
-    isBuyerMode,
-    canSwitchToSeller,
-    inboxChatRequest,
-    mapFocusRequest,
-    openBuyerOrdersRequest,
-    productDetailId,
-    productRefreshKey,
-    sellerRegisterRequest,
-    activeTab,
-    updateNestedTabState,
-  ]);
+    }),
+    [
+      activeTab,
+      canSwitchToSeller,
+      mapFocusRequest,
+      openBuyerOrdersRequest,
+      productDetailId,
+      productRefreshKey,
+      profileNavRequest,
+      sellerRegisterRequest,
+      unreadMessagesCount,
+      unreadNotificationsCount,
+      updateNestedTabState,
+    ]
+  );
 
   if (!isReady) {
     return <View style={styles.root} />;
@@ -454,9 +410,35 @@ export default function AuthenticatedHome() {
             {tabPanes[tab.key]}
           </View>
         ))}
+        {buyerOverlay === 'products' ? (
+          <View style={styles.overlayPane}>
+            <ProductsScreen
+              focusRequest={productsFocusRequest}
+              onOpenBuyerOrders={handleOpenBuyerOrders}
+              onBack={handleCloseBuyerOverlay}
+              onNavigationStateChange={(isNested) => updateNestedTabState('home', isNested)}
+            />
+          </View>
+        ) : null}
+        {buyerOverlay === 'notifications' ? (
+          <View style={styles.overlayPane}>
+            <NotificationsScreen audience="buyer" onBack={handleCloseBuyerOverlay} />
+          </View>
+        ) : null}
+        {buyerOverlay === 'inbox' ? (
+          <View style={styles.overlayPane}>
+            <InboxScreen
+              buyerView
+              messagesOnly
+              chatRequest={inboxChatRequest}
+              onViewShop={handleOpenStoreFromProfile}
+              onBack={handleCloseBuyerOverlay}
+            />
+          </View>
+        ) : null}
       </SafeAreaView>
 
-      {!nestedTabState[activeTab] ? (
+      {!nestedTabState[activeTab] && !buyerOverlay ? (
         <SafeAreaView style={styles.tabBarSafe} edges={['bottom', 'left', 'right']}>
           <View style={styles.tabBar}>
             {tabs.map((tab) => {
@@ -477,6 +459,12 @@ export default function AuthenticatedHome() {
                     color={color}
                     badgeCount={getBadgeCount(tab)}
                   />
+                  <Text
+                    style={[styles.tabLabel, { color }, isActive && styles.tabLabelActive]}
+                    numberOfLines={1}
+                  >
+                    {tab.label}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -501,46 +489,60 @@ const styles = StyleSheet.create({
   tabHidden: {
     display: 'none',
   },
-  tabBarSafe: {
-    backgroundColor: '#ffffff',
+  overlayPane: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#f8fafb',
+    zIndex: 20,
   },
-  tabBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 58,
+  tabBarSafe: {
     backgroundColor: '#ffffff',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
   },
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingTop: 6,
+    paddingBottom: 2,
+    minHeight: 58,
+  },
   tabItem: {
     flex: 1,
-    height: 58,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 2,
+    gap: 2,
   },
   tabItemPressed: {
     opacity: 0.7,
   },
+  tabLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  tabLabelActive: {
+    fontWeight: '700',
+  },
   iconWrap: {
-    width: ICON_SIZE + 8,
-    height: ICON_SIZE + 4,
+    position: 'relative',
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
   badge: {
     position: 'absolute',
-    top: -4,
+    top: -2,
     right: -6,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    paddingHorizontal: 4,
+    backgroundColor: '#ef4444',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ef4444',
-    borderWidth: 1.5,
-    borderColor: '#ffffff',
+    paddingHorizontal: 3,
   },
   badgeWide: {
     minWidth: 22,
@@ -548,8 +550,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#ffffff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
-    lineHeight: 12,
   },
 });

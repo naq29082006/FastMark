@@ -255,7 +255,7 @@ export default function SellerProductDetailScreen({ productId, onBack, onChanged
       <View style={styles.screen}>
         {renderTopBar()}
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" size="large" />
+          <ActivityIndicator color="#076F32" size="large" />
         </View>
       </View>
     );
@@ -527,9 +527,9 @@ const styles = StyleSheet.create({
   detailRow: { gap: 4 },
   detailLabel: { fontSize: 13, fontWeight: '800', color: '#475569' },
   detailValue: { fontSize: 15, fontWeight: '600', color: '#0f172a', lineHeight: 22 },
-  detailPrice: { color: '#0d7377', fontWeight: '800' },
+  detailPrice: { color: '#076F32', fontWeight: '800' },
   productName: { fontSize: 22, fontWeight: '900', color: '#0f172a' },
-  priceRange: { fontSize: 18, fontWeight: '800', color: '#0d7377' },
+  priceRange: { fontSize: 18, fontWeight: '800', color: '#076F32' },
   metaText: { color: '#64748b', lineHeight: 22 },
   sectionTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a', marginTop: 8 },
   statsCard: {
@@ -648,8 +648,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   successBanner: {
-    color: '#047857',
-    backgroundColor: '#ecfdf5',
+    color: '#076F32',
+    backgroundColor: '#E6F4EC',
     padding: 12,
     borderRadius: 10,
     fontWeight: '700',

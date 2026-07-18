@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   directionsMeta: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0f766e',
+    color: '#076F32',
   },
   directionsLiveMeta: {
     fontSize: 12,
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   directionsPrimaryBtnDisabled: {
     opacity: 0.7,

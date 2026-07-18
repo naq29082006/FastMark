@@ -55,9 +55,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 10,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#E6F4EC',
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: '#A7D9B8',
   },
   btn: {
     width: 34,
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   btnDisabled: {
     backgroundColor: '#ffffff',
@@ -86,6 +86,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '900',
-    color: '#0f766e',
+    color: '#076F32',
   },
 });

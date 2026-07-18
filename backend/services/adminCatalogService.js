@@ -6,13 +6,11 @@ const Product = require("../models/Product");
 const ProductVariant = require("../models/ProductVariant");
 const ProductCategory = require("../models/ProductCategory");
 const Reservation = require("../models/Reservation");
-const DealOffer = require("../models/DealOffer");
 const Report = require("../models/Report");
 const Review = require("../models/Review");
 const { SHOP_STATUS, SHOP_OPEN } = require("../constants/shopStatus");
 const { PRODUCT_STATUS } = require("../constants/productStatus");
 const { RESERVATION_STATUS } = require("../constants/reservationStatus");
-const { DEAL_OFFER_STATUS, DEAL_OFFER_BY } = require("../constants/dealOfferStatus");
 
 const SHOP_STATUS_LABELS = {
   [SHOP_STATUS.ACTIVE]: "Hoạt động",
@@ -29,12 +27,6 @@ const RESERVATION_STATUS_LABELS = {
   [RESERVATION_STATUS.CONFIRMED]: "Đã xác nhận",
   [RESERVATION_STATUS.COMPLETED]: "Đã nhận hàng",
   [RESERVATION_STATUS.CANCELLED]: "Đã hủy",
-};
-
-const DEAL_STATUS_LABELS = {
-  [DEAL_OFFER_STATUS.PENDING]: "Đang thương lượng",
-  [DEAL_OFFER_STATUS.ACCEPTED]: "Đã chấp nhận",
-  [DEAL_OFFER_STATUS.REJECTED]: "Đã từ chối / khóa",
 };
 
 function createServiceError(message, statusCode = 400) {
@@ -139,6 +131,11 @@ async function listShops(query = {}) {
       totalProducts: Number(shop.totalProducts) || 0,
       followersCount: Number(shop.followersCount) || 0,
       soldCount: Number(shop.soldCount) || 0,
+      subscriptionPlan: shop.subscriptionPlan || null,
+      subscriptionExpiresAt: shop.subscriptionExpiresAt || null,
+      subscriptionActive: Boolean(
+        shop.subscriptionExpiresAt && new Date(shop.subscriptionExpiresAt) > new Date()
+      ),
       suspendedUntil: shop.suspendedUntil || null,
       permanentlyClosedAt: shop.permanentlyClosedAt || null,
       createdAt: shop.CreatedAt || null,
@@ -213,6 +210,11 @@ async function getShopDetail(shopId) {
     totalReviews: Number(shop.totalReviews) || 0,
     followersCount: Number(shop.followersCount) || 0,
     soldCount: Number(shop.soldCount) || 0,
+    subscriptionPlan: shop.subscriptionPlan || null,
+    subscriptionExpiresAt: shop.subscriptionExpiresAt || null,
+    subscriptionActive: Boolean(
+      shop.subscriptionExpiresAt && new Date(shop.subscriptionExpiresAt) > new Date()
+    ),
     visibilityRestrictedUntil: shop.visibilityRestrictedUntil || null,
     suspendedUntil: shop.suspendedUntil || null,
     permanentlyClosedAt: shop.permanentlyClosedAt || null,
@@ -606,12 +608,11 @@ async function getReservationDetail(reservationId) {
     throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
   }
 
-  const [buyer, shop, product, variant, deal] = await Promise.all([
+  const [buyer, shop, product, variant] = await Promise.all([
     reservation.userId ? User.findById(reservation.userId).lean() : null,
     reservation.shopId ? ShopProfile.findById(reservation.shopId).lean() : null,
     reservation.productId ? Product.findById(reservation.productId).lean() : null,
     reservation.variantId ? ProductVariant.findById(reservation.variantId).lean() : null,
-    reservation.dealOfferId ? DealOffer.findById(reservation.dealOfferId).lean() : null,
   ]);
 
   return {
@@ -662,14 +663,6 @@ async function getReservationDetail(reservationId) {
           price: Number(variant.Price) || 0,
         }
       : null,
-    deal: deal
-      ? {
-          id: String(deal._id),
-          originalPrice: Number(deal.originalPrice) || 0,
-          offeredPrice: Number(deal.offeredPrice) || 0,
-          status: deal.status,
-        }
-      : null,
   };
 }
 
@@ -695,231 +688,17 @@ async function cancelReservation(reservationId, reason = "") {
   reservation.cancelledAt = new Date();
   reservation.cancelReason = pickString(reason) || "Admin hủy đơn.";
   reservation.UpdatedAt = new Date();
+
+  if (reservation.depositPaidAt && Number(reservation.depositAmount) > 0 && reservation.userId) {
+    const { creditWalletRefund } = require("./walletService");
+    await creditWalletRefund(reservation.userId, reservation.depositAmount, {
+      description: `Hoàn cọc giữ hàng #${String(reservation._id).slice(-8).toUpperCase()}`,
+    });
+  }
+
   await reservation.save();
 
   return getReservationDetail(reservationId);
-}
-
-async function listDeals(query = {}) {
-  const { page, limit, skip } = parsePagination(query);
-  const search = pickString(query.search);
-  const status = pickString(query.status);
-
-  const filter = {};
-  if (status !== "" && Number.isFinite(Number(status))) {
-    filter.status = Number(status);
-  }
-
-  if (search) {
-    const regex = new RegExp(escapeRegex(search), "i");
-    const [users, shops, products] = await Promise.all([
-      User.find({
-        $or: [{ FullName: regex }, { UserName: regex }, { Email: regex }],
-      })
-        .select("_id")
-        .lean(),
-      ShopProfile.find({ $or: [{ shopName: regex }, { shopUsername: regex }] })
-        .select("_id")
-        .lean(),
-      Product.find({ ProductName: regex }).select("_id").lean(),
-    ]);
-
-    filter.$or = [
-      { userId: { $in: users.map((item) => item._id) } },
-      { shopId: { $in: shops.map((item) => item._id) } },
-      { productId: { $in: products.map((item) => item._id) } },
-      { note: regex },
-      { sellerNote: regex },
-    ];
-  }
-
-  const [total, deals] = await Promise.all([
-    DealOffer.countDocuments(filter),
-    DealOffer.find(filter).sort({ CreatedAt: -1 }).skip(skip).limit(limit).lean(),
-  ]);
-
-  const userIds = [...new Set(deals.map((item) => String(item.userId || "")).filter(Boolean))];
-  const shopIds = [...new Set(deals.map((item) => String(item.shopId || "")).filter(Boolean))];
-  const productIds = [...new Set(deals.map((item) => String(item.productId || "")).filter(Boolean))];
-
-  const [users, shops, products] = await Promise.all([
-    userIds.length
-      ? User.find({ _id: { $in: userIds } }).select("FullName UserName Email Phone").lean()
-      : [],
-    shopIds.length
-      ? ShopProfile.find({ _id: { $in: shopIds } }).select("shopName shopUsername userId").lean()
-      : [],
-    productIds.length
-      ? Product.find({ _id: { $in: productIds } }).select("ProductName Thumbnail").lean()
-      : [],
-  ]);
-
-  const sellerIds = shops.map((shop) => shop.userId).filter(Boolean);
-  const sellers = sellerIds.length
-    ? await User.find({ _id: { $in: sellerIds } }).select("FullName UserName").lean()
-    : [];
-
-  const userMap = new Map(users.map((item) => [String(item._id), item]));
-  const shopMap = new Map(shops.map((item) => [String(item._id), item]));
-  const productMap = new Map(products.map((item) => [String(item._id), item]));
-  const sellerMap = new Map(sellers.map((item) => [String(item._id), item]));
-
-  const items = deals.map((deal) => {
-    const buyer = userMap.get(String(deal.userId || ""));
-    const shop = shopMap.get(String(deal.shopId || ""));
-    const seller = shop ? sellerMap.get(String(shop.userId || "")) : null;
-    const product = productMap.get(String(deal.productId || ""));
-
-    return {
-      id: String(deal._id),
-      status: deal.status,
-      statusLabel: DEAL_STATUS_LABELS[deal.status] || "Không rõ",
-      originalPrice: Number(deal.originalPrice) || 0,
-      offeredPrice: Number(deal.offeredPrice) || 0,
-      lastOfferBy: deal.lastOfferBy,
-      lastOfferByLabel:
-        Number(deal.lastOfferBy) === DEAL_OFFER_BY.SELLER ? "Người bán" : "Người mua",
-      quantity: Number(deal.quantity) || 1,
-      note: deal.note || "",
-      sellerNote: deal.sellerNote || "",
-      createdAt: deal.CreatedAt || null,
-      respondedAt: deal.respondedAt || null,
-      buyer: buyer
-        ? {
-            id: String(buyer._id),
-            fullName: buyer.FullName || "",
-            userName: buyer.UserName || "",
-            email: buyer.Email || "",
-          }
-        : null,
-      seller: seller
-        ? {
-            id: String(seller._id),
-            fullName: seller.FullName || "",
-            userName: seller.UserName || "",
-          }
-        : null,
-      shop: shop
-        ? {
-            id: String(shop._id),
-            shopName: shop.shopName || "",
-          }
-        : null,
-      product: product
-        ? {
-            id: String(product._id),
-            productName: product.ProductName || "",
-            thumbnail: product.Thumbnail || "",
-          }
-        : null,
-    };
-  });
-
-  return {
-    items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-    },
-  };
-}
-
-async function getDealDetail(dealId) {
-  const objectId = toObjectId(dealId);
-  if (!objectId) {
-    throw createServiceError("ID deal không hợp lệ.", 400);
-  }
-
-  const deal = await DealOffer.findById(objectId).lean();
-  if (!deal) {
-    throw createServiceError("Không tìm thấy deal.", 404);
-  }
-
-  const [buyer, shop, product, variant] = await Promise.all([
-    deal.userId ? User.findById(deal.userId).lean() : null,
-    deal.shopId ? ShopProfile.findById(deal.shopId).lean() : null,
-    deal.productId ? Product.findById(deal.productId).lean() : null,
-    deal.variantId ? ProductVariant.findById(deal.variantId).lean() : null,
-  ]);
-
-  const seller = shop?.userId ? await User.findById(shop.userId).lean() : null;
-
-  return {
-    id: String(deal._id),
-    status: deal.status,
-    statusLabel: DEAL_STATUS_LABELS[deal.status] || "Không rõ",
-    originalPrice: Number(deal.originalPrice) || 0,
-    offeredPrice: Number(deal.offeredPrice) || 0,
-    discountPercent: Number(deal.discountPercent) || 0,
-    lastOfferBy: deal.lastOfferBy,
-    lastOfferByLabel:
-      Number(deal.lastOfferBy) === DEAL_OFFER_BY.SELLER ? "Người bán" : "Người mua",
-    quantity: Number(deal.quantity) || 1,
-    note: deal.note || "",
-    sellerNote: deal.sellerNote || "",
-    respondedAt: deal.respondedAt || null,
-    reservationId: deal.reservationId ? String(deal.reservationId) : "",
-    createdAt: deal.CreatedAt || null,
-    buyer: buyer
-      ? {
-          id: String(buyer._id),
-          fullName: buyer.FullName || "",
-          userName: buyer.UserName || "",
-          email: buyer.Email || "",
-          phone: buyer.Phone || "",
-        }
-      : null,
-    seller: seller
-      ? {
-          id: String(seller._id),
-          fullName: seller.FullName || "",
-          userName: seller.UserName || "",
-        }
-      : null,
-    shop: shop
-      ? {
-          id: String(shop._id),
-          shopName: shop.shopName || "",
-          shopUsername: shop.shopUsername || "",
-        }
-      : null,
-    product: product
-      ? {
-          id: String(product._id),
-          productName: product.ProductName || "",
-          thumbnail: product.Thumbnail || "",
-        }
-      : null,
-    variant: variant
-      ? {
-          id: String(variant._id),
-          variantName: variant.VariantName || "",
-          price: Number(variant.Price) || 0,
-        }
-      : null,
-  };
-}
-
-async function lockDeal(dealId, reason = "") {
-  const objectId = toObjectId(dealId);
-  if (!objectId) {
-    throw createServiceError("ID deal không hợp lệ.", 400);
-  }
-
-  const deal = await DealOffer.findById(objectId);
-  if (!deal) {
-    throw createServiceError("Không tìm thấy deal.", 404);
-  }
-
-  deal.status = DEAL_OFFER_STATUS.REJECTED;
-  deal.sellerNote = pickString(reason) || deal.sellerNote || "Admin khóa deal bất thường.";
-  deal.respondedAt = new Date();
-  deal.UpdatedAt = new Date();
-  await deal.save();
-
-  return getDealDetail(dealId);
 }
 
 module.exports = {
@@ -934,9 +713,6 @@ module.exports = {
   listReservations,
   getReservationDetail,
   cancelReservation,
-  listDeals,
-  getDealDetail,
-  lockDeal,
   SHOP_STATUS,
   PRODUCT_STATUS,
 };

@@ -112,7 +112,7 @@ export default function SellerStatsScreen({ onBack, embedded = false }) {
     return (
       <ProfileSubScreen title="Thống kê" onBack={onBack} embedded={embedded}>
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" size="large" />
+          <ActivityIndicator color="#076F32" size="large" />
         </View>
       </ProfileSubScreen>
     );
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   chipActive: {
-    borderColor: '#0d7377',
+    borderColor: '#076F32',
     backgroundColor: '#ecfeff',
   },
   chipText: {
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   chipTextActive: {
-    color: '#0f766e',
+    color: '#076F32',
   },
   customRow: {
     flexDirection: 'row',
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   statCardHighlight: {
-    borderColor: '#99f6e4',
+    borderColor: '#A7D9B8',
     backgroundColor: '#f0fdfa',
   },
   statValue: {

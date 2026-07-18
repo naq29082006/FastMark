@@ -1,0 +1,31 @@
+const WALLET_TX_TYPE = {
+  TOPUP: 1,
+  PAYMENT: 2,
+  REFUND: 3,
+  WITHDRAWAL: 4,
+};
+
+const WALLET_TX_STATUS = {
+  PENDING: 0,
+  SUCCESS: 1,
+  FAILED: 2,
+  CANCELLED: 3,
+};
+
+const WALLET_TX_TYPE_LABEL = {
+  [WALLET_TX_TYPE.TOPUP]: "Nạp tiền",
+  [WALLET_TX_TYPE.PAYMENT]: "Thanh toán",
+  [WALLET_TX_TYPE.REFUND]: "Hoàn tiền",
+  [WALLET_TX_TYPE.WITHDRAWAL]: "Rút tiền",
+};
+
+const MIN_TOPUP_AMOUNT = 10000;
+const MAX_TOPUP_AMOUNT = 20000000;
+
+module.exports = {
+  WALLET_TX_TYPE,
+  WALLET_TX_STATUS,
+  WALLET_TX_TYPE_LABEL,
+  MIN_TOPUP_AMOUNT,
+  MAX_TOPUP_AMOUNT,
+};

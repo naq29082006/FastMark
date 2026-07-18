@@ -31,6 +31,10 @@ function pickPayloadValue(body, keys) {
   return undefined;
 }
 
+function pickString(value) {
+  return String(value || "").trim();
+}
+
 function normalizeSellerRegistrationPayload(body = {}) {
   const shopName = pickPayloadValue(body, ["shopName", "storeName", "tenGianHang", "TenGianHang"]);
   const shopUsername = pickPayloadValue(body, ["shopUsername", "storeUsername"]);
@@ -393,11 +397,13 @@ async function promoteUserToSeller(user, verification, approvedById = null) {
 
   const existingShop = await ShopProfile.findOne({ userId: user._id });
   let shop = existingShop;
+  const identityName = String(user.FullName || user.UserName || "").trim();
+  const identityUsername = String(user.UserName || "").trim().toLowerCase();
   if (!existingShop) {
     shop = await ShopProfile.create({
       userId: user._id,
-      shopUsername: verification.shopUsername || "",
-      shopName: verification.shopName || user.FullName || user.UserName || "",
+      shopUsername: identityUsername,
+      shopName: identityName,
       categoryId,
       description: verification.shopDescription || "",
       avatar: "",
@@ -408,9 +414,8 @@ async function promoteUserToSeller(user, verification, approvedById = null) {
       phone: user.Phone,
     });
   } else {
-    existingShop.shopUsername = verification.shopUsername || existingShop.shopUsername || "";
-    existingShop.shopName =
-      verification.shopName || existingShop.shopName || user.FullName || user.UserName || "";
+    existingShop.shopUsername = identityUsername || existingShop.shopUsername || "";
+    existingShop.shopName = identityName || existingShop.shopName || "";
     if (categoryId) {
       existingShop.categoryId = categoryId;
     }
@@ -489,11 +494,14 @@ async function submitSellerVerification(user, payload) {
     throw createServiceError("Vui lòng chọn vị trí trên bản đồ.");
   }
 
-  const shopUsername = await assertShopUsernameAvailable(
-    normalizedPayload.shopUsername,
-    user._id
-  );
-  const shopName = assertShopNameValid(normalizedPayload.shopName);
+  const shopUsername = pickString(user.UserName).toLowerCase();
+  const shopName = pickString(user.FullName) || shopUsername;
+  if (!shopName || shopName.length < 2) {
+    throw createServiceError("Tài khoản thiếu họ tên. Hãy cập nhật hồ sơ trước khi đăng ký bán.");
+  }
+  if (!shopUsername || shopUsername.length < 3) {
+    throw createServiceError("Tài khoản thiếu username. Hãy cập nhật hồ sơ trước khi đăng ký bán.");
+  }
   const category = await assertCategoryExists(normalizedPayload.categoryId);
   const shopDescription = String(normalizedPayload.shopDescription || "").trim();
 

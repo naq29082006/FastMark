@@ -69,7 +69,7 @@ export default function SellerReviewsManageScreen({ onBack }) {
     <ProfileSubScreen title="Quản lý đánh giá" onBack={onBack}>
       {isLoading ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" size="large" />
+          <ActivityIndicator color="#076F32" size="large" />
         </View>
       ) : error ? (
         <View style={styles.centered}>
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   retryButtonText: { color: '#ffffff', fontWeight: '800' },
   card: {

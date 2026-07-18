@@ -46,10 +46,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   callBtn: {
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   messageBtn: {
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   pressed: {
     opacity: 0.8,

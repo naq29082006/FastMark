@@ -35,7 +35,7 @@ export default function NotificationSettingsScreen({ onBack }) {
   return (
     <ProfileSubScreen title="Cài đặt thông báo" onBack={onBack}>
       {isLoading ? (
-        <ActivityIndicator color="#0d7377" style={styles.loader} />
+        <ActivityIndicator color="#076F32" style={styles.loader} />
       ) : (
         <>
           <View style={styles.card}>
@@ -50,7 +50,7 @@ export default function NotificationSettingsScreen({ onBack }) {
                 value={settings.orderNotifications}
                 onValueChange={(value) => updateSetting('orderNotifications', value)}
                 trackColor={{ false: '#cbd5e1', true: '#86efac' }}
-                thumbColor={settings.orderNotifications ? '#0f766e' : '#f8fafc'}
+                thumbColor={settings.orderNotifications ? '#076F32' : '#f8fafc'}
               />
             </View>
           </View>
@@ -67,7 +67,7 @@ export default function NotificationSettingsScreen({ onBack }) {
                 value={settings.systemNotifications}
                 onValueChange={(value) => updateSetting('systemNotifications', value)}
                 trackColor={{ false: '#cbd5e1', true: '#86efac' }}
-                thumbColor={settings.systemNotifications ? '#0f766e' : '#f8fafc'}
+                thumbColor={settings.systemNotifications ? '#076F32' : '#f8fafc'}
               />
             </View>
           </View>
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   },
   savingText: {
     marginTop: 8,
-    color: '#0f766e',
+    color: '#076F32',
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',

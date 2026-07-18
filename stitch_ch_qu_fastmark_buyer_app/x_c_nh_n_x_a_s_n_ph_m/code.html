@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Delete Product Confirmation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "outline": "#6e7b6c",
+                      "inverse-primary": "#62df7d",
+                      "tertiary-fixed": "#ffe083",
+                      "inverse-surface": "#27313f",
+                      "surface-dim": "#d0dbed",
+                      "inverse-on-surface": "#eaf1ff",
+                      "surface-container-lowest": "#ffffff",
+                      "on-surface": "#121c2a",
+                      "surface-container-highest": "#d9e3f6",
+                      "primary-container": "#00873a",
+                      "tertiary": "#735c00",
+                      "secondary": "#006e2f",
+                      "secondary-fixed": "#6bff8f",
+                      "on-secondary-fixed": "#002109",
+                      "background": "#f8f9ff",
+                      "on-primary-container": "#f7fff2",
+                      "on-error": "#ffffff",
+                      "on-surface-variant": "#3e4a3d",
+                      "surface-container-low": "#eff4ff",
+                      "primary": "#006b2c",
+                      "on-secondary-fixed-variant": "#005321",
+                      "tertiary-fixed-dim": "#eec200",
+                      "surface-tint": "#006e2d",
+                      "error": "#ba1a1a",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "outline-variant": "#bdcaba",
+                      "on-tertiary-container": "#4e3e00",
+                      "primary-fixed-dim": "#62df7d",
+                      "on-primary-fixed": "#002109",
+                      "error-container": "#ffdad6",
+                      "surface-bright": "#f8f9ff",
+                      "on-error-container": "#93000a",
+                      "surface": "#f8f9ff",
+                      "on-background": "#121c2a",
+                      "surface-container": "#e6eeff",
+                      "primary-fixed": "#7ffc97",
+                      "on-secondary-container": "#007432",
+                      "on-secondary": "#ffffff",
+                      "on-primary": "#ffffff",
+                      "tertiary-container": "#cea700",
+                      "surface-container-high": "#dee9fc",
+                      "secondary-container": "#6bff8f",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-tertiary": "#ffffff",
+                      "surface-variant": "#d9e3f6",
+                      "secondary-fixed-dim": "#4ae176",
+                      "on-tertiary-fixed": "#231b00"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "touch-target-min": "56px",
+                      "stack-gap-md": "16px",
+                      "stack-gap-lg": "32px",
+                      "gutter": "16px",
+                      "container-margin": "24px",
+                      "unit": "8px"
+              },
+              "fontFamily": {
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "price-display": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "label-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "price-display": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "20px",
+                              {
+                                      "lineHeight": "30px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+            },
+          },
+        }
+      </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen relative flex items-center justify-center font-body-md antialiased overflow-hidden">
+<!-- Simulated background content (Product List) -->
+<div class="absolute inset-0 z-0 p-container-margin grid grid-cols-1 md:grid-cols-3 gap-stack-gap-md opacity-20 filter blur-sm">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-4 h-64"></div>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-4 h-64 hidden md:block"></div>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-4 h-64 hidden md:block"></div>
+</div>
+<!-- Scrim (Dark Overlay) -->
+<div aria-hidden="true" class="fixed inset-0 bg-on-background/40 z-40 transition-opacity duration-300"></div>
+<!-- Dialog Container -->
+<div aria-labelledby="dialog-title" aria-modal="true" class="relative z-50 w-full max-w-sm md:max-w-md mx-container-margin md:mx-auto bg-surface-container-lowest rounded-xl shadow-2xl border border-outline-variant flex flex-col transform transition-all duration-300 scale-100 opacity-100" role="dialog">
+<!-- Icon & Title Section -->
+<div class="pt-8 px-6 pb-4 flex flex-col items-center text-center gap-4">
+<div class="w-16 h-16 rounded-full bg-error-container flex items-center justify-center text-error mb-2">
+<span class="material-symbols-outlined" style="font-size: 32px; font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface" id="dialog-title">
+                Bác có chắc chắn muốn xóa sản phẩm này?
+            </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                Thao tác này không thể hoàn tác. Sản phẩm sẽ bị xóa vĩnh viễn khỏi cửa hàng.
+            </p>
+</div>
+<!-- Actions Section -->
+<div class="p-6 pt-2 flex flex-col gap-4 w-full">
+<button class="w-full h-touch-target-min flex items-center justify-center gap-2 bg-error text-on-error font-headline-md text-headline-md rounded-lg shadow-sm hover:brightness-95 active:scale-[0.98] transition-all duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">delete</span>
+                Xóa ngay
+            </button>
+<button class="w-full h-touch-target-min flex items-center justify-center gap-2 bg-transparent text-primary border-2 border-primary font-headline-md text-headline-md rounded-lg hover:bg-surface-variant active:scale-[0.98] transition-all duration-200">
+                Hủy
+            </button>
+</div>
+</div>
+</body></html>

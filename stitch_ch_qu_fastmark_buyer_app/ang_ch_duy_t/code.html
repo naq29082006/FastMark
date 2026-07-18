@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Đang chờ xác duyệt - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed": "#ffe083",
+                      "primary": "#006b2c",
+                      "on-tertiary-fixed": "#231b00",
+                      "error": "#ba1a1a",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-background": "#121c2a",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "on-tertiary-container": "#4e3e00",
+                      "surface-tint": "#006e2d",
+                      "on-primary-container": "#f7fff2",
+                      "primary-fixed-dim": "#62df7d",
+                      "primary-fixed": "#7ffc97",
+                      "on-secondary-container": "#007432",
+                      "surface-variant": "#d9e3f6",
+                      "surface-bright": "#f8f9ff",
+                      "on-error-container": "#93000a",
+                      "on-secondary-fixed-variant": "#005321",
+                      "secondary-fixed-dim": "#4ae176",
+                      "secondary": "#006e2f",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-fixed": "#002109",
+                      "on-surface": "#121c2a",
+                      "tertiary-fixed-dim": "#eec200",
+                      "outline-variant": "#bdcaba",
+                      "error-container": "#ffdad6",
+                      "surface": "#f8f9ff",
+                      "on-secondary": "#ffffff",
+                      "background": "#f8f9ff",
+                      "on-primary-fixed": "#002109",
+                      "on-surface-variant": "#3e4a3d",
+                      "inverse-surface": "#27313f",
+                      "primary-container": "#00873a",
+                      "outline": "#6e7b6c",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-error": "#ffffff",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-low": "#eff4ff",
+                      "surface-dim": "#d0dbed",
+                      "secondary-fixed": "#6bff8f",
+                      "tertiary": "#735c00",
+                      "surface-container-highest": "#d9e3f6",
+                      "on-primary": "#ffffff",
+                      "tertiary-container": "#cea700",
+                      "inverse-primary": "#62df7d",
+                      "surface-container": "#e6eeff",
+                      "surface-container-high": "#dee9fc",
+                      "secondary-container": "#6bff8f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "8px",
+                      "touch-target-min": "56px",
+                      "container-margin": "24px",
+                      "stack-gap-md": "16px",
+                      "gutter": "16px",
+                      "stack-gap-lg": "32px"
+              },
+              "fontFamily": {
+                      "body-md": ["Inter"],
+                      "price-display": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "label-lg": ["Inter"],
+                      "body-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "price-display": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                      "label-md": ["16px", {"lineHeight": "20px", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "label-lg": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-32">
+<!-- Top App Bar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-margin h-touch-target-min bg-surface dark:bg-on-background bg-surface-container-low dark:bg-surface-container-lowest">
+<div class="flex items-center gap-4">
+<button aria-label="Quay lại" class="text-on-surface-variant dark:text-outline-variant hover:bg-primary-container/20 transition-colors duration-200 h-12 w-12 flex items-center justify-center rounded-full">
+<span class="material-symbols-outlined" data-icon="arrow_back" data-weight="regular">arrow_back</span>
+</button>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed truncate">
+            Chợ Quê FastMark
+        </h1>
+<div class="flex items-center">
+<!-- Empty space for balance -->
+<div class="w-12 h-12"></div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="pt-[80px] px-container-margin md:max-w-2xl md:mx-auto">
+<div class="flex flex-col items-center mt-8 mb-12 text-center">
+<div class="w-24 h-24 bg-tertiary-fixed rounded-full flex items-center justify-center mb-6 animate-pulse">
+<span class="material-symbols-outlined text-6xl text-tertiary" data-icon="hourglass_empty" data-weight="fill" style="font-variation-settings: 'FILL' 1;">hourglass_empty</span>
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-background mb-4">
+                Đang chờ xác duyệt
+            </h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                Hồ sơ cửa hàng của bạn đang được chúng tôi kiểm tra. Quá trình này thường mất từ 1 đến 2 ngày làm việc để hoàn tất.
+            </p>
+</div>
+<!-- Verification Timeline -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm mb-12 relative overflow-hidden">
+<!-- Decorative background element -->
+<div class="absolute -right-16 -top-16 w-48 h-48 bg-surface-container-low rounded-full opacity-50 pointer-events-none"></div>
+<h3 class="font-headline-md text-headline-md text-on-background mb-8 border-b border-outline-variant pb-4">
+                Tiến trình hồ sơ
+            </h3>
+<div class="relative pl-6 border-l-2 border-outline-variant ml-4 space-y-12">
+<!-- Step 1: Completed -->
+<div class="relative">
+<div class="absolute -left-[35px] top-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center border-4 border-surface-container-lowest shadow-sm z-10">
+<span class="material-symbols-outlined text-on-primary text-sm" data-icon="check" data-weight="regular">check</span>
+</div>
+<div>
+<h4 class="font-label-lg text-label-lg text-on-background mb-1">Gửi hồ sơ thành công</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Bạn đã cung cấp đầy đủ thông tin cửa hàng.</p>
+<p class="font-body-md text-body-md text-outline mt-1 text-sm">Hôm nay, 08:30</p>
+</div>
+</div>
+<!-- Step 2: In Progress -->
+<div class="relative">
+<div class="absolute -left-[35px] top-0 w-8 h-8 rounded-full bg-tertiary flex items-center justify-center border-4 border-surface-container-lowest shadow-sm z-10 animate-bounce">
+<span class="material-symbols-outlined text-on-tertiary text-sm" data-icon="sync" data-weight="regular">sync</span>
+</div>
+<div>
+<h4 class="font-label-lg text-label-lg text-on-background mb-1">Đang kiểm tra thông tin</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Hệ thống đang xác thực danh tính và giấy phép kinh doanh.</p>
+<span class="inline-block mt-2 px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed-variant rounded-full text-sm font-medium">
+                            Đang xử lý
+                        </span>
+</div>
+</div>
+<!-- Step 3: Pending -->
+<div class="relative">
+<div class="absolute -left-[35px] top-0 w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center border-4 border-surface-container-lowest shadow-sm z-10">
+<span class="material-symbols-outlined text-outline text-sm" data-icon="storefront" data-weight="regular">storefront</span>
+</div>
+<div class="opacity-60">
+<h4 class="font-label-lg text-label-lg text-on-background mb-1">Hoàn tất &amp; Mở cửa hàng</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Cửa hàng của bạn sẽ sẵn sàng để bán sản phẩm.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Area -->
+<div class="space-y-4">
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-lg flex items-center justify-center shadow-sm hover:bg-primary/90 transition-colors active:scale-[0.98]">
+                Quay về Trang chủ
+            </button>
+<button class="w-full h-touch-target-min border-2 border-primary text-primary font-headline-md text-headline-md rounded-lg flex items-center justify-center hover:bg-primary/5 transition-colors active:scale-[0.98]">
+                Xem lại hồ sơ đã gửi
+            </button>
+</div>
+</main>
+</body></html>

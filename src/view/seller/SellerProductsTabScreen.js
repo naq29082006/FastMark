@@ -103,6 +103,7 @@ export default function SellerProductsTabScreen({
   productRefreshKey = 0,
   onProductChanged,
   onNavigationStateChange,
+  onBack,
 }) {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
@@ -186,6 +187,11 @@ export default function SellerProductsTabScreen({
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
+        {onBack ? (
+          <Pressable onPress={onBack} style={styles.backBtn} hitSlop={8}>
+            <Ionicons name="chevron-back" size={22} color="#0f172a" />
+          </Pressable>
+        ) : null}
         <Text style={styles.title}>Quản lý sản phẩm</Text>
       </View>
 
@@ -199,7 +205,7 @@ export default function SellerProductsTabScreen({
 
       {isLoading ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" size="large" />
+          <ActivityIndicator color="#076F32" size="large" />
         </View>
       ) : error && products.length === 0 ? (
         <View style={styles.centered}>
@@ -252,10 +258,20 @@ export default function SellerProductsTabScreen({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f1f5f9' },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingTop: 12,
     paddingHorizontal: 16,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
+    gap: 4,
+  },
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
   },
   title: {
     fontSize: 24,
@@ -333,7 +349,7 @@ const styles = StyleSheet.create({
   priceRange: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#0d7377',
+    color: '#076F32',
     marginBottom: 6,
   },
   metaLine: {
@@ -359,7 +375,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   retryButtonText: { color: '#ffffff', fontWeight: '800' },
   fab: {
@@ -369,7 +385,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     borderRadius: 22,
     paddingHorizontal: 14,
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,

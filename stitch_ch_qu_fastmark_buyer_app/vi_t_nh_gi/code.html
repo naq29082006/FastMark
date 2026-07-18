@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Viết Đánh Giá - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-low": "#eff4ff",
+                        "tertiary-fixed": "#ffe083",
+                        "tertiary-container": "#cea700",
+                        "tertiary": "#735c00",
+                        "outline-variant": "#bdcaba",
+                        "on-secondary-fixed-variant": "#005321",
+                        "on-primary-container": "#f7fff2",
+                        "surface-dim": "#d0dbed",
+                        "secondary-container": "#6bff8f",
+                        "on-tertiary-fixed": "#231b00",
+                        "on-background": "#121c2a",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "secondary": "#006e2f",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-surface": "#121c2a",
+                        "on-primary-fixed": "#002109",
+                        "primary-fixed-dim": "#62df7d",
+                        "primary": "#006b2c",
+                        "background": "#f8f9ff",
+                        "secondary-fixed": "#6bff8f",
+                        "inverse-primary": "#62df7d",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#dee9fc",
+                        "surface-bright": "#f8f9ff",
+                        "surface-container-highest": "#d9e3f6",
+                        "primary-container": "#00873a",
+                        "inverse-surface": "#27313f",
+                        "on-tertiary-container": "#4e3e00",
+                        "surface-variant": "#d9e3f6",
+                        "primary-fixed": "#7ffc97",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#005320",
+                        "tertiary-fixed-dim": "#eec200",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-secondary-fixed": "#002109",
+                        "surface-tint": "#006e2d",
+                        "outline": "#6e7b6c",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container": "#e6eeff",
+                        "on-secondary-container": "#007432",
+                        "on-primary": "#ffffff",
+                        "on-error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-lg": "32px",
+                        "gutter": "16px",
+                        "touch-target-min": "56px",
+                        "container-margin": "24px",
+                        "unit": "8px",
+                        "stack-gap-md": "16px"
+                    },
+                    "fontFamily": {
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col md:flex-row font-body-md font-sans">
+<!-- Mobile Top App Bar (Only visible on Mobile, Suppressed Nav Items) -->
+<!-- Task: Linear/Transactional intent (Create Review). Suppress main nav items. -->
+<header class="md:hidden flex flex-col w-full px-container-margin py-unit gap-2 bg-surface border-b border-outline-variant docked full-width top-0 sticky z-40">
+<div class="flex items-center justify-between h-touch-target-min">
+<button aria-label="Quay lại" class="flex items-center justify-center text-on-surface hover:bg-surface-variant rounded-full h-12 w-12 transition-colors">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-on-surface">Viết đánh giá</h1>
+<div class="w-12"></div> <!-- Spacer for centering -->
+</div>
+</header>
+<!-- Desktop Navigation Drawer (Hidden on Mobile) -->
+<!-- Task: Linear intent, but keeping drawer structural for desktop layout, just visually deactivated/simplified -->
+<aside class="hidden md:flex flex-col h-full py-6 w-80 bg-surface shadow-xl fixed left-0 top-0 z-50 rounded-r-xl border-r border-outline-variant overflow-y-auto">
+<div class="px-container-margin mb-8 flex items-center gap-4">
+<button aria-label="Quay lại" class="flex items-center justify-center text-on-surface hover:bg-surface-variant rounded-full h-12 w-12 transition-colors">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Viết đánh giá</h1>
+</div>
+<!-- Simplified info panel instead of full nav for transactional page -->
+<div class="px-container-margin mt-4">
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant">
+<h2 class="font-label-lg text-label-lg text-on-surface mb-2">Đang đánh giá</h2>
+<div class="flex items-center gap-4 mt-4">
+<img alt="Rau muống" class="w-16 h-16 rounded-lg object-cover border border-outline-variant" data-alt="A close-up photograph of a bundle of fresh, bright green morning glory vegetables tied with a thin bamboo strip. The vegetables are resting on a clean, light-colored wooden table in a well-lit environment, evoking a sense of organic freshness and healthy eating. The lighting is soft and natural, emphasizing the vibrant green hues of the leaves." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTnIoeVWl0d-4SVevJEiYhuD1d0syt6L6Acocl-0Hk1v_VBXxfMAeQYRX6KQKJ75yXG6xRyg7ZeQpB8TyBDxE0UbwdF9_F5OfwgcMWN64yJKworIN9ulpixALMAclM7R2-G8l5jg3kCqDCohWRSiDF0OX5MgqOaUq66I5P1JTRISEoxsM-kYLUPHY6Vk023mYVR1jaXJP0gRy2ujN4yq0K0qJYee2kFkXXZvMdiZ6810h9aMWKjoNSVFsSIyra9tsFkdjIfQg1nxEz"/>
+<div>
+<p class="font-body-md text-body-md font-semibold">Rau Muống Hữu Cơ</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Cô Tư Rau Sạch</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full md:ml-80 pb-[100px] md:pb-12 pt-6 md:pt-12 px-container-margin max-w-3xl mx-auto">
+<!-- Mobile Item Summary (Hidden on Desktop) -->
+<div class="md:hidden bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm mb-stack-gap-lg flex items-center gap-4">
+<img alt="Rau muống" class="w-16 h-16 rounded-lg object-cover border border-outline-variant" data-alt="A close-up photograph of a bundle of fresh, bright green morning glory vegetables tied with a thin bamboo strip. The vegetables are resting on a clean, light-colored wooden table in a well-lit environment, evoking a sense of organic freshness and healthy eating. The lighting is soft and natural, emphasizing the vibrant green hues of the leaves." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5JQl9bB9BvnI0fido2YlNDREZcoksIbdvdj6VptL4tNZCPq5xhKcj9Ix1AvlHMOjU8dcLtD5df1dmu2JMQ0L74h_cdXKzY1yBiVHMy5I5jLGLHqyV8TCWAddhaMdfljPx7L-Ri3DZ1I5RK30lUCbruJxzMFDgu7k7IuYUzeUM8Re494Zodx28rlP-ztnCHLcB68OZ5NM_5AZ4Xv14Ahnlx-Ip5-4PJxPDUhDv8wMUE6S762Wo6leW1hb-fowN6xOrj8QL3uVbBIRj"/>
+<div>
+<p class="font-body-md text-body-md font-semibold text-on-surface">Rau Muống Hữu Cơ</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Cửa hàng: Cô Tư Rau Sạch</p>
+</div>
+</div>
+<form action="#" class="space-y-stack-gap-lg" method="POST">
+<!-- Rating Section -->
+<section class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant shadow-sm">
+<h2 class="font-label-lg text-label-lg text-on-surface mb-4 text-center">Chất lượng sản phẩm thế nào?</h2>
+<div class="flex justify-center gap-4 my-6" id="star-rating-container">
+<!-- Stars will be interactive via JS, default to 5 for now -->
+<button aria-label="1 sao" class="text-tertiary-fixed-dim hover:text-tertiary transition-transform hover:scale-110" type="button">
+<span class="material-symbols-outlined text-[48px]" data-icon="star" data-weight="fill" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button aria-label="2 sao" class="text-tertiary-fixed-dim hover:text-tertiary transition-transform hover:scale-110" type="button">
+<span class="material-symbols-outlined text-[48px]" data-icon="star" data-weight="fill" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button aria-label="3 sao" class="text-tertiary-fixed-dim hover:text-tertiary transition-transform hover:scale-110" type="button">
+<span class="material-symbols-outlined text-[48px]" data-icon="star" data-weight="fill" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button aria-label="4 sao" class="text-tertiary-fixed-dim hover:text-tertiary transition-transform hover:scale-110" type="button">
+<span class="material-symbols-outlined text-[48px]" data-icon="star" data-weight="fill" style="font-variation-settings: 'FILL' 1;">star</span>
+</button>
+<button aria-label="5 sao" class="text-outline-variant hover:text-tertiary-fixed-dim transition-transform hover:scale-110" type="button">
+<span class="material-symbols-outlined text-[48px]" data-icon="star">star</span>
+</button>
+</div>
+<p class="text-center font-label-md text-label-md text-tertiary font-medium" id="rating-text">Tuyệt vời!</p>
+</section>
+<!-- Review Text Section -->
+<section class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant shadow-sm">
+<label class="block font-label-lg text-label-lg text-on-surface mb-4" for="review-content">
+                    Chia sẻ cảm nhận của bác về sản phẩm này
+                </label>
+<textarea class="w-full min-h-[120px] p-4 rounded-xl border border-outline focus:border-primary focus:ring-2 focus:ring-primary-container bg-surface text-on-surface font-body-md text-body-md placeholder:text-on-surface-variant transition-colors" id="review-content" name="review-content" placeholder="Rau tươi ngon, đóng gói cẩn thận..." rows="4"></textarea>
+</section>
+<!-- Photo Upload Section -->
+<section class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant shadow-sm">
+<h2 class="font-label-lg text-label-lg text-on-surface mb-4">Thêm hình ảnh thực tế (không bắt buộc)</h2>
+<div class="flex flex-wrap gap-4">
+<!-- Upload Button -->
+<button class="flex flex-col items-center justify-center w-[100px] h-[100px] rounded-xl border-2 border-dashed border-primary text-primary hover:bg-surface-container transition-colors bg-surface-container-lowest" type="button">
+<span class="material-symbols-outlined text-3xl mb-1" data-icon="add_a_photo">add_a_photo</span>
+<span class="font-label-md text-label-md">Thêm ảnh</span>
+</button>
+<!-- Example Uploaded Image -->
+<div class="relative w-[100px] h-[100px] rounded-xl overflow-hidden group">
+<img alt="Ảnh đã tải lên" class="w-full h-full object-cover" data-alt="A brightly lit, overhead shot of fresh morning glory leaves neatly arranged in a bamboo basket. The vibrant green of the vegetables contrasts beautifully with the warm, textured brown of the woven basket. The setting is clean and modern, evoking a fresh market purchase ready for cooking." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAJaIzUg-Fhq_Ll0kISvhYqwhgyaGRs4bbgKK-fRlT4nFdgc1_D9mL35dpk7L42WN44l6nALDA-PT_r6c0uUP-N4qS99VSZyhewSbkImrRbMDGgfJjtrYpbcvPIQXE8PpbilLt8TJCF7FLjKZ1Eye5mTGk9sCChRQNz7dI07ERFIbGvI-FE49ylxSBWW7EAH2b808gNs7rJVDViIkxo4Hr_sETAqMvkVxp0H6-vReVmdRk6-k9Y4L3NAm8KT0SssQ8pmGkcyX-vm_vx"/>
+<button aria-label="Xóa ảnh" class="absolute top-1 right-1 bg-surface/80 text-on-surface rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity" type="button">
+<span class="material-symbols-outlined text-sm" data-icon="close">close</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Submit Action -->
+<div class="pt-4">
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-xl shadow-md hover:bg-surface-tint hover:shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98]" type="submit">
+                    Gửi Đánh Giá
+                    <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</form>
+</main>
+<!-- Bottom Nav Bar (Suppressed due to transactional nature of page) -->
+<!-- Following logic: "Automatic Suppression: You MUST exclude the navigation shell if the page intent is: Linear/Transactional... Task-Focused" -->
+<script>
+        // Simple interactive star rating logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const starContainer = document.getElementById('star-rating-container');
+            const stars = starContainer.querySelectorAll('button');
+            const ratingText = document.getElementById('rating-text');
+            const texts = ["Rất tệ", "Tệ", "Bình thường", "Tốt", "Tuyệt vời!"];
+            
+            let currentRating = 4; // 1-based index (4 stars selected by default)
+
+            function updateStars(rating) {
+                stars.forEach((btn, index) => {
+                    const icon = btn.querySelector('span');
+                    if (index < rating) {
+                        // Filled state
+                        btn.className = "text-tertiary-fixed-dim hover:text-tertiary transition-transform hover:scale-110";
+                        icon.setAttribute('data-weight', 'fill');
+                        icon.style.fontVariationSettings = "'FILL' 1";
+                    } else {
+                        // Empty state
+                        btn.className = "text-outline-variant hover:text-tertiary-fixed-dim transition-transform hover:scale-110";
+                        icon.removeAttribute('data-weight');
+                        icon.style.fontVariationSettings = "'FILL' 0";
+                    }
+                });
+                ratingText.textContent = texts[rating - 1];
+            }
+
+            stars.forEach((star, index) => {
+                star.addEventListener('click', () => {
+                    currentRating = index + 1;
+                    updateStars(currentRating);
+                });
+            });
+            
+            // Initialize
+            updateStars(currentRating);
+        });
+    </script>
+</body></html>

@@ -26,6 +26,7 @@ export function useSellerAccessSync({
   const accessStatus = useSelector(selectSellerAccessStatus);
   const syncedAt = useSelector(selectSellerAccessSyncedAt);
   const isSyncingRef = useRef(false);
+  const lastActiveRefreshRef = useRef(0);
   const shouldPoll =
     enabled && verification?.status === SELLER_VERIFICATION_STATUS.PENDING;
 
@@ -45,20 +46,30 @@ export function useSellerAccessSync({
     }
   }, [dispatch, enabled]);
 
+  // Chỉ sync seller khi cần — tránh đua token/API ngay sau login.
   useEffect(() => {
     if (!enabled) {
       return undefined;
     }
 
-    refresh();
+    const timer = setTimeout(() => {
+      refresh();
+    }, 4000);
 
     const appStateSubscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') {
-        refresh();
+      if (nextState !== 'active') {
+        return;
       }
+      const now = Date.now();
+      if (now - lastActiveRefreshRef.current < 60000) {
+        return;
+      }
+      lastActiveRefreshRef.current = now;
+      refresh();
     });
 
     return () => {
+      clearTimeout(timer);
       appStateSubscription.remove();
     };
   }, [enabled, refresh]);

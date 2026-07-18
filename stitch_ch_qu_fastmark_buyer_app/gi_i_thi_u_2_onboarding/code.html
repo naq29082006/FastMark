@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Onboarding 2 - FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface": "#f8f9ff",
+                      "on-secondary": "#ffffff",
+                      "background": "#f8f9ff",
+                      "on-primary-fixed": "#002109",
+                      "on-surface-variant": "#3e4a3d",
+                      "inverse-surface": "#27313f",
+                      "on-error": "#ffffff",
+                      "primary-container": "#00873a",
+                      "outline": "#6e7b6c",
+                      "inverse-on-surface": "#eaf1ff",
+                      "surface-dim": "#d0dbed",
+                      "secondary-fixed": "#6bff8f",
+                      "tertiary": "#735c00",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-low": "#eff4ff",
+                      "surface-container-highest": "#d9e3f6",
+                      "on-primary": "#ffffff",
+                      "tertiary-container": "#cea700",
+                      "inverse-primary": "#62df7d",
+                      "surface-container": "#e6eeff",
+                      "surface-container-high": "#dee9fc",
+                      "secondary-container": "#6bff8f",
+                      "tertiary-fixed": "#ffe083",
+                      "primary": "#006b2c",
+                      "on-tertiary-fixed": "#231b00",
+                      "error": "#ba1a1a",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-tertiary-container": "#4e3e00",
+                      "surface-tint": "#006e2d",
+                      "on-primary-container": "#f7fff2",
+                      "on-background": "#121c2a",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "primary-fixed": "#7ffc97",
+                      "on-secondary-container": "#007432",
+                      "primary-fixed-dim": "#62df7d",
+                      "surface-variant": "#d9e3f6",
+                      "surface-bright": "#f8f9ff",
+                      "on-error-container": "#93000a",
+                      "secondary": "#006e2f",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-fixed": "#002109",
+                      "on-secondary-fixed-variant": "#005321",
+                      "secondary-fixed-dim": "#4ae176",
+                      "outline-variant": "#bdcaba",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#121c2a",
+                      "tertiary-fixed-dim": "#eec200"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-gap-md": "16px",
+                      "gutter": "16px",
+                      "stack-gap-lg": "32px",
+                      "unit": "8px",
+                      "touch-target-min": "56px",
+                      "container-margin": "24px"
+              },
+              "fontFamily": {
+                      "label-lg": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "price-display": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "label-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "20px",
+                              {
+                                      "lineHeight": "30px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "price-display": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col justify-between">
+<!-- Skip Navigation Shell (TopAppBar/BottomNavBar/Drawer) as this is a linear/transactional onboarding screen -->
+<main class="flex-grow flex flex-col items-center justify-center px-container-margin py-stack-gap-lg">
+<!-- Illustration -->
+<div class="w-full max-w-md mb-stack-gap-lg flex justify-center">
+<div class="w-64 h-64 md:w-80 md:h-80 rounded-full bg-surface-container overflow-hidden flex items-center justify-center relative">
+<img class="w-full h-full object-cover" data-alt="A friendly local vendor handing a reusable shopping bag full of fresh, vibrant vegetables to a smiling customer. The scene is set in a modern, clean, traditional Vietnamese market stall. Warm, bright lighting emphasizing freshness and trust. High contrast, clean lines, flat minimalist illustration style with humanist touches, incorporating primary green tones (#006b2c) and soft whites." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTiLHaTqwMSBJ5V1G9Fuk0Yjn2kKnDQmGfRX_QD1KJTmDCxo14WbtbATVLsmO4aLcLmF-r1Ifb89iV1V5uvt9C_MLa9gLUrrDpOZ44ScZmzTtyTjthadScwZ1lNwp8tq38UvoiX2IVgN5SarsEs5s6XJLX0oNhHQZmMqKxHR6sTKWshonnUi7vAoK4l4cFuopds7iy2msD8srt8032TYY2jWHsfrlUKMwfNlrs6Bq90ayM0Lxw0CDw07ZYnuSN87PdHnq8yaauWJBa"/>
+</div>
+</div>
+<!-- Content -->
+<div class="text-center w-full max-w-md">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary mb-stack-gap-md">
+                Đặt trước, lấy sau
+            </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                Tiết kiệm thời gian, không cần xếp hàng, nhận hàng trực tiếp tại cửa hàng.
+            </p>
+</div>
+<!-- Progress Indicators -->
+<div class="flex space-x-2 mt-stack-gap-lg mb-stack-gap-md">
+<div class="w-2 h-2 rounded-full bg-surface-variant"></div>
+<div class="w-6 h-2 rounded-full bg-primary"></div>
+<div class="w-2 h-2 rounded-full bg-surface-variant"></div>
+</div>
+</main>
+<!-- Bottom Action -->
+<footer class="px-container-margin py-stack-gap-md w-full max-w-md mx-auto">
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-lg flex items-center justify-center space-x-2 hover:bg-secondary transition-colors active:scale-95">
+<span>Tiếp tục</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">arrow_forward</span>
+</button>
+</footer>
+</body></html>

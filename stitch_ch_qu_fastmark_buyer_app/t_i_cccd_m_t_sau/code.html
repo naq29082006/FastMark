@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tải ảnh CCCD mặt sau</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "on-tertiary-fixed": "#231b00",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-tertiary-container": "#4e3e00",
+                        "surface-tint": "#006e2d",
+                        "on-primary-container": "#f7fff2",
+                        "primary-fixed-dim": "#62df7d",
+                        "primary-fixed": "#7ffc97",
+                        "on-secondary-container": "#007432",
+                        "surface-variant": "#d9e3f6",
+                        "surface-bright": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#005321",
+                        "secondary-fixed-dim": "#4ae176",
+                        "secondary": "#006e2f",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#002109",
+                        "on-surface": "#121c2a",
+                        "tertiary-fixed-dim": "#eec200",
+                        "outline-variant": "#bdcaba",
+                        "error-container": "#ffdad6",
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed": "#002109",
+                        "on-surface-variant": "#3e4a3d",
+                        "inverse-surface": "#27313f",
+                        "primary-container": "#00873a",
+                        "outline": "#6e7b6c",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-error": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "surface-dim": "#d0dbed",
+                        "secondary-fixed": "#6bff8f",
+                        "tertiary": "#735c00",
+                        "surface-container-highest": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "inverse-primary": "#62df7d",
+                        "surface-container": "#e6eeff",
+                        "surface-container-high": "#dee9fc",
+                        "secondary-container": "#6bff8f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "container-margin": "24px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "stack-gap-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md antialiased pb-24 md:pb-0 pt-[56px] md:pt-[72px]">
+<!-- Top App Bar (Transactional, no nav elements) -->
+<header class="bg-surface dark:bg-on-background fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-margin h-touch-target-min md:h-[72px] bg-surface-container-low dark:bg-surface-container-lowest">
+<button aria-label="Quay lại" class="flex items-center justify-center w-touch-target-min h-touch-target-min -ml-4 text-primary dark:text-primary-fixed hover:bg-primary-container/20 rounded-full transition-colors duration-200" type="button">
+<span class="material-symbols-outlined text-[28px]">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed text-center flex-1 pr-[40px]">Tải ảnh CCCD</h1>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 px-container-margin py-stack-gap-lg max-w-2xl mx-auto w-full flex flex-col items-center">
+<!-- Step Indicator -->
+<div class="w-full flex items-center justify-center mb-stack-gap-lg px-4 gap-2">
+<div class="h-2 flex-1 bg-primary rounded-full"></div>
+<div class="h-2 flex-1 bg-primary rounded-full"></div>
+<div class="h-2 flex-1 bg-surface-variant rounded-full"></div>
+</div>
+<div class="text-center mb-stack-gap-lg w-full">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary mb-2">Chụp mặt sau CCCD</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Vui lòng chụp rõ nét mặt sau Căn cước công dân của bạn.</p>
+</div>
+<!-- Camera / Upload Area -->
+<div aria-label="Nhấn để chụp ảnh hoặc tải lên mặt sau CCCD" class="w-full aspect-[1.58] bg-surface-container rounded-xl border-2 border-dashed border-outline-variant flex flex-col items-center justify-center relative overflow-hidden mb-stack-gap-lg cursor-pointer hover:bg-surface-container-high transition-colors" role="button">
+<!-- Sample/Placeholder Image -->
+<div class="absolute inset-0 opacity-20 bg-cover bg-center" data-alt="A stylized, illustrative placeholder showing the back of a Vietnamese identity card with a fingerprint pattern, clear layout lines, and soft, clean lighting in a light-mode green-tinted aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA8-VICGUJSrwA2Eq11DLAl5n5SeYXOPlOApFo1-ijES0OAJ0SlX3QtxPVOk-OyGlCBat6JVT7pFxZ67UVsVp0vdi2EqvjHjvjtZ56E5_KqfEuzANV8LsKVOXQfQdf-oqXZdqriwG6FCNldCWIGPhSUJbXHuWAB9HDECA9uTQ10Ws94NmXD9Y5DFVgo7iMsAO00G-f9MW8bUQv_QvxZzAsXurs5UVgJw4V22XzigTATOKSco6__lTwl-7YwxTEdfuJaA-3w11Z8gzbY')"></div>
+<div class="relative z-10 flex flex-col items-center p-6 text-center">
+<span class="material-symbols-outlined text-[64px] text-primary mb-4" style="font-variation-settings: 'FILL' 1;">add_a_photo</span>
+<span class="font-label-lg text-label-lg text-primary">Nhấn để chụp hoặc tải ảnh</span>
+<span class="font-body-md text-body-md text-on-surface-variant mt-2 text-sm">Đảm bảo ảnh rõ nét, không bị lóa sáng</span>
+</div>
+<!-- Focus Frame UI Overlay -->
+<div class="absolute inset-4 border-2 border-primary opacity-50 rounded-lg pointer-events-none">
+<!-- Corner markers -->
+<div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg -mt-[2px] -ml-[2px]"></div>
+<div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg -mt-[2px] -mr-[2px]"></div>
+<div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg -mb-[2px] -ml-[2px]"></div>
+<div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg -mb-[2px] -mr-[2px]"></div>
+</div>
+</div>
+<!-- Instructions/Tips -->
+<div class="w-full bg-surface-container-low rounded-xl p-6 mb-stack-gap-lg">
+<h3 class="font-label-lg text-label-lg text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">lightbulb</span>
+                Mẹo chụp ảnh đẹp
+            </h3>
+<ul class="space-y-4">
+<li class="flex items-start gap-4">
+<span class="material-symbols-outlined text-secondary mt-1">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Đặt CCCD trên mặt phẳng có màu nền tương phản.</span>
+</li>
+<li class="flex items-start gap-4">
+<span class="material-symbols-outlined text-secondary mt-1">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Đảm bảo đủ sáng, tránh ánh sáng phản chiếu trực tiếp làm lóa mờ thông tin.</span>
+</li>
+<li class="flex items-start gap-4">
+<span class="material-symbols-outlined text-secondary mt-1">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Chụp toàn bộ khung viền thẻ, không bị cắt xén góc.</span>
+</li>
+</ul>
+</div>
+<!-- Action Area -->
+<div class="w-full mt-auto pt-stack-gap-lg">
+<button aria-disabled="true" class="w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-xl flex items-center justify-center gap-2 hover:bg-primary-container hover:text-on-primary-container active:scale-[0.98] transition-all" disabled="" type="button">
+                Tiếp tục
+                <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</main>
+</body></html>

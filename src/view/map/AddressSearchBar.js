@@ -139,7 +139,7 @@ export default function AddressSearchBar({ onSelectResult, onFocusChange, placeh
             }, 220);
           }}
         />
-        {isSearching ? <ActivityIndicator size="small" color="#0d7377" /> : null}
+        {isSearching ? <ActivityIndicator size="small" color="#076F32" /> : null}
         {query.length > 0 && !isSearching ? (
           <Pressable accessibilityRole="button" onPress={handleClear} style={styles.clearButton}>
             <Ionicons name="close-circle" size={20} color="#94a3b8" />

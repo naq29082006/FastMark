@@ -1,29 +1,21 @@
 const mongoose = require("mongoose");
-const DealOffer = require("../models/DealOffer");
 const Reservation = require("../models/Reservation");
 const Product = require("../models/Product");
 const ProductVariant = require("../models/ProductVariant");
 const ShopProfile = require("../models/ShopProfile");
-const { DEAL_OFFER_STATUS, DEAL_OFFER_BY } = require("../constants/dealOfferStatus");
 const { RESERVATION_STATUS } = require("../constants/reservationStatus");
 const { PRODUCT_STATUS } = require("../constants/productStatus");
 const { SHOP_STATUS, SHOP_OPEN } = require("../constants/shopStatus");
-const { MESSAGE_TYPE } = require("../constants/messageType");
 const {
   toPublicReservation,
   reserveVariantInventory,
   releaseVariantInventory,
   expireOverdueReservations,
+  ensurePickupCode,
 } = require("./reservationService");
-const { formatOfferMessageContent, formatBuyerCounterMessageContent } = require("../utils/offerMessageFormat");
-const {
-  computeDiscountPercent,
-  assertDealDiscountAllowed,
-  resolveDealMoney,
-} = require("../utils/dealPricing");
+const { debitWallet, creditWalletRefund } = require("./walletService");
 const { createNotification } = require("./notificationService");
 const { NOTIFICATION_AUDIENCE } = require("../constants/notificationAudience");
-const messageService = require("./messageService");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -35,13 +27,13 @@ function assertPhoneVerifiedForTrade(user) {
   const phone = String(user?.Phone || "").trim();
   if (!/^\d{10}$/.test(phone)) {
     throw createServiceError(
-      "Vui lòng thêm và xác minh số điện thoại trước khi deal giá hoặc giữ hàng.",
+      "Vui lòng thêm và xác minh số điện thoại trước khi giữ hàng.",
       403
     );
   }
   if (!user.SellerPhoneVerified) {
     throw createServiceError(
-      "Vui lòng xác minh số điện thoại trước khi deal giá hoặc giữ hàng.",
+      "Vui lòng xác minh số điện thoại trước khi giữ hàng.",
       403
     );
   }
@@ -54,14 +46,6 @@ function pickNumber(value) {
 
 function pickString(value) {
   return String(value || "").trim();
-}
-
-function guardDealDiscount(originalTotal, offeredTotal) {
-  try {
-    assertDealDiscountAllowed(originalTotal, offeredTotal);
-  } catch (error) {
-    throw createServiceError(error.message, error.statusCode || 400);
-  }
 }
 
 async function validateProductAndShop(productId, variantId) {
@@ -92,93 +76,6 @@ async function validateProductAndShop(productId, variantId) {
   return { product, variant, shop };
 }
 
-async function toPublicDeal(deal) {
-  const [product, variant, shop] = await Promise.all([
-    Product.findById(deal.productId),
-    ProductVariant.findById(deal.variantId),
-    ShopProfile.findById(deal.shopId),
-  ]);
-
-  return {
-    id: deal._id,
-    orderCode: `ID: ${String(deal._id).slice(-8).toUpperCase()}`,
-    status: deal.status,
-    originalPrice: deal.originalPrice || 0,
-    offeredPrice: deal.offeredPrice || 0,
-    quantity: Number(deal.quantity) || 1,
-    lastOfferBy: Number(deal.lastOfferBy) || DEAL_OFFER_BY.BUYER,
-    discountPercent: deal.discountPercent || 0,
-    note: deal.note || "",
-    sellerNote: deal.sellerNote || "",
-    respondedAt: deal.respondedAt || null,
-    createdAt: deal.CreatedAt,
-    reservationId: deal.reservationId || null,
-    productId: deal.productId,
-    variantId: deal.variantId,
-    shopId: deal.shopId,
-    productName: product?.ProductName || "",
-    productThumbnail: product?.Thumbnail || "",
-    variantName: variant?.VariantName || "",
-    storeName: shop?.shopName || shop?.description || "",
-    shopUsername: shop?.shopUsername || "",
-  };
-}
-
-async function sendBuyerCounterChatMessage(user, shop, deal, previousOfferPrice) {
-  const product = await Product.findById(deal.productId);
-  const money = resolveDealMoney(deal);
-  const content = formatBuyerCounterMessageContent({
-    productName: product?.ProductName || "",
-    originalPrice: money.originalTotal,
-    previousOfferPrice,
-    offeredPrice: money.offeredTotal,
-    quantity: money.qty,
-    discountPercent: deal.discountPercent,
-    note: deal.note || "",
-  });
-
-
-  const { conversation } = await messageService.findOrCreateBuyerConversation(
-    user,
-    String(shop._id),
-    shop.shopName || ""
-  );
-
-  await messageService.sendBuyerMessage(user, conversation._id, {
-    content,
-    messageType: MESSAGE_TYPE.OFFER,
-  });
-
-  return conversation._id;
-}
-
-async function sendOfferChatMessage(user, shop, deal) {
-  const product = await Product.findById(deal.productId);
-  const money = resolveDealMoney(deal);
-  const content = formatOfferMessageContent({
-    productName: product?.ProductName || "",
-    originalPrice: money.originalTotal,
-    offeredPrice: money.offeredTotal,
-    quantity: money.qty,
-    discountPercent: deal.discountPercent,
-    note: deal.note || "",
-  });
-
-
-  const { conversation } = await messageService.findOrCreateBuyerConversation(
-    user,
-    String(shop._id),
-    shop.shopName || ""
-  );
-
-  await messageService.sendBuyerMessage(user, conversation._id, {
-    content,
-    messageType: MESSAGE_TYPE.OFFER,
-  });
-
-  return conversation._id;
-}
-
 async function notifyShopOwner(shop, { title, content }) {
   if (!shop?.userId) {
     return;
@@ -190,250 +87,11 @@ async function notifyShopOwner(shop, { title, content }) {
   });
 }
 
-async function createDealOffer(user, payload) {
-  assertPhoneVerifiedForTrade(user);
-
-  const productId = pickString(payload.productId);
-  const variantId = pickString(payload.variantId);
-  // Deal is always on ORDER TOTAL for the selected quantity (not per unit).
-  const offeredTotal = pickNumber(
-    payload.offeredTotal ?? payload.offeredPrice ?? payload.offered_price
-  );
-  const quantity = Math.round(pickNumber(payload.quantity) || 1);
-  const note = pickString(payload.note);
-
-  if (!productId || !variantId) {
-    throw createServiceError("Thiếu sản phẩm hoặc biến thể.");
-  }
-  if (!Number.isFinite(offeredTotal) || offeredTotal <= 0) {
-    throw createServiceError("Tổng đề nghị không hợp lệ.");
-  }
-  if (!Number.isFinite(quantity) || quantity <= 0) {
-    throw createServiceError("Số lượng không hợp lệ.");
-  }
-
-  const { product, variant, shop } = await validateProductAndShop(productId, variantId);
-  const originalUnit = Number(variant.Price) || 0;
-  const originalTotal = originalUnit * quantity;
-
-  if ((variant.Quantity ?? 0) < quantity) {
-    throw createServiceError(`Chỉ còn ${variant.Quantity} sản phẩm trong kho.`);
-  }
-
-  guardDealDiscount(originalTotal, offeredTotal);
-
-  const existingPending = await DealOffer.findOne({
-    userId: user._id,
-    productId: product._id,
-    variantId: variant._id,
-    status: DEAL_OFFER_STATUS.PENDING,
-  });
-  if (existingPending) {
-    throw createServiceError("Bạn đã có đề nghị đang chờ xử lý cho sản phẩm này.");
-  }
-
-  const now = new Date();
-  const discountPercent = computeDiscountPercent(originalTotal, offeredTotal);
-
-  const deal = await DealOffer.create({
-    productId: product._id,
-    variantId: variant._id,
-    userId: user._id,
-    shopId: shop._id,
-    originalPrice: originalUnit,
-    offeredPrice: offeredTotal,
-    lastOfferBy: DEAL_OFFER_BY.BUYER,
-    quantity,
-    discountPercent,
-    note,
-    status: DEAL_OFFER_STATUS.PENDING,
-    CreatedAt: now,
-    UpdatedAt: now,
-  });
-
-  await sendOfferChatMessage(user, shop, deal);
-
-  await notifyShopOwner(shop, {
-    title: "Đề nghị deal giá mới",
-    content: `${user.FullName || user.UserName} đề nghị tổng ${offeredTotal.toLocaleString("vi-VN")}đ cho ${quantity} ${product.ProductName} (gốc ${originalTotal.toLocaleString("vi-VN")}đ).`,
-  });
-
-  return toPublicDeal(deal);
-}
-
-
-async function listBuyerDeals(user, { status, search } = {}) {
-  const query = { userId: user._id };
-
-  if (status !== undefined && status !== null && status !== "") {
-    query.status = Number(status);
-  }
-
-  let deals = await DealOffer.find(query).sort({ CreatedAt: -1 }).limit(100);
-  const mapped = await Promise.all(deals.map(toPublicDeal));
-
-  const keyword = pickString(search).toLowerCase();
-  if (!keyword) {
-    return mapped;
-  }
-
-  return mapped.filter(
-    (deal) =>
-      deal.productName.toLowerCase().includes(keyword) ||
-      deal.storeName.toLowerCase().includes(keyword) ||
-      deal.variantName.toLowerCase().includes(keyword)
-  );
-}
-
-async function getBuyerDeal(user, dealId) {
-  const deal = await DealOffer.findOne({ _id: dealId, userId: user._id });
-  if (!deal) {
-    throw createServiceError("Không tìm thấy deal giá.", 404);
-  }
-  return toPublicDeal(deal);
-}
-
-async function resubmitDealOffer(user, dealId, payload) {
-  const deal = await DealOffer.findOne({ _id: dealId, userId: user._id });
-  if (!deal) {
-    throw createServiceError("Không tìm thấy deal giá.", 404);
-  }
-
-  const canResubmitRejected = deal.status === DEAL_OFFER_STATUS.REJECTED;
-  const canRedealAccepted =
-    deal.status === DEAL_OFFER_STATUS.ACCEPTED && !deal.reservationId;
-  if (!canResubmitRejected && !canRedealAccepted) {
-    throw createServiceError(
-      "Chỉ có thể deal lại khi bị từ chối hoặc đã chấp nhận nhưng chưa giữ hàng."
-    );
-  }
-
-  const offeredPrice = pickNumber(
-    payload.offeredTotal ?? payload.offeredPrice ?? payload.offered_price
-  );
-  const note = pickString(payload.note);
-
-  if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
-    throw createServiceError("Tổng đề nghị không hợp lệ.");
-  }
-
-  const { product, variant, shop } = await validateProductAndShop(deal.productId, deal.variantId);
-  const originalUnit = Number(variant.Price) || 0;
-  const quantity = Math.max(1, Number(deal.quantity) || 1);
-  const originalTotal = originalUnit * quantity;
-
-  guardDealDiscount(originalTotal, offeredPrice);
-
-  const now = new Date();
-  deal.offeredPrice = offeredPrice;
-  deal.originalPrice = originalUnit;
-  deal.discountPercent = computeDiscountPercent(originalTotal, offeredPrice);
-  deal.note = note;
-  deal.lastOfferBy = DEAL_OFFER_BY.BUYER;
-  deal.sellerNote = "";
-  deal.status = DEAL_OFFER_STATUS.PENDING;
-  deal.respondedAt = null;
-  deal.reservationId = null;
-  deal.UpdatedAt = now;
-  await deal.save();
-
-  await sendOfferChatMessage(user, shop, deal);
-
-  await notifyShopOwner(shop, {
-    title: "Đề nghị deal giá mới",
-    content: `${user.FullName || user.UserName} đề nghị lại ${offeredPrice.toLocaleString("vi-VN")}đ cho ${quantity} ${product.ProductName}.`,
-  });
-
-  return toPublicDeal(deal);
-}
-
-
-async function counterDealOfferByBuyer(user, dealId, payload) {
-  const deal = await DealOffer.findOne({ _id: dealId, userId: user._id });
-  if (!deal) {
-    throw createServiceError("Không tìm thấy deal giá.", 404);
-  }
-  if (deal.status !== DEAL_OFFER_STATUS.PENDING) {
-    throw createServiceError("Deal này đã được xử lý.");
-  }
-  if (Number(deal.lastOfferBy) !== DEAL_OFFER_BY.SELLER) {
-    throw createServiceError("Shop chưa đề xuất giá để trả giá lại.");
-  }
-
-  const offeredPrice = pickNumber(
-    payload.offeredTotal ?? payload.offeredPrice ?? payload.offered_price
-  );
-  const note = pickString(payload.note);
-
-  if (!Number.isFinite(offeredPrice) || offeredPrice <= 0) {
-    throw createServiceError("Tổng đề nghị không hợp lệ.");
-  }
-
-  const { product, variant, shop } = await validateProductAndShop(deal.productId, deal.variantId);
-  const originalUnit = Number(variant.Price) || 0;
-  const quantity = Math.max(1, Number(deal.quantity) || 1);
-  const originalTotal = originalUnit * quantity;
-
-  guardDealDiscount(originalTotal, offeredPrice);
-
-  const now = new Date();
-  const previousOfferPrice = Number(deal.offeredPrice) || 0;
-  deal.offeredPrice = offeredPrice;
-  deal.originalPrice = originalUnit;
-  deal.discountPercent = computeDiscountPercent(originalTotal, offeredPrice);
-  deal.note = note;
-  deal.lastOfferBy = DEAL_OFFER_BY.BUYER;
-  deal.sellerNote = "";
-  deal.respondedAt = null;
-  deal.UpdatedAt = now;
-  await deal.save();
-
-  await sendBuyerCounterChatMessage(user, shop, deal, previousOfferPrice);
-
-  await notifyShopOwner(shop, {
-    title: "Khách trả giá lại",
-    content: `${user.FullName || user.UserName} đề nghị ${offeredPrice.toLocaleString("vi-VN")}đ (shop đề xuất ${Number(previousOfferPrice).toLocaleString("vi-VN")}đ) cho ${quantity} ${product.ProductName}.`,
-  });
-
-  return toPublicDeal(deal);
-}
-
-
-async function acceptCounterOffer(user, dealId) {
-  const deal = await DealOffer.findOne({ _id: dealId, userId: user._id });
-  if (!deal) {
-    throw createServiceError("Không tìm thấy deal giá.", 404);
-  }
-  if (deal.status !== DEAL_OFFER_STATUS.PENDING) {
-    throw createServiceError("Deal này đã được xử lý.");
-  }
-  if (Number(deal.lastOfferBy) !== DEAL_OFFER_BY.SELLER) {
-    throw createServiceError("Shop chưa đề xuất mức giá mới.");
-  }
-
-  const shop = await ShopProfile.findById(deal.shopId);
-  const finalPrice = deal.offeredPrice;
-  const now = new Date();
-
-  deal.status = DEAL_OFFER_STATUS.ACCEPTED;
-  deal.respondedAt = now;
-  deal.UpdatedAt = now;
-  await deal.save();
-
-  await notifyShopOwner(shop, {
-    title: "Khách chấp nhận giá đề xuất",
-    content: `${user.FullName || user.UserName} đã chấp nhận mức giá ${Number(finalPrice).toLocaleString("vi-VN")}đ.`,
-  });
-
-  return toPublicDeal(deal);
-}
-
 async function createReservation(user, payload) {
   assertPhoneVerifiedForTrade(user);
 
   const productId = pickString(payload.productId);
   const variantId = pickString(payload.variantId);
-  const dealOfferId = pickString(payload.dealOfferId);
   const quantity = pickNumber(payload.quantity) || 1;
   const note = pickString(payload.note);
   const pickupTimeRaw = payload.pickupTime ?? payload.pickup_time;
@@ -460,41 +118,20 @@ async function createReservation(user, payload) {
 
   const { product, variant, shop } = await validateProductAndShop(productId, variantId);
 
+  if (shop.allowReserve === false) {
+    throw createServiceError("Cửa hàng không nhận giữ hàng.", 400);
+  }
+
   if ((variant.Quantity ?? 0) < quantity) {
     throw createServiceError("Số lượng vượt quá tồn kho.", 400);
   }
 
-  let agreedPrice = Number(variant.Price) || 0;
-  let linkedDealId = null;
-
-  if (dealOfferId) {
-    const deal = await DealOffer.findOne({
-      _id: dealOfferId,
-      userId: user._id,
-      productId: product._id,
-      variantId: variant._id,
-    });
-    if (!deal) {
-      throw createServiceError("Deal giá không hợp lệ.", 400);
-    }
-    if (deal.status !== DEAL_OFFER_STATUS.ACCEPTED) {
-      throw createServiceError("Deal giá chưa được chấp nhận.", 400);
-    }
-    if (deal.reservationId) {
-      throw createServiceError("Deal này đã có yêu cầu giữ hàng.", 400);
-    }
-    const money = resolveDealMoney(deal);
-    if (quantity !== money.qty) {
-      throw createServiceError(
-        `Số lượng giữ hàng phải khớp deal (${money.qty} sp).`,
-        400
-      );
-    }
-    agreedPrice = money.agreedUnitPrice;
-    linkedDealId = deal._id;
-  }
-
-
+  const agreedPrice = Number(variant.Price) || 0;
+  const depositPercent = Math.max(0, Math.min(100, Number(shop.depositPercent) || 0));
+  const depositRequired = depositPercent > 0;
+  const depositAmount = depositRequired
+    ? Math.round((agreedPrice * quantity * depositPercent) / 100)
+    : 0;
   const now = new Date();
   const session = await mongoose.startSession();
 
@@ -503,6 +140,18 @@ async function createReservation(user, payload) {
     await session.withTransaction(async () => {
       await reserveVariantInventory(variant._id, quantity, session);
 
+      let depositTxnId = null;
+      let depositPaidAt = null;
+
+      if (depositAmount > 0) {
+        const { transaction } = await debitWallet(user._id, depositAmount, {
+          description: `Cọc giữ hàng ${product.ProductName || ""}`.trim(),
+          session,
+        });
+        depositTxnId = transaction._id;
+        depositPaidAt = now;
+      }
+
       reservation = await Reservation.create(
         [
           {
@@ -510,7 +159,6 @@ async function createReservation(user, payload) {
             shopId: shop._id,
             productId: product._id,
             userId: user._id,
-            dealOfferId: linkedDealId,
             quantity,
             reservedPrice: Number(variant.Price) || 0,
             agreedPrice,
@@ -518,6 +166,11 @@ async function createReservation(user, payload) {
             note,
             status: RESERVATION_STATUS.PENDING,
             inventoryHeld: true,
+            depositRequired,
+            depositPercent,
+            depositAmount,
+            depositPaidAt,
+            depositTxnId,
             CreatedAt: now,
             UpdatedAt: now,
           },
@@ -525,19 +178,16 @@ async function createReservation(user, payload) {
         { session }
       );
       reservation = reservation[0];
-
-      if (linkedDealId) {
-        await DealOffer.findByIdAndUpdate(
-          linkedDealId,
-          { $set: { reservationId: reservation._id, UpdatedAt: now } },
-          { session }
-        );
-      }
     });
+
+    const depositNote =
+      depositAmount > 0
+        ? ` Đã cọc ${depositAmount.toLocaleString("vi-VN")}đ (${depositPercent}%).`
+        : "";
 
     await notifyShopOwner(shop, {
       title: "Yêu cầu giữ hàng mới",
-      content: `${user.FullName || user.UserName} yêu cầu giữ ${quantity} ${product.ProductName} — nhận lúc ${pickupTime.toLocaleString("vi-VN")}.`,
+      content: `${user.FullName || user.UserName} yêu cầu giữ ${quantity} ${product.ProductName} — nhận lúc ${pickupTime.toLocaleString("vi-VN")}.${depositNote}`,
     });
 
     return toPublicReservation(reservation);
@@ -597,13 +247,8 @@ async function listBuyerReservations(user, { tab = "holding", search } = {}) {
 }
 
 async function listBuyerOrders(user, { tab = "holding", search } = {}) {
-  if (tab === "pending_price") {
-    const deals = await listBuyerDeals(user, { search });
-    return { tab, deals, reservations: [] };
-  }
-
   const reservations = await listBuyerReservations(user, { tab, search });
-  return { tab, deals: [], reservations };
+  return { tab, reservations };
 }
 
 async function getBuyerReservation(user, reservationId) {
@@ -612,6 +257,7 @@ async function getBuyerReservation(user, reservationId) {
   if (!reservation) {
     throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
   }
+  await ensurePickupCode(reservation);
   const publicReservation = await toPublicReservation(reservation);
   const shop = await ShopProfile.findById(reservation.shopId);
   return {
@@ -658,6 +304,13 @@ async function cancelReservationByBuyer(user, reservationId) {
   reservation.cancelledAt = now;
   reservation.cancelReason = "Người mua hủy đơn";
   await releaseVariantInventory(reservation);
+
+  if (reservation.depositPaidAt && Number(reservation.depositAmount) > 0) {
+    await creditWalletRefund(user._id, reservation.depositAmount, {
+      description: `Hoàn cọc giữ hàng #${String(reservation._id).slice(-8).toUpperCase()}`,
+    });
+  }
+
   reservation.UpdatedAt = now;
   await reservation.save();
 
@@ -678,18 +331,10 @@ async function completeReservationByBuyer(user, reservationId) {
 }
 
 module.exports = {
-  createDealOffer,
-  listBuyerDeals,
-  getBuyerDeal,
-  resubmitDealOffer,
-  counterDealOfferByBuyer,
-  acceptCounterOffer,
   createReservation,
   listBuyerReservations,
   listBuyerOrders,
   getBuyerReservation,
   cancelReservationByBuyer,
   completeReservationByBuyer,
-  toPublicDeal,
-  computeDiscountPercent,
 };

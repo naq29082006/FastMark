@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Bulk Notification Templates - VietMarket Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error": "#ba1a1a",
+                        "tertiary-fixed": "#ffd9de",
+                        "primary": "#006b2c",
+                        "tertiary": "#a72d51",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#ffb2bf",
+                        "surface": "#f8f9ff",
+                        "surface-tint": "#006e2d",
+                        "secondary-fixed": "#6bff8f",
+                        "on-secondary-container": "#007432",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#c74668",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline-variant": "#bdcaba",
+                        "background": "#f8f9ff",
+                        "on-primary": "#ffffff",
+                        "on-surface-variant": "#3e4a3d",
+                        "secondary-fixed-dim": "#4ae176",
+                        "surface-variant": "#d3e4fe",
+                        "on-primary-container": "#f7fff2",
+                        "on-secondary-fixed-variant": "#005321",
+                        "inverse-primary": "#62df7d",
+                        "outline": "#6e7b6c",
+                        "on-tertiary-fixed": "#3f0016",
+                        "secondary-container": "#6bff8f",
+                        "on-primary-fixed": "#002109",
+                        "on-background": "#0b1c30",
+                        "on-secondary-fixed": "#002109",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#7ffc97",
+                        "on-surface": "#0b1c30",
+                        "primary-fixed-dim": "#62df7d",
+                        "surface-dim": "#cbdbf5",
+                        "surface-bright": "#f8f9ff",
+                        "surface-container-low": "#eff4ff",
+                        "surface-container": "#e5eeff",
+                        "primary-container": "#00873a",
+                        "error-container": "#ffdad6",
+                        "surface-container-high": "#dce9ff",
+                        "secondary": "#006e2f",
+                        "inverse-on-surface": "#eaf1ff",
+                        "inverse-surface": "#213145",
+                        "on-tertiary-fixed-variant": "#8a143c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "space-xs": "4px",
+                        "container-max-width": "1440px",
+                        "sidebar-width": "260px",
+                        "space-xl": "32px",
+                        "header-height": "64px",
+                        "margin-page": "32px",
+                        "gutter": "24px",
+                        "space-sm": "8px",
+                        "space-md": "16px",
+                        "space-lg": "24px"
+                    },
+                    "fontFamily": {
+                        "caption": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h5": ["Inter"],
+                        "h4": ["Inter"],
+                        "h1": ["Inter"],
+                        "h2": ["Inter"],
+                        "h3": ["Inter"],
+                        "h6": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "h5": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "h4": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+                        "h1": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h2": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "h3": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "h6": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAF8; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .icon-fill { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="text-on-surface flex min-h-screen">
+<!-- SideNavBar -->
+<nav class="hidden md:flex fixed left-0 top-0 h-screen w-[260px] flex-col py-space-lg bg-white dark:bg-surface-container border-r border-outline-variant z-20">
+<div class="px-space-xl mb-space-lg">
+<h1 class="font-h2 text-h2 font-bold text-primary">VietMarket</h1>
+<p class="font-caption text-caption text-on-surface-variant mt-1">Admin Console</p>
+</div>
+<ul class="flex-1 overflow-y-auto px-space-md space-y-2">
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="dashboard">dashboard</span><span class="font-h6 text-h6">Dashboard</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="group">group</span><span class="font-h6 text-h6">Users</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="store">store</span><span class="font-h6 text-h6">Sellers</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="inventory_2">inventory_2</span><span class="font-h6 text-h6">Products</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="category">category</span><span class="font-h6 text-h6">Categories</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="shopping_cart">shopping_cart</span><span class="font-h6 text-h6">Orders</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="payments">payments</span><span class="font-h6 text-h6">Financials</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg bg-primary-container/10 text-primary border-l-4 border-primary cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md icon-fill" data-icon="campaign">campaign</span><span class="font-h6 text-h6">Ads</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="assessment">assessment</span><span class="font-h6 text-h6">Reports</span></a></li>
+<li><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer active:scale-95" href="#"><span class="material-symbols-outlined mr-space-md" data-icon="settings">settings</span><span class="font-h6 text-h6">Settings</span></a></li>
+</ul>
+</nav>
+<!-- TopNavBar -->
+<header class="hidden md:flex fixed top-0 right-0 w-[calc(100%-260px)] h-header-height justify-between items-center px-margin-page bg-white dark:bg-surface-container border-b border-outline-variant z-10">
+<div class="flex items-center">
+<div class="relative w-64 mr-4">
+<span class="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-full font-body-md text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Search..." type="text"/>
+</div>
+</div>
+<div class="flex items-center space-x-2">
+<button class="hover:bg-surface-container-high rounded-full p-2 transition-all duration-200 text-on-surface-variant"><span class="material-symbols-outlined" data-icon="language">language</span></button>
+<button class="hover:bg-surface-container-high rounded-full p-2 transition-all duration-200 text-on-surface-variant"><span class="material-symbols-outlined" data-icon="help">help</span></button>
+<button class="hover:bg-surface-container-high rounded-full p-2 transition-all duration-200 text-on-surface-variant relative"><span class="material-symbols-outlined" data-icon="notifications">notifications</span><span class="absolute top-1 right-2 w-2 h-2 bg-error rounded-full"></span></button>
+<div class="ml-4 h-8 w-8 rounded-full bg-primary-container flex items-center justify-center cursor-pointer border border-outline-variant overflow-hidden">
+<img alt="Admin User Profile" class="w-full h-full object-cover" data-alt="Professional headshot of a corporate admin user in a modern office setting, bright lighting, high quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfoIU_CXKU4zPbXm11uvTNJSa1aZmSbJq_-_ruXyE9KyhnwFLLGlMAlGX5Vonhw7t2a9_0GpJhYybY1Hnl1ITV6Q0bnybLKHCFqHhUK8CRnBIBFOOXiWWQjta_RCH3W8vi1SBy85PZ0wkxSI4BuZaZrtrAQT6H5oJfEuLmcuNSupcNq5-TPfH6YQxw4VtdV9n88D-Yeiz-7-nfE9aKLRcthGnYBYjJmQUnQP3eYUMOt7y6oZel1GI3olAGEZe7hzp3KxoCvBg0_48R"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="w-full md:ml-[260px] md:mt-[64px] p-margin-page pt-4">
+<!-- Page Header -->
+<div class="flex justify-between items-end mb-gutter">
+<div>
+<nav class="flex text-caption font-caption text-on-surface-variant mb-2">
+<ol class="flex space-x-2">
+<li><a class="hover:text-primary" href="#">Admin Console</a></li>
+<li><span class="mx-1">/</span></li>
+<li><a class="hover:text-primary" href="#">Ads &amp; Comms</a></li>
+<li><span class="mx-1">/</span></li>
+<li class="text-on-surface font-medium">Notification Templates</li>
+</ol>
+</nav>
+<h2 class="font-h1 text-h1 text-on-surface">Bulk Notifications</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-1">Manage broadcast message templates for specific audience segments.</p>
+</div>
+<button class="bg-primary text-on-primary hover:bg-surface-tint font-h6 text-h6 py-2 px-4 rounded-lg flex items-center transition-colors shadow-sm">
+<span class="material-symbols-outlined mr-2 text-[20px]">add</span>
+                Create Template
+            </button>
+</div>
+<!-- Layout Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Left Column: Template List (Takes up 2/3 space on large screens) -->
+<div class="lg:col-span-2 flex flex-col gap-gutter">
+<!-- Filters & Actions -->
+<div class="bg-white rounded-xl border border-outline-variant p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+<div class="flex gap-2 w-full sm:w-auto">
+<select class="form-select bg-surface-container-low border-outline-variant rounded-lg font-body-md text-on-surface text-sm py-2 px-3 focus:ring-primary focus:border-primary">
+<option>All Audiences</option>
+<option>Buyers Only</option>
+<option>Sellers Only</option>
+</select>
+<select class="form-select bg-surface-container-low border-outline-variant rounded-lg font-body-md text-on-surface text-sm py-2 px-3 focus:ring-primary focus:border-primary">
+<option>Status: All</option>
+<option>Active</option>
+<option>Draft</option>
+</select>
+</div>
+<div class="relative w-full sm:w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 transform -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full pl-10 pr-4 py-2 border border-outline-variant rounded-lg font-body-md text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Search templates..." type="text"/>
+</div>
+</div>
+<!-- Template Table Card -->
+<div class="bg-white rounded-xl border border-outline-variant overflow-hidden flex-1">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="py-3 px-4 font-h6 text-h6 text-on-surface font-semibold uppercase tracking-wider text-xs">Template Name</th>
+<th class="py-3 px-4 font-h6 text-h6 text-on-surface font-semibold uppercase tracking-wider text-xs">Audience</th>
+<th class="py-3 px-4 font-h6 text-h6 text-on-surface font-semibold uppercase tracking-wider text-xs">Status</th>
+<th class="py-3 px-4 font-h6 text-h6 text-on-surface font-semibold uppercase tracking-wider text-xs">Last Used</th>
+<th class="py-3 px-4 font-h6 text-h6 text-on-surface font-semibold uppercase tracking-wider text-xs text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant font-body-md text-body-md">
+<tr class="hover:bg-surface-container-lowest transition-colors cursor-pointer group">
+<td class="py-4 px-4">
+<div class="font-medium text-on-surface group-hover:text-primary transition-colors">Flash Sale Alert 24h</div>
+<div class="text-on-surface-variant text-sm truncate max-w-[200px]">Don't miss out on our massive 24h flash sale starting tomorrow...</div>
+</td>
+<td class="py-4 px-4"><span class="inline-flex items-center px-2 py-1 rounded-md bg-surface-container text-on-surface text-xs font-medium">Buyers</span></td>
+<td class="py-4 px-4"><span class="inline-flex items-center px-2 py-1 rounded-md bg-[#dcfce7] text-[#16a34a] text-xs font-medium">Active</span></td>
+<td class="py-4 px-4 text-on-surface-variant text-sm">Oct 24, 2023</td>
+<td class="py-4 px-4 text-right">
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors cursor-pointer group bg-surface-container-low/30 border-l-2 border-primary">
+<td class="py-4 px-4">
+<div class="font-medium text-primary">System Maintenance Notice</div>
+<div class="text-on-surface-variant text-sm truncate max-w-[200px]">Scheduled downtime for essential system upgrades on Sunday...</div>
+</td>
+<td class="py-4 px-4"><span class="inline-flex items-center px-2 py-1 rounded-md bg-surface-container-high text-on-surface text-xs font-medium">All Users</span></td>
+<td class="py-4 px-4"><span class="inline-flex items-center px-2 py-1 rounded-md bg-[#dcfce7] text-[#16a34a] text-xs font-medium">Active</span></td>
+<td class="py-4 px-4 text-on-surface-variant text-sm">Sep 12, 2023</td>
+<td class="py-4 px-4 text-right">
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors cursor-pointer group">
+<td class="py-4 px-4">
+<div class="font-medium text-on-surface group-hover:text-primary transition-colors">Seller Fee Update Q4</div>
+<div class="text-on-surface-variant text-sm truncate max-w-[200px]">Important update regarding transaction fees effective...</div>
+</td>
+<td class="py-4 px-4"><span class="inline-flex items-center px-2 py-1 rounded-md bg-surface-variant text-on-surface text-xs font-medium">Sellers</span></td>
+<td class="py-4 px-4"><span class="inline-flex items-center px-2 py-1 rounded-md bg-[#f1f5f9] text-[#475569] text-xs font-medium">Draft</span></td>
+<td class="py-4 px-4 text-on-surface-variant text-sm">Never</td>
+<td class="py-4 px-4 text-right">
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors cursor-pointer group">
+<td class="py-4 px-4">
+<div class="font-medium text-on-surface group-hover:text-primary transition-colors">Holiday Shipping Deadlines</div>
+<div class="text-on-surface-variant text-sm truncate max-w-[200px]">Ensure your gifts arrive on time. Check our holiday shipping...</div>
+</td>
+<td class="py-4 px-4"><span class="inline-flex items-center px-2 py-1 rounded-md bg-surface-container text-on-surface text-xs font-medium">Buyers</span></td>
+<td class="py-4 px-4"><span class="inline-flex items-center px-2 py-1 rounded-md bg-[#dcfce7] text-[#16a34a] text-xs font-medium">Active</span></td>
+<td class="py-4 px-4 text-on-surface-variant text-sm">Dec 01, 2022</td>
+<td class="py-4 px-4 text-right">
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Pagination -->
+<div class="border-t border-outline-variant p-4 flex justify-between items-center bg-white">
+<span class="text-sm text-on-surface-variant">Showing 1 to 4 of 24 entries</span>
+<div class="flex space-x-1">
+<button class="px-3 py-1 border border-outline-variant rounded-md text-on-surface-variant hover:bg-surface-container disabled:opacity-50 text-sm">Prev</button>
+<button class="px-3 py-1 border border-primary bg-primary text-on-primary rounded-md text-sm">1</button>
+<button class="px-3 py-1 border border-outline-variant rounded-md text-on-surface hover:bg-surface-container text-sm">2</button>
+<button class="px-3 py-1 border border-outline-variant rounded-md text-on-surface-variant hover:bg-surface-container text-sm">Next</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Live Preview Pane -->
+<div class="lg:col-span-1">
+<div class="bg-white rounded-xl border border-outline-variant h-full flex flex-col overflow-hidden sticky top-24">
+<div class="bg-surface-container-low p-4 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-h5 text-h5 text-on-surface">Live Preview</h3>
+<div class="flex space-x-2">
+<button class="text-primary p-1 rounded hover:bg-primary-container/20"><span class="material-symbols-outlined text-[20px]">smartphone</span></button>
+<button class="text-on-surface-variant p-1 rounded hover:bg-surface-container"><span class="material-symbols-outlined text-[20px]">desktop_windows</span></button>
+</div>
+</div>
+<div class="flex-1 bg-surface flex items-center justify-center p-6">
+<!-- Simulated Mobile Device -->
+<div class="w-[320px] h-[600px] bg-white rounded-[32px] border-8 border-outline-variant shadow-lg overflow-hidden flex flex-col relative">
+<!-- Mobile Status Bar -->
+<div class="bg-surface-container-low h-6 w-full flex justify-between items-center px-4 text-[10px] text-on-surface-variant">
+<span>9:41</span>
+<div class="flex space-x-1">
+<span class="material-symbols-outlined text-[12px]">signal_cellular_4_bar</span>
+<span class="material-symbols-outlined text-[12px]">wifi</span>
+<span class="material-symbols-outlined text-[12px]">battery_full</span>
+</div>
+</div>
+<!-- App Header -->
+<div class="bg-primary text-on-primary p-3 flex items-center shadow-sm z-10">
+<span class="material-symbols-outlined mr-2">arrow_back</span>
+<span class="font-medium text-sm">Notifications</span>
+</div>
+<!-- Notification Feed Content -->
+<div class="flex-1 bg-surface p-3 space-y-3 overflow-y-auto">
+<!-- The Previewed Notification -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-outline-variant relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center space-x-2">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">info</span>
+</div>
+<div>
+<h4 class="text-sm font-semibold text-on-surface leading-tight">System Maintenance Notice</h4>
+<span class="text-[10px] text-on-surface-variant">Just now</span>
+</div>
+</div>
+</div>
+<p class="text-xs text-on-surface mt-2 leading-relaxed">
+                                        Scheduled downtime for essential system upgrades on Sunday, Nov 5th from 02:00 AM to 04:00 AM (ICT). We apologize for any inconvenience.
+                                    </p>
+<div class="mt-3">
+<button class="w-full py-1.5 bg-surface-container-low text-primary text-xs font-medium rounded-md hover:bg-surface-container transition-colors">Read Details</button>
+</div>
+</div>
+<!-- Dummy old notification -->
+<div class="bg-white p-4 rounded-xl shadow-sm border border-transparent opacity-60">
+<div class="flex items-center space-x-2 mb-2">
+<div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">local_shipping</span>
+</div>
+<div>
+<h4 class="text-sm font-medium text-on-surface leading-tight">Order Shipped</h4>
+<span class="text-[10px] text-on-surface-variant">Yesterday</span>
+</div>
+</div>
+<p class="text-xs text-on-surface mt-2">Your order #VN-8842 has been handed over to the delivery partner.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

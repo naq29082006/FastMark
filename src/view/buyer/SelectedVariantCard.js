@@ -56,16 +56,16 @@ export default function SelectedVariantCard({
 const styles = StyleSheet.create({
   box: {
     borderWidth: 1,
-    borderColor: '#99f6e4',
+    borderColor: '#A7D9B8',
     borderRadius: 12,
     padding: 12,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#E6F4EC',
     marginBottom: 4,
   },
   label: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0f766e',
+    color: '#076F32',
     marginBottom: 8,
   },
   row: {
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#0f766e',
+    color: '#076F32',
     lineHeight: 18,
   },
   meta: {

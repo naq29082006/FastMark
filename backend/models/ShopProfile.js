@@ -34,6 +34,17 @@ const ShopProfileSchema = new mongoose.Schema({
   totalProducts: { type: Number, default: 0 },
   soldCount: { type: Number, default: 0 },
 
+  /** Cho phép buyer giữ hàng */
+  allowReserve: { type: Boolean, default: true },
+  /** % đặt cọc (0 = không cọc). Ví dụ 10, 30, 50 */
+  depositPercent: { type: Number, default: 0, min: 0, max: 100 },
+
+  /** Gói người bán: 1 | 3 | 6 (tháng), null = chưa mua */
+  subscriptionPlan: { type: Number, default: null },
+  subscriptionExpiresAt: { type: Date, default: null, index: true },
+  /** Ghim giờ mở/đóng cửa trên trang shop công khai */
+  pinHours: { type: Boolean, default: false },
+
   DangHoatDong: { type: Boolean, default: false },
   LanHoatDongCuoi: { type: Date, default: null },
 

@@ -193,7 +193,7 @@ export default function SellerLocationPickerScreen({
           <Text style={styles.infoLabel}>Địa chỉ hệ thống</Text>
           {isResolving ? (
             <View style={styles.resolvingRow}>
-              <ActivityIndicator color="#0d7377" size="small" />
+              <ActivityIndicator color="#076F32" size="small" />
               <Text style={styles.resolvingText}>Đang lấy địa chỉ...</Text>
             </View>
           ) : (
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     marginTop: 4,
   },
   confirmButtonText: {

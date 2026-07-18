@@ -1,0 +1,16 @@
+const BANNER_TARGET_TYPE = {
+  PRODUCT: 1,
+  SHOP: 2,
+  CATEGORY: 3,
+  PROMOTION: 4,
+};
+
+const BANNER_STATUS = {
+  INACTIVE: 0,
+  ACTIVE: 1,
+};
+
+module.exports = {
+  BANNER_TARGET_TYPE,
+  BANNER_STATUS,
+};

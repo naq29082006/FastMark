@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quên mật khẩu - FastMark Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb2bf",
+                        "tertiary": "#a72d51",
+                        "tertiary-fixed": "#ffd9de",
+                        "on-primary-fixed": "#002109",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#0b1c30",
+                        "outline": "#6e7b6c",
+                        "secondary": "#006e2f",
+                        "on-primary-container": "#f7fff2",
+                        "secondary-fixed": "#6bff8f",
+                        "on-background": "#0b1c30",
+                        "secondary-container": "#6bff8f",
+                        "on-primary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#00873a",
+                        "surface": "#f8f9ff",
+                        "inverse-primary": "#62df7d",
+                        "on-tertiary-container": "#fffbff",
+                        "on-secondary-container": "#007432",
+                        "surface-bright": "#f8f9ff",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#d3e4fe",
+                        "surface-container": "#e5eeff",
+                        "surface-container-highest": "#d3e4fe",
+                        "on-secondary-fixed": "#002109",
+                        "tertiary-container": "#c74668",
+                        "background": "#f8f9ff",
+                        "primary-fixed": "#7ffc97",
+                        "primary": "#006b2c",
+                        "outline-variant": "#bdcaba",
+                        "surface-container-low": "#eff4ff",
+                        "surface-dim": "#cbdbf5",
+                        "on-tertiary-fixed": "#3f0016",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed-dim": "#4ae176",
+                        "surface-container-high": "#dce9ff",
+                        "on-surface-variant": "#3e4a3d",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-secondary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#8a143c",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-secondary-fixed-variant": "#005321",
+                        "inverse-surface": "#213145",
+                        "surface-tint": "#006e2d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "space-lg": "24px",
+                        "container-max-width": "1440px",
+                        "space-xl": "32px",
+                        "margin-page": "32px",
+                        "space-xs": "4px",
+                        "sidebar-width": "260px",
+                        "header-height": "64px",
+                        "space-sm": "8px",
+                        "space-md": "16px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "h1": ["Inter"],
+                        "caption": ["Inter"],
+                        "h6": ["Inter"],
+                        "h2": ["Inter"],
+                        "h4": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h5": ["Inter"],
+                        "h3": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "h1": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "h6": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "h2": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "h4": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "h5": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "h3": ["20px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Subtle background pattern */
+        .bg-pattern {
+            background-color: #f8f9ff;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface bg-pattern min-h-screen flex items-center justify-center p-space-md">
+<!-- Card Container -->
+<main class="w-full max-w-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-[0_15px_30px_-5px_rgba(0,0,0,0.04)] overflow-hidden">
+<!-- Header Section -->
+<div class="px-space-lg py-space-xl text-center border-b border-outline-variant bg-surface-container-low">
+<div class="inline-flex items-center justify-center w-16 h-16 bg-primary-container text-on-primary-container rounded-full mb-space-md">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 32px;">lock_reset</span>
+</div>
+<h1 class="font-h2 text-h2 text-on-surface mb-space-xs">Quên mật khẩu?</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Đừng lo lắng, hãy nhập email quản trị của bạn bên dưới và chúng tôi sẽ gửi liên kết khôi phục.
+            </p>
+</div>
+<!-- Form Section -->
+<div class="p-space-lg" id="reset-form">
+<form class="space-y-space-md" onsubmit="handleResetSubmit(event)">
+<div class="space-y-space-xs">
+<label class="block font-label-sm text-label-sm text-on-surface-variant" for="email">Email hoặc Tên đăng nhập</label>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline">mail</span>
+</div>
+<input class="block w-full pl-10 pr-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors" id="email" name="email" placeholder="admin@fastmark.vn" required="" type="email"/>
+</div>
+</div>
+<button class="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-h6 text-h6 text-on-primary bg-primary hover:bg-surface-tint focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors duration-200" type="submit">
+                    Gửi liên kết khôi phục
+                </button>
+</form>
+<div class="mt-space-lg text-center">
+<a class="inline-flex items-center font-body-md text-body-md text-primary hover:text-surface-tint transition-colors" href="#">
+<span class="material-symbols-outlined mr-1" style="font-size: 18px;">arrow_back</span>
+                    Quay lại trang Đăng nhập
+                </a>
+</div>
+</div>
+<!-- Success Message Section (Hidden by default) -->
+<div class="hidden p-space-lg text-center" id="success-message">
+<div class="inline-flex items-center justify-center w-16 h-16 bg-secondary-container text-on-secondary-container rounded-full mb-space-md">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 32px;">check_circle</span>
+</div>
+<h2 class="font-h3 text-h3 text-on-surface mb-space-sm">Đã gửi email khôi phục!</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-space-lg">
+                Chúng tôi đã gửi một email chứa liên kết khôi phục mật khẩu đến <strong class="text-on-surface" id="submitted-email"></strong>. Vui lòng kiểm tra hộp thư đến và thư mục spam của bạn.
+            </p>
+<div class="space-y-space-md">
+<button class="w-full flex justify-center items-center py-2.5 px-4 border border-outline rounded-lg text-sm font-h6 text-h6 text-on-surface bg-surface-container-lowest hover:bg-surface-container-low transition-colors duration-200" onclick="resetForm()">
+                    Thử email khác
+                </button>
+<a class="block font-body-md text-body-md text-primary hover:text-surface-tint transition-colors" href="#">
+                    Quay lại trang Đăng nhập
+                </a>
+</div>
+</div>
+</main>
+<script>
+        function handleResetSubmit(event) {
+            event.preventDefault();
+            const emailInput = document.getElementById('email').value;
+            
+            // Basic validation simulation
+            if(emailInput) {
+                document.getElementById('reset-form').classList.add('hidden');
+                document.getElementById('success-message').classList.remove('hidden');
+                document.getElementById('submitted-email').textContent = emailInput;
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('success-message').classList.add('hidden');
+            document.getElementById('reset-form').classList.remove('hidden');
+            document.getElementById('email').value = '';
+        }
+    </script>
+</body></html>

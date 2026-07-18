@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Hiệu suất Người bán - Chợ Quê FastMark Admin</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-secondary-container": "#007432",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container": "#e5eeff",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#6e7b6c",
+                        "surface-tint": "#006e2d",
+                        "on-secondary-fixed": "#002109",
+                        "tertiary-fixed-dim": "#ffb2bf",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-primary-fixed-variant": "#005320",
+                        "primary-fixed": "#7ffc97",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#d3e4fe",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-container-highest": "#d3e4fe",
+                        "primary-container": "#00873a",
+                        "inverse-surface": "#213145",
+                        "surface-bright": "#f8f9ff",
+                        "surface-container-high": "#dce9ff",
+                        "error": "#ba1a1a",
+                        "surface": "#f8f9ff",
+                        "inverse-primary": "#62df7d",
+                        "inverse-on-surface": "#eaf1ff",
+                        "secondary-fixed": "#6bff8f",
+                        "background": "#f8f9ff",
+                        "primary-fixed-dim": "#62df7d",
+                        "primary": "#006b2c",
+                        "on-tertiary-fixed-variant": "#8a143c",
+                        "on-surface": "#0b1c30",
+                        "on-primary-fixed": "#002109",
+                        "secondary": "#006e2f",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#6bff8f",
+                        "on-tertiary-fixed": "#3f0016",
+                        "on-background": "#0b1c30",
+                        "surface-dim": "#cbdbf5",
+                        "tertiary": "#a72d51",
+                        "outline-variant": "#bdcaba",
+                        "on-secondary-fixed-variant": "#005321",
+                        "on-primary-container": "#f7fff2",
+                        "tertiary-container": "#c74668",
+                        "tertiary-fixed": "#ffd9de",
+                        "surface-container-low": "#eff4ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "space-xl": "32px",
+                        "space-lg": "24px",
+                        "gutter": "24px",
+                        "sidebar-width": "260px",
+                        "margin-page": "32px",
+                        "space-sm": "8px",
+                        "space-xs": "4px",
+                        "container-max-width": "1440px",
+                        "space-md": "16px",
+                        "header-height": "64px"
+                    },
+                    "fontFamily": {
+                        "h4": ["Inter"], "h1": ["Inter"], "body-lg": ["Inter"], "h2": ["Inter"],
+                        "h5": ["Inter"], "caption": ["Inter"], "h6": ["Inter"], "h3": ["Inter"],
+                        "body-md": ["Inter"], "label-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h4": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+                        "h1": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "h2": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "h5": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "h6": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "h3": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased min-h-screen overflow-x-hidden">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-screen w-sidebar-width bg-surface dark:bg-inverse-surface border-r border-outline-variant dark:border-outline flex flex-col py-space-md z-50">
+<div class="px-space-md mb-space-lg flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold">CQ</div>
+<div class="font-h3 text-h3 font-bold text-primary dark:text-primary-fixed">FastMark Admin</div>
+</div>
+<div class="px-space-md mb-4">
+<span class="font-caption text-caption text-on-surface-variant uppercase tracking-wider">Management Console</span>
+</div>
+<nav class="flex-1 overflow-y-auto px-space-sm space-y-1">
+<!-- Tabs -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Người dùng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">storefront</span>
+<span>Người bán</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">store</span>
+<span>Gian hàng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>Sản phẩm</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">category</span>
+<span>Danh mục</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span>Đơn hàng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">ad_units</span>
+<span>Banner quảng cáo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span>Ví điện tử</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">card_membership</span>
+<span>Gói Seller</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span>Báo cáo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span>Thông báo</span>
+</a>
+<!-- Active Tab -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary-container/10 text-primary border-l-4 border-primary cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined icon-fill">analytics</span>
+<span class="font-bold">Thống kê</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Cài đặt</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="ml-sidebar-width min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-260px)] h-header-height bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flex justify-between items-center px-margin-page z-40">
+<div class="flex items-center gap-4">
+<div class="font-h4 text-h4 font-bold text-primary">Chợ Quê FastMark</div>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="flex gap-2">
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">help</span>
+</button>
+</div>
+<div class="h-6 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-3 cursor-pointer group">
+<div class="text-right">
+<div class="font-h6 text-h6 text-on-surface group-hover:text-primary transition-colors">Nguyễn Admin</div>
+<div class="font-caption text-caption text-on-surface-variant">Quản trị viên</div>
+</div>
+<img class="w-10 h-10 rounded-full object-cover border border-outline-variant" data-alt="A highly detailed professional portrait of a confident Asian male admin user, bright studio lighting, neutral grey background, wearing a crisp modern business shirt, highly photorealistic style, sharp focus." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCCZ2-hb24HfKPlHxMf-IXC4ElN8QXHlF0r21jy_D93xQYf2-x9hgKHtTa9im26O9-45O1MEs6NavME6-LwqOpE8uEDlxau6uUCMb4InVvik7Gw7QTY5g7l729ZbuKkCORKHEW5tEPGPSXQ_mR2Yaw_FDWcHZ0dzUp9Qj2PWhZ0VLye3IwbhqLd-B2s0Hrdxgu4zmRrnIThkl55WdBQODmk0aSVur-uHWlyUndeMDX4IQza9pTaxERKfpbpWr3ofcuulYU3Z0PJs22c"/>
+</div>
+</div>
+</header>
+<!-- Main Dashboard Content -->
+<main class="flex-1 mt-header-height p-margin-page overflow-y-auto bg-background">
+<!-- Page Header -->
+<div class="flex justify-between items-end mb-space-lg">
+<div>
+<div class="flex items-center gap-2 text-on-surface-variant mb-1 font-caption text-caption">
+<span>Thống kê</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-primary font-medium">Hiệu suất Người bán</span>
+</div>
+<h1 class="font-h1 text-h1 text-on-surface">Phân tích Người bán</h1>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span class="font-label-sm text-label-sm">Tháng này</span>
+</button>
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px]">download</span>
+<span class="font-label-sm text-label-sm">Xuất báo cáo</span>
+</button>
+</div>
+</div>
+<!-- Top Metrics Row -->
+<div class="grid grid-cols-12 gap-gutter mb-gutter">
+<!-- Metric 1 -->
+<div class="col-span-3 bg-surface-container-lowest border border-outline-variant rounded-lg p-space-md flex flex-col hover:shadow-sm transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="font-body-md text-body-md text-on-surface-variant">Tổng Người bán</span>
+<div class="p-1.5 rounded-md bg-surface-container text-primary">
+<span class="material-symbols-outlined text-[20px]">storefront</span>
+</div>
+</div>
+<div class="font-h1 text-h1 text-on-surface mb-1">12,450</div>
+<div class="flex items-center gap-1 text-secondary-fixed-dim font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span>+5.2% so với tháng trước</span>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="col-span-3 bg-surface-container-lowest border border-outline-variant rounded-lg p-space-md flex flex-col hover:shadow-sm transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="font-body-md text-body-md text-on-surface-variant">Gian hàng Hoạt động</span>
+<div class="p-1.5 rounded-md bg-surface-container text-primary">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+</div>
+</div>
+<div class="font-h1 text-h1 text-on-surface mb-1">8,920</div>
+<div class="flex items-center gap-1 text-secondary-fixed-dim font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span>+2.1% so với tháng trước</span>
+</div>
+</div>
+<!-- Metric 3 -->
+<div class="col-span-3 bg-surface-container-lowest border border-outline-variant rounded-lg p-space-md flex flex-col hover:shadow-sm transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="font-body-md text-body-md text-on-surface-variant">Tỷ lệ Rời bỏ (Churn)</span>
+<div class="p-1.5 rounded-md bg-error-container text-error">
+<span class="material-symbols-outlined text-[20px]">person_remove</span>
+</div>
+</div>
+<div class="font-h1 text-h1 text-on-surface mb-1">4.3%</div>
+<div class="flex items-center gap-1 text-error font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span>+0.5% so với tháng trước</span>
+</div>
+</div>
+<!-- Metric 4 -->
+<div class="col-span-3 bg-surface-container-lowest border border-outline-variant rounded-lg p-space-md flex flex-col hover:shadow-sm transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="font-body-md text-body-md text-on-surface-variant">Điểm Sức khỏe TB</span>
+<div class="p-1.5 rounded-md bg-surface-container text-primary">
+<span class="material-symbols-outlined text-[20px]">health_and_safety</span>
+</div>
+</div>
+<div class="font-h1 text-h1 text-on-surface mb-1">86/100</div>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">horizontal_rule</span>
+<span>Ổn định</span>
+</div>
+</div>
+</div>
+<!-- Main Charts Grid -->
+<div class="grid grid-cols-12 gap-gutter">
+<!-- Top Performing Categories (Bar Chart area) -->
+<div class="col-span-8 bg-surface-container-lowest border border-outline-variant rounded-lg p-space-lg flex flex-col">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-h3 text-h3 text-on-surface">Danh mục Hiệu quả nhất</h2>
+<button class="text-primary hover:bg-surface-container p-1 rounded transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="flex-1 space-y-4">
+<!-- Bar Item -->
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface font-medium">Nông sản sạch</span>
+<span class="text-on-surface-variant">12.5M VNĐ / CH</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2">
+<div class="bg-primary h-2 rounded-full" style="width: 85%"></div>
+</div>
+</div>
+<!-- Bar Item -->
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface font-medium">Thực phẩm chế biến</span>
+<span class="text-on-surface-variant">9.8M VNĐ / CH</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2">
+<div class="bg-primary/80 h-2 rounded-full" style="width: 70%"></div>
+</div>
+</div>
+<!-- Bar Item -->
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface font-medium">Đồ thủ công mỹ nghệ</span>
+<span class="text-on-surface-variant">7.2M VNĐ / CH</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2">
+<div class="bg-primary/60 h-2 rounded-full" style="width: 55%"></div>
+</div>
+</div>
+<!-- Bar Item -->
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface font-medium">Đặc sản vùng miền</span>
+<span class="text-on-surface-variant">6.5M VNĐ / CH</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2">
+<div class="bg-outline h-2 rounded-full" style="width: 45%"></div>
+</div>
+</div>
+<!-- Bar Item -->
+<div>
+<div class="flex justify-between font-label-sm text-label-sm mb-1">
+<span class="text-on-surface font-medium">Đồ uống &amp; Thảo mộc</span>
+<span class="text-on-surface-variant">4.1M VNĐ / CH</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2">
+<div class="bg-outline h-2 rounded-full" style="width: 30%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Subscription Distribution (Donut alternative) -->
+<div class="col-span-4 bg-surface-container-lowest border border-outline-variant rounded-lg p-space-lg flex flex-col">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-h3 text-h3 text-on-surface">Phân bố Gói Seller</h2>
+</div>
+<div class="flex-1 flex flex-col justify-center gap-6">
+<!-- Custom CSS Donut representation via stacked bars or circles -->
+<div class="relative w-48 h-48 mx-auto rounded-full flex items-center justify-center shadow-inner" style="background: conic-gradient(#006b2c 0% 60%, #6bff8f 60% 85%, #dce9ff 85% 100%);">
+<div class="w-32 h-32 bg-surface-container-lowest rounded-full flex flex-col items-center justify-center">
+<span class="font-h2 text-h2 text-on-surface">12.4k</span>
+<span class="font-caption text-caption text-on-surface-variant">Tổng gian hàng</span>
+</div>
+</div>
+<div class="space-y-3 mt-4">
+<div class="flex items-center justify-between font-body-md text-body-md">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<span class="text-on-surface">Gói Cơ bản (Basic)</span>
+</div>
+<span class="font-medium">60%</span>
+</div>
+<div class="flex items-center justify-between font-body-md text-body-md">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-secondary-container"></div>
+<span class="text-on-surface">Gói Chuyên nghiệp (Pro)</span>
+</div>
+<span class="font-medium">25%</span>
+</div>
+<div class="flex items-center justify-between font-body-md text-body-md">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-surface-container-high"></div>
+<span class="text-on-surface">Gói VIP</span>
+</div>
+<span class="font-medium">15%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Seller Churn Rates & Store Health -->
+<div class="col-span-12 grid grid-cols-12 gap-gutter mt-gutter">
+<!-- Churn Rate Trend -->
+<div class="col-span-6 bg-surface-container-lowest border border-outline-variant rounded-lg p-space-lg">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-h4 text-h4 text-on-surface">Xu hướng Rời bỏ (6 tháng)</h2>
+</div>
+<div class="h-48 flex items-end gap-2 pb-4 border-b border-outline-variant relative">
+<!-- Y-axis labels -->
+<div class="absolute left-0 top-0 h-full flex flex-col justify-between text-caption text-on-surface-variant pb-4">
+<span>6%</span>
+<span>4%</span>
+<span>2%</span>
+<span>0%</span>
+</div>
+<!-- Bar chart representation of line data -->
+<div class="flex-1 flex items-end justify-around pl-8 h-full pt-4">
+<div class="w-1/6 bg-error-container hover:bg-error transition-colors rounded-t-sm relative group" style="height: 40%">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-inverse-surface text-inverse-on-surface font-caption text-caption px-2 py-1 rounded">2.4%</div>
+</div>
+<div class="w-1/6 bg-error-container hover:bg-error transition-colors rounded-t-sm relative group" style="height: 55%">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-inverse-surface text-inverse-on-surface font-caption text-caption px-2 py-1 rounded">3.3%</div>
+</div>
+<div class="w-1/6 bg-error-container hover:bg-error transition-colors rounded-t-sm relative group" style="height: 45%">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-inverse-surface text-inverse-on-surface font-caption text-caption px-2 py-1 rounded">2.7%</div>
+</div>
+<div class="w-1/6 bg-error-container hover:bg-error transition-colors rounded-t-sm relative group" style="height: 65%">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-inverse-surface text-inverse-on-surface font-caption text-caption px-2 py-1 rounded">3.9%</div>
+</div>
+<div class="w-1/6 bg-error-container hover:bg-error transition-colors rounded-t-sm relative group" style="height: 60%">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-inverse-surface text-inverse-on-surface font-caption text-caption px-2 py-1 rounded">3.6%</div>
+</div>
+<div class="w-1/6 bg-error rounded-t-sm relative group" style="height: 71%">
+<div class="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-inverse-surface text-inverse-on-surface font-caption text-caption px-2 py-1 rounded">4.3%</div>
+</div>
+</div>
+</div>
+<div class="flex justify-around pl-8 mt-2 text-caption text-on-surface-variant font-medium">
+<span>T1</span>
+<span>T2</span>
+<span>T3</span>
+<span>T4</span>
+<span>T5</span>
+<span>T6</span>
+</div>
+</div>
+<!-- Store Health Metrics -->
+<div class="col-span-6 bg-surface-container-lowest border border-outline-variant rounded-lg p-space-lg">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-h4 text-h4 text-on-surface">Cảnh báo Sức khỏe Gian hàng</h2>
+<button class="text-primary text-label-sm font-label-sm hover:underline">Xem chi tiết</button>
+</div>
+<div class="space-y-4">
+<!-- Alert Item -->
+<div class="flex items-start gap-3 p-3 rounded-lg bg-error-container/30 border border-error-container">
+<span class="material-symbols-outlined text-error mt-0.5">warning</span>
+<div>
+<h4 class="font-h6 text-h6 text-on-surface mb-1">Tỷ lệ hoàn đơn cao (&gt;15%)</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Có 142 gian hàng cần kiểm tra chất lượng sản phẩm đóng gói.</p>
+</div>
+</div>
+<!-- Alert Item -->
+<div class="flex items-start gap-3 p-3 rounded-lg bg-surface-container border border-outline-variant">
+<span class="material-symbols-outlined text-primary mt-0.5">inventory</span>
+<div>
+<h4 class="font-h6 text-h6 text-on-surface mb-1">Hết hàng tồn kho</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">320 gian hàng có top sản phẩm bán chạy đang ở mức tồn kho 0.</p>
+</div>
+</div>
+<!-- Alert Item -->
+<div class="flex items-start gap-3 p-3 rounded-lg bg-surface-container border border-outline-variant">
+<span class="material-symbols-outlined text-outline mt-0.5">schedule</span>
+<div>
+<h4 class="font-h6 text-h6 text-on-surface mb-1">Phản hồi khách hàng chậm</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Thời gian phản hồi trung bình tăng 2.5 giờ so với tuần trước.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

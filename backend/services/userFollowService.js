@@ -97,16 +97,25 @@ async function getActiveShop(shopId) {
   return shop;
 }
 
-function toClientShopCard(shop, extra = {}) {
+function toClientShopCard(shop, extra = {}, owner = null) {
+  const ownerName = pickString(owner?.FullName) || pickString(owner?.UserName) || "";
+  const ownerUsername = pickString(owner?.UserName) || "";
+  const displayName = ownerName || shop.shopName || "";
+  const displayUsername = ownerUsername || shop.shopUsername || "";
+
   return {
     id: String(shop._id),
     shopId: String(shop._id),
-    shopName: shop.shopName || "",
-    shopUsername: shop.shopUsername || "",
+    shopName: displayName,
+    shopUsername: displayUsername,
+    fullName: displayName,
+    userName: displayUsername,
+    ownerUserId: shop.userId ? String(shop.userId) : "",
     shopAvatar: shop.avatar || "",
-    avatar: shop.avatar || "",
+    avatar: shop.avatar || owner?.Avatar || "",
     address: shop.address || shop.DiaChiHeThong || "",
-    followersCount: Number(shop.followersCount) || 0,
+    followersCount:
+      Number(owner?.FollowersCount) || Number(shop.followersCount) || 0,
     averageRating: Number(shop.averageRating) || 0,
     totalProducts: Number(shop.totalProducts) || 0,
     ...extra,
@@ -203,6 +212,13 @@ async function followShop(currentUser, payload = {}) {
         { $inc: { followersCount: 1 }, $set: { UpdatedAt: now } },
         options
       );
+      if (shop.userId) {
+        await User.updateOne(
+          { _id: shop.userId },
+          { $inc: { FollowersCount: 1 }, $set: { UpdatedAt: now } },
+          options
+        );
+      }
     });
   } catch (error) {
     if (error?.code === 11000 || error?.statusCode === 409) {
@@ -221,22 +237,27 @@ async function followShop(currentUser, payload = {}) {
 
   if (shop.userId && String(shop.userId) !== String(currentUser._id)) {
     const followerName = currentUser.FullName || currentUser.UserName || "Một người mua";
+    const ownerName = shop.shopName || "";
     await createNotification(shop.userId, {
-      title: "Có người theo dõi gian hàng",
-      content: `${followerName} vừa theo dõi gian hàng ${shop.shopName || ""}`.trim() + ".",
+      title: "Có người theo dõi bạn",
+      content: `${followerName} vừa theo dõi bạn${ownerName ? ` (${ownerName})` : ""}.`,
       audience: NOTIFICATION_AUDIENCE.SELLER,
     });
   }
 
   const freshShop = await ShopProfile.findById(shop._id).lean();
   const freshCurrent = await User.findById(currentUser._id).lean();
+  const freshOwner = shop.userId
+    ? await User.findById(shop.userId).lean()
+    : null;
 
   return {
     isFollowing: true,
     followId: followDoc?._id ? String(followDoc._id) : "",
     shopId: String(shop._id),
-    shop: toClientShopCard(freshShop || shop),
-    followersCount: Number(freshShop?.followersCount) || 0,
+    shop: toClientShopCard(freshShop || shop, {}, freshOwner),
+    followersCount:
+      Number(freshOwner?.FollowersCount) || Number(freshShop?.followersCount) || 0,
     followingCount: Number(freshCurrent?.FollowingCount) || 0,
   };
 }
@@ -290,16 +311,25 @@ async function unfollowShop(currentUser, payload = {}) {
       { $inc: { followersCount: -1 }, $set: { UpdatedAt: now } },
       options
     );
+    if (shop?.userId) {
+      await User.updateOne(
+        { _id: shop.userId, FollowersCount: { $gt: 0 } },
+        { $inc: { FollowersCount: -1 }, $set: { UpdatedAt: now } },
+        options
+      );
+    }
   });
 
   const freshShop = await ShopProfile.findById(shopId).lean();
   const freshCurrent = await User.findById(currentUser._id).lean();
+  const freshOwner = shop?.userId ? await User.findById(shop.userId).lean() : null;
 
   return {
     isFollowing: false,
     shopId: String(shopId),
-    shop: freshShop ? toClientShopCard(freshShop) : null,
-    followersCount: Number(freshShop?.followersCount) || 0,
+    shop: freshShop ? toClientShopCard(freshShop, {}, freshOwner) : null,
+    followersCount:
+      Number(freshOwner?.FollowersCount) || Number(freshShop?.followersCount) || 0,
     followingCount: Number(freshCurrent?.FollowingCount) || 0,
   };
 }
@@ -329,10 +359,15 @@ async function getFollowStatus(currentUser, payload = {}) {
     );
   }
 
+  const owner = shop?.userId
+    ? await User.findById(shop.userId).select("FollowersCount").lean()
+    : null;
+
   return {
     shopId: String(shopId),
     isFollowing,
-    followersCount: Number(shop?.followersCount) || 0,
+    followersCount:
+      Number(owner?.FollowersCount) || Number(shop?.followersCount) || 0,
   };
 }
 
@@ -355,6 +390,13 @@ async function listFollowing(currentUser, query = {}) {
       }).lean()
     : [];
   const shopById = new Map(shops.map((shop) => [String(shop._id), shop]));
+  const ownerIds = shops.map((shop) => shop.userId).filter(Boolean);
+  const owners = ownerIds.length
+    ? await User.find({ _id: { $in: ownerIds } })
+        .select("FullName UserName Avatar FollowersCount")
+        .lean()
+    : [];
+  const ownerById = new Map(owners.map((owner) => [String(owner._id), owner]));
 
   let items = rows
     .map((row) => {
@@ -362,16 +404,21 @@ async function listFollowing(currentUser, query = {}) {
       if (!shop) {
         return null;
       }
-      return toClientShopCard(shop, {
-        followedAt: row.CreatedAt,
-        isFollowing: true,
-      });
+      const owner = ownerById.get(String(shop.userId));
+      return toClientShopCard(
+        shop,
+        {
+          followedAt: row.CreatedAt,
+          isFollowing: true,
+        },
+        owner
+      );
     })
     .filter(Boolean);
 
   if (search) {
     items = items.filter((item) => {
-      const haystack = `${item.shopName} ${item.shopUsername}`.toLowerCase();
+      const haystack = `${item.shopName} ${item.shopUsername} ${item.fullName} ${item.userName}`.toLowerCase();
       return haystack.includes(search);
     });
   }

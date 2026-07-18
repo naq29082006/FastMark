@@ -31,11 +31,12 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files (chỉ 1 file .env ở thư mục gốc)
+# local env — chỉ 1 file .env ở thư mục gốc dự án (FastMark/.env)
 .env
 .env*.local
 **/.env
 **/.env*.local
+!.env.example
 
 # typescript
 *.tsbuildinfo

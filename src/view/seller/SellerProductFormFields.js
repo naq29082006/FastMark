@@ -417,8 +417,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   modalOptionActive: {
-    borderColor: '#0d7377',
-    backgroundColor: '#e8f3f1',
+    borderColor: '#076F32',
+    backgroundColor: '#E6F4EC',
   },
   modalOptionText: {
     fontSize: 15,
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   modalOptionTextActive: {
-    color: '#0d7377',
+    color: '#076F32',
   },
   categoryOptionRow: {
     flex: 1,
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   categoryOptionNameActive: {
-    color: '#0d7377',
+    color: '#076F32',
   },
   categoryOptionDescription: {
     fontSize: 13,
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   categoryOptionDescriptionActive: {
-    color: '#0f766e',
+    color: '#076F32',
   },
   categoryOptionDescriptionMuted: {
     fontSize: 12,
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   addImageText: {
-    color: '#0d7377',
+    color: '#076F32',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -603,13 +603,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     borderWidth: 1,
     borderColor: '#b7dfd8',
     marginBottom: 16,
   },
   addVariantText: {
-    color: '#0d7377',
+    color: '#076F32',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   submitButtonDisabled: {
     backgroundColor: '#94a3b8',

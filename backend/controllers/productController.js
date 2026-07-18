@@ -6,9 +6,11 @@ exports.createProduct = async (req, res) => {
 
   return success(res, {
     status: 201,
-    message: "Đăng sản phẩm thành công.",
+    message: result.message || "Đăng sản phẩm thành công.",
     data: {
       product: productService.toPublicProduct(result.product, result.variants),
+      subscriptionActive: result.subscriptionActive,
+      publiclyVisible: result.publiclyVisible,
     },
   });
 };

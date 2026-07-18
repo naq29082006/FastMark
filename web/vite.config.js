@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// https://vite.dev/config/
+// Đọc biến môi trường từ FastMark/.env (gốc dự án), không dùng web/.env
 export default defineConfig({
   plugins: [react()],
   envDir: path.resolve(__dirname, '..'),

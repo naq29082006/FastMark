@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Platform-wide Analytics &amp; Executive Report - VietMarket Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#7ffc97",
+                        "inverse-surface": "#213145",
+                        "surface-container": "#e5eeff",
+                        "tertiary-fixed-dim": "#ffb2bf",
+                        "secondary-container": "#6bff8f",
+                        "error-container": "#ffdad6",
+                        "on-primary-container": "#f7fff2",
+                        "primary": "#006b2c",
+                        "tertiary": "#a72d51",
+                        "on-background": "#0b1c30",
+                        "on-tertiary-fixed": "#3f0016",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#d3e4fe",
+                        "outline": "#6e7b6c",
+                        "on-primary-fixed": "#002109",
+                        "on-tertiary-container": "#fffbff",
+                        "surface": "#f8f9ff",
+                        "on-secondary-container": "#007432",
+                        "inverse-primary": "#62df7d",
+                        "primary-container": "#00873a",
+                        "outline-variant": "#bdcaba",
+                        "tertiary-container": "#c74668",
+                        "background": "#f8f9ff",
+                        "on-secondary-fixed": "#002109",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-container-low": "#eff4ff",
+                        "tertiary-fixed": "#ffd9de",
+                        "surface-dim": "#cbdbf5",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#006e2d",
+                        "secondary-fixed": "#6bff8f",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed-variant": "#005321",
+                        "on-primary-fixed-variant": "#005320",
+                        "surface-bright": "#f8f9ff",
+                        "secondary": "#006e2f",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#4ae176",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#d3e4fe",
+                        "on-tertiary-fixed-variant": "#8a143c",
+                        "surface-container-high": "#dce9ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "header-height": "64px",
+                        "gutter": "24px",
+                        "space-lg": "24px",
+                        "margin-page": "32px",
+                        "space-xl": "32px",
+                        "space-md": "16px",
+                        "space-xs": "4px",
+                        "space-sm": "8px",
+                        "sidebar-width": "260px",
+                        "container-max-width": "1440px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "h5": ["Inter"],
+                        "h6": ["Inter"],
+                        "h1": ["Inter"],
+                        "h2": ["Inter"],
+                        "caption": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "h4": ["Inter"],
+                        "h3": ["Inter"],
+                        "label-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "h5": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "h6": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "h1": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h2": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "h4": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+                        "h3": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAF8; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="bg-surface-container-lowest border-r border-outline-variant fixed left-0 top-0 h-full w-[260px] flex flex-col z-20">
+<div class="px-space-xl py-space-xl mb-4">
+<h1 class="font-h3 text-h3 font-bold text-primary">VietMarket</h1>
+<p class="font-caption text-caption text-on-surface-variant">Admin Console</p>
+</div>
+<div class="flex-1 overflow-y-auto py-4">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-h6 text-h6">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-h6 text-h6">Users</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="storefront">storefront</span>
+<span class="font-h6 text-h6">Sellers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-h6 text-h6">Products</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="category">category</span>
+<span class="font-h6 text-h6">Categories</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="font-h6 text-h6">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-h6 text-h6">Financials</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="campaign">campaign</span>
+<span class="font-h6 text-h6">Ads</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container/10 text-primary font-semibold border-l-4 border-primary" href="#">
+<span class="material-symbols-outlined" data-icon="analytics" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="font-h6 text-h6">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-h6 text-h6">Settings</span>
+</a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="bg-surface-container-lowest border-b border-outline-variant fixed top-0 right-0 left-[260px] h-[64px] flex justify-between items-center px-space-xl z-10">
+<div class="flex items-center gap-2">
+<span class="font-body-md text-body-md text-on-surface-variant">Dashboard /</span>
+<span class="font-h5 text-h5 text-primary font-bold border-b-2 border-primary pb-1">Reports</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-all">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A small, professional headshot of an administrator in a corporate setting. The image should be well-lit, sharp, and convey a sense of authority and competence, fitting for an executive dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBq6LaPETrRD5ZFgrHXN6lk8zGjVDinWswj5f9B92CKnN1wvZBhdQzWfUkovexsempt7EgCo17Uzd3BRba4qGXYXIIWc-tgEye8jBdUkfh5Lf8-C_IbPiK1qcNOuYRSGf59xYtLsVzJ1ZYIeoRBR16atOcuWcKZGPaHpvPzA1rl9DP4pf8RBrGvw5z4nTnTCiBk7__OmqlgspaUUpFbq03yvd_DWuOUgSLg6fgUOHrbQ5HwRJldxkBb9-zWT6x9XznqOPovHp61k3UZ"/>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-[260px] mt-[64px] w-full h-[calc(100vh-64px)] overflow-y-auto p-margin-page">
+<div class="max-w-container-max-width mx-auto">
+<!-- Page Header -->
+<div class="flex justify-between items-end mb-space-lg">
+<div>
+<h1 class="font-h2 text-h2 text-on-background mb-1">Platform Analytics</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Executive summary &amp; performance metrics for Q3 2023.</p>
+</div>
+<button class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg font-h6 text-h6 hover:bg-primary-container transition-colors shadow-sm">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
+                    Download Executive Summary
+                </button>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter mb-gutter">
+<!-- KPI Cards -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-space-lg hover:shadow-[0_4px_15px_rgba(0,0,0,0.04)] transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<span class="font-body-md text-body-md text-on-surface-variant">Gross Merchandise Value</span>
+<span class="material-symbols-outlined text-primary" data-icon="monetization_on">monetization_on</span>
+</div>
+<div class="font-h2 text-h2 text-on-background mb-2">$4.2M</div>
+<div class="flex items-center gap-1 text-secondary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+<span class="font-caption text-caption font-medium">+12.5% vs last quarter</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-space-lg hover:shadow-[0_4px_15px_rgba(0,0,0,0.04)] transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<span class="font-body-md text-body-md text-on-surface-variant">Average Order Value</span>
+<span class="material-symbols-outlined text-primary" data-icon="receipt_long">receipt_long</span>
+</div>
+<div class="font-h2 text-h2 text-on-background mb-2">$85.40</div>
+<div class="flex items-center gap-1 text-secondary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+<span class="font-caption text-caption font-medium">+3.2% vs last quarter</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-space-lg hover:shadow-[0_4px_15px_rgba(0,0,0,0.04)] transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<span class="font-body-md text-body-md text-on-surface-variant">Customer Acquisition Cost</span>
+<span class="material-symbols-outlined text-tertiary" data-icon="person_add">person_add</span>
+</div>
+<div class="font-h2 text-h2 text-on-background mb-2">$12.50</div>
+<div class="flex items-center gap-1 text-tertiary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_down">trending_down</span>
+<span class="font-caption text-caption font-medium">-1.5% vs last quarter</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-space-lg hover:shadow-[0_4px_15px_rgba(0,0,0,0.04)] transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<span class="font-body-md text-body-md text-on-surface-variant">Retention Rate</span>
+<span class="material-symbols-outlined text-primary" data-icon="loyalty">loyalty</span>
+</div>
+<div class="font-h2 text-h2 text-on-background mb-2">64.2%</div>
+<div class="flex items-center gap-1 text-secondary">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+<span class="font-caption text-caption font-medium">+5.1% vs last quarter</span>
+</div>
+</div>
+</div>
+<!-- Charts Section -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter mb-gutter">
+<!-- Trend Chart (Spans 2 cols) -->
+<div class="col-span-2 bg-surface-container-lowest border border-outline-variant rounded-xl p-space-lg">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-h4 text-h4 text-on-background">Revenue Trends</h3>
+<div class="flex gap-2">
+<button class="px-3 py-1 bg-surface-container-low text-primary font-label-sm text-label-sm rounded border border-primary-container/20">Monthly</button>
+<button class="px-3 py-1 text-on-surface-variant font-label-sm text-label-sm rounded hover:bg-surface-container-low">Quarterly</button>
+</div>
+</div>
+<div class="h-[300px] w-full bg-surface-container-low/50 rounded flex items-center justify-center border border-dashed border-outline-variant/50 relative overflow-hidden">
+<!-- Simulated Chart Grid -->
+<div class="absolute inset-0 flex flex-col justify-between py-4 px-2 opacity-20">
+<div class="border-b border-outline-variant w-full h-0"></div>
+<div class="border-b border-outline-variant w-full h-0"></div>
+<div class="border-b border-outline-variant w-full h-0"></div>
+<div class="border-b border-outline-variant w-full h-0"></div>
+</div>
+<span class="font-caption text-caption text-on-surface-variant z-10">[Multi-series Line Chart Visualization]</span>
+</div>
+</div>
+<!-- Category Pie Chart -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-space-lg flex flex-col">
+<h3 class="font-h4 text-h4 text-on-background mb-6">Revenue by Category</h3>
+<div class="flex-1 flex flex-col items-center justify-center">
+<div class="w-48 h-48 rounded-full border-[16px] border-primary border-t-secondary border-r-tertiary-container relative mb-6">
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="font-h3 text-h3 text-on-background font-bold">100%</span>
+</div>
+</div>
+<div class="w-full space-y-3">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<span class="font-body-md text-body-md text-on-surface-variant">Electronics</span>
+</div>
+<span class="font-h6 text-h6 text-on-background">45%</span>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-secondary"></div>
+<span class="font-body-md text-body-md text-on-surface-variant">Fashion</span>
+</div>
+<span class="font-h6 text-h6 text-on-background">30%</span>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-tertiary-container"></div>
+<span class="font-body-md text-body-md text-on-surface-variant">Home &amp; Garden</span>
+</div>
+<span class="font-h6 text-h6 text-on-background">25%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Heatmap Section -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-space-lg mb-space-lg">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-h4 text-h4 text-on-background">Geographical Performance Heatmap</h3>
+<button class="text-primary font-h6 text-h6 hover:underline flex items-center gap-1">
+                        View Details <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<div class="h-[400px] w-full rounded-lg relative overflow-hidden bg-surface-variant/30 flex items-center justify-center">
+<div class="absolute inset-0 bg-cover bg-center w-full h-full opacity-60" data-alt="A stylized, modern high-tech map of Vietnam showing a data heatmap. Bright green nodes indicate high sales density in major cities like Ho Chi Minh City and Hanoi. The map background should be light grey with subtle grid lines, fitting a clean corporate dashboard aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBEnpxGTHWvR_xjIb_BMm5lqxPROIrmTPOHmr-DYqn7RD5hQtxk0V11YF251Ipn8uYUX2M9h6xKghm5I-Wg4S7SCm3nsY8Rq85VfnVjUCMdu2YMRPX70QsLKehPe2yHh6cdjT71XZyH_cclkBdzbGiS1f0I0NJ3gPHc_FroqA5euYPOKOCX7BLJj3LOoxMJxdNGY-pLyeEWZUdpO5kR_qq5FnV0qwTeyeji4-uJ5Cmyx2xRtZnut4z43qMT_MK1WHRrF4BSS96azqNC')"></div>
+<span class="font-body-lg text-body-lg text-on-surface-variant bg-surface-container-lowest/80 px-4 py-2 rounded shadow-sm z-10 backdrop-blur-sm">[Interactive Geographic Heatmap Overlay]</span>
+</div>
+</div>
+</div>
+</main>
+</body></html>

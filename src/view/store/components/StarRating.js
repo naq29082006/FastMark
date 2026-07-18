@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   value: {
-    color: '#0f766e',
+    color: '#076F32',
     fontWeight: '800',
   },
 });

@@ -147,39 +147,18 @@ export async function completeSellerReservationOnBackend(idToken, reservationId)
   return payload.data?.reservation;
 }
 
-export async function acceptSellerDealOnBackend(idToken, dealId) {
+export async function scanCompleteSellerReservationOnBackend(idToken, code) {
   const response = await apiRequest(
-    API_ENDPOINTS.sellerDealAccept(dealId),
-    { method: 'POST', headers: await authHeaders(idToken), body: '{}' },
-    AUTH_TIMEOUT_MS
-  );
-  return parseApiResponse(response);
-}
-
-export async function rejectSellerDealOnBackend({ idToken, dealId, reason }) {
-  const response = await apiRequest(
-    API_ENDPOINTS.sellerDealReject(dealId),
+    API_ENDPOINTS.sellerReservationScanComplete,
     {
       method: 'POST',
       headers: await authHeaders(idToken),
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ code }),
     },
     AUTH_TIMEOUT_MS
   );
-  return parseApiResponse(response);
-}
-
-export async function counterSellerDealOnBackend({ idToken, dealId, counterPrice, note }) {
-  const response = await apiRequest(
-    API_ENDPOINTS.sellerDealCounter(dealId),
-    {
-      method: 'POST',
-      headers: await authHeaders(idToken),
-      body: JSON.stringify({ counterPrice, note }),
-    },
-    AUTH_TIMEOUT_MS
-  );
-  return parseApiResponse(response);
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation;
 }
 
 export async function getSellerConversationsOnBackend(idToken) {

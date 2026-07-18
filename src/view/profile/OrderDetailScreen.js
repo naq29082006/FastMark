@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   total: {
-    color: '#0f766e',
+    color: '#076F32',
     fontSize: 15,
     fontWeight: '900',
   },

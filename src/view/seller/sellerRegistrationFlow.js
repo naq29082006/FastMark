@@ -20,7 +20,7 @@ export function canSwitchToSellerMode({ role, verification } = {}) {
 
 export function getSellerRegisterButtonLabel({ role, verification } = {}) {
   if (canSwitchToSellerMode({ role, verification })) {
-    return 'Chuyển sang người bán';
+    return '';
   }
 
   if (verification?.status === SELLER_VERIFICATION_STATUS.PENDING) {

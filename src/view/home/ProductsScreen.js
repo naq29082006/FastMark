@@ -23,6 +23,7 @@ import { formatDistance, hasValidLocation, normalizeExpoLocation } from '../../c
 import { isRemoteAvatarUrl } from '../../core/utils/avatarInitial';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { searchRegisteredShops } from '../../repository/searchShopRepository';
+import { loadNearbyRegisteredShops } from '../../viewmodel/map/mapViewModel';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { normalizeProduct } from '../../model/productModel';
 import ProductDetailScreen from '../store/ProductDetailScreen';
@@ -60,13 +61,18 @@ function CategoryIconChip({ icon, label, active, onPress }) {
       ) : iconValue ? (
         <Text style={styles.categoryIconChipEmoji}>{iconValue}</Text>
       ) : (
-        <Ionicons name="pricetag-outline" size={20} color={active ? '#0d7377' : '#64748b'} />
+        <Ionicons name="pricetag-outline" size={20} color={active ? '#076F32' : '#64748b'} />
       )}
     </Pressable>
   );
 }
 
-export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrders }) {
+export default function ProductsScreen({
+  onNavigationStateChange,
+  onOpenBuyerOrders,
+  focusRequest = null,
+  onBack = null,
+}) {
   const insets = useScreenInsets();
   const scrollRef = useRef(null);
   const searchTimerRef = useRef(null);
@@ -90,8 +96,9 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
   const [shops, setShops] = useState([]);
   const [isLoadingShops, setIsLoadingShops] = useState(false);
   const [shopsError, setShopsError] = useState('');
+  const [browseNearbyShops, setBrowseNearbyShops] = useState(false);
 
-  const isSearching = Boolean(debouncedSearch);
+  const isSearching = Boolean(debouncedSearch) || browseNearbyShops;
   useEffect(() => {
     onNavigationStateChange?.(Boolean(selectedProductId || selectedStoreId || showCategoriesScreen));
   }, [onNavigationStateChange, selectedProductId, selectedStoreId, showCategoriesScreen]);
@@ -112,11 +119,15 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
 
   useEffect(() => {
     if (!debouncedSearch) {
-      setSearchTab('products');
-      setShops([]);
-      setShopsError('');
+      if (!browseNearbyShops) {
+        setSearchTab('products');
+        setShops([]);
+        setShopsError('');
+      }
+    } else {
+      setBrowseNearbyShops(false);
     }
-  }, [debouncedSearch]);
+  }, [browseNearbyShops, debouncedSearch]);
 
   const loadLocation = useCallback(async () => {
     setIsLocating(true);
@@ -263,7 +274,7 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
 
   const loadShops = useCallback(
     async ({ refresh = false } = {}) => {
-      if (!debouncedSearch || !hasValidLocation(currentLocation)) {
+      if ((!debouncedSearch && !browseNearbyShops) || !hasValidLocation(currentLocation)) {
         setShops([]);
         setIsLoadingShops(false);
         return;
@@ -275,15 +286,24 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
       setShopsError('');
 
       try {
-        const result = await searchRegisteredShops({
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          radiusMeters: UNLIMITED_SEARCH_RADIUS,
-          shopQuery: debouncedSearch,
-          identityOnly: true,
-          limit: 200,
-        });
-        setShops(Array.isArray(result?.shops) ? result.shops : []);
+        if (browseNearbyShops && !debouncedSearch) {
+          const nearby = await loadNearbyRegisteredShops({
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            radiusMeters: NEARBY_RADIUS_METERS,
+          });
+          setShops(Array.isArray(nearby) ? nearby : []);
+        } else {
+          const result = await searchRegisteredShops({
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            radiusMeters: UNLIMITED_SEARCH_RADIUS,
+            shopQuery: debouncedSearch,
+            identityOnly: true,
+            limit: 200,
+          });
+          setShops(Array.isArray(result?.shops) ? result.shops : []);
+        }
       } catch (error) {
         setShops([]);
         setShopsError(error.message || 'Không tìm được gian hàng.');
@@ -291,7 +311,7 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
         setIsLoadingShops(false);
       }
     },
-    [currentLocation, debouncedSearch]
+    [browseNearbyShops, currentLocation, debouncedSearch]
   );
 
   useEffect(() => {
@@ -307,6 +327,35 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
   useEffect(() => {
     loadShops();
   }, [loadShops]);
+
+  useEffect(() => {
+    if (!focusRequest?.at) {
+      return;
+    }
+
+    if (focusRequest.search != null) {
+      setBrowseNearbyShops(false);
+      setSearch(String(focusRequest.search || ''));
+      setDebouncedSearch(String(focusRequest.search || '').trim());
+    }
+
+    if (focusRequest.categoryId != null) {
+      setBrowseNearbyShops(false);
+      setSelectedCategoryId(String(focusRequest.categoryId || ''));
+    }
+
+    if (focusRequest.focusShops) {
+      setSearchTab('shops');
+      setBrowseNearbyShops(true);
+      setSearch('');
+      setDebouncedSearch('');
+    } else if (focusRequest.focusHot || focusRequest.categoryId || focusRequest.search) {
+      setSearchTab('products');
+      setBrowseNearbyShops(false);
+    }
+
+    scrollRef.current?.scrollTo?.({ y: 0, animated: true });
+  }, [focusRequest]);
 
   function handleSelectCategory(categoryId) {
     setSelectedCategoryId((current) => (current === categoryId ? '' : categoryId));
@@ -382,11 +431,18 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
               loadShops({ refresh: true });
             }
           }}
-          tintColor="#0d7377"
+          tintColor="#076F32"
         />
       }
     >
-      <Text style={styles.pageTitle}>Sản phẩm</Text>
+      <View style={styles.pageTitleRow}>
+        {onBack ? (
+          <Pressable onPress={onBack} hitSlop={8} style={styles.pageBackBtn}>
+            <Ionicons name="arrow-back" size={22} color="#0f172a" />
+          </Pressable>
+        ) : null}
+        <Text style={styles.pageTitle}>Sản phẩm</Text>
+      </View>
 
       <ClearableSearchField
         value={search}
@@ -427,7 +483,7 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
           {searchTab === 'products' ? (
             isLoading || isLocating ? (
               <View style={styles.loaderBox}>
-                <ActivityIndicator color="#0d7377" />
+                <ActivityIndicator color="#076F32" />
                 <Text style={styles.loaderText}>Đang tìm sản phẩm...</Text>
               </View>
             ) : products.length > 0 ? (
@@ -451,7 +507,7 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
             )
           ) : isLoadingShops || isLocating ? (
             <View style={styles.loaderBox}>
-              <ActivityIndicator color="#0d7377" />
+              <ActivityIndicator color="#076F32" />
               <Text style={styles.loaderText}>Đang tìm gian hàng...</Text>
             </View>
           ) : shops.length > 0 ? (
@@ -526,7 +582,7 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
               accessibilityRole="button"
               accessibilityLabel="Tất cả danh mục"
             >
-              <Ionicons name="grid-outline" size={20} color="#0d7377" />
+              <Ionicons name="grid-outline" size={20} color="#076F32" />
             </Pressable>
             {categories.map((category) => (
               <CategoryIconChip
@@ -548,7 +604,7 @@ export default function ProductsScreen({ onNavigationStateChange, onOpenBuyerOrd
 
           {isLoading || isLocating ? (
             <View style={styles.loaderBox}>
-              <ActivityIndicator color="#0d7377" />
+              <ActivityIndicator color="#076F32" />
               <Text style={styles.loaderText}>Đang tải sản phẩm gần bạn...</Text>
             </View>
           ) : products.length > 0 ? (
@@ -609,12 +665,24 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 28,
   },
+  pageTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 14,
+    gap: 8,
+  },
+  pageBackBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pageTitle: {
+    flex: 1,
     fontSize: 24,
     fontWeight: '900',
     color: '#0f172a',
-    paddingHorizontal: 20,
-    marginBottom: 14,
   },
   searchField: {
     marginHorizontal: 20,
@@ -635,7 +703,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
   },
   searchTabItemActive: {
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
   },
   searchTabText: {
     fontWeight: '700',
@@ -643,7 +711,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   searchTabTextActive: {
-    color: '#0d7377',
+    color: '#076F32',
   },
   searchResultsSection: {
     paddingTop: 4,
@@ -684,12 +752,12 @@ const styles = StyleSheet.create({
   shopCardDistance: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0d7377',
+    color: '#076F32',
   },
   shopCardIdentity: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0d7377',
+    color: '#076F32',
   },
   shopCardAddress: {
     fontSize: 13,
@@ -719,8 +787,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   categoryIconChipActive: {
-    borderColor: '#0d7377',
-    backgroundColor: '#ecfdf5',
+    borderColor: '#076F32',
+    backgroundColor: '#E6F4EC',
   },
   categoryIconChipImage: {
     width: 24,
@@ -735,9 +803,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     borderWidth: 1,
-    borderColor: '#0d7377',
+    borderColor: '#076F32',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -909,7 +977,7 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0d7377',
+    color: '#076F32',
     marginBottom: 4,
   },
   productPriceCompact: {

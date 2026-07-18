@@ -399,7 +399,7 @@ export default function StoreDetailScreen({
   if (loading) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#0d7377" />
+        <ActivityIndicator size="large" color="#076F32" />
       </View>
     );
   }
@@ -415,10 +415,14 @@ export default function StoreDetailScreen({
     );
   }
 
-  const username = store.shop_username ? `@${store.shop_username}` : '';
+  const username = store.userName
+    ? `@${store.userName}`
+    : store.shop_username
+      ? `@${store.shop_username}`
+      : '';
   const hoursText = formatHours(store.open_time, store.close_time);
   const coverImage = store.cover_image_url || store.image_url;
-  const shopTitle = store.shop_name || store.name || 'Shop';
+  const shopTitle = store.fullName || store.shop_name || store.name || 'Shop';
   const shopInitial = getAvatarInitial(shopTitle);
   const currentUserId = String(authProfile?.mongoUserId || authProfile?.id || '');
   const ownerUserId = String(store.owner_user_id || '');
@@ -756,7 +760,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   backLinkText: {
-    color: '#0d7377',
+    color: '#076F32',
     fontWeight: '700',
   },
   scroll: {
@@ -803,7 +807,7 @@ const styles = StyleSheet.create({
   },
   cover: {
     height: 180,
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -845,7 +849,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   followBtnActive: {
     backgroundColor: '#e2e8f0',
@@ -883,7 +887,7 @@ const styles = StyleSheet.create({
   },
   shopUsername: {
     fontSize: 14,
-    color: '#0d7377',
+    color: '#076F32',
     fontWeight: '700',
     marginBottom: 8,
   },
@@ -919,7 +923,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#0d7377',
+    color: '#076F32',
   },
   statLabel: {
     fontSize: 10,
@@ -947,7 +951,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   messageButtonText: {
     color: '#ffffff',
@@ -990,12 +994,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#E6F4EC',
     borderWidth: 1,
-    borderColor: '#99f6e4',
+    borderColor: '#A7D9B8',
   },
   directionsChipText: {
-    color: '#0f766e',
+    color: '#076F32',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -1017,7 +1021,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#0d7377',
+    borderBottomColor: '#076F32',
     backgroundColor: '#f8fffe',
   },
   tabText: {
@@ -1026,7 +1030,7 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
   },
   tabTextActive: {
-    color: '#0d7377',
+    color: '#076F32',
     fontWeight: '800',
   },
   productsGrid: {
@@ -1127,7 +1131,7 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#0d7377',
+    color: '#076F32',
     marginBottom: 3,
   },
   productSold: {
@@ -1153,7 +1157,7 @@ const styles = StyleSheet.create({
   reviewsSummaryScore: {
     fontSize: 36,
     fontWeight: '900',
-    color: '#0d7377',
+    color: '#076F32',
   },
   reviewsSummaryCount: {
     fontSize: 12,
@@ -1176,7 +1180,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,

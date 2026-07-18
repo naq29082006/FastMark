@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0d7377',
+    color: '#076F32',
     marginBottom: 4,
   },
   productPriceCompact: {

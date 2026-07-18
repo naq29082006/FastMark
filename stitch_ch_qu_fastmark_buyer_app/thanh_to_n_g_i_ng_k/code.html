@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Thanh toán gói cước</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-container": "#cea700",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-tertiary-fixed": "#231b00",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#00873a",
+                        "surface-variant": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "primary-fixed": "#7ffc97",
+                        "outline-variant": "#bdcaba",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-secondary-fixed-variant": "#005321",
+                        "inverse-primary": "#62df7d",
+                        "on-secondary-container": "#007432",
+                        "tertiary-fixed-dim": "#eec200",
+                        "secondary-container": "#6bff8f",
+                        "surface-container-high": "#dee9fc",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-secondary-fixed": "#002109",
+                        "surface-bright": "#f8f9ff",
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "surface-container-low": "#eff4ff",
+                        "on-primary-container": "#f7fff2",
+                        "inverse-surface": "#27313f",
+                        "tertiary": "#735c00",
+                        "secondary": "#006e2f",
+                        "surface-tint": "#006e2d",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-primary-fixed": "#002109",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#121c2a",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#6e7b6c",
+                        "surface-dim": "#d0dbed",
+                        "inverse-on-surface": "#eaf1ff",
+                        "background": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#e6eeff",
+                        "surface": "#f8f9ff",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "surface-container-highest": "#d9e3f6",
+                        "secondary-fixed": "#6bff8f",
+                        "on-error": "#ffffff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "container-margin": "24px",
+                        "stack-gap-lg": "32px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px"
+                    },
+                    fontFamily: {
+                        "headline-lg": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background antialiased min-h-screen pb-24 md:pb-0 font-body-md">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flat no shadows flex flex-col w-full px-container-margin py-unit gap-2 docked full-width top-0 sticky z-40">
+<div class="flex items-center justify-between min-h-[56px]">
+<button aria-label="Quay lại" class="text-on-surface p-2 -ml-2 rounded-full hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-primary dark:text-primary-fixed">Thanh toán</h1>
+<div class="w-10"></div> <!-- Spacer for center alignment -->
+</div>
+</header>
+<main class="px-container-margin pt-stack-gap-md max-w-3xl mx-auto">
+<!-- Order Summary -->
+<section class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant mb-stack-gap-lg">
+<h2 class="font-label-lg text-label-lg text-on-surface mb-4">Chi tiết thanh toán</h2>
+<div class="space-y-4">
+<div class="flex justify-between items-center">
+<span class="text-on-surface-variant">Gói cước</span>
+<span class="font-label-lg text-label-lg">Cửa hàng Chuyên nghiệp (1 tháng)</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-on-surface-variant">Tạm tính</span>
+<span>150.000đ</span>
+</div>
+<div class="h-px bg-outline-variant w-full"></div>
+<div class="flex justify-between items-center">
+<span class="font-label-lg text-label-lg">Tổng cộng</span>
+<span class="font-price-display text-price-display text-error">150.000đ</span>
+</div>
+</div>
+</section>
+<!-- Payment Methods -->
+<section class="mb-stack-gap-lg">
+<h2 class="font-label-lg text-label-lg text-on-surface mb-4">Phương thức thanh toán</h2>
+<div class="space-y-4">
+<!-- Wallet Balance -->
+<label class="flex items-center p-4 bg-surface-container-lowest rounded-xl border border-primary ring-1 ring-primary cursor-pointer relative overflow-hidden transition-all group">
+<div class="flex-shrink-0 mr-4 text-primary">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+</div>
+<div class="flex-grow">
+<div class="font-label-lg text-label-lg text-on-surface">Ví Chợ Quê</div>
+<div class="text-on-surface-variant text-sm mt-1">Số dư: 500.000đ</div>
+</div>
+<div class="flex-shrink-0">
+<input checked="" class="w-6 h-6 text-primary focus:ring-primary border-outline-variant" name="payment_method" type="radio" value="wallet"/>
+</div>
+</label>
+<!-- Momo E-wallet -->
+<label class="flex items-center p-4 bg-surface-container-lowest rounded-xl border border-outline-variant cursor-pointer relative overflow-hidden transition-all hover:border-primary">
+<div class="flex-shrink-0 mr-4 text-[#A50064]">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div class="flex-grow">
+<div class="font-label-lg text-label-lg text-on-surface">Ví MoMo</div>
+<div class="text-on-surface-variant text-sm mt-1">Thanh toán qua ứng dụng MoMo</div>
+</div>
+<div class="flex-shrink-0">
+<input class="w-6 h-6 text-primary focus:ring-primary border-outline-variant" name="payment_method" type="radio" value="momo"/>
+</div>
+</label>
+<!-- Bank Transfer -->
+<label class="flex items-center p-4 bg-surface-container-lowest rounded-xl border border-outline-variant cursor-pointer relative overflow-hidden transition-all hover:border-primary">
+<div class="flex-shrink-0 mr-4 text-secondary">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">qr_code_scanner</span>
+</div>
+<div class="flex-grow">
+<div class="font-label-lg text-label-lg text-on-surface">Chuyển khoản ngân hàng</div>
+<div class="text-on-surface-variant text-sm mt-1">Quét mã QR qua ứng dụng ngân hàng</div>
+</div>
+<div class="flex-shrink-0">
+<input class="w-6 h-6 text-primary focus:ring-primary border-outline-variant" name="payment_method" type="radio" value="bank"/>
+</div>
+</label>
+</div>
+</section>
+<!-- Action Button (Sticky Bottom on Mobile) -->
+<div class="fixed md:static bottom-0 left-0 w-full p-container-margin bg-surface-container-lowest border-t border-outline-variant md:border-none md:bg-transparent z-40">
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-xl font-headline-md text-headline-md-mobile flex items-center justify-center gap-2 active:opacity-80 transition-opacity shadow-lg">
+                Xác nhận thanh toán
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_forward</span>
+</button>
+</div>
+</main>
+<!-- BottomNavBar (Hidden as this is a transactional page) -->
+<!-- Suppressed due to "Destination" Rule -->
+<script>
+        // Simple script to toggle active styling on payment methods
+        const paymentLabels = document.querySelectorAll('label:has(input[type="radio"])');
+        
+        paymentLabels.forEach(label => {
+            const radio = label.querySelector('input[type="radio"]');
+            
+            radio.addEventListener('change', () => {
+                // Reset all
+                paymentLabels.forEach(l => {
+                    l.classList.remove('border-primary', 'ring-1', 'ring-primary');
+                    l.classList.add('border-outline-variant');
+                });
+                
+                // Set active
+                if (radio.checked) {
+                    label.classList.add('border-primary', 'ring-1', 'ring-primary');
+                    label.classList.remove('border-outline-variant');
+                }
+            });
+        });
+    </script>
+</body></html>

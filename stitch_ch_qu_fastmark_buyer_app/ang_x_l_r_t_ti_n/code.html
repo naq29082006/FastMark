@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Đang xử lý rút tiền...</title>
+<!-- Material Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#002109",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#27313f",
+                        "tertiary-fixed": "#ffe083",
+                        "on-tertiary-fixed": "#231b00",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "secondary": "#006e2f",
+                        "secondary-fixed": "#6bff8f",
+                        "surface-tint": "#006e2d",
+                        "primary": "#006b2c",
+                        "outline": "#6e7b6c",
+                        "surface-dim": "#d0dbed",
+                        "surface-container-low": "#eff4ff",
+                        "surface": "#f8f9ff",
+                        "on-tertiary": "#ffffff",
+                        "surface-variant": "#d9e3f6",
+                        "on-primary-container": "#f7fff2",
+                        "background": "#f8f9ff",
+                        "tertiary-fixed-dim": "#eec200",
+                        "secondary-container": "#6bff8f",
+                        "surface-container": "#e6eeff",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#735c00",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#62df7d",
+                        "outline-variant": "#bdcaba",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#f8f9ff",
+                        "on-tertiary-container": "#4e3e00",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-surface-variant": "#3e4a3d",
+                        "surface-container-high": "#dee9fc",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-secondary-fixed-variant": "#005321",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "inverse-primary": "#62df7d",
+                        "surface-container-highest": "#d9e3f6",
+                        "on-secondary-fixed": "#002109",
+                        "on-secondary-container": "#007432",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "primary-container": "#00873a",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-surface": "#121c2a",
+                        "primary-fixed": "#7ffc97"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "touch-target-min": "56px",
+                        "unit": "8px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "container-margin": "24px",
+                        "stack-gap-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .loading-pulse {
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.8);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+        
+        .spin-slow {
+            animation: spin 3s linear infinite;
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col justify-center items-center px-container-margin">
+<!-- Main Content Canvas -->
+<main class="w-full max-w-md flex flex-col items-center justify-center text-center space-y-stack-gap-lg">
+<!-- Animated Icon Container -->
+<div class="relative flex items-center justify-center w-32 h-32 mb-4">
+<!-- Pulsing background rings -->
+<div class="absolute inset-0 rounded-full bg-primary-container opacity-20 loading-pulse"></div>
+<div class="absolute inset-4 rounded-full bg-primary-container opacity-40 loading-pulse" style="animation-delay: 0.5s;"></div>
+<!-- Central solid circle -->
+<div class="absolute inset-8 rounded-full bg-primary flex items-center justify-center z-10 shadow-md">
+<!-- Rotating icon to indicate processing -->
+<span class="material-symbols-outlined text-on-primary icon-fill text-4xl spin-slow" data-icon="sync">
+                    sync
+                </span>
+</div>
+<!-- Floating secondary icons -->
+<div class="absolute top-0 right-0 animate-bounce" style="animation-duration: 2s;">
+<div class="bg-surface rounded-full p-2 shadow-sm border border-outline-variant">
+<span class="material-symbols-outlined text-primary text-xl" data-icon="payments">payments</span>
+</div>
+</div>
+</div>
+<!-- Typography -->
+<div class="space-y-unit">
+<!-- Explicit loading message per prompt -->
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary mb-2 md:font-headline-lg md:text-headline-lg">
+                Đang xử lý yêu cầu rút tiền...
+            </h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-[280px] mx-auto">
+                Vui lòng không đóng ứng dụng. Quá trình này có thể mất vài giây.
+            </p>
+</div>
+<!-- Progress Bar (Indeterminate) -->
+<div class="w-full h-2 bg-surface-variant rounded-full overflow-hidden relative mt-8">
+<div class="absolute top-0 bottom-0 left-0 bg-primary rounded-full animate-[progress_2s_ease-in-out_infinite]" style="width: 30%;"></div>
+</div>
+<style>
+            @keyframes progress {
+                0% { left: -30%; width: 30%; }
+                50% { left: 40%; width: 50%; }
+                100% { left: 100%; width: 30%; }
+            }
+        </style>
+<!-- Safety / Trust Note -->
+<div class="flex items-center gap-2 mt-8 text-on-surface-variant bg-surface-container py-3 px-4 rounded-lg border border-outline-variant">
+<span class="material-symbols-outlined text-secondary icon-fill" data-icon="security">security</span>
+<span class="font-label-md text-label-md">Giao dịch an toàn và bảo mật</span>
+</div>
+</main>
+<!-- Simulated redirect script for effect -->
+<script>
+        // Simulate a delay then 'redirect' or update UI to show success
+        setTimeout(() => {
+            const heading = document.querySelector('h1');
+            const iconContainer = document.querySelector('.relative.flex');
+            const progressBar = document.querySelector('.w-full.h-2');
+            
+            if(heading) heading.textContent = "Rút tiền thành công!";
+            if(progressBar) progressBar.style.display = 'none';
+            
+            if(iconContainer) {
+                iconContainer.innerHTML = `
+                    <div class="absolute inset-8 rounded-full bg-secondary flex items-center justify-center z-10 shadow-md">
+                        <span class="material-symbols-outlined text-on-secondary icon-fill text-4xl" data-icon="check_circle">
+                            check_circle
+                        </span>
+                    </div>
+                `;
+            }
+        }, 3500);
+    </script>
+</body></html>

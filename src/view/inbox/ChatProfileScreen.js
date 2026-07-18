@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   displayName: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
   userName: { fontSize: 14, fontWeight: '600', color: '#64748b' },
   activity: { fontSize: 13, color: '#94a3b8', marginTop: 2 },
-  activityOnline: { color: '#059669', fontWeight: '700' },
+  activityOnline: { color: '#076F32', fontWeight: '700' },
   followRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     minHeight: 46,
     borderRadius: 12,
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 
 import { getMyNotificationsOnBackend } from '../../api/notificationApi';
+import { Ionicons } from '@expo/vector-icons';
 
 import NotificationDetailScreen from './NotificationDetailScreen';
 
@@ -54,7 +55,11 @@ function capitalizeFirstLetter(value = '') {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-export default function NotificationsScreen({ onNavigationStateChange, audience = 'buyer' }) {
+export default function NotificationsScreen({
+  onNavigationStateChange,
+  audience = 'buyer',
+  onBack = null,
+}) {
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -111,14 +116,22 @@ export default function NotificationsScreen({ onNavigationStateChange, audience 
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
+        {onBack ? (
+          <Pressable onPress={onBack} hitSlop={8} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color="#0f172a" />
+          </Pressable>
+        ) : (
+          <View style={styles.backBtn} />
+        )}
         <Text style={styles.title}>Thông báo</Text>
+        <View style={styles.backBtn} />
       </View>
 
       {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
 
       {isLoading ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" />
+          <ActivityIndicator color="#076F32" />
         </View>
       ) : (
         <FlatList
@@ -161,12 +174,26 @@ export default function NotificationsScreen({ onNavigationStateChange, audience 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f8fafc' },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingTop: 12,
     paddingHorizontal: 16,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
   },
-  title: { fontSize: 24, fontWeight: '900', color: '#0f172a' },
+  backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
   errorText: {
     color: '#dc2626',
     marginHorizontal: 16,
@@ -189,12 +216,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  avatarText: { fontSize: 18, fontWeight: '800', color: '#0d7377' },
+  avatarText: { fontSize: 18, fontWeight: '800', color: '#076F32' },
   listBody: { flex: 1, minWidth: 0 },
   listTopRow: {
     flexDirection: 'row',

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chi tiết gói - Chợ Quê FastMark</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-container": "#cea700",
+                    "primary-fixed-dim": "#62df7d",
+                    "on-tertiary-fixed": "#231b00",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "primary-container": "#00873a",
+                    "surface-variant": "#d9e3f6",
+                    "on-primary": "#ffffff",
+                    "primary-fixed": "#7ffc97",
+                    "outline-variant": "#bdcaba",
+                    "secondary-fixed-dim": "#4ae176",
+                    "on-secondary-fixed-variant": "#005321",
+                    "inverse-primary": "#62df7d",
+                    "on-secondary-container": "#007432",
+                    "tertiary-fixed-dim": "#eec200",
+                    "secondary-container": "#6bff8f",
+                    "surface-container-high": "#dee9fc",
+                    "on-tertiary-container": "#4e3e00",
+                    "on-secondary-fixed": "#002109",
+                    "surface-bright": "#f8f9ff",
+                    "tertiary-fixed": "#ffe083",
+                    "primary": "#006b2c",
+                    "surface-container-low": "#eff4ff",
+                    "on-primary-container": "#f7fff2",
+                    "inverse-surface": "#27313f",
+                    "tertiary": "#735c00",
+                    "secondary": "#006e2f",
+                    "surface-tint": "#006e2d",
+                    "on-tertiary-fixed-variant": "#574500",
+                    "on-primary-fixed": "#002109",
+                    "error-container": "#ffdad6",
+                    "on-surface": "#121c2a",
+                    "on-surface-variant": "#3e4a3d",
+                    "on-tertiary": "#ffffff",
+                    "outline": "#6e7b6c",
+                    "surface-dim": "#d0dbed",
+                    "inverse-on-surface": "#eaf1ff",
+                    "background": "#f8f9ff",
+                    "error": "#ba1a1a",
+                    "on-error-container": "#93000a",
+                    "surface-container": "#e6eeff",
+                    "surface": "#f8f9ff",
+                    "on-primary-fixed-variant": "#005320",
+                    "on-background": "#121c2a",
+                    "surface-container-highest": "#d9e3f6",
+                    "secondary-fixed": "#6bff8f",
+                    "on-error": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-margin": "24px",
+                    "stack-gap-lg": "32px",
+                    "stack-gap-md": "16px",
+                    "gutter": "16px",
+                    "unit": "8px",
+                    "touch-target-min": "56px"
+            },
+            "fontFamily": {
+                    "headline-lg": [
+                            "Inter"
+                    ],
+                    "label-lg": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "headline-md": [
+                            "Inter"
+                    ],
+                    "price-display": [
+                            "Inter"
+                    ],
+                    "headline-lg-mobile": [
+                            "Inter"
+                    ],
+                    "label-md": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-lg": [
+                            "20px",
+                            {
+                                    "lineHeight": "30px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-md": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "price-display": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "36px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "500"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen pb-32">
+<!-- Header (Task-Focused / Transactional) -->
+<header class="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-surface-variant flex items-center justify-between px-container-margin py-2">
+<button aria-label="Quay lại" class="w-touch-target-min h-touch-target-min flex items-center justify-start text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 600;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile text-on-surface text-center flex-1">Chi tiết gói</h1>
+<div class="w-touch-target-min h-touch-target-min"></div>
+</header>
+<main class="max-w-3xl mx-auto">
+<!-- Hero Section -->
+<section class="px-container-margin mt-stack-gap-md">
+<div class="bg-surface-container-high rounded-2xl p-6 border border-outline-variant relative overflow-hidden shadow-sm">
+<!-- Abstract background shape -->
+<div class="absolute -right-12 -top-12 w-48 h-48 bg-primary opacity-5 rounded-full blur-3xl pointer-events-none"></div>
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+<div class="flex-1">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full font-label-md text-label-md mb-4">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">star</span>
+                            Gói Phổ Biến Nhất
+                        </div>
+<h2 class="font-headline-lg text-headline-lg-mobile text-on-surface mb-2">Gói 3 Tháng</h2>
+<div class="flex items-end gap-2">
+<span class="font-price-display text-price-display text-error">270.000đ</span>
+<span class="font-body-md text-body-md text-on-surface-variant pb-1">/ 90 ngày</span>
+</div>
+</div>
+<div class="hidden md:block w-32 h-32 flex-shrink-0">
+<img class="w-full h-full object-contain" data-alt="A stylized, flat-design illustration of a woven basket filled with fresh, vibrant green vegetables and colorful fruits. The style is modern, clean, and uses a soft color palette dominated by rich greens and warm earthy tones, perfectly fitting a modern Vietnamese agricultural app interface. The background is completely transparent." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSR9_HxJt0IyzPE1E5GMGRZAGZCPelUWS4xmDkI3eTVw2OnuMdADXmlOyqhkfuJpTIEs5XTT82i-lHam3Njhh7NziuSHkuOUFWa6Jlbf1zmnj4q0WBsL3AzCMJkFoA-B_lng1r-RlyvJXDePBdjdMvu2TVEBNB1VuscUV_BnHGywwkUwNYz4HlqkOTl9FYE3JyQMdfFvJRqvjJ2emAzkh12o3pqX4p1sScqaivFrWo3KxqsdvuBWjiQMFuPF1xcIwXOGnV0ThyUJl3"/>
+</div>
+</div>
+</div>
+</section>
+<!-- Benefits Section -->
+<section class="px-container-margin mt-stack-gap-lg">
+<h3 class="font-headline-md text-headline-md-mobile text-on-surface mb-stack-gap-md">Quyền lợi bao gồm</h3>
+<div class="flex flex-col gap-4">
+<!-- Benefit Item 1 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0 text-primary">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+</div>
+<div>
+<h4 class="font-label-lg text-label-lg text-on-surface mb-1">Miễn phí giao hàng</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Không giới hạn số lần miễn phí vận chuyển cho mọi đơn hàng trong phạm vi 5km từ chợ quê.</p>
+</div>
+</div>
+<!-- Benefit Item 2 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0 text-primary">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">sell</span>
+</div>
+<div>
+<h4 class="font-label-lg text-label-lg text-on-surface mb-1">Giá sỉ tận vườn</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Được mua nông sản với mức giá ưu đãi đặc biệt dành riêng cho thành viên VIP.</p>
+</div>
+</div>
+<!-- Benefit Item 3 -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant shadow-sm flex items-start gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center flex-shrink-0 text-primary">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">support_agent</span>
+</div>
+<div>
+<h4 class="font-label-lg text-label-lg text-on-surface mb-1">Hỗ trợ ưu tiên</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Đường dây nóng xử lý đơn hàng nhanh chóng, hoàn tiền ngay lập tức nếu sản phẩm lỗi.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Info Note -->
+<section class="px-container-margin mt-stack-gap-md mb-8">
+<div class="flex items-start gap-2 p-4 bg-surface-container-low rounded-lg">
+<span class="material-symbols-outlined text-primary text-[20px] mt-0.5" style="font-variation-settings: 'FILL' 0;">info</span>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">
+                    Gói dịch vụ sẽ không tự động gia hạn. Bạn sẽ nhận được thông báo trước 3 ngày khi gói chuẩn bị hết hạn.
+                </p>
+</div>
+</section>
+</main>
+<!-- Bottom Action Bar (Fixed) -->
+<div class="fixed bottom-0 left-0 w-full bg-surface-container-lowest border-t border-outline-variant p-container-margin shadow-[0_-8px_16px_rgba(0,0,0,0.05)] z-50">
+<div class="max-w-3xl mx-auto">
+<div class="flex items-center justify-between mb-4">
+<span class="font-body-lg text-body-lg text-on-surface-variant">Tổng thanh toán:</span>
+<span class="font-price-display text-price-display text-error">270.000đ</span>
+</div>
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md-mobile rounded-full flex items-center justify-center gap-2 hover:bg-surface-tint active:scale-[0.98] transition-all duration-200 shadow-md">
+                Thanh toán ngay
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 600;">arrow_forward</span>
+</button>
+</div>
+</div>
+</body></html>

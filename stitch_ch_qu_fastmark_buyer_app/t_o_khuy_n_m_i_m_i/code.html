@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tạo khuyến mãi - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-container": "#cea700",
+                      "primary-fixed-dim": "#62df7d",
+                      "on-tertiary-fixed": "#231b00",
+                      "surface-container-lowest": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "primary-container": "#00873a",
+                      "surface-variant": "#d9e3f6",
+                      "on-primary": "#ffffff",
+                      "primary-fixed": "#7ffc97",
+                      "outline-variant": "#bdcaba",
+                      "secondary-fixed-dim": "#4ae176",
+                      "on-secondary-fixed-variant": "#005321",
+                      "inverse-primary": "#62df7d",
+                      "on-secondary-container": "#007432",
+                      "tertiary-fixed-dim": "#eec200",
+                      "secondary-container": "#6bff8f",
+                      "surface-container-high": "#dee9fc",
+                      "on-tertiary-container": "#4e3e00",
+                      "on-secondary-fixed": "#002109",
+                      "surface-bright": "#f8f9ff",
+                      "tertiary-fixed": "#ffe083",
+                      "primary": "#006b2c",
+                      "surface-container-low": "#eff4ff",
+                      "on-primary-container": "#f7fff2",
+                      "inverse-surface": "#27313f",
+                      "tertiary": "#735c00",
+                      "secondary": "#006e2f",
+                      "surface-tint": "#006e2d",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "on-primary-fixed": "#002109",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#121c2a",
+                      "on-surface-variant": "#3e4a3d",
+                      "on-tertiary": "#ffffff",
+                      "outline": "#6e7b6c",
+                      "surface-dim": "#d0dbed",
+                      "inverse-on-surface": "#eaf1ff",
+                      "background": "#f8f9ff",
+                      "error": "#ba1a1a",
+                      "on-error-container": "#93000a",
+                      "surface-container": "#e6eeff",
+                      "surface": "#f8f9ff",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-background": "#121c2a",
+                      "surface-container-highest": "#d9e3f6",
+                      "secondary-fixed": "#6bff8f",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "container-margin": "24px",
+                      "stack-gap-lg": "32px",
+                      "stack-gap-md": "16px",
+                      "gutter": "16px",
+                      "unit": "8px",
+                      "touch-target-min": "56px"
+              },
+              "fontFamily": {
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "label-lg": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "price-display": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "20px",
+                              {
+                                      "lineHeight": "30px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "price-display": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for better visual integration */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f8f9ff; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #bdcaba; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6e7b6c; 
+        }
+        
+        /* Ensure touch targets are respected globally */
+        button, input, select, .touch-target {
+            min-height: 56px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen flex flex-col md:flex-row pb-[80px] md:pb-0">
+<!-- Mobile Top App Bar (Hidden on Desktop) -->
+<header class="md:hidden flex flex-col w-full px-container-margin py-unit gap-2 bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline sticky top-0 z-40">
+<div class="flex justify-between items-center h-[56px]">
+<button aria-label="Menu" class="p-2 -ml-2 text-primary dark:text-primary-fixed hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-full transition-all active:opacity-80 active:scale-95">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-primary dark:text-primary-fixed">Tạo khuyến mãi</h1>
+<button aria-label="Notifications" class="p-2 -mr-2 text-primary dark:text-primary-fixed hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-full transition-all active:opacity-80 active:scale-95">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+</header>
+<!-- Desktop Navigation Drawer (Hidden on Mobile) -->
+<aside class="hidden md:flex flex-col h-screen w-80 rounded-r-xl bg-surface dark:bg-inverse-surface shadow-xl py-6 fixed left-0 top-0 z-40 overflow-y-auto">
+<div class="px-6 mb-8 flex items-center gap-4">
+<div class="w-16 h-16 rounded-full overflow-hidden border-2 border-primary">
+<img alt="User Profile Picture" class="object-cover w-full h-full" data-alt="A close up portrait of an elderly Vietnamese man with a warm, welcoming smile, wearing a simple traditional shirt. Soft, natural lighting highlights the texture of his face. The background is slightly blurred showing a vibrant, sunny day at a rural market with fresh green vegetables, fitting the modern minimalist light-mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhDFl55wkGOYRCY2R85oa6fSSYOeptN5pMj32stApz-ZhkuTFE56_9FyCoPaJnQZsMRaCrleKxKToqA0XXUMATXyHOC0EDiPTNBIGvqF1cnG8w1q0hVqO0bz6uOrwKlw5kW4cCxarusE3jSF4hIsOhyYxovu8PTHtzBeWbgD5t3kcN9hr7h6DOz3IjleLrkWP2yar2c01jsDA3cJQVNqbatfFX_phF3udYHmgGA03cGMaQKmdWjYdzZ642_or3ExoGzu9Ng8WTgBDw"/>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed">Chợ Quê FastMark</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Chào Bác Ba</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2">
+<!-- Home -->
+<a class="flex items-center gap-4 text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-lg text-label-lg">Trang chủ</span>
+</a>
+<!-- Store Management (Active since we are creating a promotion for the store) -->
+<a class="flex items-center gap-4 bg-primary-container text-on-primary-container font-bold rounded-full mx-2 px-4 py-4 active:brightness-90 transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="storefront">storefront</span>
+<span class="font-label-lg text-label-lg">Quản lý cửa hàng</span>
+</a>
+<!-- Wallet -->
+<a class="flex items-center gap-4 text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-lg text-label-lg">Ví điện tử</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center gap-4 text-on-surface-variant dark:text-outline-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-colors mt-auto" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-lg text-label-lg">Cài đặt</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 px-container-margin md:ml-80 md:px-8 py-8 w-full max-w-[800px] mx-auto">
+<!-- Page Header for Desktop -->
+<div class="hidden md:flex justify-between items-center mb-stack-gap-lg">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Tạo khuyến mãi mới</h1>
+</div>
+<!-- Form Container -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 md:p-8 shadow-sm">
+<form action="#" class="flex flex-col gap-stack-gap-md" method="POST">
+<!-- Promotion Name -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="promo_name">Tên chương trình khuyến mãi</label>
+<input class="w-full h-[56px] px-4 rounded-lg border border-outline-variant bg-surface-bright text-on-surface font-body-lg text-body-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow" id="promo_name" name="promo_name" placeholder="VD: Khuyến mãi mùa Hè, Giảm giá cuối tuần..." required="" type="text"/>
+<p class="font-label-md text-label-md text-on-surface-variant">Tên ngắn gọn, dễ hiểu để thu hút khách hàng.</p>
+</div>
+<!-- Discount Percentage -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="discount_percent">Mức giảm giá (%)</label>
+<div class="relative">
+<input class="w-full h-[56px] pl-4 pr-12 rounded-lg border border-outline-variant bg-surface-bright text-on-surface font-body-lg text-body-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow" id="discount_percent" max="100" min="1" name="discount_percent" placeholder="VD: 10, 20, 50..." required="" type="number"/>
+<span class="absolute right-4 top-1/2 -translate-y-1/2 font-headline-md text-headline-md text-on-surface-variant">%</span>
+</div>
+</div>
+<!-- Date Range (Grid for Desktop, Stack for Mobile) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-gap-md">
+<!-- Start Date -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="start_date">Ngày bắt đầu</label>
+<input class="w-full h-[56px] px-4 rounded-lg border border-outline-variant bg-surface-bright text-on-surface font-body-lg text-body-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow" id="start_date" name="start_date" required="" type="date"/>
+</div>
+<!-- End Date -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="end_date">Ngày kết thúc</label>
+<input class="w-full h-[56px] px-4 rounded-lg border border-outline-variant bg-surface-bright text-on-surface font-body-lg text-body-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow" id="end_date" name="end_date" required="" type="date"/>
+</div>
+</div>
+<!-- Product Selection -->
+<div class="flex flex-col gap-4 mt-4">
+<span class="font-label-lg text-label-lg text-on-surface">Áp dụng cho</span>
+<div class="flex flex-col gap-3">
+<!-- Option: All Products -->
+<label class="flex items-center p-4 border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container transition-colors has-[:checked]:bg-surface-container has-[:checked]:border-primary">
+<input checked="" class="w-6 h-6 text-primary border-outline-variant focus:ring-primary" name="product_selection" type="radio" value="all"/>
+<div class="ml-4 flex flex-col">
+<span class="font-body-lg text-body-lg text-on-surface font-medium">Tất cả sản phẩm</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Khuyến mãi sẽ tự động áp dụng cho mọi mặt hàng trong cửa hàng.</span>
+</div>
+</label>
+<!-- Option: Specific Products -->
+<label class="flex items-center p-4 border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container transition-colors has-[:checked]:bg-surface-container has-[:checked]:border-primary">
+<input class="w-6 h-6 text-primary border-outline-variant focus:ring-primary" name="product_selection" type="radio" value="specific"/>
+<div class="ml-4 flex flex-col">
+<span class="font-body-lg text-body-lg text-on-surface font-medium">Sản phẩm cụ thể</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Chỉ chọn một số mặt hàng nhất định để áp dụng giảm giá.</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Submit Button -->
+<div class="mt-8 pt-6 border-t border-outline-variant">
+<button class="w-full h-[56px] bg-primary text-on-primary font-headline-md text-headline-md rounded-full hover:bg-surface-tint transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-sm" type="submit">
+<span>Tạo Khuyến Mãi</span>
+<span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</form>
+</div>
+</main>
+<!-- Mobile Bottom Navigation Bar (Hidden on Desktop) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-surface-container-lowest dark:bg-inverse-surface border-t border-outline-variant px-2 pb-2 pt-2 h-[80px] shadow-lg">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Trang chủ</span>
+</a>
+<!-- Explore -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="explore">explore</span>
+<span class="font-label-md text-label-md">Khám phá</span>
+</a>
+<!-- Orders -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="receipt_long">receipt_long</span>
+<span class="font-label-md text-label-md">Đơn hàng</span>
+</a>
+<!-- Messages -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="chat">chat</span>
+<span class="font-label-md text-label-md">Tin nhắn</span>
+</a>
+<!-- Account (Active, as store management usually falls under account) -->
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-full px-6 py-2 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label-md text-label-md">Tài khoản</span>
+</a>
+</nav>
+<script>
+        // Simple client-side validation logic placeholder
+        document.querySelector('form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            // In a real app, this would handle form submission
+            alert('Đã gửi yêu cầu tạo khuyến mãi!');
+        });
+    </script>
+</body></html>

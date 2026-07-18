@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Rút tiền - Chợ Quê FastMark</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#cea700",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-tertiary-fixed": "#231b00",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#00873a",
+                        "surface-variant": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "primary-fixed": "#7ffc97",
+                        "outline-variant": "#bdcaba",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-secondary-fixed-variant": "#005321",
+                        "inverse-primary": "#62df7d",
+                        "on-secondary-container": "#007432",
+                        "tertiary-fixed-dim": "#eec200",
+                        "secondary-container": "#6bff8f",
+                        "surface-container-high": "#dee9fc",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-secondary-fixed": "#002109",
+                        "surface-bright": "#f8f9ff",
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "surface-container-low": "#eff4ff",
+                        "on-primary-container": "#f7fff2",
+                        "inverse-surface": "#27313f",
+                        "tertiary": "#735c00",
+                        "secondary": "#006e2f",
+                        "surface-tint": "#006e2d",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-primary-fixed": "#002109",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#121c2a",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#6e7b6c",
+                        "surface-dim": "#d0dbed",
+                        "inverse-on-surface": "#eaf1ff",
+                        "background": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#e6eeff",
+                        "surface": "#f8f9ff",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "surface-container-highest": "#d9e3f6",
+                        "secondary-fixed": "#6bff8f",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-margin": "24px",
+                        "stack-gap-lg": "32px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "price-display": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col">
+<header class="flex items-center px-container-margin h-[72px] bg-surface sticky top-0 z-10 border-b border-surface-container-high">
+<button aria-label="Quay lại" class="h-touch-target-min w-touch-target-min flex items-center justify-center -ml-4 text-on-surface rounded-full hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined" style="font-size: 28px;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md ml-2 flex-1 text-on-surface">Rút tiền doanh thu</h1>
+</header>
+<main class="flex-1 flex flex-col px-container-margin py-stack-gap-lg gap-stack-gap-lg max-w-2xl mx-auto w-full mb-32">
+<section class="bg-surface-container-low rounded-xl p-8 flex flex-col items-center justify-center gap-2 border border-surface-container-highest">
+<p class="font-label-lg text-label-lg text-on-surface-variant">Số dư hiện tại có thể rút</p>
+<p class="font-price-display text-price-display text-primary tracking-tight">12.500.000 ₫</p>
+</section>
+<section class="flex flex-col gap-stack-gap-md">
+<div class="flex justify-between items-end">
+<label class="font-label-lg text-label-lg text-on-surface" for="amount">Số tiền cần rút</label>
+<button class="font-label-md text-label-md text-primary hover:text-primary-container px-2 py-1 rounded" type="button">Rút toàn bộ</button>
+</div>
+<div class="relative flex items-center h-[72px] border-2 border-outline-variant rounded-lg px-6 bg-surface-container-lowest focus-within:border-primary focus-within:ring-2 focus-within:ring-primary-container/20 transition-all">
+<input class="w-full bg-transparent border-none outline-none font-headline-lg-mobile text-headline-lg-mobile text-on-surface placeholder:text-outline p-0 focus:ring-0" id="amount" inputmode="numeric" placeholder="0" type="text"/>
+<span class="font-headline-md text-headline-md text-on-surface-variant ml-4">₫</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Tối thiểu 100.000 ₫ - Không mất phí giao dịch</p>
+</section>
+<section class="flex flex-col mt-4">
+<h2 class="font-label-lg text-label-lg text-on-surface mb-2">Chuyển tiền đến</h2>
+<div class="flex flex-col">
+<label class="flex items-center gap-4 py-[20px] border-b border-surface-container-highest cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-primary shrink-0 group-hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined" style="font-size: 28px;">account_balance</span>
+</div>
+<div class="flex-1 flex flex-col">
+<span class="font-body-lg text-body-lg text-on-surface">Ngân hàng Vietcombank</span>
+<span class="font-body-md text-body-md text-on-surface-variant">**** **** 1234 - Nguyen Van A</span>
+</div>
+<div class="shrink-0 flex items-center justify-center w-8 h-8 rounded-full border-2 border-primary bg-primary text-on-primary">
+<span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<input checked="" class="hidden" name="withdrawal_method" type="radio" value="vcb"/>
+</label>
+<label class="flex items-center gap-4 py-[20px] border-b border-surface-container-highest cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-primary shrink-0 group-hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined" style="font-size: 28px;">account_balance_wallet</span>
+</div>
+<div class="flex-1 flex flex-col">
+<span class="font-body-lg text-body-lg text-on-surface">Ví điện tử MoMo</span>
+<span class="font-body-md text-body-md text-on-surface-variant">090****888 - Nguyen Van A</span>
+</div>
+<div class="shrink-0 flex items-center justify-center w-8 h-8 rounded-full border-2 border-outline-variant bg-transparent"></div>
+<input class="hidden" name="withdrawal_method" type="radio" value="momo"/>
+</label>
+<button class="flex items-center gap-4 py-[20px] cursor-pointer hover:bg-surface-container-low rounded-lg transition-colors px-2 -mx-2 mt-2" type="button">
+<div class="w-12 h-12 rounded-full border-2 border-dashed border-outline flex items-center justify-center text-outline shrink-0">
+<span class="material-symbols-outlined" style="font-size: 24px;">add</span>
+</div>
+<span class="font-label-lg text-label-lg text-primary">Thêm tài khoản / ví mới</span>
+</button>
+</div>
+</section>
+</main>
+<div class="fixed bottom-0 left-0 w-full bg-surface-container-lowest border-t border-surface-container-highest p-container-margin pb-safe-area shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-20">
+<div class="max-w-2xl mx-auto">
+<button class="w-full h-[64px] bg-primary hover:bg-surface-tint text-on-primary rounded-full font-headline-md text-headline-md flex items-center justify-center gap-2 transition-transform active:scale-[0.98]">
+                Xác nhận rút tiền
+                <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<script>
+        document.querySelectorAll('label').forEach(label => {
+            label.addEventListener('click', function() {
+                document.querySelectorAll('label .shrink-0.w-8').forEach(indicator => {
+                    indicator.classList.remove('border-primary', 'bg-primary', 'text-on-primary');
+                    indicator.classList.add('border-outline-variant', 'bg-transparent');
+                    indicator.innerHTML = '';
+                });
+                
+                const currentIndicator = this.querySelector('.shrink-0.w-8');
+                if(currentIndicator) {
+                    currentIndicator.classList.remove('border-outline-variant', 'bg-transparent');
+                    currentIndicator.classList.add('border-primary', 'bg-primary', 'text-on-primary');
+                    currentIndicator.innerHTML = '<span class="material-symbols-outlined" style="font-size: 20px; font-variation-settings: \'FILL\' 1;">check</span>';
+                }
+            });
+        });
+    </script>
+</body></html>

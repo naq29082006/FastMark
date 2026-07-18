@@ -90,7 +90,7 @@ a {
 .login-card button,
 .approve-btn,
 .page-header button {
-  background: #0d7377;
+  background: #076F32;
   color: #ffffff;
 }
 
@@ -113,10 +113,10 @@ a {
 }
 
 .success-banner {
-  color: #047857;
+  color: #076F32;
   font-weight: 600;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  background: #E6F4EC;
+  border: 1px solid #A7D9B8;
   border-radius: 12px;
   padding: 12px 16px;
 }
@@ -162,7 +162,7 @@ a {
 }
 
 .admin-sidebar a.active {
-  background: #0d7377;
+  background: #076F32;
   color: #ffffff;
 }
 
@@ -254,7 +254,7 @@ a {
 
 .shop-username {
   margin-top: 4px !important;
-  color: #0f766e !important;
+  color: #076F32 !important;
   font-weight: 700;
 }
 
@@ -413,8 +413,8 @@ a {
 }
 
 .category-tabs .tab-btn.active {
-  background: #0f766e;
-  border-color: #0f766e;
+  background: #076F32;
+  border-color: #076F32;
   color: #fff;
 }
 
@@ -445,8 +445,8 @@ a {
 }
 
 .table-actions button {
-  background: #e8f3f1;
-  color: #0d7377;
+  background: #E6F4EC;
+  color: #076F32;
   white-space: nowrap;
   min-width: 64px;
 }
@@ -504,7 +504,7 @@ a {
 .header-actions .approve-btn,
 .header-actions .danger-btn,
 .filter-form .primary-btn {
-  background: #0d7377;
+  background: #076F32;
   color: #ffffff;
   border: 0;
   border-radius: 10px;
@@ -551,8 +551,8 @@ a {
   display: grid;
   place-items: center;
   font-weight: 800;
-  color: #0f766e;
-  background: #ecfdf5;
+  color: #076F32;
+  background: #E6F4EC;
 }
 
 .detail-avatar {
@@ -595,8 +595,8 @@ a {
 }
 
 .badge-success {
-  background: #dcfce7;
-  color: #15803d;
+  background: #E6F4EC;
+  color: #055528;
 }
 
 .badge-danger {
@@ -627,7 +627,7 @@ a {
 }
 
 .table-link {
-  color: #0d7377;
+  color: #076F32;
   font-weight: 800;
   text-decoration: none;
 }
@@ -771,7 +771,7 @@ a {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #0f766e;
+  background: #076F32;
   color: #ffffff;
   border-radius: 12px;
   padding: 12px 16px;
@@ -1009,15 +1009,15 @@ a {
 }
 
 .outline-btn-show {
-  border: 1px solid #14b8a6;
-  background: #ecfdf5;
-  color: #0f766e;
+  border: 1px solid #076F32;
+  background: #E6F4EC;
+  color: #076F32;
 }
 
 .outline-btn-show:hover:not(:disabled) {
   background: #d1fae5;
-  border-color: #0d9488;
-  color: #115e59;
+  border-color: #076F32;
+  color: #055528;
 }
 
 .outline-btn-delete {
@@ -1084,7 +1084,7 @@ a {
 
 .evidence-thumbnail:hover {
   transform: translateY(-1px);
-  border-color: #0d7377;
+  border-color: #076F32;
   box-shadow: 0 8px 20px rgba(15, 115, 119, 0.12);
 }
 
@@ -1272,8 +1272,8 @@ button.table-link {
 }
 
 .chip.active {
-  background: #0d7377;
-  border-color: #0d7377;
+  background: #076F32;
+  border-color: #076F32;
   color: #ffffff;
 }
 
@@ -1459,7 +1459,7 @@ button.table-link {
   place-items: center;
   background: #e2e8f0;
   font-weight: 800;
-  color: #0d7377;
+  color: #076F32;
 }
 
 .empty-inline {
@@ -1550,7 +1550,7 @@ button.table-link {
   display: grid;
   place-items: center;
   font-weight: 800;
-  color: #0f766e;
+  color: #076F32;
 }
 
 .muted {
@@ -1559,7 +1559,7 @@ button.table-link {
 }
 
 .link-btn {
-  color: #0f766e;
+  color: #076F32;
   font-weight: 700;
   text-decoration: none;
 }

@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   },
   currentPhoneHint: {
     fontSize: 13,
-    color: '#0f766e',
+    color: '#076F32',
     fontWeight: '700',
     marginBottom: 12,
   },
@@ -401,24 +401,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   codeBox: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#E6F4EC',
     borderRadius: 12,
     padding: 14,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: '#A7D9B8',
     alignItems: 'center',
   },
   codeBoxLabel: {
     fontSize: 13,
-    color: '#047857',
+    color: '#076F32',
     marginBottom: 6,
     fontWeight: '700',
   },
   codeBoxValue: {
     fontSize: 32,
     fontWeight: '800',
-    color: '#0f766e',
+    color: '#076F32',
     letterSpacing: 6,
   },
   errorText: {
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     marginTop: 8,
   },
   buttonPressed: {
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   resendText: {
-    color: '#0d7377',
+    color: '#076F32',
     fontSize: 14,
     fontWeight: '700',
   },

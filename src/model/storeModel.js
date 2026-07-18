@@ -63,5 +63,7 @@ export function normalizeStore(row) {
     category_name: row.categoryName || row.category_name || '',
     categoryId: row.categoryId || row.category_id || '',
     category_id: row.categoryId || row.category_id || '',
+    allowReserve: row.allowReserve !== false,
+    depositPercent: Math.max(0, Math.min(100, Number(row.depositPercent) || 0)),
   };
 }

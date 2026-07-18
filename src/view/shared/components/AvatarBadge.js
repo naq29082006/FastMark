@@ -11,7 +11,7 @@ export default function AvatarBadge({
   name,
   uri,
   size = 64,
-  backgroundColor = '#0d7377',
+  backgroundColor = '#076F32',
   style,
   textStyle,
 }) {

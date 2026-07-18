@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chợ Quê FastMark - Tải ảnh CCCD mặt trước</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed": "#ffe083",
+                      "primary": "#006b2c",
+                      "on-tertiary-fixed": "#231b00",
+                      "error": "#ba1a1a",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-background": "#121c2a",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "on-tertiary-container": "#4e3e00",
+                      "surface-tint": "#006e2d",
+                      "on-primary-container": "#f7fff2",
+                      "primary-fixed-dim": "#62df7d",
+                      "primary-fixed": "#7ffc97",
+                      "on-secondary-container": "#007432",
+                      "surface-variant": "#d9e3f6",
+                      "surface-bright": "#f8f9ff",
+                      "on-error-container": "#93000a",
+                      "on-secondary-fixed-variant": "#005321",
+                      "secondary-fixed-dim": "#4ae176",
+                      "secondary": "#006e2f",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-fixed": "#002109",
+                      "on-surface": "#121c2a",
+                      "tertiary-fixed-dim": "#eec200",
+                      "outline-variant": "#bdcaba",
+                      "error-container": "#ffdad6",
+                      "surface": "#f8f9ff",
+                      "on-secondary": "#ffffff",
+                      "background": "#f8f9ff",
+                      "on-primary-fixed": "#002109",
+                      "on-surface-variant": "#3e4a3d",
+                      "inverse-surface": "#27313f",
+                      "primary-container": "#00873a",
+                      "outline": "#6e7b6c",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-error": "#ffffff",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-low": "#eff4ff",
+                      "surface-dim": "#d0dbed",
+                      "secondary-fixed": "#6bff8f",
+                      "tertiary": "#735c00",
+                      "surface-container-highest": "#d9e3f6",
+                      "on-primary": "#ffffff",
+                      "tertiary-container": "#cea700",
+                      "inverse-primary": "#62df7d",
+                      "surface-container": "#e6eeff",
+                      "surface-container-high": "#dee9fc",
+                      "secondary-container": "#6bff8f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "unit": "8px",
+                      "touch-target-min": "56px",
+                      "container-margin": "24px",
+                      "stack-gap-md": "16px",
+                      "gutter": "16px",
+                      "stack-gap-lg": "32px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "price-display": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "label-lg": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "price-display": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "20px",
+                              {
+                                      "lineHeight": "30px",
+                                      "fontWeight": "400"
+                              }
+                      }
+              }
+            },
+          }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+            -webkit-tap-highlight-color: transparent;
+        }
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen flex flex-col items-center pt-touch-target-min pb-container-margin md:pb-touch-target-min bg-background text-on-background selection:bg-primary-container selection:text-on-primary-container">
+<!-- Top App Bar (Transactional - Back Button) -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-margin h-touch-target-min bg-surface dark:bg-on-background bg-surface-container-low dark:bg-surface-container-lowest transition-colors duration-200 flat no shadows">
+<button aria-label="Quay lại" class="flex items-center justify-center w-touch-target-min h-touch-target-min -ml-4 rounded-full text-primary dark:text-primary-fixed hover:bg-primary-container/20 transition-colors" type="button">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed flex-1 text-center pr-touch-target-min">Xác thực danh tính</h1>
+</header>
+<main class="w-full max-w-md px-container-margin flex-grow flex flex-col mt-stack-gap-lg">
+<!-- Header Text -->
+<div class="mb-stack-gap-lg text-center">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface mb-unit">Chụp ảnh CCCD</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Vui lòng cung cấp hình ảnh <strong class="text-on-surface">Mặt Trước</strong> của Căn cước công dân. Đảm bảo ảnh rõ nét, không bị lóa sáng hay mất góc.</p>
+</div>
+<!-- Camera Framing Area -->
+<div class="relative w-full aspect-[1.6/1] bg-surface-container-high rounded-xl border-2 border-dashed border-outline flex flex-col items-center justify-center mb-stack-gap-lg overflow-hidden group">
+<!-- Corner Guides (Simulating Camera Reticle) -->
+<div class="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg pointer-events-none"></div>
+<div class="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg pointer-events-none"></div>
+<div class="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg pointer-events-none"></div>
+<div class="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg pointer-events-none"></div>
+<!-- Empty State / Instruction Graphic -->
+<div class="flex flex-col items-center justify-center text-center p-4">
+<span class="material-symbols-outlined text-outline mb-unit" data-icon="id_card" style="font-size: 48px;">id_card</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant">Khung viền thẻ CCCD</span>
+</div>
+<!-- Optional: Simulated Image Preview Layer (hidden by default) -->
+<!-- <img src="placeholder" data-alt="A clear, well-lit, high-resolution sample image of a Vietnamese citizen identity card front face, placed on a flat, neutral-colored table surface. The card details are perfectly sharp and legible, with no reflections or glare obscuring the text or the photo. The lighting is even and soft, capturing the subtle textures of the plastic card. The scene is practical and focused on clarity." class="absolute inset-0 w-full h-full object-cover hidden" alt="Bản xem trước"> -->
+</div>
+<!-- Guidance List -->
+<div class="bg-surface-container rounded-xl p-gutter mb-stack-gap-lg">
+<h3 class="font-label-lg text-label-lg text-on-surface mb-stack-gap-md">Lưu ý để ảnh hợp lệ:</h3>
+<ul class="space-y-stack-gap-md">
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-unit mt-1" data-icon="check_circle">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Hình ảnh rõ nét, chữ không bị mờ.</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-unit mt-1" data-icon="light_mode">light_mode</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Không bị chói sáng hay bóng phản chiếu.</span>
+</li>
+<li class="flex items-start">
+<span class="material-symbols-outlined text-primary mr-unit mt-1" data-icon="crop_free">crop_free</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Thẻ nằm trọn trong khung, không bị cắt góc.</span>
+</li>
+</ul>
+</div>
+<!-- Action Buttons -->
+<div class="mt-auto space-y-gutter pb-container-margin">
+<!-- Primary Action: Take Photo -->
+<button class="w-full min-h-[56px] flex items-center justify-center gap-unit bg-primary text-on-primary rounded-xl font-headline-md text-headline-md shadow-sm hover:bg-surface-tint transition-colors focus:ring-4 focus:ring-primary-container focus:outline-none active:scale-[0.98]" type="button">
+<span class="material-symbols-outlined" data-icon="photo_camera" style="font-variation-settings: 'FILL' 1;">photo_camera</span>
+                Chụp ảnh ngay
+            </button>
+<!-- Secondary Action: Upload from Gallery -->
+<button class="w-full min-h-[56px] flex items-center justify-center gap-unit bg-transparent text-primary border-2 border-primary rounded-xl font-headline-md text-headline-md hover:bg-primary-container/10 transition-colors focus:ring-4 focus:ring-primary-container focus:outline-none active:scale-[0.98]" type="button">
+<span class="material-symbols-outlined" data-icon="photo_library">photo_library</span>
+                Chọn ảnh từ thư viện
+            </button>
+</div>
+</main>
+<!-- Note: BottomNavBar is suppressed due to Transactional/Onboarding nature of the screen -->
+</body></html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chợ Quê FastMark - Chưa có đơn hàng</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#cea700",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-tertiary-fixed": "#231b00",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#00873a",
+                        "surface-variant": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "primary-fixed": "#7ffc97",
+                        "outline-variant": "#bdcaba",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-secondary-fixed-variant": "#005321",
+                        "inverse-primary": "#62df7d",
+                        "on-secondary-container": "#007432",
+                        "tertiary-fixed-dim": "#eec200",
+                        "secondary-container": "#6bff8f",
+                        "surface-container-high": "#dee9fc",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-secondary-fixed": "#002109",
+                        "surface-bright": "#f8f9ff",
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "surface-container-low": "#eff4ff",
+                        "on-primary-container": "#f7fff2",
+                        "inverse-surface": "#27313f",
+                        "tertiary": "#735c00",
+                        "secondary": "#006e2f",
+                        "surface-tint": "#006e2d",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-primary-fixed": "#002109",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#121c2a",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#6e7b6c",
+                        "surface-dim": "#d0dbed",
+                        "inverse-on-surface": "#eaf1ff",
+                        "background": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#e6eeff",
+                        "surface": "#f8f9ff",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "surface-container-highest": "#d9e3f6",
+                        "secondary-fixed": "#6bff8f",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-margin": "24px",
+                        "stack-gap-lg": "32px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col pb-[100px] md:pb-0">
+<!-- TopAppBar (from JSON) -->
+<header class="bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline docked full-width top-0 flex flex-col w-full px-container-margin py-unit gap-2 sticky z-40">
+<div class="flex items-center justify-between w-full h-touch-target-min">
+<button class="w-12 h-12 flex items-center justify-center text-primary dark:text-primary-fixed hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-full transition-all">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-primary dark:text-primary-fixed flex-1 text-center">
+                Chợ Quê FastMark
+            </h1>
+<button class="w-12 h-12 flex items-center justify-center text-primary dark:text-primary-fixed hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-full transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col items-center justify-center px-container-margin py-stack-gap-lg max-w-3xl mx-auto w-full text-center">
+<!-- Empty State Illustration & Message -->
+<div class="flex flex-col items-center mb-stack-gap-lg w-full">
+<div class="w-64 h-64 mb-stack-gap-md rounded-xl overflow-hidden bg-surface-variant flex items-center justify-center relative">
+<img class="object-cover w-full h-full opacity-90" data-alt="A charming, simple illustration in a bright, modern light-mode style showing an empty market stall with fresh green leaves. The stall is clean and inviting but currently has no produce, hinting at a fresh start. Soft, warm sunlight illuminates the scene, emphasizing primary green and off-white tones, creating an 'An Tâm' (peace of mind) feeling." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmvvhWde5NyPTreUVT3Q93uTjIE9IJb1c5a1ZFL30Am4ARNKLFa_PiUAkjmm7rF3PPpIMYhRr5mOSpaOM7NVwJ1fk-PFX4Vg636pqIgETfZgsWIOUHaAHXc92YEmXbz3qBtv8tO6cTpt5Mpi_mUlDhM7DLsb7U2By5PaUprbVFz0TAb6I5DK9zq7ST5V5TJucJPAVZb9rCM0PUXFcxlky0D-K_2ClIt9Ijs--301I3XmyyBc_TOiLYIhAjuR-IgKTJVvAV0CZNdnVe"/>
+</div>
+<h2 class="font-headline-lg text-headline-lg-mobile text-primary mb-unit">Chưa có đơn hàng nào</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-md mx-auto">
+                Gian hàng của bạn đang trống đơn. Hãy thử áp dụng vài mẹo nhỏ để thu hút khách hàng nhé!
+            </p>
+</div>
+<!-- Tips Section (Bento-ish Grid) -->
+<div class="w-full grid grid-cols-1 md:grid-cols-2 gap-gutter mb-stack-gap-lg text-left">
+<!-- Tip 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-stack-gap-md rounded-xl flex items-start gap-gutter shadow-sm">
+<div class="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-secondary-container" data-icon="share">share</span>
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface mb-1">Chia sẻ cửa hàng</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Gửi liên kết gian hàng cho bạn bè, người thân hoặc trên mạng xã hội.</p>
+</div>
+</div>
+<!-- Tip 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-stack-gap-md rounded-xl flex items-start gap-gutter shadow-sm">
+<div class="w-12 h-12 rounded-full bg-tertiary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-tertiary-container" data-icon="add_a_photo">add_a_photo</span>
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface mb-1">Thêm hình ảnh đẹp</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Chụp ảnh sản phẩm rõ nét, sáng sủa để khách hàng dễ hình dung.</p>
+</div>
+</div>
+<!-- Tip 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant p-stack-gap-md rounded-xl flex items-start gap-gutter shadow-sm md:col-span-2">
+<div class="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-container" data-icon="local_offer">local_offer</span>
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface mb-1">Tạo khuyến mãi nhỏ</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Giảm giá một chút hoặc tặng kèm món quà nhỏ cho những đơn hàng đầu tiên để khuyến khích mua sắm.</p>
+</div>
+</div>
+</div>
+<!-- Primary Action -->
+<div class="w-full max-w-md mx-auto flex flex-col gap-unit">
+<button class="w-full min-h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-full flex items-center justify-center gap-2 hover:bg-surface-tint active:scale-95 transition-all">
+                Đăng sản phẩm mới
+                <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<button class="w-full min-h-touch-target-min bg-transparent border border-primary text-primary font-headline-md text-headline-md rounded-full flex items-center justify-center gap-2 hover:bg-surface-variant active:scale-95 transition-all">
+                Xem hướng dẫn bán hàng
+            </button>
+</div>
+</main>
+<!-- BottomNavBar (from JSON) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-surface dark:bg-inverse-surface px-2 pb-2 bg-surface-container-lowest dark:bg-inverse-surface border-t border-outline-variant shadow-lg h-touch-target-min">
+<!-- Item 1 -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+<span class="font-label-md text-xs">Trang chủ</span>
+</a>
+<!-- Item 2 -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="explore">explore</span>
+<span class="font-label-md text-xs">Khám phá</span>
+</a>
+<!-- Item 3 (ACTIVE - "Đơn hàng") -->
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-full px-6 py-2 Active: scale-90 transition-transform duration-150 shadow-sm" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="receipt_long" data-weight="fill" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-label-md text-xs font-bold">Đơn hàng</span>
+</a>
+<!-- Item 4 -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="chat">chat</span>
+<span class="font-label-md text-xs">Tin nhắn</span>
+</a>
+<!-- Item 5 -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label-md text-xs">Tài khoản</span>
+</a>
+</nav>
+<!-- Desktop Navigation Cluster (visible only on md+) -->
+<div class="hidden md:flex fixed left-0 top-[72px] h-[calc(100vh-72px)] w-64 bg-surface-container-lowest border-r border-outline-variant p-4 flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-lg">Trang chủ</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="font-label-lg">Khám phá</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary-container text-on-secondary-container font-bold transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long" data-weight="fill" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-label-lg">Đơn hàng</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="font-label-lg">Tin nhắn</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-variant transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-lg">Tài khoản</span>
+</a>
+</div>
+</body></html>

@@ -54,15 +54,17 @@ export default function BuyerQuickMenu({
             style={[
               styles.dropdown,
               dropdownStyle,
-              { top: insets.top + 72, right: 34 },
+              { top: insets.top + 56, right: 16 },
             ]}
           >
             <Pressable onPress={() => closeAndRun(onEditAccount)} style={styles.menuItem}>
               <Text style={styles.menuItemText}>Sửa thông tin tài khoản</Text>
             </Pressable>
-            <Pressable onPress={() => closeAndRun(onSellerAction)} style={styles.menuItem}>
-              <Text style={styles.menuItemText}>{sellerButtonLabel}</Text>
-            </Pressable>
+            {sellerButtonLabel ? (
+              <Pressable onPress={() => closeAndRun(onSellerAction)} style={styles.menuItem}>
+                <Text style={styles.menuItemText}>{sellerButtonLabel}</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={() => closeAndRun(onLogout)}
               style={[styles.menuItem, styles.menuItemLast]}

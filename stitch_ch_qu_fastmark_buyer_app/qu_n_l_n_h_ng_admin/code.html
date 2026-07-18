@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VietMarket Admin - Orders</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#e5eeff",
+                        "surface-container-low": "#eff4ff",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-primary-container": "#f7fff2",
+                        "on-primary-fixed-variant": "#005320",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#3e4a3d",
+                        "surface": "#f8f9ff",
+                        "secondary": "#006e2f",
+                        "on-tertiary-fixed-variant": "#8a143c",
+                        "surface-container-high": "#dce9ff",
+                        "inverse-primary": "#62df7d",
+                        "tertiary-container": "#c74668",
+                        "surface-variant": "#d3e4fe",
+                        "error": "#ba1a1a",
+                        "secondary-fixed-dim": "#4ae176",
+                        "outline": "#6e7b6c",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-tertiary": "#ffffff",
+                        "surface-bright": "#f8f9ff",
+                        "secondary-container": "#6bff8f",
+                        "inverse-surface": "#213145",
+                        "surface-container-highest": "#d3e4fe",
+                        "secondary-fixed": "#6bff8f",
+                        "primary-fixed": "#7ffc97",
+                        "on-secondary-fixed": "#002109",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-tint": "#006e2d",
+                        "primary-container": "#00873a",
+                        "on-secondary-container": "#007432",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#3f0016",
+                        "tertiary-fixed-dim": "#ffb2bf",
+                        "on-background": "#0b1c30",
+                        "on-primary-fixed": "#002109",
+                        "on-surface": "#0b1c30",
+                        "background": "#f8f9ff",
+                        "on-secondary-fixed-variant": "#005321",
+                        "tertiary": "#a72d51",
+                        "on-secondary": "#ffffff",
+                        "surface-dim": "#cbdbf5",
+                        "primary": "#006b2c",
+                        "outline-variant": "#bdcaba",
+                        "tertiary-fixed": "#ffd9de",
+                        "on-tertiary-container": "#fffbff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-page": "32px",
+                        "space-lg": "24px",
+                        "sidebar-width": "260px",
+                        "gutter": "24px",
+                        "container-max-width": "1440px",
+                        "space-xl": "32px",
+                        "space-xs": "4px",
+                        "space-md": "16px",
+                        "space-sm": "8px",
+                        "header-height": "64px"
+                    },
+                    "fontFamily": {
+                        "h5": ["Inter"], "h4": ["Inter"], "h2": ["Inter"], "caption": ["Inter"],
+                        "label-sm": ["Inter"], "h3": ["Inter"], "body-lg": ["Inter"], "h1": ["Inter"],
+                        "body-md": ["Inter"], "h6": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h5": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "h4": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+                        "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                        "h3": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "h1": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "h6": ["14px", {"lineHeight": "20px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- App Container -->
+<div class="flex h-screen w-full">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest border-r border-outline-variant flex flex-col z-20">
+<!-- Brand Area -->
+<div class="h-header-height flex items-center px-4 border-b border-outline-variant/30">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container text-on-primary-container flex items-center justify-center font-bold">V</div>
+<div>
+<h1 class="font-h5 text-h5 text-primary">VietMarket</h1>
+<p class="font-caption text-caption text-on-surface-variant">Admin Console</p>
+</div>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex flex-col h-full overflow-y-auto custom-scrollbar py-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+<span class="font-h6 text-h6">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-xl">group</span>
+<span class="font-h6 text-h6">Users</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-xl">storefront</span>
+<span class="font-h6 text-h6">Sellers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-xl">inventory_2</span>
+<span class="font-h6 text-h6">Products</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-xl">category</span>
+<span class="font-h6 text-h6">Categories</span>
+</a>
+<!-- Active Navigation Item -->
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container/10 text-primary font-semibold border-l-4 border-primary transition-all scale-[0.99] opacity-90" href="#">
+<span class="material-symbols-outlined text-xl">shopping_cart</span>
+<span class="font-h6 text-h6">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-xl">payments</span>
+<span class="font-h6 text-h6">Financials</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-xl">campaign</span>
+<span class="font-h6 text-h6">Ads</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-xl">analytics</span>
+<span class="font-h6 text-h6">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-colors duration-200 mt-auto" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<span class="font-h6 text-h6">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Wrapper -->
+<div class="flex-1 ml-[260px] flex flex-col min-w-0 bg-background">
+<!-- TopNavBar -->
+<header class="h-header-height bg-surface-container-lowest border-b border-outline-variant flex justify-between items-center px-space-xl z-10">
+<div class="flex items-center gap-4">
+<div class="relative max-w-md w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-64 pl-10 pr-4 py-2 bg-surface-container-low border-transparent focus:border-primary focus:ring-1 focus:ring-primary rounded-full font-body-md text-body-md transition-all outline-none" placeholder="Search orders, customers..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-all hover:scale-95 duration-150 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-all hover:scale-95 duration-150">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant mx-2"></div>
+<img alt="Administrator Profile" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="Close up professional headshot of a business administrator in a modern office with bright natural lighting, shallow depth of field." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-KIIvF1QVk-ZrGoO90KWVAEfI6Etlb1KEsCDlD-woqkVUVL0DX02FZfuD8GIA6_LagR0MN7P7BXy1GAc8xteCFdHYj31uS_RVHdl5uYZL2NtVWUevDt8wLr9fX2z_1wzV6e6MAN8pbqQ3YpDkm44zofIUepkXxittIh9flN5s7cp4pc8-3k7_654zBwzI74N2L3doJPNjG_jukM3eajPKyiGNnkl_Tq8JvyrRzIm81umcZB8Kl1aO_Zuak0XW3pJ7ndF4zD6oOk7w"/>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 overflow-y-auto custom-scrollbar p-margin-page">
+<div class="max-w-container-max-width mx-auto flex flex-col gap-space-lg h-full">
+<!-- Page Header -->
+<div class="flex justify-between items-end">
+<div>
+<h2 class="font-h3 text-h3 text-on-surface">Quản lý Đơn hàng</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">View, track, and manage all marketplace transactions.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded bg-surface hover:bg-surface-container-low text-on-surface font-label-sm text-label-sm transition-colors">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                                Export CSV
+                            </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded hover:bg-primary-container transition-colors shadow-sm font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                                Create Order
+                            </button>
+</div>
+</div>
+<!-- Filter Bar -->
+<div class="bg-surface border border-outline-variant rounded-lg p-4 flex flex-wrap items-center justify-between gap-4">
+<div class="flex flex-wrap items-center gap-4 flex-1">
+<!-- Date Range -->
+<div class="flex items-center gap-2 border border-outline-variant rounded px-3 py-1.5 bg-surface-container-lowest">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">calendar_today</span>
+<span class="font-body-md text-body-md text-on-surface">Oct 1 - Oct 31, 2023</span>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] ml-2">expand_more</span>
+</div>
+<!-- Status Filter -->
+<div class="flex items-center gap-2 border border-outline-variant rounded px-3 py-1.5 bg-surface-container-lowest cursor-pointer hover:bg-surface-container-low transition-colors">
+<span class="font-body-md text-body-md text-on-surface-variant">Status:</span>
+<span class="font-label-sm text-label-sm text-on-surface">All Statuses</span>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">expand_more</span>
+</div>
+<!-- Region Filter -->
+<div class="flex items-center gap-2 border border-outline-variant rounded px-3 py-1.5 bg-surface-container-lowest cursor-pointer hover:bg-surface-container-low transition-colors">
+<span class="font-body-md text-body-md text-on-surface-variant">Region:</span>
+<span class="font-label-sm text-label-sm text-on-surface">Ho Chi Minh</span>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">expand_more</span>
+</div>
+</div>
+<!-- Bulk Actions (Disabled by default) -->
+<div class="flex items-center gap-2 pl-4 border-l border-outline-variant opacity-50 cursor-not-allowed">
+<span class="font-caption text-caption text-on-surface-variant">0 selected</span>
+<button class="px-3 py-1.5 border border-outline-variant rounded bg-surface text-on-surface-variant font-label-sm text-label-sm pointer-events-none">Update Status</button>
+</div>
+</div>
+<!-- Data Table -->
+<div class="bg-surface border border-outline-variant rounded-lg overflow-hidden flex flex-col flex-1">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low border-b border-outline-variant">
+<tr>
+<th class="py-3 px-4 w-[48px]"><input class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4 cursor-pointer" type="checkbox"/></th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">Order ID</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">Customer</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">Store Name</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">Date</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold text-right">Amount</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">Status</th>
+<th class="py-3 px-4 w-[64px]"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/50">
+<!-- Row 1: Completed -->
+<tr class="hover:bg-surface-container-lowest transition-colors group cursor-pointer">
+<td class="py-3 px-4"><input class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4 cursor-pointer" type="checkbox"/></td>
+<td class="py-3 px-4 font-body-md text-body-md text-primary font-medium">#ORD-9021</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Nguyen Van A</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Saigon Tech Store</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">24 Oct, 14:30</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium text-right">₫4,500,000</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-1 rounded bg-[#dcfce7] text-[#166534] font-label-sm text-[11px] uppercase tracking-wide">Completed</span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-variant rounded"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- Row 2: Processing -->
+<tr class="hover:bg-surface-container-lowest transition-colors group cursor-pointer">
+<td class="py-3 px-4"><input class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4 cursor-pointer" type="checkbox"/></td>
+<td class="py-3 px-4 font-body-md text-body-md text-primary font-medium">#ORD-9022</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Tran Thi B</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Hanoi Fashion Hub</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">24 Oct, 15:10</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium text-right">₫1,250,000</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-800 font-label-sm text-[11px] uppercase tracking-wide">Processing</span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-variant rounded"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- Row 3: Shipping -->
+<tr class="hover:bg-surface-container-lowest transition-colors group cursor-pointer">
+<td class="py-3 px-4"><input class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4 cursor-pointer" type="checkbox"/></td>
+<td class="py-3 px-4 font-body-md text-body-md text-primary font-medium">#ORD-9023</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Le Van C</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Da Nang Crafts</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">23 Oct, 09:45</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium text-right">₫850,000</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-1 rounded bg-purple-100 text-purple-800 font-label-sm text-[11px] uppercase tracking-wide">Shipping</span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-variant rounded"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- Row 4: Cancelled -->
+<tr class="hover:bg-surface-container-lowest transition-colors group cursor-pointer">
+<td class="py-3 px-4"><input class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4 cursor-pointer" type="checkbox"/></td>
+<td class="py-3 px-4 font-body-md text-body-md text-primary font-medium">#ORD-9024</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Pham Minh D</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Saigon Tech Store</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">23 Oct, 11:20</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium text-right">₫12,000,000</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-1 rounded bg-error/10 text-error font-label-sm text-[11px] uppercase tracking-wide">Cancelled</span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-variant rounded"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+<!-- Row 5: Disputed -->
+<tr class="hover:bg-surface-container-lowest transition-colors group cursor-pointer">
+<td class="py-3 px-4"><input class="rounded border-outline-variant text-primary focus:ring-primary w-4 h-4 cursor-pointer" type="checkbox"/></td>
+<td class="py-3 px-4 font-body-md text-body-md text-primary font-medium">#ORD-9025</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface">Hoang Oanh E</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">Viet Home Goods</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface-variant">22 Oct, 16:05</td>
+<td class="py-3 px-4 font-body-md text-body-md text-on-surface font-medium text-right">₫3,200,000</td>
+<td class="py-3 px-4">
+<span class="inline-flex items-center px-2 py-1 rounded bg-orange-100 text-orange-800 font-label-sm text-[11px] uppercase tracking-wide">Disputed</span>
+</td>
+<td class="py-3 px-4 text-right">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-variant rounded"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="mt-auto px-4 py-3 border-t border-outline-variant bg-surface-container-lowest flex items-center justify-between">
+<span class="font-caption text-caption text-on-surface-variant">Showing 1 to 5 of 12,450 entries</span>
+<div class="flex items-center gap-1">
+<button class="p-1 rounded text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50"><span class="material-symbols-outlined text-[20px]">chevron_left</span></button>
+<button class="w-8 h-8 rounded bg-primary text-on-primary font-label-sm text-label-sm flex items-center justify-center">1</button>
+<button class="w-8 h-8 rounded text-on-surface hover:bg-surface-container-low font-label-sm text-label-sm flex items-center justify-center">2</button>
+<button class="w-8 h-8 rounded text-on-surface hover:bg-surface-container-low font-label-sm text-label-sm flex items-center justify-center">3</button>
+<span class="px-2 text-on-surface-variant">...</span>
+<button class="w-8 h-8 rounded text-on-surface hover:bg-surface-container-low font-label-sm text-label-sm flex items-center justify-center">10</button>
+<button class="p-1 rounded text-on-surface-variant hover:bg-surface-container-low"><span class="material-symbols-outlined text-[20px]">chevron_right</span></button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

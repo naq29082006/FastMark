@@ -17,8 +17,8 @@ import ShopsPage from './pages/ShopsPage';
 import ShopDetailPage from './pages/ShopDetailPage';
 import ProductsPage from './pages/ProductsPage';
 import ReservationsPage from './pages/ReservationsPage';
-import DealsPage from './pages/DealsPage';
 import StatsPage from './pages/StatsPage';
+import BannersPage from './pages/BannersPage';
 
 function ProtectedRoutes() {
   const { user, isAdmin, loading } = useAuth();
@@ -51,10 +51,10 @@ function ProtectedRoutes() {
         <Route path="products" element={<ProductsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="reservations" element={<ReservationsPage />} />
-        <Route path="deals" element={<DealsPage />} />
         <Route path="reports" element={<ReportManagement />} />
         <Route path="reviews" element={<ReviewManagement />} />
         <Route path="notifications" element={<SystemNotification />} />
+        <Route path="banners" element={<BannersPage />} />
         <Route path="stats" element={<StatsPage />} />
       </Route>
     </Routes>

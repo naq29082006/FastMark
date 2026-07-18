@@ -159,6 +159,7 @@ export default function ShopsPage() {
               <th>Địa chỉ</th>
               <th>Danh mục</th>
               <th>Mở/đóng</th>
+              <th>Gói</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
@@ -166,11 +167,11 @@ export default function ShopsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7}>Đang tải...</td>
+                <td colSpan={8}>Đang tải...</td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={7}>Không có gian hàng.</td>
+                <td colSpan={8}>Không có gian hàng.</td>
               </tr>
             ) : (
               items.map((shop) => (
@@ -200,6 +201,16 @@ export default function ShopsPage() {
                     <span className={shop.isOpen === 1 ? 'badge badge-success' : 'badge'}>
                       {shop.isOpenLabel}
                     </span>
+                  </td>
+                  <td>
+                    {shop.subscriptionActive ? (
+                      <span className="badge badge-success">
+                        {shop.subscriptionPlan ? `${shop.subscriptionPlan} tháng` : 'Active'}
+                        <div className="muted">{formatDate(shop.subscriptionExpiresAt)}</div>
+                      </span>
+                    ) : (
+                      <span className="badge">Hết / chưa mua</span>
+                    )}
                   </td>
                   <td>
                     <span className={shop.status === 1 ? 'badge badge-success' : 'badge badge-danger'}>

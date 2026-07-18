@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sửa Sản Phẩm - Chợ Quê</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline": "#6e7b6c",
+                    "inverse-primary": "#62df7d",
+                    "tertiary-fixed": "#ffe083",
+                    "inverse-surface": "#27313f",
+                    "surface-dim": "#d0dbed",
+                    "inverse-on-surface": "#eaf1ff",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#121c2a",
+                    "surface-container-highest": "#d9e3f6",
+                    "primary-container": "#00873a",
+                    "tertiary": "#735c00",
+                    "secondary": "#006e2f",
+                    "secondary-fixed": "#6bff8f",
+                    "on-secondary-fixed": "#002109",
+                    "background": "#f8f9ff",
+                    "on-primary-container": "#f7fff2",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#3e4a3d",
+                    "surface-container-low": "#eff4ff",
+                    "primary": "#006b2c",
+                    "on-secondary-fixed-variant": "#005321",
+                    "tertiary-fixed-dim": "#eec200",
+                    "surface-tint": "#006e2d",
+                    "error": "#ba1a1a",
+                    "on-tertiary-fixed-variant": "#574500",
+                    "outline-variant": "#bdcaba",
+                    "on-tertiary-container": "#4e3e00",
+                    "primary-fixed-dim": "#62df7d",
+                    "on-primary-fixed": "#002109",
+                    "error-container": "#ffdad6",
+                    "surface-bright": "#f8f9ff",
+                    "on-error-container": "#93000a",
+                    "surface": "#f8f9ff",
+                    "on-background": "#121c2a",
+                    "surface-container": "#e6eeff",
+                    "primary-fixed": "#7ffc97",
+                    "on-secondary-container": "#007432",
+                    "on-secondary": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "tertiary-container": "#cea700",
+                    "surface-container-high": "#dee9fc",
+                    "secondary-container": "#6bff8f",
+                    "on-primary-fixed-variant": "#005320",
+                    "on-tertiary": "#ffffff",
+                    "surface-variant": "#d9e3f6",
+                    "secondary-fixed-dim": "#4ae176",
+                    "on-tertiary-fixed": "#231b00"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "touch-target-min": "56px",
+                    "stack-gap-md": "16px",
+                    "stack-gap-lg": "32px",
+                    "gutter": "16px",
+                    "container-margin": "24px",
+                    "unit": "8px"
+            },
+            "fontFamily": {
+                    "headline-lg-mobile": ["Inter", "sans-serif"],
+                    "price-display": ["Inter", "sans-serif"],
+                    "headline-md": ["Inter", "sans-serif"],
+                    "label-md": ["Inter", "sans-serif"],
+                    "label-lg": ["Inter", "sans-serif"],
+                    "headline-lg": ["Inter", "sans-serif"],
+                    "body-md": ["Inter", "sans-serif"],
+                    "body-lg": ["Inter", "sans-serif"]
+            },
+            "fontSize": {
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "price-display": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "label-md": ["16px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "label-lg": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        /* Base styles to ensure consistency with design system */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: theme('colors.surface-variant');
+            border-radius: theme('borderRadius.full');
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: theme('colors.outline-variant');
+        }
+
+        /* Ensuring inputs respect touch targets */
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            min-height: theme('spacing.touch-target-min');
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface antialiased min-h-screen flex flex-col relative pb-32">
+<!-- Top Navigation for Sub-page (Task Focused) -->
+<!-- Applying Semantic Shell Mandate: Suppressing global nav for a task-focused "Edit" screen -->
+<header class="sticky top-0 z-40 bg-surface border-b border-surface-variant px-container-margin py-unit flex items-center h-[72px]">
+<button aria-label="Quay lại" class="flex items-center justify-center w-12 h-12 rounded-full hover:bg-surface-variant transition-colors text-on-surface -ml-2">
+<span class="material-symbols-outlined text-3xl">arrow_back</span>
+</button>
+<h1 class="flex-1 text-center font-headline-md text-headline-md-mobile text-on-surface mr-10">Sửa Sản Phẩm</h1>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 px-container-margin py-stack-gap-lg max-w-3xl mx-auto w-full flex flex-col gap-stack-gap-lg">
+<!-- Image Editing Section -->
+<section aria-label="Ảnh sản phẩm" class="flex flex-col gap-stack-gap-md">
+<div class="relative w-full aspect-video md:aspect-[21/9] rounded-xl overflow-hidden bg-surface-container-highest border border-outline-variant flex items-center justify-center group cursor-pointer">
+<!-- Current Image Placeholder -->
+<img class="absolute inset-0 w-full h-full object-cover z-0" data-alt="A vivid, high-resolution photograph of a fresh bunch of water spinach (rau muống) tied with a rustic string, sitting on a clean, light wooden table. The lighting is bright and natural, highlighting the crisp, vibrant green leaves against a minimalist background. The style is modern, organic, and clean, conveying freshness and quality in a bright, light-mode setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrWiNYwWy0j9rmJ0dW9klv0S6aJwizYMpIiDafHtOEDpzn1yj6h7c073-xzDzTYhAKWfdjInqs4AqC3wM3jxJ7GbKdn1zLtzubIg3sohjlBFfHrhBtKA43gLjZKFjJgz9LfLH2rP89mQwwX6DhJCwsIe8tUvi4xBRwj8ccNVX_LTjG3t4n9Xx9fnM02gLFBHeoNomDU4XQBZFgEJZ1j8EP8tDsQsIlaWALJXMX3UHP4C2MyDwb3b4LCh-OJZKSFNVHglJBRuveY0Vh"/>
+<!-- Edit Overlay -->
+<div class="absolute inset-0 bg-on-surface/30 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center justify-center">
+<div class="bg-surface text-on-surface rounded-full px-6 py-3 flex items-center gap-2 font-label-lg text-label-lg shadow-md">
+<span class="material-symbols-outlined" data-weight="fill">photo_camera</span>
+                        Đổi ảnh
+                    </div>
+</div>
+<!-- Fallback Icon if no image (hidden usually in edit mode, shown here for structure) -->
+<div class="hidden z-0 flex-col items-center text-on-surface-variant">
+<span class="material-symbols-outlined text-5xl mb-2">add_a_photo</span>
+<span class="font-label-lg text-label-lg">Thêm ảnh sản phẩm</span>
+</div>
+</div>
+<p class="text-body-md text-on-surface-variant text-center">Nên chọn ảnh rõ nét, ánh sáng tốt để thu hút người mua.</p>
+</section>
+<!-- Form Section -->
+<form class="flex flex-col gap-stack-gap-md bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm">
+<!-- Name Input -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="product_name">Tên sản phẩm *</label>
+<input class="w-full bg-background border-outline-variant text-on-surface font-body-lg text-body-lg rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all shadow-sm outline-none placeholder:text-on-surface-variant/50" id="product_name" placeholder="VD: Cà chua chuỗi ngọc..." required="" type="text" value="Rau muống sạch VietGAP"/>
+</div>
+<!-- Category Dropdown -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="product_category">Danh mục *</label>
+<div class="relative">
+<select class="appearance-none w-full bg-background border-outline-variant text-on-surface font-body-lg text-body-lg rounded-lg pl-4 pr-12 py-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all shadow-sm outline-none" id="product_category" required="">
+<option value="">Chọn danh mục</option>
+<option selected="" value="rau_cu">Rau củ quả</option>
+<option value="thit_ca">Thịt cá tươi sống</option>
+<option value="trai_cay">Trái cây</option>
+<option value="dac_san">Đặc sản địa phương</option>
+</select>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+</div>
+</div>
+<!-- Price and Quantity Row (Responsive) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-stack-gap-md">
+<!-- Price Input -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="product_price">Giá bán (VNĐ) *</label>
+<div class="relative">
+<input class="w-full bg-background border-outline-variant text-on-surface font-body-lg text-body-lg rounded-lg pl-4 pr-12 py-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all shadow-sm outline-none text-right font-semibold text-primary" id="product_price" min="0" placeholder="0" required="" step="1000" type="number" value="15000"/>
+<span class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant font-body-lg text-body-lg pointer-events-none">đ</span>
+</div>
+</div>
+<!-- Quantity/Unit Input -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="product_quantity">Số lượng hiện có *</label>
+<div class="flex items-center gap-2">
+<input class="flex-1 bg-background border-outline-variant text-on-surface font-body-lg text-body-lg rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary focus:border-primary transition-all shadow-sm outline-none text-center" id="product_quantity" min="0" placeholder="0" required="" type="number" value="50"/>
+<select class="w-[100px] h-[56px] bg-surface-container-high border-none text-on-surface font-label-lg text-label-lg rounded-lg px-3 outline-none focus:ring-2 focus:ring-primary cursor-pointer appearance-none text-center" id="product_unit">
+<option selected="" value="bo">Bó</option>
+<option value="kg">Kg</option>
+<option value="qua">Quả</option>
+<option value="goi">Gói</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Description Textarea -->
+<div class="flex flex-col gap-2">
+<label class="font-label-lg text-label-lg text-on-surface" for="product_desc">Mô tả sản phẩm</label>
+<textarea class="w-full bg-background border-outline-variant text-on-surface font-body-lg text-body-lg rounded-lg p-4 focus:ring-2 focus:ring-primary focus:border-primary transition-all shadow-sm outline-none resize-y min-h-[120px]" id="product_desc" placeholder="Mô tả nguồn gốc, cách bảo quản, hạn sử dụng..." rows="4">Rau muống trồng theo tiêu chuẩn VietGAP, đảm bảo an toàn vệ sinh thực phẩm. Hái tại vườn sáng sớm, tươi ngon giòn ngọt.</textarea>
+</div>
+</form>
+<!-- Danger Zone (Delete Product) - Minimalist approach -->
+<div class="flex justify-center pt-4">
+<button class="flex items-center gap-2 px-6 py-4 rounded-lg text-error hover:bg-error-container transition-colors font-label-lg text-label-lg min-h-[56px]">
+<span class="material-symbols-outlined">delete</span>
+                Xóa sản phẩm này
+             </button>
+</div>
+</main>
+<!-- Fixed Bottom Action Area -->
+<div class="fixed bottom-0 left-0 w-full bg-surface border-t border-outline-variant p-container-margin z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] flex justify-center">
+<button class="w-full max-w-3xl h-touch-target-min bg-primary text-on-primary rounded-full font-headline-md text-headline-md-mobile flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all shadow-md">
+            Lưu thay đổi
+            <span class="material-symbols-outlined" data-weight="fill">check_circle</span>
+</button>
+</div>
+</body></html>

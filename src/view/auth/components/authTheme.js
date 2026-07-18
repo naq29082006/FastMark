@@ -1,8 +1,8 @@
 export const AUTH_COLORS = {
   background: '#f4f7f6',
   card: '#ffffff',
-  primary: '#0d7377',
-  primaryDark: '#095a5d',
+  primary: '#076F32',
+  primaryDark: '#055528',
   text: '#1f2937',
   textMuted: '#6b7280',
   border: '#e5e7eb',
@@ -11,7 +11,7 @@ export const AUTH_COLORS = {
   errorBg: '#fef2f2',
   errorText: '#b91c1c',
   successBg: '#f0fdf4',
-  successText: '#15803d',
+  successText: '#055528',
 };
 
 export const AUTH_RADIUS = {

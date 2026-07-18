@@ -1,27 +1,85 @@
 const Reservation = require("../models/Reservation");
-const DealOffer = require("../models/DealOffer");
 const Product = require("../models/Product");
 const ProductVariant = require("../models/ProductVariant");
 const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
+const crypto = require("crypto");
 const {
   RESERVATION_STATUS,
   BUYER_CANCEL_LOCK_MINUTES,
 } = require("../constants/reservationStatus");
-const { DEAL_OFFER_STATUS, DEAL_OFFER_BY } = require("../constants/dealOfferStatus");
 const { createNotification } = require("./notificationService");
 const { NOTIFICATION_AUDIENCE } = require("../constants/notificationAudience");
 const { getShopForSeller } = require("./shopSettingsService");
+const { creditWalletRefund } = require("./walletService");
 
 const NO_SHOW_CANCEL_REASON = "Người mua không đến lấy hàng";
 const SHOP_UNCONFIRMED_CANCEL_REASON = "Do shop chưa xác nhận đơn hàng";
 const SHOP_CANCEL_REASON = "Shop hủy";
 const BUYER_CANCEL_REASON = "Người mua hủy đơn";
+const PICKUP_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function generatePickupCode(length = 6) {
+  let code = "";
+  const bytes = crypto.randomBytes(length);
+  for (let i = 0; i < length; i += 1) {
+    code += PICKUP_CODE_ALPHABET[bytes[i] % PICKUP_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+function buildPickupQrPayload(reservationId, pickupCode) {
+  return `FM|PICKUP|${String(reservationId)}|${String(pickupCode || "").toUpperCase()}`;
+}
+
+function parsePickupScanPayload(raw) {
+  const text = String(raw || "").trim();
+  if (!text) {
+    return { reservationId: "", pickupCode: "" };
+  }
+
+  const pipeMatch = text.match(/^FM\|PICKUP\|([a-f\d]{24})\|([A-Z0-9]{4,12})$/i);
+  if (pipeMatch) {
+    return {
+      reservationId: pipeMatch[1],
+      pickupCode: pipeMatch[2].toUpperCase(),
+    };
+  }
+
+  // Cho phép shop nhập tay chỉ mã 6 ký tự.
+  if (/^[A-Z0-9]{4,12}$/i.test(text) && !/^[a-f\d]{24}$/i.test(text)) {
+    return { reservationId: "", pickupCode: text.toUpperCase() };
+  }
+
+  if (/^[a-f\d]{24}$/i.test(text)) {
+    return { reservationId: text, pickupCode: "" };
+  }
+
+  return { reservationId: "", pickupCode: text.toUpperCase() };
+}
+
+async function ensurePickupCode(reservation) {
+  if (
+    reservation.status !== RESERVATION_STATUS.CONFIRMED &&
+    reservation.status !== RESERVATION_STATUS.COMPLETED
+  ) {
+    return reservation;
+  }
+
+  if (reservation.pickupCode) {
+    return reservation;
+  }
+
+  reservation.pickupCode = generatePickupCode(6);
+  reservation.UpdatedAt = new Date();
+  await reservation.save();
+  return reservation;
 }
 
 function computeTotal(reservation) {
@@ -30,12 +88,23 @@ function computeTotal(reservation) {
   return price * quantity;
 }
 
+async function refundDepositIfPaid(reservation) {
+  if (!reservation?.depositPaidAt || !(Number(reservation.depositAmount) > 0)) {
+    return;
+  }
+  if (!reservation.userId) {
+    return;
+  }
+  await creditWalletRefund(reservation.userId, reservation.depositAmount, {
+    description: `Hoàn cọc giữ hàng #${String(reservation._id).slice(-8).toUpperCase()}`,
+  });
+}
+
 async function toPublicReservation(doc) {
-  const [buyer, product, variant, deal, shop] = await Promise.all([
+  const [buyer, product, variant, shop] = await Promise.all([
     User.findById(doc.userId),
     Product.findById(doc.productId),
     ProductVariant.findById(doc.variantId),
-    doc.dealOfferId ? DealOffer.findById(doc.dealOfferId) : null,
     doc.shopId ? ShopProfile.findById(doc.shopId) : null,
   ]);
 
@@ -56,9 +125,22 @@ async function toPublicReservation(doc) {
     buyerPriceAcceptedAt: doc.buyerPriceAcceptedAt || null,
     cancelLockedAt: doc.cancelLockedAt || null,
     buyerCancelLocked: doc.cancelLockedAt ? new Date() >= new Date(doc.cancelLockedAt) : false,
+    depositRequired: Boolean(doc.depositRequired),
+    depositPercent: Number(doc.depositPercent) || 0,
+    depositAmount: Number(doc.depositAmount) || 0,
+    depositPaidAt: doc.depositPaidAt || null,
+    depositTxnId: doc.depositTxnId ? String(doc.depositTxnId) : null,
+    voucherCode: doc.voucherCode || "",
+    discountAmount: Number(doc.discountAmount) || 0,
+    pickupCode: doc.pickupCode || "",
+    qrPayload:
+      doc.pickupCode &&
+      (doc.status === RESERVATION_STATUS.CONFIRMED ||
+        doc.status === RESERVATION_STATUS.COMPLETED)
+        ? buildPickupQrPayload(doc._id, doc.pickupCode)
+        : "",
     createdAt: doc.CreatedAt,
     updatedAt: doc.UpdatedAt,
-    dealOfferId: doc.dealOfferId || null,
     shopId: doc.shopId ? String(doc.shopId) : "",
     storeName: shop?.shopName || shop?.description || "",
     buyer: buyer
@@ -82,14 +164,6 @@ async function toPublicReservation(doc) {
           id: variant._id,
           variantName: variant.VariantName || "",
           price: variant.Price || 0,
-        }
-      : null,
-    deal: deal
-      ? {
-          id: deal._id,
-          status: deal.status,
-          offeredPrice: deal.offeredPrice || 0,
-          lastOfferBy: Number(deal.lastOfferBy) || 1,
         }
       : null,
   };
@@ -205,6 +279,7 @@ async function listSellerReservations(user, { tab = "holding" } = {}) {
 async function getSellerReservationDetail(user, reservationId) {
   await expireOverdueReservations();
   const { reservation } = await getOwnedReservation(user, reservationId);
+  await ensurePickupCode(reservation);
   return toPublicReservation(reservation);
 }
 
@@ -219,6 +294,7 @@ async function confirmReservation(user, reservationId) {
   reservation.status = RESERVATION_STATUS.CONFIRMED;
   reservation.confirmedAt = now;
   reservation.agreedPrice = reservation.agreedPrice ?? reservation.reservedPrice;
+  reservation.pickupCode = reservation.pickupCode || generatePickupCode(6);
   reservation.UpdatedAt = now;
   await reservation.save();
 
@@ -246,6 +322,7 @@ async function rejectReservation(user, reservationId, { reason } = {}) {
   reservation.cancelledAt = now;
   reservation.cancelReason = String(reason || "").trim() || SHOP_CANCEL_REASON;
   await releaseVariantInventory(reservation);
+  await refundDepositIfPaid(reservation);
   reservation.UpdatedAt = now;
   await reservation.save();
 
@@ -276,6 +353,7 @@ async function cancelReservationBySeller(user, reservationId, { reason } = {}) {
   reservation.cancelledAt = now;
   reservation.cancelReason = String(reason || "").trim() || SHOP_CANCEL_REASON;
   await releaseVariantInventory(reservation);
+  await refundDepositIfPaid(reservation);
   reservation.UpdatedAt = now;
   await reservation.save();
 
@@ -305,59 +383,39 @@ async function completeReservation(user, reservationId) {
   return toPublicReservation(reservation);
 }
 
-async function listPendingPriceDeals(user) {
+async function completeReservationByScan(user, rawPayload) {
   const shop = await getShopForSeller(user);
-  const deals = await DealOffer.find({
-    shopId: shop._id,
-  })
-    .sort({ CreatedAt: -1 })
-    .limit(100);
+  const parsed = parsePickupScanPayload(rawPayload);
 
-  return Promise.all(
-    deals.map(async (deal) => {
-      const [buyer, product, variant] = await Promise.all([
-        User.findById(deal.userId),
-        Product.findById(deal.productId),
-        ProductVariant.findById(deal.variantId),
-      ]);
+  let reservation = null;
+  if (parsed.reservationId) {
+    reservation = await Reservation.findOne({
+      _id: parsed.reservationId,
+      shopId: shop._id,
+    });
+  } else if (parsed.pickupCode) {
+    reservation = await Reservation.findOne({
+      shopId: shop._id,
+      pickupCode: parsed.pickupCode,
+      status: RESERVATION_STATUS.CONFIRMED,
+    }).sort({ UpdatedAt: -1 });
+  }
 
-      return {
-        id: deal._id,
-        status: deal.status,
-        originalPrice: deal.originalPrice || 0,
-        offeredPrice: deal.offeredPrice || 0,
-        quantity: Number(deal.quantity) || 1,
-        lastOfferBy: Number(deal.lastOfferBy) || DEAL_OFFER_BY.BUYER,
-        discountPercent: deal.discountPercent || 0,
-        note: deal.note || "",
-        sellerNote: deal.sellerNote || "",
-        reservationId: deal.reservationId || null,
-        createdAt: deal.CreatedAt,
-        buyer: buyer
-          ? {
-              id: buyer._id,
-              fullName: buyer.FullName || "",
-              phone: buyer.Phone || "",
-              avatar: buyer.Avatar || "",
-            }
-          : null,
-        product: product
-          ? {
-              id: product._id,
-              productName: product.ProductName || "",
-              thumbnail: product.Thumbnail || "",
-            }
-          : null,
-        variant: variant
-          ? {
-              id: variant._id,
-              variantName: variant.VariantName || "",
-              price: variant.Price || 0,
-            }
-          : null,
-      };
-    })
-  );
+  if (!reservation) {
+    throw createServiceError("Không tìm thấy đơn khớp mã quét.", 404);
+  }
+
+  if (parsed.pickupCode && reservation.pickupCode) {
+    if (String(reservation.pickupCode).toUpperCase() !== parsed.pickupCode) {
+      throw createServiceError("Mã nhận hàng không khớp.", 400);
+    }
+  }
+
+  if (!reservation.pickupCode && parsed.pickupCode) {
+    throw createServiceError("Đơn chưa có mã nhận hàng.", 400);
+  }
+
+  return completeReservation(user, reservation._id);
 }
 
 async function expireOverdueReservations() {
@@ -384,6 +442,7 @@ async function expireOverdueReservations() {
       reservation.cancelledAt = now;
       reservation.cancelReason = cancelReason;
       await releaseVariantInventory(reservation);
+      await refundDepositIfPaid(reservation);
       reservation.UpdatedAt = now;
       await reservation.save();
       cancelledCount += 1;
@@ -422,8 +481,9 @@ module.exports = {
   rejectReservation,
   cancelReservationBySeller,
   completeReservation,
-  listPendingPriceDeals,
+  completeReservationByScan,
   toPublicReservation,
+  ensurePickupCode,
   computeTotal,
   reserveVariantInventory,
   releaseVariantInventory,

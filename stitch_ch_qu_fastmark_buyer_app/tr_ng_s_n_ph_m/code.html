@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chợ Quê FastMark - Sản phẩm</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#d9e3f6",
+                        "on-primary-container": "#f7fff2",
+                        "background": "#f8f9ff",
+                        "surface-container": "#e6eeff",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#eec200",
+                        "secondary-container": "#6bff8f",
+                        "primary": "#006b2c",
+                        "outline": "#6e7b6c",
+                        "surface-dim": "#d0dbed",
+                        "surface-container-low": "#eff4ff",
+                        "surface": "#f8f9ff",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#006e2f",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed": "#6bff8f",
+                        "surface-tint": "#006e2d",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#27313f",
+                        "on-primary-fixed": "#002109",
+                        "tertiary-fixed": "#ffe083",
+                        "on-tertiary-fixed": "#231b00",
+                        "on-secondary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "primary-container": "#00873a",
+                        "inverse-on-surface": "#eaf1ff",
+                        "primary-fixed": "#7ffc97",
+                        "on-surface": "#121c2a",
+                        "on-secondary-fixed-variant": "#005321",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "surface-container-highest": "#d9e3f6",
+                        "on-secondary-fixed": "#002109",
+                        "on-secondary-container": "#007432",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#62df7d",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "surface-container-high": "#dee9fc",
+                        "tertiary": "#735c00",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#62df7d",
+                        "outline-variant": "#bdcaba",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#f8f9ff",
+                        "on-tertiary-container": "#4e3e00",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-surface-variant": "#3e4a3d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "stack-gap-lg": "32px",
+                        "container-margin": "24px",
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "stack-gap-md": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background min-h-screen flex flex-col font-body-md text-on-background">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-container-margin h-touch-target-min bg-surface dark:bg-on-background bg-surface-container-low dark:bg-surface-container-lowest transition-colors duration-200">
+<div class="flex items-center gap-unit cursor-pointer hover:bg-primary-container/20 rounded-full p-2 transition-colors duration-200">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed" data-icon="storefront">storefront</span>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed truncate flex-1 text-center px-4">Chợ Quê FastMark</h1>
+<div class="flex items-center gap-unit cursor-pointer hover:bg-primary-container/20 rounded-full p-2 transition-colors duration-200">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed" data-icon="notifications">notifications</span>
+</div>
+</header>
+<!-- Main Content Area - Empty State -->
+<main class="flex-1 flex flex-col items-center justify-center px-container-margin mt-[56px] mb-[80px]">
+<div class="flex flex-col items-center max-w-md w-full text-center space-y-stack-gap-lg">
+<!-- Empty State Illustration Placeholder -->
+<div class="w-64 h-64 rounded-xl overflow-hidden shadow-sm border border-outline-variant/30 flex items-center justify-center bg-surface-container-low">
+<img class="object-cover w-full h-full opacity-80" data-alt="A warm, charming 3D illustration of an empty traditional Vietnamese wooden market stall or woven bamboo basket. The setting is bright and cheerful, evoking a sense of opportunity. The lighting is soft and natural, emphasizing organic textures and a fresh, minimalist aesthetic. The color palette incorporates subtle shades of primary green against off-white backgrounds, creating a feeling of 'An Tâm' (peace of mind)." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAPHHp53DYJfFV_zFA5C5L_wv4YT3oLnsy01sylrVIvj4RU-821eYO-VNme7B8Vm9zmwKz6G0822mHzTYQ2oNkXS98X1MOyTw2upj6ZFfEW7IpCqKqzRHEY4df4ohivuTKHC4rD0n2CL1Nvtk6EBPRCE2pYEEh7HNcP494QxVAGXPs2XJoyx5R8dps-xkSvy9xd_1FcNl0XA7_7YoxqntZAcJcn-PvyzpuqR2o6UPEd6MVI1QwJ6ZjyPW8tuxHxMjliLEtMtxL4fAQ7"/>
+</div>
+<div class="space-y-stack-gap-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Bác chưa có sản phẩm nào đang bán</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Hãy thêm những món hàng tươi ngon của bác để bà con cùng mua sắm nhé!</p>
+</div>
+<!-- Primary Action Button -->
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-lg flex items-center justify-center gap-2 hover:bg-primary-container transition-colors active:scale-[0.98] shadow-sm">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+                Đăng sản phẩm ngay
+                <span class="material-symbols-outlined ml-2" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<!-- Secondary Action (Optional Help) -->
+<button class="w-full h-touch-target-min bg-transparent border border-primary text-primary font-label-lg text-label-lg rounded-lg flex items-center justify-center hover:bg-surface-container-low transition-colors active:scale-[0.98]">
+                Xem hướng dẫn đăng bài
+            </button>
+</div>
+</main>
+<!-- BottomNavBar -->
+<!-- Active State: Sản phẩm (index 1) based on context -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 py-3 h-auto bg-surface dark:bg-on-background border-t border-outline-variant dark:border-outline rounded-t-xl transition-colors duration-200">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-unit py-1 hover:text-primary scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md text-xs">Bảng tin</span>
+</a>
+<!-- ACTIVE ITEM: Sản phẩm -->
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-xl px-unit py-1 scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="inventory_2" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span class="font-label-md text-label-md text-xs">Sản phẩm</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-unit py-1 hover:text-primary scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="calendar_today">calendar_today</span>
+<span class="font-label-md text-label-md text-xs">Đơn hàng</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-unit py-1 hover:text-primary scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="chat">chat</span>
+<span class="font-label-md text-label-md text-xs">Tin nhắn</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-unit py-1 hover:text-primary scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="person">person</span>
+<span class="font-label-md text-label-md text-xs">Cửa hàng</span>
+</a>
+</nav>
+</body></html>

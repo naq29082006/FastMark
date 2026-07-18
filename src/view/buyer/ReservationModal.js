@@ -39,25 +39,21 @@ export default function ReservationModal({
   loading = false,
   product,
   store,
-  dealOfferId,
-  agreedPrice,
-  agreedTotal,
-  lockedQuantity,
   preselectedVariantId = null,
+  initialQuantity = 1,
   onClose,
   onSuccess,
 }) {
   const insets = useSafeAreaInsets();
   const hasPresetVariant = Boolean(preselectedVariantId);
-  const isFromDeal = Boolean(dealOfferId);
   const variants = useMemo(() => {
     const list = product?.variants || [];
     const inStock = list.filter((v) => (v.quantity ?? 0) > 0);
-    if (isFromDeal && preselectedVariantId) {
-      const dealVariant = list.find((v) => String(v.id) === String(preselectedVariantId));
-      if (dealVariant) {
+    if (hasPresetVariant && preselectedVariantId) {
+      const preset = list.find((v) => String(v.id) === String(preselectedVariantId));
+      if (preset) {
         const others = inStock.filter((v) => String(v.id) !== String(preselectedVariantId));
-        return [dealVariant, ...others];
+        return [preset, ...others];
       }
     }
     if (inStock.length > 0) {
@@ -76,7 +72,7 @@ export default function ReservationModal({
         images: [],
       },
     ];
-  }, [product, isFromDeal, preselectedVariantId]);
+  }, [product, hasPresetVariant, preselectedVariantId]);
 
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [quantity, setQuantity] = useState(1);
@@ -88,19 +84,15 @@ export default function ReservationModal({
 
   const selectedVariant = variants.find((v) => String(v.id) === String(selectedVariantId));
   const maxQty = Math.max(0, Number(selectedVariant?.quantity) || 0);
-  const qtyNum = lockedQuantity != null ? Number(lockedQuantity) || 0 : Number(quantity) || 0;
-  const dealTotal =
-    agreedTotal != null
-      ? Number(agreedTotal) || 0
-      : agreedPrice != null
-        ? (Number(agreedPrice) || 0) * (qtyNum || 1)
-        : 0;
-  const unitPrice = isFromDeal
-    ? qtyNum > 0
-      ? Math.round(dealTotal / qtyNum)
-      : 0
-    : agreedPrice ?? selectedVariant?.price ?? 0;
-  const totalAmount = isFromDeal ? dealTotal : unitPrice * qtyNum;
+  const qtyNum = Number(quantity) || 0;
+  const unitPrice = selectedVariant?.price ?? 0;
+  const totalAmount = unitPrice * qtyNum;
+  const depositPercent = Math.max(0, Math.min(100, Number(store?.depositPercent) || 0));
+  const allowReserve = store?.allowReserve !== false;
+  const depositAmount =
+    allowReserve && depositPercent > 0
+      ? Math.round((unitPrice * qtyNum * depositPercent) / 100)
+      : 0;
   const pickupTime = parsePickupInputs(dateInput, timeInput);
 
   const pickupOptions = useMemo(
@@ -117,16 +109,17 @@ export default function ReservationModal({
       return;
     }
     setSelectedVariantId(preselectedVariantId || variants[0]?.id || null);
-    setQuantity(lockedQuantity != null ? Number(lockedQuantity) || 1 : 1);
+    const seedQty = Math.max(1, Math.floor(Number(initialQuantity) || 1));
+    setQuantity(seedQty);
     setNote('');
     setError('');
     const defaults = formatPickupInputs(buildDefaultPickupDate());
     setDateInput(defaults.dateInput);
     setTimeInput(defaults.timeInput);
-  }, [visible, variants, preselectedVariantId, lockedQuantity]);
+  }, [visible, variants, preselectedVariantId, initialQuantity]);
 
   useEffect(() => {
-    if (!selectedVariant || lockedQuantity != null) {
+    if (!selectedVariant) {
       return;
     }
     const stock = Math.max(0, Number(selectedVariant.quantity) || 0);
@@ -136,7 +129,7 @@ export default function ReservationModal({
       }
       return Math.max(1, Math.min(Number(prev) || 1, stock));
     });
-  }, [selectedVariantId, selectedVariant?.quantity, lockedQuantity]);
+  }, [selectedVariantId, selectedVariant?.quantity]);
 
   function applyPickupDate(date) {
     const formatted = formatPickupInputs(date);
@@ -145,6 +138,9 @@ export default function ReservationModal({
   }
 
   function validateForm() {
+    if (!allowReserve) {
+      return 'Cửa hàng không nhận giữ hàng.';
+    }
     if (!selectedVariant) {
       return 'Vui lòng chọn biến thể sản phẩm.';
     }
@@ -178,7 +174,6 @@ export default function ReservationModal({
         idToken,
         productId: product.id,
         variantId: selectedVariant.id,
-        dealOfferId: dealOfferId || undefined,
         quantity: qtyNum,
         pickupTime: pickupTime.toISOString(),
         note: note.trim(),
@@ -196,13 +191,13 @@ export default function ReservationModal({
     return null;
   }
 
-  if (loading || (isFromDeal && !product?.id)) {
+  if (loading) {
     return (
       <Modal visible animationType="fade" transparent onRequestClose={onClose}>
         <View style={styles.overlay}>
           <View style={[styles.sheet, styles.loadingSheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
             <View style={styles.handle} />
-            <ActivityIndicator size="large" color="#0f766e" />
+            <ActivityIndicator size="large" color="#076F32" />
             <Text style={styles.loadingText}>Đang tải sản phẩm...</Text>
             <Pressable style={[styles.cancelBtn, styles.loadingCancelBtn]} onPress={onClose}>
               <Text style={styles.cancelBtnText}>Huỷ</Text>
@@ -222,25 +217,16 @@ export default function ReservationModal({
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
           <View style={styles.handle} />
           <View style={styles.titleRow}>
-            <Text style={styles.titleIcon}>{dealOfferId ? '🕐' : '📦'}</Text>
+            <Text style={styles.titleIcon}>📦</Text>
             <View>
-              <Text style={styles.title}>
-                {dealOfferId ? 'Giữ hàng theo deal' : 'Yêu cầu giữ hàng'}
-              </Text>
+              <Text style={styles.title}>Yêu cầu giữ hàng</Text>
               <Text style={styles.subtitle}>{product?.name || product?.productName}</Text>
             </View>
           </View>
           {store?.name ? <Text style={styles.shopName}>🏪 {store.name}</Text> : null}
-          {dealOfferId ? (
-            <View style={styles.dealBadge}>
-              <Text style={styles.dealBadgeText}>
-                Giá đã thỏa thuận: {formatPrice(totalAmount)} ({qtyNum} sp)
-              </Text>
-            </View>
-          ) : null}
 
           <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
-            {!dealOfferId && !hasPresetVariant ? (
+            {!hasPresetVariant ? (
               <>
                 <Text style={styles.label}>Chọn biến thể</Text>
                 {variants.map((variant) => {
@@ -267,11 +253,10 @@ export default function ReservationModal({
               </>
             ) : null}
 
-            {(dealOfferId || hasPresetVariant) && selectedVariant ? (
+            {hasPresetVariant && selectedVariant ? (
               <SelectedVariantCard
                 variant={selectedVariant}
                 productThumbnail={product?.thumbnail || ''}
-                priceOverride={isFromDeal ? unitPrice : null}
               />
             ) : null}
 
@@ -279,19 +264,31 @@ export default function ReservationModal({
               <Text style={styles.totalUnderVariant}>Tổng: {formatPrice(totalAmount)}</Text>
             ) : null}
 
-            <Text style={styles.label}>Số lượng</Text>
-            {dealOfferId && lockedQuantity != null ? (
-              <Text style={styles.lockedQty}>{lockedQuantity} sp (theo deal)</Text>
+            {!allowReserve ? (
+              <Text style={styles.depositWarn}>Cửa hàng hiện không nhận giữ hàng.</Text>
+            ) : depositAmount > 0 ? (
+              <View style={styles.depositBox}>
+                <Text style={styles.depositTitle}>
+                  Đặt cọc {depositPercent}%: {formatPrice(depositAmount)}
+                </Text>
+                <Text style={styles.depositHint}>
+                  Số tiền sẽ trừ từ Ví FastMark khi gửi yêu cầu. Hủy khi đang chờ duyệt sẽ được hoàn
+                  cọc.
+                </Text>
+              </View>
             ) : (
-              <QuantityStepper
-                value={qtyNum}
-                max={maxQty}
-                onChange={(next) => {
-                  setQuantity(next);
-                  setError('');
-                }}
-              />
+              <Text style={styles.depositHint}>Shop không yêu cầu đặt cọc.</Text>
             )}
+
+            <Text style={styles.label}>Số lượng</Text>
+            <QuantityStepper
+              value={qtyNum}
+              max={maxQty}
+              onChange={(next) => {
+                setQuantity(next);
+                setError('');
+              }}
+            />
 
             <Text style={styles.label}>Giờ nhận hàng</Text>
             <View style={styles.datetimeRow}>
@@ -370,9 +367,7 @@ export default function ReservationModal({
               {isSubmitting ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
-                <Text style={styles.submitBtnText}>
-                  {dealOfferId ? 'Xác nhận giữ hàng' : 'Gửi yêu cầu'}
-                </Text>
+                <Text style={styles.submitBtnText}>Gửi yêu cầu</Text>
               )}
             </Pressable>
           </View>
@@ -445,25 +440,6 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontWeight: '600',
   },
-  dealBadge: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    backgroundColor: '#fef3c7',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  dealBadgeText: {
-    color: '#b45309',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  lockedQty: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0f172a',
-    paddingVertical: 10,
-  },
   scroll: {
     marginTop: 16,
     maxHeight: 420,
@@ -491,8 +467,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   variantChipActive: {
-    borderColor: '#0f766e',
-    backgroundColor: '#ecfdf5',
+    borderColor: '#076F32',
+    backgroundColor: '#E6F4EC',
   },
   variantText: {
     fontSize: 13,
@@ -500,7 +476,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   variantTextActive: {
-    color: '#0f766e',
+    color: '#076F32',
   },
   input: {
     borderWidth: 1,
@@ -520,15 +496,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
-  datetimeField: {
-    flex: 1,
-  },
-  datetimeHint: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
-    marginBottom: 6,
-  },
   timeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -543,8 +510,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   timeChipActive: {
-    borderColor: '#0f766e',
-    backgroundColor: '#ecfdf5',
+    borderColor: '#076F32',
+    backgroundColor: '#E6F4EC',
   },
   timeChipText: {
     fontSize: 12,
@@ -552,20 +519,46 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   timeChipTextActive: {
-    color: '#0f766e',
+    color: '#076F32',
   },
   selectedTime: {
     marginTop: 8,
     fontSize: 14,
     fontWeight: '800',
-    color: '#0f766e',
+    color: '#076F32',
   },
   totalUnderVariant: {
     marginTop: 8,
     marginBottom: 4,
     fontSize: 16,
     fontWeight: '900',
-    color: '#0f766e',
+    color: '#076F32',
+  },
+  depositBox: {
+    backgroundColor: '#E6F4EC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#A7D9B8',
+  },
+  depositTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#076F32',
+  },
+  depositHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  depositWarn: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#b91c1c',
+    marginBottom: 8,
   },
   errorBox: {
     marginTop: 12,
@@ -608,7 +601,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
     paddingVertical: 12,
     paddingHorizontal: 8,
   },

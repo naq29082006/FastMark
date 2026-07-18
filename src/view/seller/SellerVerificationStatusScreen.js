@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: 8,
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Quản lý sản phẩm - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-container": "#cea700",
+                      "primary-fixed-dim": "#62df7d",
+                      "on-tertiary-fixed": "#231b00",
+                      "surface-container-lowest": "#ffffff",
+                      "on-secondary": "#ffffff",
+                      "primary-container": "#00873a",
+                      "surface-variant": "#d9e3f6",
+                      "on-primary": "#ffffff",
+                      "primary-fixed": "#7ffc97",
+                      "outline-variant": "#bdcaba",
+                      "secondary-fixed-dim": "#4ae176",
+                      "on-secondary-fixed-variant": "#005321",
+                      "inverse-primary": "#62df7d",
+                      "on-secondary-container": "#007432",
+                      "tertiary-fixed-dim": "#eec200",
+                      "secondary-container": "#6bff8f",
+                      "surface-container-high": "#dee9fc",
+                      "on-tertiary-container": "#4e3e00",
+                      "on-secondary-fixed": "#002109",
+                      "surface-bright": "#f8f9ff",
+                      "tertiary-fixed": "#ffe083",
+                      "primary": "#006b2c",
+                      "surface-container-low": "#eff4ff",
+                      "on-primary-container": "#f7fff2",
+                      "inverse-surface": "#27313f",
+                      "tertiary": "#735c00",
+                      "secondary": "#006e2f",
+                      "surface-tint": "#006e2d",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "on-primary-fixed": "#002109",
+                      "error-container": "#ffdad6",
+                      "on-surface": "#121c2a",
+                      "on-surface-variant": "#3e4a3d",
+                      "on-tertiary": "#ffffff",
+                      "outline": "#6e7b6c",
+                      "surface-dim": "#d0dbed",
+                      "inverse-on-surface": "#eaf1ff",
+                      "background": "#f8f9ff",
+                      "error": "#ba1a1a",
+                      "on-error-container": "#93000a",
+                      "surface-container": "#e6eeff",
+                      "surface": "#f8f9ff",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-background": "#121c2a",
+                      "surface-container-highest": "#d9e3f6",
+                      "secondary-fixed": "#6bff8f",
+                      "on-error": "#ffffff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "container-margin": "24px",
+                      "stack-gap-lg": "32px",
+                      "stack-gap-md": "16px",
+                      "gutter": "16px",
+                      "unit": "8px",
+                      "touch-target-min": "56px"
+              },
+              "fontFamily": {
+                      "headline-lg": [
+                              "Inter"
+                      ],
+                      "label-lg": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "price-display": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "20px",
+                              {
+                                      "lineHeight": "30px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "price-display": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen pb-24 md:pb-0 md:flex">
+<!-- Top App Bar (Web & Mobile) -->
+<header class="bg-surface dark:bg-inverse-surface text-primary dark:text-primary-fixed docked full-width top-0 bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flat no shadows flex flex-col w-full px-container-margin py-unit gap-2 fixed z-40 md:static md:w-full">
+<div class="flex justify-between items-center w-full h-touch-target-min">
+<button aria-label="Menu" class="flex items-center justify-center w-touch-target-min h-touch-target-min text-on-surface dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-full transition-all md:hidden">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-primary dark:text-primary-fixed flex-1 text-center md:text-left md:pl-4">Chợ Quê FastMark</h1>
+<button aria-label="Notifications" class="flex items-center justify-center w-touch-target-min h-touch-target-min text-on-surface dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-on-surface-variant rounded-full transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+<!-- Desktop Navigation Cluster (Hidden on Mobile) -->
+<nav class="hidden md:flex flex-row gap-4 px-4 pb-2 w-full border-t border-outline-variant mt-2 pt-2">
+<a class="flex flex-row items-center gap-2 text-on-surface-variant hover:bg-surface-variant px-4 py-2 rounded-full font-label-lg text-label-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+                Trang chủ
+            </a>
+<a class="flex flex-row items-center gap-2 text-on-surface-variant hover:bg-surface-variant px-4 py-2 rounded-full font-label-lg text-label-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+                Khám phá
+            </a>
+<a class="flex flex-row items-center gap-2 text-on-surface-variant hover:bg-surface-variant px-4 py-2 rounded-full font-label-lg text-label-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+                Đơn hàng
+            </a>
+<a class="flex flex-row items-center gap-2 bg-primary-container text-on-primary-container font-bold px-4 py-2 rounded-full font-label-lg text-label-lg transition-all shadow-sm" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+                Sản phẩm
+            </a>
+<a class="flex flex-row items-center gap-2 text-on-surface-variant hover:bg-surface-variant px-4 py-2 rounded-full font-label-lg text-label-lg transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+                Tài khoản
+            </a>
+</nav>
+</header>
+<!-- Side Navigation Drawer (Web Only - Left Side) -->
+<aside class="hidden md:flex bg-surface dark:bg-inverse-surface text-primary dark:text-primary-fixed h-screen w-80 rounded-r-xl shadow-xl flex-col py-6 sticky top-0 shrink-0 z-30 ml-4 border-r border-outline-variant mt-4">
+<div class="px-6 mb-8 flex flex-col gap-2">
+<img alt="User Profile Picture" class="w-20 h-20 rounded-full object-cover border-2 border-primary-container" data-alt="A portrait of an elderly Vietnamese man, smiling warmly, wearing a traditional conical hat or simple farming clothes, set against a bright, modern light-mode background with soft green branding tones. High key lighting, friendly and welcoming mood, clean minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDHi8W_aEXIUVdXmS2ChMwWwzxRgrl6xCLITt5fvBCeQtWVVzzCApHOkwVSVOe5axzTZ3bAOo9ggI1ddxwrbgd3OPymCcwEe6IGaVAaE3zdpmkUdVX4JfPlrn7n53klzdY_Qaq8-cdw5pQnBL-2vdrawu_HvH5GXJs2-RvdLpV6STuIGXmm0jlwBodqmGIh5yFpMfO_GIwdCmnLhYBdHLi0RrJMx9R901FTcAYWlQVwJHKW5Gk3n142YSWcJkcDITqffDJrGAqyAfO"/>
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface">Chào Bác Ba</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Thành viên Thân thiết</p>
+<p class="font-label-lg text-label-lg text-primary font-semibold mt-2">Ví: 500.000đ</p>
+</div>
+<nav class="flex flex-col gap-2 flex-1 overflow-y-auto">
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant transition-all font-body-lg text-body-lg" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+                Trang chủ
+            </a>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant transition-all font-body-lg text-body-lg" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+                Ví điện tử
+            </a>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant transition-all font-body-lg text-body-lg" href="#">
+<span class="material-symbols-outlined" data-icon="qr_code_2">qr_code_2</span>
+                Mã QR của tôi
+            </a>
+<a class="flex items-center gap-4 bg-primary-container text-on-primary-container font-bold mx-2 px-4 py-4 rounded-full hover:bg-surface-variant transition-all font-body-lg text-body-lg shadow-sm" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+                Quản lý sản phẩm
+            </a>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant transition-all font-body-lg text-body-lg" href="#">
+<span class="material-symbols-outlined" data-icon="favorite">favorite</span>
+                Cửa hàng yêu thích
+            </a>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant transition-all font-body-lg text-body-lg" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+                Hỗ trợ
+            </a>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 rounded-full hover:bg-surface-variant transition-all font-body-lg text-body-lg mt-auto" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                Cài đặt
+            </a>
+</nav>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 px-container-margin pt-24 md:pt-8 md:px-8 pb-stack-gap-lg w-full max-w-7xl mx-auto">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-stack-gap-lg gap-4">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface">Quản lý sản phẩm</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mt-1">Danh sách mặt hàng đang bán tại gian hàng của bạn.</p>
+</div>
+<!-- Filter/Search Bar -->
+<div class="w-full md:w-auto flex flex-row gap-2">
+<div class="relative w-full md:w-80 h-touch-target-min">
+<span class="material-symbols-outlined absolute left-4 top-1/2 transform -translate-y-1/2 text-on-surface-variant" data-icon="search">search</span>
+<input class="w-full h-full pl-12 pr-4 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface focus:ring-2 focus:ring-primary focus:border-primary font-body-lg text-body-lg outline-none transition-all" placeholder="Tìm tên sản phẩm..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Product List (Bento Grid Style) -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-stack-gap-md">
+<!-- Product Card 1: In Stock -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col">
+<div class="relative h-48 w-full bg-surface-variant">
+<img alt="Rau muống sạch" class="w-full h-full object-cover" data-alt="Fresh green vegetables, like bok choy or morning glory, bundled together in a rustic market setting. Bright, natural daylight, crisp details, conveying freshness and organic quality, light mode aesthetic, top-down or slightly angled perspective." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1Jh-kGenkAugZWTXnSUm_G2aLhRS7VcTD5HBQKsUJ6uRP7oggSb08eSIrqBMEDGm8ZV6ErgrMmRzreurimBYA9ApGOmkHsfh6fU64E8ZNjDJ0IHdZY__3ET2zI2fff0hODMgI_Wnjc5mQspfWtJf9Aw7jRPA82JMXoTGXd8ODLJ3vNFVN0B9JJZZ_bKuAKUQxaNE2rlFn_GtNlVQxeF7YVY07rTsK23Knbr7yKf4mDWJgJP4iYY79lwpX75mXDnO4_u5gNIaoXoWU"/>
+<div class="absolute top-2 right-2 bg-primary-container text-on-primary-container px-3 py-1 rounded-full font-label-md text-label-md flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        Còn hàng
+                    </div>
+</div>
+<div class="p-4 flex flex-col flex-1 gap-2">
+<h3 class="font-headline-md text-headline-md font-semibold text-on-surface line-clamp-2">Rau muống sạch VietGAP (Bó 500g)</h3>
+<p class="font-price-display text-price-display font-bold text-error mt-auto">15.000đ</p>
+<div class="flex flex-row justify-between border-t border-outline-variant pt-3 mt-2 gap-2">
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-on-surface-variant hover:bg-surface-variant rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+                            Sửa
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-on-surface-variant hover:bg-surface-variant rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="visibility_off">visibility_off</span>
+                            Ẩn
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-error hover:bg-error-container hover:text-on-error-container rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+                            Xóa
+                        </button>
+</div>
+</div>
+</div>
+<!-- Product Card 2: Out of Stock -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col opacity-80">
+<div class="relative h-48 w-full bg-surface-variant">
+<img alt="Chuối ngự" class="w-full h-full object-cover grayscale-[30%]" data-alt="A bunch of ripe yellow bananas on a wooden table. Bright, natural lighting, fresh appearance, rural market context, clean background, light mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDdyEIYkG1t939EXfLbO0w5yQzI6t3SsRvgVfY8sEutMmnVcZEx5wJpN8ohrJBcxIjSrF4cpHfgLhKClFdmwvvUvcevVFUsQQUbrsUmygHZkvbwAGMHTbU5vEdAkkOHemQS5_thCpO-XR0yKDElaIp9JzfHP8RzcbAc3ms-m6VWAVuV49vOlF4plngfeUizYT5iDdOcw5peyyYxmGew6NI8zT_LiWZPtervyLG-yaEqFOGYAHmkuVJb_INAccdxW5ehniLfoMhAX8O"/>
+<div class="absolute top-2 right-2 bg-error-container text-on-error-container px-3 py-1 rounded-full font-label-md text-label-md flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]" data-icon="cancel" style="font-variation-settings: 'FILL' 1;">cancel</span>
+                        Hết hàng
+                    </div>
+</div>
+<div class="p-4 flex flex-col flex-1 gap-2">
+<h3 class="font-headline-md text-headline-md font-semibold text-on-surface line-clamp-2">Chuối ngự Nam Định (Nải 1.5kg)</h3>
+<p class="font-price-display text-price-display font-bold text-error mt-auto">35.000đ</p>
+<div class="flex flex-row justify-between border-t border-outline-variant pt-3 mt-2 gap-2">
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-on-surface-variant hover:bg-surface-variant rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+                            Sửa
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-on-surface-variant hover:bg-surface-variant rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="visibility_off">visibility_off</span>
+                            Ẩn
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-error hover:bg-error-container hover:text-on-error-container rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+                            Xóa
+                        </button>
+</div>
+</div>
+</div>
+<!-- Product Card 3: In Stock -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col">
+<div class="relative h-48 w-full bg-surface-variant">
+<img alt="Trứng gà ta" class="w-full h-full object-cover" data-alt="Fresh free-range chicken eggs in a woven bamboo basket. Warm, natural lighting, rustic and authentic market feel, clean and hygienic presentation, light mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuNb_ahwUwe_jXqPiDDkt1gU2G8fnC86vhSbue7VCFQW9cAjujSiptome6skPD6yLkpndyNKekP5jgGLwjWtDkhGQxdS5a9A8syD-MDRZj9qgJBjugOE_JSAFaRmlevhkwmolPmR2bPJyB9ZIk5jYgmp3WHdSHCUQXyfWp6Osl2gIFoLgyrNpV6fQIANUneoxud8MNfhHc44JNPM_2cXDMNcsqBUSY6I59PyML7TIQYR2BTVAomSXaXwtcvxrq69f1s2Yup-S4-6Kr"/>
+<div class="absolute top-2 right-2 bg-primary-container text-on-primary-container px-3 py-1 rounded-full font-label-md text-label-md flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        Còn hàng
+                    </div>
+</div>
+<div class="p-4 flex flex-col flex-1 gap-2">
+<h3 class="font-headline-md text-headline-md font-semibold text-on-surface line-clamp-2">Trứng gà ta thả vườn (Chục 10 quả)</h3>
+<p class="font-price-display text-price-display font-bold text-error mt-auto">45.000đ</p>
+<div class="flex flex-row justify-between border-t border-outline-variant pt-3 mt-2 gap-2">
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-on-surface-variant hover:bg-surface-variant rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="edit">edit</span>
+                            Sửa
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-on-surface-variant hover:bg-surface-variant rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="visibility_off">visibility_off</span>
+                            Ẩn
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-1 h-12 text-error hover:bg-error-container hover:text-on-error-container rounded-lg font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+                            Xóa
+                        </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Floating Action Button (FAB) for Adding Product -->
+<button aria-label="Thêm sản phẩm mới" class="fixed bottom-24 md:bottom-8 right-container-margin md:right-8 bg-primary text-on-primary w-16 h-16 rounded-full shadow-lg hover:shadow-xl hover:bg-surface-tint transition-all flex items-center justify-center z-40 active:scale-95">
+<span class="material-symbols-outlined text-3xl" data-icon="add">add</span>
+</button>
+</main>
+<!-- Bottom Nav Bar (Mobile Only) -->
+<nav class="md:hidden bg-surface-container-lowest dark:bg-inverse-surface text-primary dark:text-primary-fixed fixed bottom-0 w-full z-50 h-touch-target-min bg-surface-container-lowest dark:bg-inverse-surface border-t border-outline-variant shadow-lg fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-surface dark:bg-inverse-surface px-2 pb-2 pt-2">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-all font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="text-xs mt-1">Trang chủ</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-all font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="explore">explore</span>
+<span class="text-xs mt-1">Khám phá</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-all font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="text-xs mt-1">Đơn hàng</span>
+</a>
+<!-- Using "inventory_2" for Product Management as it implies stock/inventory, replacing chat for seller context -->
+<a class="flex flex-col items-center justify-center bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-full px-6 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-all duration-150 font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span class="text-xs mt-1 font-bold">Sản phẩm</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-2 hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-all font-label-lg text-label-lg" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="text-xs mt-1">Tài khoản</span>
+</a>
+</nav>
+</body></html>

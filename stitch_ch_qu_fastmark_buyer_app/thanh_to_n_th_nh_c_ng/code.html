@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Thanh toán thành công - Chợ Quê FastMark</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-container": "#cea700",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-tertiary-fixed": "#231b00",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#00873a",
+                        "surface-variant": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "primary-fixed": "#7ffc97",
+                        "outline-variant": "#bdcaba",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-secondary-fixed-variant": "#005321",
+                        "inverse-primary": "#62df7d",
+                        "on-secondary-container": "#007432",
+                        "tertiary-fixed-dim": "#eec200",
+                        "secondary-container": "#6bff8f",
+                        "surface-container-high": "#dee9fc",
+                        "on-tertiary-container": "#4e3e00",
+                        "on-secondary-fixed": "#002109",
+                        "surface-bright": "#f8f9ff",
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "surface-container-low": "#eff4ff",
+                        "on-primary-container": "#f7fff2",
+                        "inverse-surface": "#27313f",
+                        "tertiary": "#735c00",
+                        "secondary": "#006e2f",
+                        "surface-tint": "#006e2d",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-primary-fixed": "#002109",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#121c2a",
+                        "on-surface-variant": "#3e4a3d",
+                        "on-tertiary": "#ffffff",
+                        "outline": "#6e7b6c",
+                        "surface-dim": "#d0dbed",
+                        "inverse-on-surface": "#eaf1ff",
+                        "background": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "on-error-container": "#93000a",
+                        "surface-container": "#e6eeff",
+                        "surface": "#f8f9ff",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "surface-container-highest": "#d9e3f6",
+                        "secondary-fixed": "#6bff8f",
+                        "on-error": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-margin": "24px",
+                        "stack-gap-lg": "32px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            60% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop-in {
+            animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+            animation: fadeInUp 0.7s ease-out 0.2s forwards;
+            opacity: 0;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased font-body-md min-h-screen flex flex-col items-center justify-center p-container-margin">
+<div class="max-w-md w-full flex flex-col items-center text-center">
+<div class="w-32 h-32 bg-primary-container text-on-primary-container rounded-full flex items-center justify-center mb-8 shadow-md animate-pop-in">
+<span class="material-symbols-outlined text-[80px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div class="animate-fade-in-up w-full flex flex-col items-center">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary mb-4">
+                Thanh toán thành công!
+            </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-10 px-4">
+                Gói dịch vụ "Quảng Cáo Cửa Hàng - 30 Ngày" của bạn đã được kích hoạt. Cảm ơn bạn đã tin tưởng Chợ Quê.
+            </p>
+<div class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-6 mb-12 shadow-sm text-left flex flex-col gap-unit relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary rounded-l-xl"></div>
+<h2 class="font-label-lg text-label-lg text-on-surface mb-2">Chi tiết giao dịch</h2>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant border-dashed">
+<span class="font-body-md text-body-md text-on-surface-variant">Mã giao dịch:</span>
+<span class="font-label-lg text-label-lg text-on-surface">#CQ-88231</span>
+</div>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant border-dashed">
+<span class="font-body-md text-body-md text-on-surface-variant">Thời gian:</span>
+<span class="font-label-lg text-label-lg text-on-surface">14:30 - 24/10/2023</span>
+</div>
+<div class="flex justify-between items-center pt-4">
+<span class="font-body-lg text-body-lg text-on-surface">Tổng tiền:</span>
+<span class="font-price-display text-price-display text-error">150.000đ</span>
+</div>
+</div>
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md-mobile rounded-full flex items-center justify-center gap-2 hover:bg-surface-tint active:scale-[0.98] transition-all shadow-md">
+                Về Trang Chủ Quản Lý
+                <span class="material-symbols-outlined" style="font-variation-settings: 'wght' 600;">arrow_forward</span>
+</button>
+<button class="w-full h-touch-target-min mt-4 bg-transparent text-primary border border-primary font-headline-md text-headline-md-mobile rounded-full flex items-center justify-center gap-2 hover:bg-surface-variant active:scale-[0.98] transition-all">
+                Xem biên lai chi tiết
+            </button>
+</div>
+</div>
+</body></html>

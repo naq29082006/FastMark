@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { useSelector } from 'react-redux';
 
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { getShopCategoriesOnBackend } from '../../api/productApi';
@@ -24,6 +25,7 @@ import { resolveErrorMessage } from '../../core/utils/resolveErrorMessage';
 import { logErrorDetails } from '../../core/utils/logger';
 import { reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
 import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
+import { selectAuthProfile } from '../../viewmodel/auth/authSelectors';
 import ProfileSubScreen from '../profile/ProfileSubScreen';
 import { CategoryCombobox } from './SellerProductFormFields';
 import SellerLocationPickerScreen from './SellerLocationPickerScreen';
@@ -156,6 +158,7 @@ async function recoverSubmittedVerification(idToken) {
 }
 
 export default function SellerRegistrationScreen({ onBack, onSubmitted, initialVerification = null }) {
+  const profile = useSelector(selectAuthProfile);
   const [cccdFront, setCccdFront] = useState(null);
   const [cccdBack, setCccdBack] = useState(null);
   const [selfie, setSelfie] = useState(null);
@@ -163,8 +166,6 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
   const [systemAddress, setSystemAddress] = useState('');
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
-  const [shopName, setShopName] = useState('');
-  const [shopUsername, setShopUsername] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [shopDescription, setShopDescription] = useState('');
   const [categories, setCategories] = useState([]);
@@ -230,12 +231,10 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
         ? Number(initialVerification.longitude)
         : null
     );
-    setShopName(initialVerification.shopName || '');
-    setShopUsername(initialVerification.shopUsername || '');
+    setShopDescription(initialVerification.shopDescription || '');
     setCategoryId((current) =>
       current || normalizeCategoryId(initialVerification.categoryId)
     );
-    setShopDescription(initialVerification.shopDescription || '');
 
     if (initialVerification.cccdFrontImage) {
       setCccdFront({ uri: initialVerification.cccdFrontImage });
@@ -316,15 +315,13 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
       return;
     }
 
-    const normalizedShopName = shopName.trim().replace(/\s+/g, ' ');
-    if (normalizedShopName.length < 2 || normalizedShopName.length > 80) {
-      setError('Tên gian hàng phải từ 2-80 ký tự.');
+    if (!String(profile?.fullName || '').trim()) {
+      setError('Hãy cập nhật họ tên tài khoản trước khi đăng ký bán.');
       return;
     }
 
-    const normalizedShopUsername = shopUsername.trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,30}$/.test(normalizedShopUsername)) {
-      setError('Tên shop phải từ 3-30 ký tự, chỉ chữ thường, số và dấu gạch dưới.');
+    if (!String(profile?.userName || '').trim()) {
+      setError('Hãy cập nhật username tài khoản trước khi đăng ký bán.');
       return;
     }
 
@@ -386,8 +383,6 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
             selfieImageUrl: selfieImage.existingUrl,
             address: address.trim(),
             systemAddress: systemAddress.trim(),
-            shopName: normalizedShopName,
-            shopUsername: normalizedShopUsername,
             categoryId: normalizedCategoryId,
             shopDescription: shopDescription.trim(),
             latitude,
@@ -482,36 +477,20 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
         />
 
         <View style={styles.field}>
-          <Text style={styles.label}>Tên cụ thể gian hàng</Text>
-          <TextInput
-            value={shopName}
-            onChangeText={setShopName}
-            placeholder="vd: Nông sản Vy, Bánh mì Huỳnh Hoa..."
-            placeholderTextColor="#94a3b8"
-            style={styles.input}
-          />
-          <Text style={styles.fieldHint}>Tên hiển thị công khai của gian hàng (2-80 ký tự).</Text>
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Username shop</Text>
-          <TextInput
-            value={shopUsername}
-            onChangeText={(value) => setShopUsername(value.toLowerCase())}
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder="vd: shop_rau_sach"
-            placeholderTextColor="#94a3b8"
-            style={styles.input}
-          />
-          <Text style={styles.fieldHint}>Chỉ dùng chữ thường, số và dấu gạch dưới (3-30 ký tự).</Text>
+          <Text style={styles.label}>Tên hiển thị & username</Text>
+          <Text style={styles.readOnlyValue}>
+            {profile?.fullName || 'Chưa có họ tên'} · @{profile?.userName || '—'}
+          </Text>
+          <Text style={styles.fieldHint}>
+            Gian hàng dùng chung họ tên và username tài khoản. Đổi ở tab Tài khoản nếu cần.
+          </Text>
         </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>Danh mục kinh doanh</Text>
           {isLoadingCategories ? (
             <View style={styles.categoryLoading}>
-              <ActivityIndicator color="#0d7377" />
+              <ActivityIndicator color="#076F32" />
               <Text style={styles.fieldHint}>Đang tải danh mục...</Text>
             </View>
           ) : categories.length === 0 ? (
@@ -581,7 +560,7 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
               ]}
             >
               {isLocating ? (
-                <ActivityIndicator color="#0d7377" />
+                <ActivityIndicator color="#076F32" />
               ) : (
                 <Text style={styles.pickButtonText}>Vị trí hiện tại</Text>
               )}
@@ -681,6 +660,11 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontWeight: '600',
   },
+  readOnlyValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
   categoryLoading: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -715,7 +699,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     borderWidth: 1,
     borderColor: '#b7dfd8',
   },
@@ -723,7 +707,7 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   pickButtonText: {
-    color: '#0d7377',
+    color: '#076F32',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -798,7 +782,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   successText: {
-    color: '#047857',
+    color: '#076F32',
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 12,
@@ -808,7 +792,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   buttonPressed: {
     opacity: 0.85,

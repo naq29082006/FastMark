@@ -829,7 +829,7 @@ export default function ChatScreen({
 
       {isLoading ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" />
+          <ActivityIndicator color="#076F32" />
         </View>
       ) : (
         <FlatList
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-  activityOnline: { color: '#16a34a' },
+  activityOnline: { color: '#076F32' },
   sequenceText: {
     textAlign: 'center',
     color: '#64748b',
@@ -994,7 +994,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
@@ -1004,7 +1004,7 @@ const styles = StyleSheet.create({
   peerAvatarText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
   messageRowOther: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleMine: { backgroundColor: '#0d7377', borderBottomRightRadius: 6 },
+  bubbleMine: { backgroundColor: '#076F32', borderBottomRightRadius: 6 },
   bubbleOther: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
@@ -1100,7 +1100,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendButtonActive: { backgroundColor: '#0d7377' },
+  sendButtonActive: { backgroundColor: '#076F32' },
   sendButtonDisabled: { backgroundColor: '#e2e8f0' },
   sendButtonText: { color: '#ffffff', fontSize: 18, fontWeight: '800' },
   sendButtonTextDisabled: { color: '#94a3b8' },

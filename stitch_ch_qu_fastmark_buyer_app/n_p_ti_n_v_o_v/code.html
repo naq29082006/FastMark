@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Nạp tiền vào ví - FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "tertiary-fixed": "#ffe083",
+                            "primary": "#006b2c",
+                            "on-tertiary-fixed": "#231b00",
+                            "error": "#ba1a1a",
+                            "on-primary-fixed-variant": "#005320",
+                            "on-background": "#121c2a",
+                            "on-tertiary-fixed-variant": "#574500",
+                            "on-tertiary-container": "#4e3e00",
+                            "surface-tint": "#006e2d",
+                            "on-primary-container": "#f7fff2",
+                            "primary-fixed-dim": "#62df7d",
+                            "primary-fixed": "#7ffc97",
+                            "on-secondary-container": "#007432",
+                            "surface-variant": "#d9e3f6",
+                            "surface-bright": "#f8f9ff",
+                            "on-error-container": "#93000a",
+                            "on-secondary-fixed-variant": "#005321",
+                            "secondary-fixed-dim": "#4ae176",
+                            "secondary": "#006e2f",
+                            "on-tertiary": "#ffffff",
+                            "on-secondary-fixed": "#002109",
+                            "on-surface": "#121c2a",
+                            "tertiary-fixed-dim": "#eec200",
+                            "outline-variant": "#bdcaba",
+                            "error-container": "#ffdad6",
+                            "surface": "#f8f9ff",
+                            "on-secondary": "#ffffff",
+                            "background": "#f8f9ff",
+                            "on-primary-fixed": "#002109",
+                            "on-surface-variant": "#3e4a3d",
+                            "inverse-surface": "#27313f",
+                            "primary-container": "#00873a",
+                            "outline": "#6e7b6c",
+                            "inverse-on-surface": "#eaf1ff",
+                            "on-error": "#ffffff",
+                            "surface-container-lowest": "#ffffff",
+                            "surface-container-low": "#eff4ff",
+                            "surface-dim": "#d0dbed",
+                            "secondary-fixed": "#6bff8f",
+                            "tertiary": "#735c00",
+                            "surface-container-highest": "#d9e3f6",
+                            "on-primary": "#ffffff",
+                            "tertiary-container": "#cea700",
+                            "inverse-primary": "#62df7d",
+                            "surface-container": "#e6eeff",
+                            "surface-container-high": "#dee9fc",
+                            "secondary-container": "#6bff8f"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                    },
+                    "spacing": {
+                            "stack-gap-lg": "32px",
+                            "stack-gap-md": "16px",
+                            "gutter": "16px",
+                            "unit": "8px",
+                            "touch-target-min": "56px",
+                            "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                            "price-display": [
+                                    "Inter"
+                            ],
+                            "headline-lg-mobile": [
+                                    "Inter"
+                            ],
+                            "label-md": [
+                                    "Inter"
+                            ],
+                            "headline-lg": [
+                                    "Inter"
+                            ],
+                            "body-md": [
+                                    "Inter"
+                            ],
+                            "headline-md": [
+                                    "Inter"
+                            ],
+                            "label-lg": [
+                                    "Inter"
+                            ],
+                            "body-lg": [
+                                    "Inter"
+                            ]
+                    },
+                    "fontSize": {
+                            "price-display": [
+                                    "24px",
+                                    {
+                                            "lineHeight": "32px",
+                                            "fontWeight": "700"
+                                    }
+                            ],
+                            "headline-lg-mobile": [
+                                    "28px",
+                                    {
+                                            "lineHeight": "36px",
+                                            "fontWeight": "700"
+                                    }
+                            ],
+                            "label-md": [
+                                    "16px",
+                                    {
+                                            "lineHeight": "20px",
+                                            "fontWeight": "500"
+                                    }
+                            ],
+                            "headline-lg": [
+                                    "32px",
+                                    {
+                                            "lineHeight": "40px",
+                                            "letterSpacing": "-0.02em",
+                                            "fontWeight": "700"
+                                    }
+                            ],
+                            "body-md": [
+                                    "18px",
+                                    {
+                                            "lineHeight": "28px",
+                                            "fontWeight": "400"
+                                    }
+                            ],
+                            "headline-md": [
+                                    "24px",
+                                    {
+                                            "lineHeight": "32px",
+                                            "fontWeight": "600"
+                                    }
+                            ],
+                            "label-lg": [
+                                    "18px",
+                                    {
+                                            "lineHeight": "24px",
+                                            "fontWeight": "600"
+                                    }
+                            ],
+                            "body-lg": [
+                                    "20px",
+                                    {
+                                            "lineHeight": "30px",
+                                            "fontWeight": "400"
+                                    }
+                            ]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9ff;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for horizontal lists */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .radio-custom:checked + div {
+            border-color: #006b2c;
+            background-color: #eaf1ff;
+        }
+        
+        .radio-custom:checked + div .radio-icon {
+            color: #006b2c;
+        }
+        
+        .amount-btn.active {
+            background-color: #00873a;
+            color: #ffffff;
+            border-color: #00873a;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col md:max-w-md md:mx-auto md:shadow-2xl md:bg-white relative">
+<!-- TopAppBar -->
+<header class="bg-surface sticky top-0 z-40 border-b border-outline-variant/30 flex flex-col w-full px-container-margin py-unit gap-2">
+<div class="flex items-center justify-between h-14">
+<button aria-label="Quay lại" class="w-12 h-12 flex items-center justify-center -ml-3 text-on-surface hover:bg-surface-variant rounded-full transition-colors">
+<span class="material-symbols-outlined text-3xl">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-on-surface">Nạp tiền</h1>
+<div class="w-12 h-12"></div> <!-- Spacer -->
+</div>
+</header>
+<main class="flex-1 overflow-y-auto px-container-margin py-stack-gap-lg flex flex-col gap-stack-gap-lg pb-32">
+<!-- Balance Card -->
+<section class="bg-primary text-on-primary rounded-xl p-6 shadow-md relative overflow-hidden flex flex-col items-center justify-center gap-2">
+<!-- Decorative circle -->
+<div class="absolute -right-10 -top-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+<p class="font-body-md text-body-md text-on-primary/90">Số dư hiện tại</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile font-bold tracking-tight">1.250.000đ</p>
+</section>
+<!-- Quick Amount Selection -->
+<section class="flex flex-col gap-stack-gap-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Chọn mệnh giá nạp</h2>
+<div class="grid grid-cols-2 gap-gutter">
+<button class="amount-btn h-touch-target-min rounded-lg border border-outline-variant bg-surface-container-lowest font-label-lg text-label-lg text-on-surface transition-all active:scale-95" onclick="selectAmount(this, '50.000')">50.000đ</button>
+<button class="amount-btn h-touch-target-min rounded-lg border border-outline-variant bg-surface-container-lowest font-label-lg text-label-lg text-on-surface transition-all active:scale-95 active" onclick="selectAmount(this, '100.000')">100.000đ</button>
+<button class="amount-btn h-touch-target-min rounded-lg border border-outline-variant bg-surface-container-lowest font-label-lg text-label-lg text-on-surface transition-all active:scale-95" onclick="selectAmount(this, '200.000')">200.000đ</button>
+<button class="amount-btn h-touch-target-min rounded-lg border border-outline-variant bg-surface-container-lowest font-label-lg text-label-lg text-on-surface transition-all active:scale-95" onclick="selectAmount(this, '500.000')">500.000đ</button>
+</div>
+<!-- Custom Amount Input -->
+<div class="relative mt-2">
+<label class="sr-only" for="customAmount">Nhập số tiền khác</label>
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline">payments</span>
+</div>
+<input class="block w-full h-touch-target-min pl-12 pr-12 rounded-lg border-outline-variant bg-surface-container-lowest focus:border-primary focus:ring-1 focus:ring-primary font-body-lg text-body-lg text-on-surface" id="customAmount" placeholder="Nhập số tiền khác..." type="text"/>
+<div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+<span class="font-label-md text-label-md text-outline">VNĐ</span>
+</div>
+</div>
+</section>
+<!-- Payment Methods -->
+<section class="flex flex-col gap-stack-gap-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Phương thức nạp</h2>
+<div class="flex flex-col gap-3">
+<!-- Method 1: Bank Card -->
+<label class="cursor-pointer relative">
+<input checked="" class="radio-custom sr-only" name="paymentMethod" type="radio"/>
+<div class="flex items-center p-4 border border-outline-variant rounded-xl bg-surface-container-lowest transition-colors min-h-[72px]">
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center mr-4 shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant radio-icon">credit_card</span>
+</div>
+<div class="flex-1">
+<p class="font-label-lg text-label-lg text-on-surface">Thẻ ngân hàng</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mt-1">Nạp nhanh qua thẻ ATM/Visa</p>
+</div>
+<span class="material-symbols-outlined text-primary ml-2 hidden check-icon">check_circle</span>
+</div>
+</label>
+<!-- Method 2: Bank Transfer -->
+<label class="cursor-pointer relative">
+<input class="radio-custom sr-only" name="paymentMethod" type="radio"/>
+<div class="flex items-center p-4 border border-outline-variant rounded-xl bg-surface-container-lowest transition-colors min-h-[72px]">
+<div class="w-12 h-12 rounded-full bg-surface-variant flex items-center justify-center mr-4 shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant radio-icon">account_balance</span>
+</div>
+<div class="flex-1">
+<p class="font-label-lg text-label-lg text-on-surface">Chuyển khoản</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mt-1">Chuyển khoản qua số tài khoản</p>
+</div>
+<span class="material-symbols-outlined text-primary ml-2 hidden check-icon">check_circle</span>
+</div>
+</label>
+<!-- Method 3: MoMo -->
+<label class="cursor-pointer relative">
+<input class="radio-custom sr-only" name="paymentMethod" type="radio"/>
+<div class="flex items-center p-4 border border-outline-variant rounded-xl bg-surface-container-lowest transition-colors min-h-[72px]">
+<div class="w-12 h-12 rounded-full bg-[#A50064]/10 flex items-center justify-center mr-4 shrink-0">
+<span class="material-symbols-outlined text-[#A50064] radio-icon">wallet</span>
+</div>
+<div class="flex-1">
+<p class="font-label-lg text-label-lg text-on-surface">Ví MoMo</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mt-1">Mở ứng dụng MoMo để thanh toán</p>
+</div>
+<span class="material-symbols-outlined text-primary ml-2 hidden check-icon">check_circle</span>
+</div>
+</label>
+</div>
+</section>
+</main>
+<!-- Bottom Action Bar -->
+<div class="fixed bottom-0 left-0 w-full z-50 bg-surface border-t border-outline-variant/30 px-container-margin py-4 md:max-w-md md:left-1/2 md:-translate-x-1/2">
+<button class="w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-full flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform" id="confirmBtn">
+            Xác nhận nạp <span id="displayAmount">100.000đ</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+<script>
+        // Handle quick amount selection
+        function selectAmount(element, amount) {
+            // Remove active class from all buttons
+            document.querySelectorAll('.amount-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Add active class to clicked button
+            element.classList.add('active');
+            
+            // Clear custom input
+            document.getElementById('customAmount').value = '';
+            
+            // Update bottom button text
+            document.getElementById('displayAmount').innerText = amount + 'đ';
+        }
+
+        // Handle custom amount input
+        document.getElementById('customAmount').addEventListener('input', function(e) {
+            let val = e.target.value.replace(/\D/g, ''); // Keep only numbers
+            
+            if (val) {
+                // Format with dots
+                val = parseInt(val).toLocaleString('vi-VN');
+                e.target.value = val;
+                
+                // Remove active state from quick buttons
+                document.querySelectorAll('.amount-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // Update bottom button
+                document.getElementById('displayAmount').innerText = val + 'đ';
+            } else {
+                // If empty, revert to default 100k
+                document.querySelectorAll('.amount-btn')[1].classList.add('active');
+                document.getElementById('displayAmount').innerText = '100.000đ';
+            }
+        });
+
+        // Toggle checkmark visibility for radio buttons
+        const radios = document.querySelectorAll('input[name="paymentMethod"]');
+        
+        function updateCheckmarks() {
+            document.querySelectorAll('.check-icon').forEach(icon => {
+                icon.classList.add('hidden');
+            });
+            
+            const checkedRadio = document.querySelector('input[name="paymentMethod"]:checked');
+            if (checkedRadio) {
+                const checkIcon = checkedRadio.nextElementSibling.querySelector('.check-icon');
+                if (checkIcon) checkIcon.classList.remove('hidden');
+            }
+        }
+        
+        radios.forEach(radio => {
+            radio.addEventListener('change', updateCheckmarks);
+        });
+        
+        // Initial setup
+        updateCheckmarks();
+    </script>
+</body></html>

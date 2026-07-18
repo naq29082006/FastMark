@@ -66,19 +66,3 @@ export function cancelReservation(token, reservationId, reason = '') {
     body: { reason },
   });
 }
-
-export function listDeals(token, params = {}) {
-  return apiRequest(buildQueryPath('/api/admin/deals', params), { token });
-}
-
-export function getDealDetail(token, dealId) {
-  return apiRequest(`/api/admin/deals/${dealId}`, { token });
-}
-
-export function lockDeal(token, dealId, reason = '') {
-  return apiRequest(`/api/admin/deals/${dealId}/lock`, {
-    method: 'POST',
-    token,
-    body: { reason },
-  });
-}

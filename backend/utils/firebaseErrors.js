@@ -18,8 +18,12 @@ function mapFirebaseAdminError(error) {
   const statusCode =
     code === "auth/email-already-exists" ? 409 :
     code.startsWith("auth/invalid") || code === "auth/argument-error" ? 400 :
-    code === "auth/user-not-found" || code === "auth/wrong-password" ? 401 :
-    500;
+    code === "auth/user-not-found" ||
+    code === "auth/wrong-password" ||
+    code === "auth/id-token-expired" ||
+    code === "auth/id-token-revoked"
+      ? 401
+      : 500;
 
   const mapped = new Error(message);
   mapped.statusCode = statusCode;

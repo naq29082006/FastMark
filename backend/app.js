@@ -11,6 +11,9 @@ const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const walletRoutes = require('./routes/walletRoutes');
+const walletController = require('./controllers/walletController');
+const asyncHandler = require('./utils/asyncHandler');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -40,6 +43,9 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/banners', require('./routes/bannerRoutes'));
+app.post('/api/webhooks/payos', asyncHandler(walletController.payosWebhook));
 app.use('/api', storeRoutes);
 
 app.use((req, res) => {

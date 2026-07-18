@@ -19,10 +19,10 @@ export default function AdminLayout() {
           <NavLink to="/products">Sản phẩm</NavLink>
           <NavLink to="/categories">Danh mục</NavLink>
           <NavLink to="/reservations">Đơn giữ hàng</NavLink>
-          <NavLink to="/deals">Deal giá</NavLink>
           <NavLink to="/reports">Báo cáo & Khiếu nại</NavLink>
           <NavLink to="/reviews">Đánh giá</NavLink>
           <NavLink to="/notifications">Thông báo</NavLink>
+          <NavLink to="/banners">Banner</NavLink>
           <NavLink to="/stats">Thống kê</NavLink>
         </nav>
         <div className="sidebar-footer">

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Danh sách người theo dõi - Chợ Việt</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-error": "#ffffff",
+                    "on-primary-container": "#f7fff2",
+                    "tertiary-container": "#cea700",
+                    "inverse-primary": "#62df7d",
+                    "outline-variant": "#bdcaba",
+                    "on-primary-fixed-variant": "#005320",
+                    "surface-container-high": "#dee9fc",
+                    "on-surface": "#121c2a",
+                    "on-tertiary-fixed-variant": "#574500",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-secondary-fixed": "#002109",
+                    "tertiary-fixed": "#ffe083",
+                    "on-secondary": "#ffffff",
+                    "error": "#ba1a1a",
+                    "surface-container": "#e6eeff",
+                    "surface-container-low": "#eff4ff",
+                    "on-error-container": "#93000a",
+                    "error-container": "#ffdad6",
+                    "background": "#f8f9ff",
+                    "outline": "#6e7b6c",
+                    "primary-container": "#00873a",
+                    "secondary": "#006e2f",
+                    "on-primary-fixed": "#002109",
+                    "on-tertiary": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "surface-tint": "#006e2d",
+                    "on-secondary-container": "#007432",
+                    "surface-dim": "#d0dbed",
+                    "secondary-fixed": "#6bff8f",
+                    "primary-fixed": "#7ffc97",
+                    "surface": "#f8f9ff",
+                    "secondary-fixed-dim": "#4ae176",
+                    "on-tertiary-fixed": "#231b00",
+                    "surface-container-highest": "#d9e3f6",
+                    "primary-fixed-dim": "#62df7d",
+                    "secondary-container": "#6bff8f",
+                    "primary": "#006b2c",
+                    "on-tertiary-container": "#4e3e00",
+                    "on-surface-variant": "#3e4a3d",
+                    "on-secondary-fixed-variant": "#005321",
+                    "surface-container-lowest": "#ffffff",
+                    "tertiary-fixed-dim": "#eec200",
+                    "surface-bright": "#f8f9ff",
+                    "tertiary": "#735c00",
+                    "inverse-surface": "#27313f",
+                    "on-background": "#121c2a",
+                    "surface-variant": "#d9e3f6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-gap-lg": "32px",
+                    "container-margin": "24px",
+                    "unit": "8px",
+                    "touch-target-min": "56px",
+                    "gutter": "16px",
+                    "stack-gap-md": "16px"
+            },
+            "fontFamily": {
+                    "price-display": [
+                            "Inter"
+                    ],
+                    "label-md": [
+                            "Inter"
+                    ],
+                    "headline-lg-mobile": [
+                            "Inter"
+                    ],
+                    "label-lg": [
+                            "Inter"
+                    ],
+                    "headline-md": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "headline-lg": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "price-display": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "36px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-lg": [
+                            "20px",
+                            {
+                                    "lineHeight": "30px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-md": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    }
+            }
+          },
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="flex flex-col min-h-screen font-body-md text-body-md bg-background text-on-background pb-[88px] md:pb-0">
+<!-- Top App Bar -->
+<header class="flex justify-between items-center w-full px-container-margin h-touch-target-min bg-surface text-primary border-b border-outline-variant sticky top-0 z-40">
+<button aria-label="Quay lại" class="w-12 h-12 flex items-center justify-center text-on-surface hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Người theo dõi</h1>
+<div class="w-12"></div> <!-- Spacer for center alignment -->
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow w-full max-w-3xl mx-auto px-container-margin py-stack-gap-md">
+<!-- Search Bar -->
+<div class="mb-stack-gap-lg">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-4 text-on-surface-variant pointer-events-none">search</span>
+<input class="w-full h-touch-target-min pl-12 pr-4 bg-surface-container-low border border-outline-variant rounded-full font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Tìm kiếm người theo dõi..." type="text"/>
+</div>
+</div>
+<!-- Followers List -->
+<div class="space-y-4">
+<!-- Follower Item 1 -->
+<div class="flex items-center justify-between p-4 bg-surface-container-lowest border border-outline-variant rounded-xl hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-4">
+<img class="w-14 h-14 rounded-full object-cover border border-outline-variant" data-alt="A portrait of a cheerful elderly Vietnamese woman in a traditional market setting, soft natural lighting highlighting her friendly expression, wearing a simple patterned blouse, modern minimalist photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQKF813IS6m7W0BGfaPNG4PBK5a8ftfrJZxdkdQ7HUK_uy85rkKd4IVFxof5Uhklm59nniIrY5fz1KAvZnbuV5O9EsN8XXT2D0sUVV5I7ENl0x3O2kxqh9TTa-25fp7AtwYYDH7BKuUd3t0zXQ_etTLGSgVO0Zv8ILClpxxxu1aE_3yIxfKv-cbrSYxxdpHXthE9WT3qfd5be85RP3tzQeTNko17Ky1pLhAxgfuavuA-C55TRd1veSvnoWs5phoIohgU7ZmJP8eri4"/>
+<div>
+<h2 class="font-label-lg text-label-lg text-on-surface">Bà Tám Gò Vấp</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Theo dõi từ tháng 3</p>
+</div>
+</div>
+<button aria-label="Nhắn tin" class="flex items-center justify-center gap-2 h-12 px-4 rounded-full bg-primary-container text-on-primary-container hover:bg-secondary transition-colors">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">chat</span>
+<span class="font-label-md text-label-md hidden sm:inline">Nhắn tin</span>
+</button>
+</div>
+<!-- Follower Item 2 -->
+<div class="flex items-center justify-between p-4 bg-surface-container-lowest border border-outline-variant rounded-xl hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-4">
+<img class="w-14 h-14 rounded-full object-cover border border-outline-variant" data-alt="A portrait of a middle-aged Vietnamese man smiling warmly, wearing a neat polo shirt, casual outdoor setting with blurred green foliage in the background, bright daylight, high quality digital photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4WGJsgwtJQeg4sNKn-iux5B2ble-wW2tQEJ9k5B2vKd8Dp3ikxnMhTzrbUfjQD9TxjF-1SGGsUJ-6pTL7m3GR3eER5hKEgv6mFgw_huSIttjsVlevf4Wq2Tecig_UgisLNrfHFoP8ABvLGbTqJDTzRpTCg00TJsCxCO3JPvQQ0QpSfuC2lL4BRqJPa3r6n1j0ZE9MKjffTuZShL7MTlqZoA0D2W6XDvNFji2LmaKzfIgMqBkrJTRRTSO6o0ifSSvCrwhmxJ-5ZpgS"/>
+<div>
+<h2 class="font-label-lg text-label-lg text-on-surface">Chú Tư Trái Cây</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Theo dõi từ tháng 2</p>
+</div>
+</div>
+<button aria-label="Nhắn tin" class="flex items-center justify-center gap-2 h-12 px-4 rounded-full bg-primary-container text-on-primary-container hover:bg-secondary transition-colors">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">chat</span>
+<span class="font-label-md text-label-md hidden sm:inline">Nhắn tin</span>
+</button>
+</div>
+<!-- Follower Item 3 -->
+<div class="flex items-center justify-between p-4 bg-surface-container-lowest border border-outline-variant rounded-xl hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-4">
+<img class="w-14 h-14 rounded-full object-cover border border-outline-variant" data-alt="A portrait of a young Vietnamese woman with a gentle smile, wearing a modern modest outfit, standing in front of a slightly blurred traditional market stall, warm lighting, clear and approachable demeanor." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYAbIv3bT5Rtgbf2yTPTPQTfaVlZP-yjq35lmBfTTYg_J0lLP50NNDV6hJXo7cPrMNHxl6juU7I7T32YREUd4Wqn9oOSi2bhcJ7_SPWK3yI3Ce0XxnEArij7vbxMnHroHZCIlAntUy_2YJ_i0bx-xSYKrY3Zw-pFQH4mEe308njxOduGwGofBtos2V1-XhJgTDqXgMzjUChPyV-BZUsEmnNwu1u3TjvQZ1Vm0Nng8adYNgr_SF86LTdhZE87OsSuCCWTIe5W1P01Co"/>
+<div>
+<h2 class="font-label-lg text-label-lg text-on-surface">Cô Hoa Chợ Đệm</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Theo dõi từ tuần trước</p>
+</div>
+</div>
+<button aria-label="Nhắn tin" class="flex items-center justify-center gap-2 h-12 px-4 rounded-full bg-primary-container text-on-primary-container hover:bg-secondary transition-colors">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">chat</span>
+<span class="font-label-md text-label-md hidden sm:inline">Nhắn tin</span>
+</button>
+</div>
+<!-- Follower Item 4 -->
+<div class="flex items-center justify-between p-4 bg-surface-container-lowest border border-outline-variant rounded-xl hover:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-14 h-14 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 32px;">person</span>
+</div>
+<div>
+<h2 class="font-label-lg text-label-lg text-on-surface">Bác Năm Rau Sạch</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Vừa theo dõi</p>
+</div>
+</div>
+<button aria-label="Nhắn tin" class="flex items-center justify-center gap-2 h-12 px-4 rounded-full bg-primary-container text-on-primary-container hover:bg-secondary transition-colors">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">chat</span>
+<span class="font-label-md text-label-md hidden sm:inline">Nhắn tin</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Hidden on desktop) -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-2 bg-surface border-t border-outline-variant md:hidden">
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high rounded-lg transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+<span class="font-label-md text-[12px] mt-1">Trang chủ</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high rounded-lg transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">inventory_2</span>
+<span class="font-label-md text-[12px] mt-1">Sản phẩm</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high rounded-lg transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">shopping_bag</span>
+<span class="font-label-md text-[12px] mt-1">Đơn hàng</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-gutter py-2 scale-90 transition-transform duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">campaign</span>
+<span class="font-label-md text-[12px] mt-1">Tiếp thị</span>
+</button>
+</nav>
+</body></html>

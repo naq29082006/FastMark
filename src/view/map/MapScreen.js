@@ -19,7 +19,6 @@ import DirectionsScreen from './DirectionsScreen';
 import AddressSearchBar from './AddressSearchBar';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import StoreDetailScreen from '../store/StoreDetailScreen';
-import DealOfferModal from '../buyer/DealOfferModal';
 import ReservationModal from '../buyer/ReservationModal';
 import { calculateDistanceMeters, formatDistance, hasValidLocation, normalizeExpoLocation } from '../../core/utils/geo';
 import { loadNearbyRegisteredShops, reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
@@ -92,7 +91,6 @@ export default function MapScreen({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [registeredShops, setRegisteredShops] = useState([]);
   const [storeNav, setStoreNav] = useState(null);
-  const [dealModal, setDealModal] = useState(null);
   const [reserveModal, setReserveModal] = useState(null);
   const [directionsSession, setDirectionsSession] = useState(null);
   const [routeDistanceById, setRouteDistanceById] = useState({});
@@ -797,13 +795,6 @@ export default function MapScreen({
         onBack={goBackStoreNav}
         onStorePress={openStore}
         onOpenChat={onOpenChat}
-        onDeal={(product, store, selectedVariant) =>
-          setDealModal({
-            product: { ...product, id: product.id || storeNav.productId },
-            store,
-            preselectedVariantId: selectedVariant?.id || null,
-          })
-        }
         onReserve={(product, store, selectedVariant) =>
           setReserveModal({
             product: { ...product, id: product.id || storeNav.productId },
@@ -1032,18 +1023,6 @@ export default function MapScreen({
   return (
     <>
       {screenContent}
-      <DealOfferModal
-        visible={Boolean(dealModal)}
-        product={dealModal?.product}
-        store={dealModal?.store}
-        preselectedVariantId={dealModal?.preselectedVariantId}
-        onClose={() => setDealModal(null)}
-        onSuccess={() => {
-          setDealModal(null);
-          setStoreNav(null);
-          onOpenBuyerOrders?.(RESERVATION_TAB.PENDING_PRICE);
-        }}
-      />
       <ReservationModal
         visible={Boolean(reserveModal)}
         product={reserveModal?.product}
@@ -1169,8 +1148,8 @@ const styles = StyleSheet.create({
   nearbyDistance: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#0f766e',
-    backgroundColor: '#ecfdf5',
+    color: '#076F32',
+    backgroundColor: '#E6F4EC',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 999,
@@ -1179,7 +1158,7 @@ const styles = StyleSheet.create({
   nearbyMetaLine: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0f766e',
+    color: '#076F32',
     lineHeight: 16,
   },
   nearbyAddress: {
@@ -1232,7 +1211,7 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   settingsFabActive: {
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   settingsFabIcon: {
     fontSize: 20,
@@ -1369,12 +1348,12 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   categoryTextActive: {
-    color: '#0f766e',
+    color: '#076F32',
     fontWeight: '800',
   },
   checkmark: {
     fontSize: 13,
-    color: '#0f766e',
+    color: '#076F32',
     fontWeight: 'bold',
   },
   directionsCard: {
@@ -1415,7 +1394,7 @@ const styles = StyleSheet.create({
   directionsMeta: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0f766e',
+    color: '#076F32',
   },
   directionsActions: {
     flexDirection: 'row',
@@ -1443,7 +1422,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   directionsPrimaryBtnDisabled: {
     opacity: 0.7,

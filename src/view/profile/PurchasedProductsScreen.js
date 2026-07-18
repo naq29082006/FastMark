@@ -211,7 +211,7 @@ export default function PurchasedProductsScreen({
   const content = (
     <>
       {isLoading ? (
-        <ActivityIndicator size="large" color="#0f766e" style={styles.loader} />
+        <ActivityIndicator size="large" color="#076F32" style={styles.loader} />
       ) : (
         <PurchaseList
           items={purchases}
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#ccfbf1',
+    borderColor: '#E6F4EC',
   },
   emoji: {
     fontSize: 30,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   totalValue: {
-    color: '#0f766e',
+    color: '#076F32',
     fontSize: 14,
     fontWeight: '900',
   },

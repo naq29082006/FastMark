@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chi tiết Tin nhắn</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed": "#002109",
+                        "on-surface-variant": "#3e4a3d",
+                        "inverse-surface": "#27313f",
+                        "on-error": "#ffffff",
+                        "primary-container": "#00873a",
+                        "outline": "#6e7b6c",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-dim": "#d0dbed",
+                        "secondary-fixed": "#6bff8f",
+                        "tertiary": "#735c00",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "surface-container-highest": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "inverse-primary": "#62df7d",
+                        "surface-container": "#e6eeff",
+                        "surface-container-high": "#dee9fc",
+                        "secondary-container": "#6bff8f",
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "on-tertiary-fixed": "#231b00",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-tertiary-container": "#4e3e00",
+                        "surface-tint": "#006e2d",
+                        "on-primary-container": "#f7fff2",
+                        "on-background": "#121c2a",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "primary-fixed": "#7ffc97",
+                        "on-secondary-container": "#007432",
+                        "primary-fixed-dim": "#62df7d",
+                        "surface-variant": "#d9e3f6",
+                        "surface-bright": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "secondary": "#006e2f",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#002109",
+                        "on-secondary-fixed-variant": "#005321",
+                        "secondary-fixed-dim": "#4ae176",
+                        "outline-variant": "#bdcaba",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#121c2a",
+                        "tertiary-fixed-dim": "#eec200"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "stack-gap-lg": "32px",
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Scrollbar hiding */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background h-screen flex flex-col font-body-lg overflow-hidden">
+<!-- TopAppBar -->
+<header class="flex flex-col w-full px-container-margin py-unit gap-2 bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline docked full-width top-0 z-50">
+<div class="flex items-center justify-between w-full h-[56px]">
+<div class="flex items-center gap-4">
+<button aria-label="Quay lại" class="w-[48px] h-[48px] flex items-center justify-center rounded-full hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-colors text-on-surface dark:text-inverse-on-surface">
+<span class="material-symbols-outlined text-3xl">arrow_back</span>
+</button>
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-12 h-12 rounded-full object-cover border-2 border-surface" data-alt="A close-up portrait of a friendly Vietnamese market vendor, wearing a traditional conical hat (non la), smiling warmly in a bustling outdoor market setting. Vibrant green vegetables and colorful fruits are softly blurred in the background. Natural sunlight illuminating her face. Modern light-mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCs5JmjHKDt7O2koNE-MOYPYqgSdjNTEf4NoExS0nMiAoxn6-ZoaHIEy8TbZ07Qi4BqiaeE4OsUC6d9wz_8SEsAWgyyIDf9b6cYHNIpS-WPEXTZLrXQIvpC7uYxEdAdTEDVSE1A-Uqiw0VR9b4OESbPLiqBBuQ0vlTk23xHkyHnRLtiRMaeeFRtVYfD92ig4FLsb-CskFimV9QaFaKCIfYDflh5O5xrsi05ENiPyGPpYWJnVRtKHIboQCQ9wa_9ZyVjYBC22eYEpM8y"/>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-secondary-fixed rounded-full border-2 border-surface"></div>
+</div>
+<div class="flex flex-col">
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-primary dark:text-primary-fixed">Cô Lan Rau Sạch</h1>
+<span class="font-label-md text-label-md text-on-surface-variant">Đang hoạt động</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button aria-label="Gọi điện" class="w-[48px] h-[48px] flex items-center justify-center rounded-full hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-colors text-primary dark:text-primary-fixed">
+<span class="material-symbols-outlined text-3xl">call</span>
+</button>
+<button aria-label="Tùy chọn" class="w-[48px] h-[48px] flex items-center justify-center rounded-full hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-colors text-primary dark:text-primary-fixed">
+<span class="material-symbols-outlined text-3xl">more_vert</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Chat Canvas -->
+<main class="flex-1 overflow-y-auto bg-surface-container-low px-container-margin py-stack-gap-md flex flex-col gap-4">
+<!-- Timestamp -->
+<div class="flex justify-center w-full my-2">
+<span class="font-label-md text-label-md text-on-surface-variant bg-surface px-4 py-1 rounded-full text-sm">Hôm nay, 08:30</span>
+</div>
+<!-- Vendor Message -->
+<div class="flex flex-col items-start max-w-[85%] gap-1">
+<div class="bg-surface text-on-surface p-4 rounded-2xl rounded-tl-sm border border-outline-variant shadow-sm inline-block">
+<p class="font-body-md text-body-md">Chào Bác Ba, sáng nay có xà lách tươi lắm, bác có lấy một mớ không ạ?</p>
+</div>
+<span class="font-label-md text-[12px] text-on-surface-variant ml-1">08:31</span>
+</div>
+<!-- User Message -->
+<div class="flex flex-col items-end w-full gap-1">
+<div class="flex justify-end w-full">
+<div class="bg-primary text-on-primary p-4 rounded-2xl rounded-tr-sm max-w-[85%] shadow-sm inline-block">
+<p class="font-body-md text-body-md">Có cô nhé, lấy cho tôi 2 mớ. Sẵn tiện cho hỏi giá cà chua nay bao nhiêu?</p>
+</div>
+</div>
+<span class="font-label-md text-[12px] text-on-surface-variant mr-1">08:35</span>
+</div>
+<!-- Vendor Message - Product Card Share -->
+<div class="flex flex-col items-start max-w-[85%] gap-1 mt-2">
+<div class="bg-surface text-on-surface p-4 rounded-2xl rounded-tl-sm border border-outline-variant shadow-sm inline-block flex flex-col gap-3 w-full sm:w-[300px]">
+<p class="font-body-md text-body-md">Dạ cà chua bi nay giá rẻ Bác ơi, chỉ 25k/kg thôi ạ.</p>
+<!-- Shared Product Card -->
+<div class="border border-outline-variant rounded-lg overflow-hidden bg-surface-container-lowest">
+<img class="w-full h-32 object-cover" data-alt="A close-up shot of fresh, bright red cherry tomatoes in a woven bamboo basket. Droplets of water on the tomatoes indicate freshness. Soft, natural lighting highlights the smooth texture and vibrant color. Placed on a rustic wooden table in a well-lit market setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAf79HYcs_TUHiVQFoB7JrdLz4NnOlXnyXdc3hy1yK6voYOZ8pO22Q1o9u4rNcL5qtTGTG4ncIqFpA7XlcmqZU_I3sWCU3FqMVw4rjg2xCNnw6l0LyWf9K3-ef-WUHwh3PEa8SYC0pXm9LISXzftoQFXXX6Iayy3pUAfxfrRy-NjXwSjbq2HB4Jds0JYwHgTwCuVRL7E0-othHix89p-RsoUM4NOBB4tuAl7Urqp0hvwwPVe0BiRZG5QIu5Ap9be5mwKSYv6ZYOUdw_"/>
+<div class="p-3 flex flex-col gap-1">
+<span class="font-label-lg text-label-lg line-clamp-1 text-on-surface">Cà chua bi hữu cơ Đà Lạt</span>
+<span class="font-price-display text-price-display text-[#DC2626]">25.000đ<span class="font-body-md text-on-surface-variant">/kg</span></span>
+<button class="mt-2 w-full h-[40px] bg-primary text-on-primary rounded-full font-label-md text-label-md flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">add_shopping_cart</span>
+                            Chọn mua
+                        </button>
+</div>
+</div>
+</div>
+<span class="font-label-md text-[12px] text-on-surface-variant ml-1">08:38</span>
+</div>
+<!-- User Message -->
+<div class="flex flex-col items-end w-full gap-1 mt-2">
+<div class="flex justify-end w-full">
+<div class="bg-primary text-on-primary p-4 rounded-2xl rounded-tr-sm max-w-[85%] shadow-sm inline-block">
+<p class="font-body-md text-body-md">Được, vậy lấy tôi 1kg cà chua luôn nhé.</p>
+</div>
+</div>
+<div class="flex items-center gap-1 mr-1">
+<span class="font-label-md text-[12px] text-on-surface-variant">08:40</span>
+<span class="material-symbols-outlined text-[14px] text-primary">done_all</span>
+</div>
+</div>
+</main>
+<!-- Message Input Area -->
+<div class="bg-surface dark:bg-inverse-surface border-t border-outline-variant p-2 flex items-end gap-2 pb-6 pt-3 px-4">
+<button aria-label="Thêm" class="w-[48px] h-[48px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-variant transition-colors flex-shrink-0">
+<span class="material-symbols-outlined text-3xl">add_circle</span>
+</button>
+<button aria-label="Gửi ảnh" class="w-[48px] h-[48px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-variant transition-colors flex-shrink-0">
+<span class="material-symbols-outlined text-3xl">image</span>
+</button>
+<div class="flex-1 bg-surface-container-low rounded-[24px] border border-outline-variant flex items-center px-4 min-h-[56px]">
+<input class="w-full bg-transparent border-none focus:ring-0 font-body-lg text-body-lg text-on-surface py-3" placeholder="Nhập tin nhắn..." type="text"/>
+<button aria-label="Biểu tượng cảm xúc" class="w-[40px] h-[40px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-variant transition-colors flex-shrink-0 ml-2">
+<span class="material-symbols-outlined text-2xl">mood</span>
+</button>
+</div>
+<button aria-label="Gửi" class="w-[56px] h-[56px] flex items-center justify-center rounded-full bg-primary text-on-primary hover:bg-surface-tint transition-colors shadow-md flex-shrink-0">
+<span class="material-symbols-outlined text-3xl fill">send</span>
+</button>
+</div>
+</body></html>

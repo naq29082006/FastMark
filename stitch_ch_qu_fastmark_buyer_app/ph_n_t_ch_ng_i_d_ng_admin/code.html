@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FastMark Admin - Người dùng Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings:
+          'FILL' 0,
+          'wght' 400,
+          'GRAD' 0,
+          'opsz' 24
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "on-secondary-container": "#007432",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container": "#e5eeff",
+                      "secondary-fixed-dim": "#4ae176",
+                      "on-tertiary": "#ffffff",
+                      "outline": "#6e7b6c",
+                      "surface-tint": "#006e2d",
+                      "on-secondary-fixed": "#002109",
+                      "tertiary-fixed-dim": "#ffb2bf",
+                      "on-surface-variant": "#3e4a3d",
+                      "on-primary-fixed-variant": "#005320",
+                      "primary-fixed": "#7ffc97",
+                      "on-error": "#ffffff",
+                      "surface-variant": "#d3e4fe",
+                      "on-tertiary-container": "#fffbff",
+                      "surface-container-highest": "#d3e4fe",
+                      "primary-container": "#00873a",
+                      "inverse-surface": "#213145",
+                      "surface-bright": "#f8f9ff",
+                      "surface-container-high": "#dce9ff",
+                      "error": "#ba1a1a",
+                      "surface": "#f8f9ff",
+                      "inverse-primary": "#62df7d",
+                      "inverse-on-surface": "#eaf1ff",
+                      "secondary-fixed": "#6bff8f",
+                      "background": "#f8f9ff",
+                      "primary-fixed-dim": "#62df7d",
+                      "primary": "#006b2c",
+                      "on-tertiary-fixed-variant": "#8a143c",
+                      "on-surface": "#0b1c30",
+                      "on-primary-fixed": "#002109",
+                      "secondary": "#006e2f",
+                      "on-secondary": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "secondary-container": "#6bff8f",
+                      "on-tertiary-fixed": "#3f0016",
+                      "on-background": "#0b1c30",
+                      "surface-dim": "#cbdbf5",
+                      "tertiary": "#a72d51",
+                      "outline-variant": "#bdcaba",
+                      "on-secondary-fixed-variant": "#005321",
+                      "on-primary-container": "#f7fff2",
+                      "tertiary-container": "#c74668",
+                      "tertiary-fixed": "#ffd9de",
+                      "surface-container-low": "#eff4ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "space-xl": "32px",
+                      "space-lg": "24px",
+                      "gutter": "24px",
+                      "sidebar-width": "260px",
+                      "margin-page": "32px",
+                      "space-sm": "8px",
+                      "space-xs": "4px",
+                      "container-max-width": "1440px",
+                      "space-md": "16px",
+                      "header-height": "64px"
+              },
+              "fontFamily": {
+                      "h4": [
+                              "Inter"
+                      ],
+                      "h1": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "h2": [
+                              "Inter"
+                      ],
+                      "h5": [
+                              "Inter"
+                      ],
+                      "caption": [
+                              "Inter"
+                      ],
+                      "h6": [
+                              "Inter"
+                      ],
+                      "h3": [
+                              "Inter"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "label-sm": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "h4": [
+                              "18px",
+                              {
+                                      "lineHeight": "26px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "h1": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "h2": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "h5": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "caption": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "h6": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "h3": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-x-hidden">
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 w-[calc(100%-260px)] h-header-height bg-surface border-b border-outline-variant flex justify-between items-center px-margin-page z-40">
+<div class="flex items-center gap-space-sm">
+<span class="text-on-surface-variant">FastMark Admin</span>
+<span class="material-symbols-outlined text-on-surface-variant text-sm">chevron_right</span>
+<span class="font-h5 text-h5 text-on-surface">Người dùng</span>
+</div>
+<div class="flex items-center gap-space-lg">
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-lg text-body-md focus:ring-2 focus:ring-primary outline-none w-64 text-on-surface placeholder:text-on-surface-variant" placeholder="Tìm kiếm..." type="text"/>
+</div>
+<div class="flex items-center gap-space-md">
+<button class="text-on-surface-variant hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-all duration-200">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="h-6 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-space-sm cursor-pointer hover:bg-surface-container-low p-2 rounded-lg transition-colors">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="Professional corporate headshot of an Asian male administrator in his 30s, wearing a crisp light blue shirt, neutral background, soft highly detailed lighting, conveying trust and competence in a modern tech environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyXS3y7JdAYE9Ytmhk2wOnILcAhA4kAufBCzJBioB-57o4fTaVMw8op-gCOLO1Uyn4UD-ZzW9GKkddDO8nhtq5yK3vq5bOZdlV6YhW0B1fd022O2rXEUndHUNE0vkSI-5jGtQXN3qOf-y_UMnj44xPW71gq6v2zSjrowoqpun0pwYA8CI6ujye3EOiz9uTO5FmlRB3dYv7b-y3XrgKj9LIjPJYPtgwFDzpq_CcdId5VMHk6mBqP9MPU4Niebm0FaliLo7pIRv_qltn"/>
+<span class="font-body-md text-on-surface font-medium hidden md:block">Nguyễn Admin</span>
+</div>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-screen w-sidebar-width bg-surface border-r border-outline-variant flex flex-col py-space-md z-50">
+<div class="px-space-md mb-space-lg flex items-center gap-space-sm">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary text-xl" style="font-variation-settings: 'FILL' 1;">storefront</span>
+</div>
+<div>
+<h1 class="font-h3 text-h3 font-bold text-primary">FastMark</h1>
+<p class="font-caption text-caption text-on-surface-variant">Management Console</p>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto px-space-sm flex flex-col gap-1">
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg bg-primary-container/10 text-primary border-l-4 border-primary transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="font-body-md text-body-md font-medium">Người dùng</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">storefront</span>
+<span class="font-body-md text-body-md">Người bán</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">store</span>
+<span class="font-body-md text-body-md">Gian hàng</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md text-body-md">Sản phẩm</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">category</span>
+<span class="font-body-md text-body-md">Danh mục</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="font-body-md text-body-md">Đơn hàng</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">ad_units</span>
+<span class="font-body-md text-body-md">Banner quảng cáo</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-body-md text-body-md">Ví điện tử</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">card_membership</span>
+<span class="font-body-md text-body-md">Gói Seller</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-body-md text-body-md">Báo cáo</span>
+</a>
+</div>
+<div class="px-space-sm mt-auto flex flex-col gap-1 border-t border-outline-variant pt-space-md">
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-body-md text-body-md">Thông báo</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-md text-body-md">Thống kê</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Cài đặt</span>
+</a>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="ml-[260px] mt-[64px] p-margin-page min-h-[calc(100vh-64px)] max-w-container-max-width mx-auto">
+<!-- Header & Filters -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-space-xl gap-space-md">
+<div>
+<h2 class="font-h1 text-h1 text-on-surface">Phân tích Người dùng</h2>
+<p class="text-on-surface-variant mt-1">Tổng quan về tăng trưởng, hành vi và mức độ giữ chân người dùng.</p>
+</div>
+<div class="flex flex-wrap items-center gap-space-sm bg-surface p-1.5 rounded-lg border border-outline-variant">
+<button class="px-4 py-2 rounded-md bg-primary text-on-primary font-label-sm text-label-sm">30 ngày qua</button>
+<button class="px-4 py-2 rounded-md text-on-surface-variant hover:bg-surface-container-low font-label-sm text-label-sm transition-colors">Quý này</button>
+<button class="px-4 py-2 rounded-md text-on-surface-variant hover:bg-surface-container-low font-label-sm text-label-sm transition-colors">Năm nay</button>
+<div class="w-px h-6 bg-outline-variant mx-1"></div>
+<button class="px-3 py-2 flex items-center gap-1 text-on-surface-variant hover:bg-surface-container-low rounded-md transition-colors">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span class="font-label-sm text-label-sm">Tùy chỉnh</span>
+</button>
+</div>
+</div>
+<!-- Key Metrics Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter mb-space-xl">
+<!-- Total Users -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="font-h6 text-h6 text-on-surface-variant">Tổng Người dùng</span>
+<div class="p-1.5 bg-primary-container/20 rounded-md">
+<span class="material-symbols-outlined text-primary text-sm">group</span>
+</div>
+</div>
+<div class="font-h1 text-h1 text-on-surface mb-2">245.8K</div>
+<div class="flex items-center gap-1 text-secondary-container text-sm font-medium">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span>+12.5%</span>
+<span class="text-on-surface-variant font-normal text-xs ml-1">vs tháng trước</span>
+</div>
+</div>
+<!-- DAU -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="font-h6 text-h6 text-on-surface-variant">DAU (Bình quân)</span>
+<div class="p-1.5 bg-secondary-container/20 rounded-md">
+<span class="material-symbols-outlined text-secondary text-sm">local_fire_department</span>
+</div>
+</div>
+<div class="font-h1 text-h1 text-on-surface mb-2">42.3K</div>
+<div class="flex items-center gap-1 text-secondary-container text-sm font-medium">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span>+5.2%</span>
+<span class="text-on-surface-variant font-normal text-xs ml-1">vs tháng trước</span>
+</div>
+</div>
+<!-- MAU -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="font-h6 text-h6 text-on-surface-variant">MAU (Bình quân)</span>
+<div class="p-1.5 bg-surface-variant rounded-md">
+<span class="material-symbols-outlined text-primary text-sm">calendar_month</span>
+</div>
+</div>
+<div class="font-h1 text-h1 text-on-surface mb-2">156.9K</div>
+<div class="flex items-center gap-1 text-secondary-container text-sm font-medium">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span>+8.7%</span>
+<span class="text-on-surface-variant font-normal text-xs ml-1">vs tháng trước</span>
+</div>
+</div>
+<!-- Avg Session -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl border border-outline-variant shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start mb-2">
+<span class="font-h6 text-h6 text-on-surface-variant">Thời gian truy cập TB</span>
+<div class="p-1.5 bg-tertiary-container/20 rounded-md">
+<span class="material-symbols-outlined text-tertiary text-sm">timer</span>
+</div>
+</div>
+<div class="font-h1 text-h1 text-on-surface mb-2">08:45</div>
+<div class="flex items-center gap-1 text-error text-sm font-medium">
+<span class="material-symbols-outlined text-[16px]">trending_down</span>
+<span>-1.2%</span>
+<span class="text-on-surface-variant font-normal text-xs ml-1">vs tháng trước</span>
+</div>
+</div>
+</div>
+<!-- Charts Area -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter mb-space-xl">
+<!-- Active Users Trend (DAU/MAU) -->
+<div class="lg:col-span-2 bg-surface-container-lowest p-space-lg rounded-xl border border-outline-variant shadow-sm">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-h4 text-h4 text-on-surface">Xu hướng DAU / MAU</h3>
+<div class="flex items-center gap-2">
+<span class="flex items-center gap-1 text-caption text-on-surface-variant"><span class="w-3 h-3 rounded-full bg-primary inline-block"></span> DAU</span>
+<span class="flex items-center gap-1 text-caption text-on-surface-variant"><span class="w-3 h-3 rounded-full bg-secondary-container inline-block"></span> MAU</span>
+</div>
+</div>
+<div class="relative h-[300px] w-full">
+<canvas id="activeUsersChart"></canvas>
+</div>
+</div>
+<!-- Registration Sources -->
+<div class="bg-surface-container-lowest p-space-lg rounded-xl border border-outline-variant shadow-sm">
+<h3 class="font-h4 text-h4 text-on-surface mb-6">Nguồn đăng ký mới</h3>
+<div class="relative h-[220px] w-full flex justify-center">
+<canvas id="sourceChart"></canvas>
+</div>
+<div class="mt-6 space-y-3">
+<div class="flex justify-between items-center text-sm">
+<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-primary"></span><span class="text-on-surface">Organic Search</span></div>
+<span class="font-medium">45%</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-secondary"></span><span class="text-on-surface">Social Media</span></div>
+<span class="font-medium">25%</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-primary-container"></span><span class="text-on-surface">Referral</span></div>
+<span class="font-medium">20%</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-surface-variant"></span><span class="text-on-surface">Direct</span></div>
+<span class="font-medium">10%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Cohort Analysis -->
+<div class="bg-surface-container-lowest p-space-lg rounded-xl border border-outline-variant shadow-sm mb-space-xl overflow-x-auto">
+<div class="flex justify-between items-center mb-6 min-w-[800px]">
+<div>
+<h3 class="font-h4 text-h4 text-on-surface">Phân tích Cohort (Tỷ lệ giữ chân)</h3>
+<p class="text-caption text-on-surface-variant mt-1">Tỷ lệ phần trăm người dùng quay lại sau tuần đăng ký đầu tiên.</p>
+</div>
+<div class="flex items-center gap-2">
+<select class="bg-surface border border-outline-variant rounded-md text-sm py-1.5 pl-3 pr-8 focus:ring-primary focus:border-primary">
+<option>Theo Tuần</option>
+<option>Theo Tháng</option>
+</select>
+</div>
+</div>
+<div class="min-w-[800px]">
+<table class="w-full text-sm text-left">
+<thead class="text-xs text-on-surface-variant bg-surface-container-low uppercase">
+<tr>
+<th class="px-4 py-3 font-semibold rounded-tl-lg">Cohort (Tuần)</th>
+<th class="px-4 py-3 font-semibold">User Mới</th>
+<th class="px-2 py-3 font-semibold text-center">Tuần 1</th>
+<th class="px-2 py-3 font-semibold text-center">Tuần 2</th>
+<th class="px-2 py-3 font-semibold text-center">Tuần 3</th>
+<th class="px-2 py-3 font-semibold text-center">Tuần 4</th>
+<th class="px-2 py-3 font-semibold text-center">Tuần 5</th>
+<th class="px-2 py-3 font-semibold text-center rounded-tr-lg">Tuần 6</th>
+</tr>
+</thead>
+<tbody>
+<tr class="border-b border-outline-variant/50">
+<td class="px-4 py-3 font-medium text-on-surface">24/10 - 30/10</td>
+<td class="px-4 py-3 text-on-surface-variant">1,245</td>
+<td class="px-2 py-2"><div class="bg-primary/90 text-white text-center py-1 rounded">100%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/70 text-white text-center py-1 rounded">68%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/50 text-on-primary-fixed-variant text-center py-1 rounded">52%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/40 text-on-primary-fixed-variant text-center py-1 rounded">45%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/30 text-on-surface text-center py-1 rounded">38%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/20 text-on-surface text-center py-1 rounded">35%</div></td>
+</tr>
+<tr class="border-b border-outline-variant/50">
+<td class="px-4 py-3 font-medium text-on-surface">31/10 - 06/11</td>
+<td class="px-4 py-3 text-on-surface-variant">1,310</td>
+<td class="px-2 py-2"><div class="bg-primary/90 text-white text-center py-1 rounded">100%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/75 text-white text-center py-1 rounded">71%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/55 text-on-primary-fixed-variant text-center py-1 rounded">56%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/45 text-on-primary-fixed-variant text-center py-1 rounded">48%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/35 text-on-surface text-center py-1 rounded">40%</div></td>
+<td class="px-2 py-2"><div class="bg-surface-container text-on-surface-variant text-center py-1 rounded">-</div></td>
+</tr>
+<tr class="border-b border-outline-variant/50">
+<td class="px-4 py-3 font-medium text-on-surface">07/11 - 13/11</td>
+<td class="px-4 py-3 text-on-surface-variant">1,450</td>
+<td class="px-2 py-2"><div class="bg-primary/90 text-white text-center py-1 rounded">100%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/65 text-white text-center py-1 rounded">65%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/45 text-on-primary-fixed-variant text-center py-1 rounded">42%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/30 text-on-surface text-center py-1 rounded">36%</div></td>
+<td class="px-2 py-2"><div class="bg-surface-container text-on-surface-variant text-center py-1 rounded">-</div></td>
+<td class="px-2 py-2"><div class="bg-surface-container text-on-surface-variant text-center py-1 rounded">-</div></td>
+</tr>
+<tr>
+<td class="px-4 py-3 font-medium text-on-surface">14/11 - 20/11</td>
+<td class="px-4 py-3 text-on-surface-variant">1,620</td>
+<td class="px-2 py-2"><div class="bg-primary/90 text-white text-center py-1 rounded">100%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/70 text-white text-center py-1 rounded">69%</div></td>
+<td class="px-2 py-2"><div class="bg-primary/50 text-on-primary-fixed-variant text-center py-1 rounded">49%</div></td>
+<td class="px-2 py-2"><div class="bg-surface-container text-on-surface-variant text-center py-1 rounded">-</div></td>
+<td class="px-2 py-2"><div class="bg-surface-container text-on-surface-variant text-center py-1 rounded">-</div></td>
+<td class="px-2 py-2"><div class="bg-surface-container text-on-surface-variant text-center py-1 rounded">-</div></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+<script>
+        // Chart.js Configuration
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // Common styles
+            Chart.defaults.font.family = 'Inter';
+            Chart.defaults.color = '#6e7b6c';
+            
+            // Active Users Chart (Line)
+            const activeUsersCtx = document.getElementById('activeUsersChart').getContext('2d');
+            new Chart(activeUsersCtx, {
+                type: 'line',
+                data: {
+                    labels: ['1 Nov', '5 Nov', '10 Nov', '15 Nov', '20 Nov', '25 Nov', '30 Nov'],
+                    datasets: [
+                        {
+                            label: 'DAU',
+                            data: [35000, 38000, 36000, 42000, 41000, 45000, 48000],
+                            borderColor: '#006b2c', // primary
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'MAU (Scale/10)',
+                            data: [140000, 142000, 145000, 148000, 152000, 155000, 158000],
+                            borderColor: '#6bff8f', // secondary-container
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#213145',
+                            titleColor: '#ffffff',
+                            bodyColor: '#eaf1ff',
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false, drawBorder: false }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: '#e5eeff', drawBorder: false },
+                            ticks: { callback: function(value) { return value/1000 + 'k'; } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: false,
+                            position: 'right',
+                        }
+                    }
+                }
+            });
+
+            // Source Chart (Doughnut)
+            const sourceCtx = document.getElementById('sourceChart').getContext('2d');
+            new Chart(sourceCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Organic Search', 'Social Media', 'Referral', 'Direct'],
+                    datasets: [{
+                        data: [45, 25, 20, 10],
+                        backgroundColor: [
+                            '#006b2c', // primary
+                            '#006e2f', // secondary
+                            '#00873a', // primary-container
+                            '#d3e4fe'  // surface-variant
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#213145',
+                            callbacks: {
+                                label: function(context) {
+                                    return ' ' + context.label + ': ' + context.raw + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body></html>

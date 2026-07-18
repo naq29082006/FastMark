@@ -8,6 +8,7 @@ import { getAndroidFirebaseConfigFromGoogleServices } from './googleServicesConf
 const log = createLogger('FirebaseApp');
 
 const requiredConfigKeys = ['apiKey', 'authDomain', 'projectId', 'appId'];
+let appInitLogged = false;
 
 export function getResolvedFirebaseConfig() {
   const androidConfig = getAndroidFirebaseConfigFromGoogleServices();
@@ -70,11 +71,15 @@ export function ensureFirebaseApp() {
   validateFirebaseConfig(config);
 
   if (getApps().length > 0) {
-    log.debug('ensureFirebaseApp:reuse-existing', getResolvedFirebaseConfigSummary());
+    if (!appInitLogged) {
+      log.debug('ensureFirebaseApp:reuse-existing', getResolvedFirebaseConfigSummary());
+      appInitLogged = true;
+    }
     return getApp();
   }
 
   log.info('ensureFirebaseApp:init', getResolvedFirebaseConfigSummary());
+  appInitLogged = true;
   return initializeApp(config);
 }
 

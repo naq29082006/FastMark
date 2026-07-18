@@ -4,6 +4,7 @@ const ProductCategory = require("../models/ProductCategory");
 const { assertProductCategoryExists } = require("./productCategoryService");
 const ShopProfile = require("../models/ShopProfile");
 const { PRODUCT_STATUS } = require("../constants/productStatus");
+const { isSubscriptionActive } = require("../constants/sellerSubscription");
 const { sanitizeUploadLabel } = require("../utils/sanitizeFileName");
 const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService");
 
@@ -322,6 +323,9 @@ async function createProduct(user, payload) {
     thumbnail = variantDocs[0]?.images?.[0]?.ImageUrl || "";
   }
 
+  const subscriptionActive = isSubscriptionActive(shop);
+  const status = subscriptionActive ? PRODUCT_STATUS.ACTIVE : PRODUCT_STATUS.HIDDEN;
+
   const product = await Product.create({
     ShopId: shop._id,
     CategoryId: category._id,
@@ -331,7 +335,7 @@ async function createProduct(user, payload) {
     MinPrice: minPrice,
     MaxPrice: maxPrice,
     Thumbnail: thumbnail,
-    Status: PRODUCT_STATUS.ACTIVE,
+    Status: status,
   });
 
   const savedVariants = await ProductVariant.insertMany(
@@ -349,6 +353,11 @@ async function createProduct(user, payload) {
   return {
     product,
     variants: savedVariants,
+    subscriptionActive,
+    publiclyVisible: subscriptionActive,
+    message: subscriptionActive
+      ? ""
+      : "Đã lưu bài. Gian hàng chưa có gói active nên bài bị ẩn công khai.",
   };
 }
 
@@ -356,7 +365,14 @@ async function listMyProducts(user) {
   const shop = await getSellerShop(user);
   await syncShopProductStats(shop);
 
-  const products = await Product.find(activeProductFilter({ ShopId: shop._id })).sort({
+  const products = await Product.find({
+    ShopId: shop._id,
+    $or: [
+      { Status: PRODUCT_STATUS.ACTIVE },
+      { Status: PRODUCT_STATUS.HIDDEN },
+      { Status: { $exists: false }, IsDeleted: { $ne: true } },
+    ],
+  }).sort({
     CreatedAt: -1,
   });
 
@@ -386,6 +402,15 @@ async function getProductById(productId) {
     throw createServiceError("Không tìm thấy sản phẩm.", 404);
   }
 
+  if (Number(product.Status) === PRODUCT_STATUS.HIDDEN) {
+    throw createServiceError("Không tìm thấy sản phẩm.", 404);
+  }
+
+  const shop = await ShopProfile.findById(product.ShopId).lean();
+  if (!shop || !isSubscriptionActive(shop)) {
+    throw createServiceError("Không tìm thấy sản phẩm.", 404);
+  }
+
   const variants = await ProductVariant.find({ ProductId: product._id }).sort({
     CreatedAt: 1,
   });
@@ -404,10 +429,6 @@ async function getMyProductById(user, productId) {
 
 async function updateProduct(user, productId, payload) {
   const { product, shop } = await getOwnedProduct(user, productId, { includeHidden: true });
-
-  if (product.Status === PRODUCT_STATUS.HIDDEN) {
-    throw createServiceError("Sản phẩm đã bị ẩn, không thể chỉnh sửa.");
-  }
 
   const productName = pickString(payload.productName || payload.ProductName || product.ProductName);
   const description = pickString(payload.description ?? payload.Description ?? product.Description);

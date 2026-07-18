@@ -83,7 +83,7 @@ export default function SellerOrderDetailScreen({ reservationId, onBack, onChang
     return (
       <ProfileSubScreen title="Chi tiết đơn giữ hàng" onBack={onBack}>
         <View style={styles.centered}>
-          <ActivityIndicator color="#0d7377" size="large" />
+          <ActivityIndicator color="#076F32" size="large" />
         </View>
       </ProfileSubScreen>
     );
@@ -140,6 +140,11 @@ export default function SellerOrderDetailScreen({ reservationId, onBack, onChang
             ) : null}
             <Text style={styles.meta}>Số lượng: {reservation.quantity}</Text>
             <Text style={styles.price}>Tổng tiền: {formatPrice(reservation.totalAmount)}</Text>
+            {Number(reservation.depositAmount) > 0 ? (
+              <Text style={styles.depositBadge}>
+                Đã cọc {formatPrice(reservation.depositAmount)}
+              </Text>
+            ) : null}
           </View>
         </View>
         {reservation.pickupTime ? (
@@ -238,22 +243,23 @@ const styles = StyleSheet.create({
   },
   value: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
   meta: { color: '#64748b', fontSize: 13, lineHeight: 20 },
-  price: { color: '#0d7377', fontWeight: '900', fontSize: 15, marginTop: 4 },
+  price: { color: '#076F32', fontWeight: '900', fontSize: 15, marginTop: 4 },
+  depositBadge: { color: '#055528', fontWeight: '800', fontSize: 13, marginTop: 4 },
   lockHint: { color: '#b45309', fontSize: 12, fontWeight: '700', marginTop: 8 },
   callButton: {
     marginTop: 10,
     minHeight: 40,
     borderRadius: 10,
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  callButtonText: { color: '#0d7377', fontWeight: '800' },
+  callButtonText: { color: '#076F32', fontWeight: '800' },
   actionRow: { gap: 10, marginTop: 4 },
   primaryBtn: {
     minHeight: 46,
     borderRadius: 12,
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     alignItems: 'center',
     justifyContent: 'center',
   },

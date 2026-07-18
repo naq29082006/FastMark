@@ -1,6 +1,5 @@
 const shopSettingsService = require("../services/shopSettingsService");
 const reservationService = require("../services/reservationService");
-const dealOfferService = require("../services/dealOfferService");
 const messageService = require("../services/messageService");
 const sellerStatsService = require("../services/sellerStatsService");
 const { success, fail } = require("../utils/apiResponse");
@@ -73,12 +72,6 @@ exports.checkShopUsernameAvailability = async (req, res) => {
 
 exports.listOrders = async (req, res) => {
   const tab = req.query.tab || "holding";
-
-  if (tab === "pending_price") {
-    const deals = await reservationService.listPendingPriceDeals(req.currentUser);
-    return success(res, { data: { deals, tab } });
-  }
-
   const reservations = await reservationService.listSellerReservations(req.currentUser, { tab });
   return success(res, { data: { reservations, tab } });
 };
@@ -131,40 +124,16 @@ exports.completeReservation = async (req, res) => {
   });
 };
 
-exports.listDeals = async (req, res) => {
-  const deals = await dealOfferService.listSellerDeals(req.currentUser, {
-    status: req.query.status,
-  });
-  return success(res, { data: { deals } });
-};
-
-exports.acceptDeal = async (req, res) => {
-  const result = await dealOfferService.acceptDealOffer(req.currentUser, req.params.id);
+exports.completeReservationByScan = async (req, res) => {
+  const payload =
+    pickBodyValue(req.body, ["qrPayload", "payload", "code", "pickupCode", "data"]) || "";
+  const reservation = await reservationService.completeReservationByScan(
+    req.currentUser,
+    payload
+  );
   return success(res, {
-    message: "Đã chấp nhận deal giá. Khách sẽ chọn giờ lấy hàng.",
-    data: result,
-  });
-};
-
-exports.rejectDeal = async (req, res) => {
-  const reason = pickBodyValue(req.body, ["reason", "note", "sellerNote"]);
-  const deal = await dealOfferService.rejectDealOffer(req.currentUser, req.params.id, { reason });
-  return success(res, {
-    message: "Đã từ chối deal giá.",
-    data: { deal },
-  });
-};
-
-exports.counterDeal = async (req, res) => {
-  const counterPrice = req.body.counterPrice ?? req.body.sellerCounterPrice;
-  if (counterPrice === undefined || counterPrice === null || counterPrice === "") {
-    return fail(res, { status: 400, message: "Thiếu giá đề xuất." });
-  }
-
-  const deal = await dealOfferService.counterDealOffer(req.currentUser, req.params.id, req.body);
-  return success(res, {
-    message: "Đã gửi mức giá đề xuất cho khách.",
-    data: { deal },
+    message: "Đã quét mã — đơn hoàn thành.",
+    data: { reservation },
   });
 };
 

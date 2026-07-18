@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chi tiết Cửa hàng - Tiệm Rau Bà Ba</title>
+<!-- Tailwind CSS Setup -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface": "#f8f9ff",
+                    "on-secondary": "#ffffff",
+                    "background": "#f8f9ff",
+                    "on-primary-fixed": "#002109",
+                    "on-surface-variant": "#3e4a3d",
+                    "inverse-surface": "#27313f",
+                    "on-error": "#ffffff",
+                    "primary-container": "#00873a",
+                    "outline": "#6e7b6c",
+                    "inverse-on-surface": "#eaf1ff",
+                    "surface-dim": "#d0dbed",
+                    "secondary-fixed": "#6bff8f",
+                    "tertiary": "#735c00",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#eff4ff",
+                    "surface-container-highest": "#d9e3f6",
+                    "on-primary": "#ffffff",
+                    "tertiary-container": "#cea700",
+                    "inverse-primary": "#62df7d",
+                    "surface-container": "#e6eeff",
+                    "surface-container-high": "#dee9fc",
+                    "secondary-container": "#6bff8f",
+                    "tertiary-fixed": "#ffe083",
+                    "primary": "#006b2c",
+                    "on-tertiary-fixed": "#231b00",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed-variant": "#005320",
+                    "on-tertiary-container": "#4e3e00",
+                    "surface-tint": "#006e2d",
+                    "on-primary-container": "#f7fff2",
+                    "on-background": "#121c2a",
+                    "on-tertiary-fixed-variant": "#574500",
+                    "primary-fixed": "#7ffc97",
+                    "on-secondary-container": "#007432",
+                    "primary-fixed-dim": "#62df7d",
+                    "surface-variant": "#d9e3f6",
+                    "surface-bright": "#f8f9ff",
+                    "on-error-container": "#93000a",
+                    "secondary": "#006e2f",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed": "#002109",
+                    "on-secondary-fixed-variant": "#005321",
+                    "secondary-fixed-dim": "#4ae176",
+                    "outline-variant": "#bdcaba",
+                    "error-container": "#ffdad6",
+                    "on-surface": "#121c2a",
+                    "tertiary-fixed-dim": "#eec200"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-gap-md": "16px",
+                    "gutter": "16px",
+                    "stack-gap-lg": "32px",
+                    "unit": "8px",
+                    "touch-target-min": "56px",
+                    "container-margin": "24px"
+            },
+            "fontFamily": {
+                    "label-lg": ["Inter", "sans-serif"],
+                    "body-lg": ["Inter", "sans-serif"],
+                    "headline-md": ["Inter", "sans-serif"],
+                    "label-md": ["Inter", "sans-serif"],
+                    "headline-lg": ["Inter", "sans-serif"],
+                    "price-display": ["Inter", "sans-serif"],
+                    "headline-lg-mobile": ["Inter", "sans-serif"],
+                    "body-md": ["Inter", "sans-serif"]
+            },
+            "fontSize": {
+                    "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                    "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                    "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                    "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                    "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                    "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                    "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                    "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+            }
+          }
+        }
+      }
+    </script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9ff; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; }
+        .icon-fill { font-variation-settings: 'FILL' 1; }
+        /* Hide scrollbar for category list */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface antialiased flex justify-center">
+<!-- Mobile App Container -->
+<main class="w-full max-w-[480px] bg-background min-h-screen relative shadow-2xl flex flex-col">
+<!-- Header Actions (Floating over cover) -->
+<div class="absolute top-0 w-full z-20 flex justify-between items-center p-4">
+<button aria-label="Quay lại" class="w-[56px] h-[56px] rounded-full bg-surface-container-lowest/80 backdrop-blur shadow-sm flex items-center justify-center text-on-surface hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[28px]" data-icon="arrow_back">arrow_back</span>
+</button>
+<div class="flex gap-2">
+<button aria-label="Tìm kiếm trong cửa hàng" class="w-[56px] h-[56px] rounded-full bg-surface-container-lowest/80 backdrop-blur shadow-sm flex items-center justify-center text-on-surface hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[28px]" data-icon="search">search</span>
+</button>
+<button aria-label="Chia sẻ cửa hàng" class="w-[56px] h-[56px] rounded-full bg-surface-container-lowest/80 backdrop-blur shadow-sm flex items-center justify-center text-on-surface hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[28px]" data-icon="share">share</span>
+</button>
+</div>
+</div>
+<!-- Cover Image -->
+<div class="h-[240px] w-full bg-surface-container-high bg-cover bg-center" data-alt="A wide angle photograph of a traditional Vietnamese countryside market stall selling fresh vegetables. The stall is overflowing with vibrant green produce, leafy greens, and root vegetables. The lighting is bright, natural sunlight, creating a fresh, inviting, and organic atmosphere. The overall aesthetic is modern yet deeply rooted in local culture, harmonizing with a clean, high-contrast UI design." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDUftuybifivOw2pxiDFJIGEZ12HLtYuPJ0NhO9mfpb8j_CqHc_HaAMfFvlhVYsXh-TNtgDu3covJIKox0hzsVbC01i4oGnFFBmrnJKcatlT9LmXhCs4_cdMAcqSjfxWc129f7dvTtzsHto3M36LtmGh6tXtpY_EEEOAtVRiWEgeuEmDLIK1O_4SjeyllWoIc1xoHrJTT3F8pcXr-KYNV1TaaEhpfh5pNec0UtPlFMep6owf5HwE_P_v0CjfWSVprO5q27HVEldSW5f')"></div>
+<!-- Store Info Section (Bento Card overlapping cover) -->
+<div class="bg-surface-container-lowest rounded-t-[32px] -mt-[32px] z-10 px-container-margin pb-stack-gap-lg pt-4 flex-none relative shadow-sm">
+<!-- Avatar -->
+<div class="absolute -top-[48px] left-container-margin">
+<div class="w-[96px] h-[96px] rounded-full border-4 border-surface-container-lowest overflow-hidden bg-surface-variant shadow-sm">
+<img alt="Avatar cửa hàng" class="w-full h-full object-cover" data-alt="A portrait photograph of a friendly, smiling elderly Vietnamese woman wearing a traditional conical hat (non la) and a simple patterned blouse. She is standing in front of her vegetable stall. The image is bright, warm, and evokes a strong sense of trust and local community, fitting perfectly into a humanist, minimalist digital platform design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATx9f16AVQ-wqJhZR6Ug3VwiRJ2ybxM8g0m1TqCNLudJmhTcCftqlkdTJOhrU2F7zndnQqql8gnNNVSthuUfFcArxUH9huHaJm3Gkx4NHeVQ19uE8LBuEkm7ehxm95PBRPF3RXwm4ErZt2DMyuBSrhn3-p9dcVncFUpnWxCmOJp5NBWHZdMQoHj4k9aXWMerBb_3nd5cM0iFiTn1RthdrMBS7bZFBOOy3NymFIi4Evd1E48WrKHPBrt9GrgBBKe1bcf0otTcEOMR2s"/>
+</div>
+</div>
+<!-- Store Title & Status -->
+<div class="mt-[56px] flex justify-between items-start">
+<div class="flex-1 pr-4">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-2">Tiệm Rau Bà Ba</h1>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-primary-container text-on-primary-container font-label-md text-label-md">
+<span class="material-symbols-outlined text-[16px] mr-1 icon-fill" data-icon="storefront">storefront</span>
+                            Đang mở cửa
+                        </span>
+</div>
+</div>
+</div>
+<!-- Stats Bar -->
+<div class="flex items-center gap-6 mt-stack-gap-md py-4 border-y border-outline-variant/30">
+<div class="flex flex-col items-center">
+<div class="flex items-center gap-1 text-on-surface">
+<span class="font-headline-md text-headline-md">4.8</span>
+<span class="material-symbols-outlined text-[24px] text-tertiary-container icon-fill" data-icon="star">star</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant">Đánh giá</span>
+</div>
+<div class="w-px h-8 bg-outline-variant/30"></div>
+<div class="flex flex-col items-center">
+<div class="flex items-center gap-1 text-on-surface">
+<span class="font-headline-md text-headline-md">1.2k</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant">Người theo dõi</span>
+</div>
+<div class="w-px h-8 bg-outline-variant/30"></div>
+<div class="flex flex-col items-center">
+<div class="flex items-center gap-1 text-on-surface">
+<span class="font-headline-md text-headline-md">50+</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface-variant">Sản phẩm</span>
+</div>
+</div>
+<!-- Information Details -->
+<div class="mt-stack-gap-md flex flex-col gap-3">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline mt-1" data-icon="location_on">location_on</span>
+<span class="font-body-lg text-body-lg text-on-surface-variant">Sạp 12, Chợ Đông Hòa, TP. Dĩ An</span>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline mt-1" data-icon="schedule">schedule</span>
+<span class="font-body-lg text-body-lg text-on-surface-variant">05:00 - 18:00 hàng ngày</span>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex gap-4 mt-stack-gap-lg">
+<button class="flex-1 min-h-[56px] rounded-full bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 active:bg-primary-fixed-variant transition-colors">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                    Theo dõi
+                </button>
+<button class="flex-1 min-h-[56px] rounded-full border-2 border-primary text-primary font-label-lg text-label-lg flex items-center justify-center gap-2 active:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+                    Nhắn tin
+                </button>
+</div>
+</div>
+<!-- Product Section -->
+<div class="flex-1 bg-background pt-stack-gap-md pb-[100px]">
+<!-- Sticky Category Header -->
+<div class="sticky top-0 z-10 bg-background/95 backdrop-blur py-4 border-b border-outline-variant/30">
+<div class="flex overflow-x-auto snap-x px-container-margin gap-3 no-scrollbar">
+<button class="snap-start shrink-0 min-h-[48px] px-6 rounded-full bg-primary text-on-primary font-label-lg text-label-lg shadow-sm">
+                        Tất cả
+                    </button>
+<button class="snap-start shrink-0 min-h-[48px] px-6 rounded-full bg-surface-container text-on-surface font-label-lg text-label-lg border border-outline-variant/50">
+                        Rau ăn lá
+                    </button>
+<button class="snap-start shrink-0 min-h-[48px] px-6 rounded-full bg-surface-container text-on-surface font-label-lg text-label-lg border border-outline-variant/50">
+                        Củ quả
+                    </button>
+<button class="snap-start shrink-0 min-h-[48px] px-6 rounded-full bg-surface-container text-on-surface font-label-lg text-label-lg border border-outline-variant/50">
+                        Gia vị
+                    </button>
+</div>
+</div>
+<!-- Product Grid -->
+<div class="grid grid-cols-2 gap-gutter px-container-margin mt-stack-gap-md">
+<!-- Product Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/50 overflow-hidden flex flex-col shadow-sm">
+<div class="aspect-square bg-surface-container relative">
+<img alt="Rau muống" class="w-full h-full object-cover" data-alt="A close up, high quality photograph of a fresh bunch of water spinach (rau muong) tied with a small string. The leaves are vibrant, crisp green with tiny water droplets. The background is a clean, neutral off-white surface, isolated to ensure high contrast for an e-commerce product card. Lighting is soft, even, and professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBd4VYoPmyRRxBDanyPsKgDQffyER9BLB3X3WmCDCQ84FqEM6Lqlll3qs5_p4AdEJFOnG7c24RNwB0Jsr6CzZSLcnpFMJaUZsU7C4ap4e8J24yZWlnIOGOTwXxibXCD-puOx58FtuEYM2M8mfJPt1c6saxg55tRrK14HbXGpT3F_fpeScqEUlJJ84jqECZ3UIMmmr7clvoQdRT6RxU9Tb_0l6uijsmyTpZ72is5tHjA32mze05umgiZarUlCiowbeJrWwDYoZFXBFtE"/>
+</div>
+<div class="p-3 flex flex-col flex-1">
+<h3 class="font-body-lg text-body-lg text-on-surface line-clamp-2 mb-1">Rau muống đồng sạch (Bó)</h3>
+<div class="mt-auto flex items-end justify-between">
+<div>
+<span class="font-price-display text-price-display text-error">15.000đ</span>
+</div>
+<button aria-label="Thêm vào giỏ" class="w-[48px] h-[48px] rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Product Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/50 overflow-hidden flex flex-col shadow-sm">
+<div class="aspect-square bg-surface-container relative">
+<img alt="Cà chua" class="w-full h-full object-cover" data-alt="A close up, high quality photograph of several ripe, bright red tomatoes resting on a clean, neutral off-white surface. The tomatoes have fresh green stems attached and a slight glossy sheen. The lighting is professional and soft, creating a fresh, appetizing look suitable for a modern online grocery store product card." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAz7Vh4K7_C_pZiFQgccb2RJqKeyKhDkrS1o-rx-IbqB4ZRODYkbrTrz2Z78I68wYC9nAsC5ufTcCcFqjeCo2uS3DgIo2RyonUqk4BZOcl5nox1-bucdf3lGxxLgIUY8wCwWmlwqfYNozQaV_15CctSrWc9_3tEcvfehvcIsDgk0p6QFyP7ocLB7mQp0i_F7glX8gk96AgciwV33X6ZMgNERpdzxqt9ucW1X2X2HoNjPivaouUvMU234xotu71kyFEyH649lrI3eZMg"/>
+</div>
+<div class="p-3 flex flex-col flex-1">
+<h3 class="font-body-lg text-body-lg text-on-surface line-clamp-2 mb-1">Cà chua Đà Lạt (1kg)</h3>
+<div class="mt-auto flex items-end justify-between">
+<div>
+<span class="font-price-display text-price-display text-error">25.000đ</span>
+</div>
+<button aria-label="Thêm vào giỏ" class="w-[48px] h-[48px] rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Product Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/50 overflow-hidden flex flex-col shadow-sm">
+<div class="aspect-square bg-surface-container relative">
+<img alt="Cà rốt" class="w-full h-full object-cover" data-alt="A close up, high quality photograph of freshly harvested bright orange carrots with feathery green tops still attached. They are arranged neatly on a clean, light gray surface. The lighting is bright and natural, emphasizing the vibrant colors and freshness, perfectly styled for a minimalist e-commerce application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGY2_HUWrd7w3S6FgX9mO7KD7TYye1dsE3IxK5VEeciz5d1cPA_7AYRKZk6F7KZ6PidE3Ls-Qv7pDt-0WrPnuCsxZYaw6WuYLIcJ0Y1U0KM63AGyK8ba_WngK9wRVLqvCTeew7EXgBwD3CRvmQXcbyJ9LaRHgnnoaU5v5N68v8DccWU5QP-39_FUFIIdD7qFDMOY-lJuApbWEOvzW_Eb4E4QMC1S-RFZ9KU6jnBME40RRtosDuj_UBPMgidofofIIBoHsbd_-GbryT"/>
+</div>
+<div class="p-3 flex flex-col flex-1">
+<h3 class="font-body-lg text-body-lg text-on-surface line-clamp-2 mb-1">Cà rốt tươi (1kg)</h3>
+<div class="mt-auto flex items-end justify-between">
+<div>
+<span class="font-price-display text-price-display text-error">20.000đ</span>
+</div>
+<button aria-label="Thêm vào giỏ" class="w-[48px] h-[48px] rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Product Card 4 -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/50 overflow-hidden flex flex-col shadow-sm">
+<div class="aspect-square bg-surface-container relative">
+<img alt="Bắp cải" class="w-full h-full object-cover" data-alt="A close up, high quality photograph of a large, perfectly round, crisp green cabbage. The outer leaves are vibrant and textured. The cabbage sits on a pristine, neutral off-white background to ensure maximum legibility and focus on the product. The lighting is studio quality, soft and even." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5-PN91r-4jN2DhUYwvO28OkXiOYVBPSC_Hr4sGusyeiEpHiySIDfPsBy4alnJcdhGbnrYM1vL1o51HnHhL7lD28nBrBkKg-wTlwPjhFu04m8J_VOLfuqhHEvM4B2-klX44haD9ayRuj9-0P4_t3fvs3TG6dIVGyJ-exmjp7AEOTlrHES2oOInhVsYEcW1Ht7RAuciVPcdHdXF5R9uwxUGUwty5c3rAAGLL0-tgOEx0b9CKXjzvUjDISquLOL37pBIlJkZrYG156mp"/>
+</div>
+<div class="p-3 flex flex-col flex-1">
+<h3 class="font-body-lg text-body-lg text-on-surface line-clamp-2 mb-1">Bắp cải xanh (Bắp)</h3>
+<div class="mt-auto flex items-end justify-between">
+<div>
+<span class="font-price-display text-price-display text-error">18.000đ</span>
+</div>
+<button aria-label="Thêm vào giỏ" class="w-[48px] h-[48px] rounded-full bg-primary-container text-on-primary-container flex items-center justify-center shadow-sm active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Floating Cart Button (Optional context action for detail page) -->
+<div class="fixed bottom-container-margin right-[calc(50%-240px+24px)] md:right-container-margin z-50">
+<button aria-label="Giỏ hàng" class="w-[64px] h-[64px] rounded-full bg-primary text-on-primary shadow-lg flex items-center justify-center relative hover:bg-primary-fixed-variant transition-colors">
+<span class="material-symbols-outlined text-[32px]" data-icon="shopping_cart">shopping_cart</span>
+<span class="absolute top-0 right-0 w-6 h-6 bg-error text-on-error rounded-full font-label-md text-[12px] flex items-center justify-center border-2 border-surface">3</span>
+</button>
+</div>
+</main>
+<script>
+        // Simple script to handle category active state visual update
+        document.addEventListener('DOMContentLoaded', () => {
+            const categoryButtons = document.querySelectorAll('.sticky button');
+            categoryButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Reset all
+                    categoryButtons.forEach(btn => {
+                        btn.className = 'snap-start shrink-0 min-h-[48px] px-6 rounded-full bg-surface-container text-on-surface font-label-lg text-label-lg border border-outline-variant/50 transition-colors';
+                    });
+                    // Set active
+                    this.className = 'snap-start shrink-0 min-h-[48px] px-6 rounded-full bg-primary text-on-primary font-label-lg text-label-lg shadow-sm transition-colors';
+                });
+            });
+        });
+    </script>
+</body></html>

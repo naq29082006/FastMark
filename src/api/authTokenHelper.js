@@ -17,7 +17,12 @@ export async function callWithAuthToken(apiCall) {
     throw error;
   }
 
-  let idToken = await getCurrentUserIdToken(true);
+  // Code cũ forceRefresh=true mọi lần → luôn gọi Google, dễ treo khi mạng kém.
+  // Lấy token cache trước; chỉ force khi server trả 401.
+  let idToken = await getCurrentUserIdToken(false);
+  if (!idToken) {
+    idToken = await getCurrentUserIdToken(true);
+  }
   if (!idToken) {
     const error = new Error('Bạn cần đăng nhập lại.');
     error.statusCode = 401;

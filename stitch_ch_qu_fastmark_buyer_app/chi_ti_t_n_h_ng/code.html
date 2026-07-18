@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chi tiết đơn hàng - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary-fixed": "#ffe083",
+                    "primary": "#006b2c",
+                    "on-tertiary-fixed": "#231b00",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed-variant": "#005320",
+                    "on-background": "#121c2a",
+                    "on-tertiary-fixed-variant": "#574500",
+                    "on-tertiary-container": "#4e3e00",
+                    "surface-tint": "#006e2d",
+                    "on-primary-container": "#f7fff2",
+                    "primary-fixed-dim": "#62df7d",
+                    "primary-fixed": "#7ffc97",
+                    "on-secondary-container": "#007432",
+                    "surface-variant": "#d9e3f6",
+                    "surface-bright": "#f8f9ff",
+                    "on-error-container": "#93000a",
+                    "on-secondary-fixed-variant": "#005321",
+                    "secondary-fixed-dim": "#4ae176",
+                    "secondary": "#006e2f",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed": "#002109",
+                    "on-surface": "#121c2a",
+                    "tertiary-fixed-dim": "#eec200",
+                    "outline-variant": "#bdcaba",
+                    "error-container": "#ffdad6",
+                    "surface": "#f8f9ff",
+                    "on-secondary": "#ffffff",
+                    "background": "#f8f9ff",
+                    "on-primary-fixed": "#002109",
+                    "on-surface-variant": "#3e4a3d",
+                    "inverse-surface": "#27313f",
+                    "primary-container": "#00873a",
+                    "outline": "#6e7b6c",
+                    "inverse-on-surface": "#eaf1ff",
+                    "on-error": "#ffffff",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-low": "#eff4ff",
+                    "surface-dim": "#d0dbed",
+                    "secondary-fixed": "#6bff8f",
+                    "tertiary": "#735c00",
+                    "surface-container-highest": "#d9e3f6",
+                    "on-primary": "#ffffff",
+                    "tertiary-container": "#cea700",
+                    "inverse-primary": "#62df7d",
+                    "surface-container": "#e6eeff",
+                    "surface-container-high": "#dee9fc",
+                    "secondary-container": "#6bff8f"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-gap-lg": "32px",
+                    "stack-gap-md": "16px",
+                    "gutter": "16px",
+                    "unit": "8px",
+                    "touch-target-min": "56px",
+                    "container-margin": "24px"
+            },
+            "fontFamily": {
+                    "price-display": [
+                            "Inter"
+                    ],
+                    "headline-lg-mobile": [
+                            "Inter"
+                    ],
+                    "label-md": [
+                            "Inter"
+                    ],
+                    "headline-lg": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ],
+                    "headline-md": [
+                            "Inter"
+                    ],
+                    "label-lg": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "price-display": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "36px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-md": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-lg": [
+                            "20px",
+                            {
+                                    "lineHeight": "30px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+        }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill-1 {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-lg text-body-lg min-h-screen pb-[80px]">
+<!-- TopAppBar (Modified for Detail View - Suppressed standard shell, using back button) -->
+<header class="sticky top-0 z-50 bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flat no shadows flex items-center w-full px-container-margin py-unit h-[64px]">
+<button aria-label="Quay lại" class="mr-4 text-on-surface dark:text-inverse-on-surface w-12 h-12 flex items-center justify-center rounded-full hover:bg-surface-variant dark:hover:bg-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[28px]" data-icon="arrow_back">arrow_back</span>
+</button>
+<div class="flex-1">
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed truncate">Chi tiết đơn hàng</h1>
+</div>
+</header>
+<main class="max-w-4xl mx-auto px-container-margin pt-stack-gap-md pb-stack-gap-lg">
+<!-- Order Header / Status -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 mb-stack-gap-lg">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-outline-variant pb-4 mb-4">
+<div>
+<h2 class="font-headline-md text-headline-md-mobile md:text-headline-md font-bold mb-1">Mã đơn: #DH-19842</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Ngày đặt: 15/10/2023 08:30</p>
+</div>
+<div class="flex items-center gap-2 bg-tertiary-fixed text-on-tertiary-fixed px-4 py-2 rounded-full">
+<span class="material-symbols-outlined icon-fill-1" data-icon="schedule">schedule</span>
+<span class="font-label-lg text-label-lg font-bold">Đang chờ lấy hàng</span>
+</div>
+</div>
+<!-- Timeline -->
+<div class="relative pt-4">
+<div class="absolute left-6 top-8 bottom-0 w-0.5 bg-outline-variant"></div>
+<div class="flex items-start gap-4 mb-6 relative z-10">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center shrink-0 border-4 border-surface-container-lowest text-on-primary">
+<span class="material-symbols-outlined" data-icon="check">check</span>
+</div>
+<div class="pt-2">
+<h3 class="font-label-lg text-label-lg font-bold">Đơn hàng đã đặt</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">15/10/2023 08:30</p>
+</div>
+</div>
+<div class="flex items-start gap-4 mb-6 relative z-10">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center shrink-0 border-4 border-surface-container-lowest text-on-primary">
+<span class="material-symbols-outlined" data-icon="storefront">storefront</span>
+</div>
+<div class="pt-2">
+<h3 class="font-label-lg text-label-lg font-bold">Người bán đã xác nhận</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">15/10/2023 09:15</p>
+</div>
+</div>
+<div class="flex items-start gap-4 relative z-10 opacity-50">
+<div class="w-12 h-12 rounded-full bg-surface-variant border-2 border-outline flex items-center justify-center shrink-0 text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="local_shipping">local_shipping</span>
+</div>
+<div class="pt-2">
+<h3 class="font-label-lg text-label-lg font-bold">Đang giao hàng</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Chờ cập nhật</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Vendor Info -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 mb-stack-gap-lg flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-16 h-16 rounded-full overflow-hidden shrink-0 border border-outline-variant">
+<img alt="Sạp Rau Cô Hoa" class="w-full h-full object-cover" data-alt="A close up shot of a friendly Vietnamese vegetable vendor, an elderly woman smiling warmly at the camera in a bustling traditional outdoor market setting. Soft natural daylight illuminates the scene, conveying a sense of familiarity, warmth, and organic freshness. Minimalist composition with high clarity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYKqy_f3IoAS9LESpLnlx87N5Oj8N9aZL6SRdSP_WTEICv5D2f7rpMDwdsc4-rdWEzKH2LbZgCQJJ5nE58_qgCqLtJvrnwpXK3_CEnpYbdyqE-cy1IUk95Gg8MzM_RnS1dn-jkwZaO4TcDuGTl3-PmW7VFDuoaEkV8IcPHEVMYHUKIgQ-tLiC7CjFWQ3ETy_TL-NhIvf1O7vwTQerB9tq9YHyAOeaVmr2sb7iQE-bFXFAR6CRntyK3k8Pko0yGCXi3csY44PyedxV7"/>
+</div>
+<div>
+<h2 class="font-label-lg text-label-lg font-bold">Sạp Rau Cô Hoa</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Chợ Trung Tâm, Quầy 12</p>
+</div>
+</div>
+<button class="h-touch-target-min px-6 rounded-full border-2 border-primary text-primary font-label-lg text-label-lg flex items-center gap-2 hover:bg-primary-container transition-colors shrink-0">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+<span class="hidden md:inline">Nhắn tin</span>
+</button>
+</section>
+<!-- Product List -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant mb-stack-gap-lg overflow-hidden">
+<div class="p-6 border-b border-outline-variant bg-surface-container-low">
+<h2 class="font-label-lg text-label-lg font-bold flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="shopping_basket">shopping_basket</span>
+                    Sản phẩm đã đặt
+                </h2>
+</div>
+<div class="divide-y divide-outline-variant">
+<!-- Item 1 -->
+<div class="p-6 flex items-center gap-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden shrink-0 border border-outline-variant bg-surface-variant">
+<img alt="Rau muống" class="w-full h-full object-cover" data-alt="A clean, bright top-down photo of fresh, vibrant green water spinach (Rau muống) bundled together on a rustic wooden table. High key lighting, emphasizing the freshness and organic nature of the produce. Minimalist background, high contrast, evoking a healthy country market feel." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkhdXQ3EfQrTi1J0q1wchvJ4tRPFBr3hHWj3B-XQqERDwRVqOKmzYaGb9MDc0Z5yw1itNY0i6rPHHOD4D-2ZuZSNbd19bSnwpCXBROt3P6MAiEzH_O7sy8s4Ntjlofx9JRIDd-kIaiXua1WELyB_9-Q0gDXtkOKQjkFnv3d0mugXSL8iMq6bwf9hzOd42NbZWl9lLmQMXMquPLiwGhxbSbSuqG2sR006wb3v-wp2ODqmgVY862ZdrYlevcfe1J7UjK1g_PDokZpV-z"/>
+</div>
+<div class="flex-1">
+<h3 class="font-label-lg text-label-lg font-bold mb-1">Rau muống đồng tươi</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-1">Số lượng: 2 bó</p>
+<p class="font-label-md text-label-md font-bold text-primary">15.000đ / bó</p>
+</div>
+<div class="text-right">
+<p class="font-price-display text-price-display text-[#DC2626]">30.000đ</p>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="p-6 flex items-center gap-4">
+<div class="w-20 h-20 rounded-lg overflow-hidden shrink-0 border border-outline-variant bg-surface-variant">
+<img alt="Cà chua" class="w-full h-full object-cover" data-alt="A high-quality studio shot of bright red, ripe tomatoes on a clean white background. The tomatoes are plump and slightly dewy, highlighting their freshness. Soft, even lighting creates a modern, minimalist aesthetic suitable for an app UI emphasizing organic food." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBr08gQfFGvPlNumF3wRoYfHQ6WawZFLtIfInxSHDGNncLIo6SDdCq-mBZuobolvYzy9qtP1VIx-FJvvG4-51E3PNuNEs9uDOowjTGTZSwTCIpuVrH4cHMoNCD6X2FOnjD3ldwUtY3b8KQX-bWmzMmkCeGCwdriahlJ49Zz4VU58sa4O9g75DoSFhyWg_AmBdI0bhKN7f7kyNj-gcsOryS1Ifcd_OCoCf0lsQekNyZY40k_8NIsbqjUU3ugLuqEjVCHm9IRYqjNQG3t"/>
+</div>
+<div class="flex-1">
+<h3 class="font-label-lg text-label-lg font-bold mb-1">Cà chua Đà Lạt</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-1">Số lượng: 1 kg</p>
+<p class="font-label-md text-label-md font-bold text-primary">35.000đ / kg</p>
+</div>
+<div class="text-right">
+<p class="font-price-display text-price-display text-[#DC2626]">35.000đ</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Payment & Total -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 mb-stack-gap-lg">
+<h2 class="font-label-lg text-label-lg font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+                Thông tin thanh toán
+            </h2>
+<div class="flex justify-between items-center mb-4 pb-4 border-b border-outline-variant">
+<span class="font-body-md text-body-md text-on-surface-variant">Phương thức:</span>
+<span class="font-label-lg text-label-lg font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="account_balance_wallet">account_balance_wallet</span>
+                    Ví điện tử
+                </span>
+</div>
+<div class="space-y-3 mb-6">
+<div class="flex justify-between">
+<span class="font-body-md text-body-md text-on-surface-variant">Tạm tính (2 sản phẩm)</span>
+<span class="font-body-md text-body-md">65.000đ</span>
+</div>
+<div class="flex justify-between">
+<span class="font-body-md text-body-md text-on-surface-variant">Phí giao hàng</span>
+<span class="font-body-md text-body-md">15.000đ</span>
+</div>
+</div>
+<div class="flex justify-between items-end border-t border-outline-variant pt-4">
+<span class="font-label-lg text-label-lg font-bold">Tổng cộng</span>
+<span class="font-price-display text-price-display text-[#DC2626]">80.000đ</span>
+</div>
+</section>
+<!-- Primary Action -->
+<div class="flex justify-center mt-stack-gap-lg">
+<button class="w-full md:w-auto min-w-[280px] h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-full flex items-center justify-center gap-2 hover:bg-surface-tint transition-colors shadow-lg active:scale-95">
+<span class="material-symbols-outlined" data-icon="qr_code_scanner">qr_code_scanner</span>
+                Xem mã QR nhận hàng
+            </button>
+</div>
+</main>
+</body></html>

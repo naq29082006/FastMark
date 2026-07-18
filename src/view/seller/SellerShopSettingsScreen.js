@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -16,7 +16,6 @@ import { getCurrentUserIdToken } from '../../repository/authRepository';
 import {
   getSellerShopSettingsOnBackend,
   updateSellerShopSettingsOnBackend,
-  checkSellerShopUsernameAvailabilityOnBackend,
 } from '../../api/sellerOpsApi';
 import { syncSellerAccess, applyShopSettingsToProfile } from '../../viewmodel/auth/authSlice';
 import { selectAuthProfile } from '../../viewmodel/auth/authSelectors';
@@ -24,32 +23,6 @@ import { reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
 import ProfileSubScreen from '../profile/ProfileSubScreen';
 import SellerLocationPickerScreen from './SellerLocationPickerScreen';
 import TimePickerField from '../shared/components/TimePickerField';
-
-const SHOP_USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
-
-function normalizeShopName(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ');
-}
-
-function normalizeShopUsername(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function getShopNameError(value) {
-  const normalized = normalizeShopName(value);
-  if (normalized.length < 2 || normalized.length > 80) {
-    return 'Tên gian hàng phải từ 2-80 ký tự.';
-  }
-  return '';
-}
-
-function getShopUsernameError(value) {
-  const normalized = normalizeShopUsername(value);
-  if (!SHOP_USERNAME_PATTERN.test(normalized)) {
-    return 'Username shop phải từ 3-30 ký tự, chỉ chữ thường, số và dấu gạch dưới.';
-  }
-  return '';
-}
 
 export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSaved }) {
   const dispatch = useDispatch();
@@ -59,12 +32,6 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
   const [isLocating, setIsLocating] = useState(false);
   const [isPickingLocation, setIsPickingLocation] = useState(false);
 
-  const [shopName, setShopName] = useState('');
-  const [shopUsername, setShopUsername] = useState('');
-  const [shopNameError, setShopNameError] = useState('');
-  const [shopUsernameError, setShopUsernameError] = useState('');
-  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
-  const usernameCheckRequestRef = useRef(0);
   const [address, setAddress] = useState('');
   const [systemAddress, setSystemAddress] = useState('');
   const [latitude, setLatitude] = useState(null);
@@ -73,16 +40,15 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
   const [openTime, setOpenTime] = useState('');
   const [closeTime, setCloseTime] = useState('');
   const [isOpen, setIsOpen] = useState(true);
+  const [allowReserve, setAllowReserve] = useState(true);
+  const [depositPercent, setDepositPercent] = useState(0);
+  const [pinHours, setPinHours] = useState(false);
 
   const loadSettings = useCallback(async () => {
     setIsLoading(true);
     try {
       const idToken = await getCurrentUserIdToken();
       const shop = await getSellerShopSettingsOnBackend(idToken);
-      setShopName(shop.shopName || '');
-      setShopUsername(shop.shopUsername || '');
-      setShopNameError('');
-      setShopUsernameError('');
       setAddress(shop.address || '');
       setSystemAddress(shop.systemAddress || '');
       setLatitude(Number.isFinite(Number(shop.latitude)) ? Number(shop.latitude) : null);
@@ -91,6 +57,9 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
       setOpenTime(shop.openTime || '');
       setCloseTime(shop.closeTime || '');
       setIsOpen(Number(shop.isOpen) === 1);
+      setAllowReserve(shop.allowReserve !== false);
+      setDepositPercent(Math.max(0, Math.min(100, Number(shop.depositPercent) || 0)));
+      setPinHours(Boolean(shop.pinHours));
       dispatch(applyShopSettingsToProfile(shop));
     } catch (loadError) {
       Alert.alert('Lỗi', loadError.message || 'Không tải được cài đặt cửa hàng.');
@@ -136,76 +105,7 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
     setIsPickingLocation(false);
   }
 
-  function handleShopNameBlur() {
-    const normalized = normalizeShopName(shopName);
-    setShopName(normalized);
-    setShopNameError(getShopNameError(normalized));
-  }
-
-  async function handleShopUsernameBlur() {
-    const normalized = normalizeShopUsername(shopUsername);
-    setShopUsername(normalized);
-
-    const formatError = getShopUsernameError(normalized);
-    if (formatError) {
-      setShopUsernameError(formatError);
-      return;
-    }
-
-    const requestId = usernameCheckRequestRef.current + 1;
-    usernameCheckRequestRef.current = requestId;
-    setIsCheckingUsername(true);
-    setShopUsernameError('');
-
-    try {
-      const idToken = await getCurrentUserIdToken();
-      const result = await checkSellerShopUsernameAvailabilityOnBackend({
-        idToken,
-        shopUsername: normalized,
-      });
-
-      if (usernameCheckRequestRef.current !== requestId) {
-        return;
-      }
-
-      if (!result?.available) {
-        setShopUsernameError(result?.message || 'Username shop đã được sử dụng.');
-      } else {
-        setShopUsernameError('');
-      }
-    } catch (checkError) {
-      if (usernameCheckRequestRef.current !== requestId) {
-        return;
-      }
-      setShopUsernameError(checkError.message || 'Không kiểm tra được username shop.');
-    } finally {
-      if (usernameCheckRequestRef.current === requestId) {
-        setIsCheckingUsername(false);
-      }
-    }
-  }
-
   async function handleSave() {
-    const nextShopNameError = getShopNameError(shopName);
-    const formatUsernameError = getShopUsernameError(shopUsername);
-    setShopNameError(nextShopNameError);
-
-    if (nextShopNameError || formatUsernameError) {
-      setShopUsernameError(formatUsernameError);
-      Alert.alert('Lỗi', 'Vui lòng kiểm tra lại tên gian hàng và username shop.');
-      return;
-    }
-
-    if (isCheckingUsername) {
-      Alert.alert('Lỗi', 'Đang kiểm tra username shop, vui lòng đợi giây lát.');
-      return;
-    }
-
-    if (shopUsernameError) {
-      Alert.alert('Lỗi', shopUsernameError);
-      return;
-    }
-
     if (!address.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ cửa hàng.');
       return;
@@ -219,43 +119,28 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
     setIsSaving(true);
     try {
       const idToken = await getCurrentUserIdToken();
-      const availability = await checkSellerShopUsernameAvailabilityOnBackend({
-        idToken,
-        shopUsername: normalizeShopUsername(shopUsername),
-      });
-
-      if (!availability?.available) {
-        const message = availability?.message || 'Username shop đã được sử dụng.';
-        setShopUsernameError(message);
-        Alert.alert('Lỗi', message);
-        return;
-      }
-
-      const updatedShop = await updateSellerShopSettingsOnBackend({
+      const updated = await updateSellerShopSettingsOnBackend({
         idToken,
         payload: {
-          shopName: normalizeShopName(shopName),
-          shopUsername: normalizeShopUsername(shopUsername),
+          description: description.trim(),
           address: address.trim(),
           systemAddress: systemAddress.trim(),
           latitude,
           longitude,
-          description: description.trim(),
           openTime,
           closeTime,
           isOpen: isOpen ? 1 : 0,
+          allowReserve,
+          depositPercent: Math.max(0, Math.min(100, Number(depositPercent) || 0)),
+          pinHours,
         },
       });
-      dispatch(applyShopSettingsToProfile(updatedShop));
+      dispatch(applyShopSettingsToProfile(updated));
       await dispatch(syncSellerAccess());
-      onSaved?.(updatedShop);
-      Alert.alert('Thành công', 'Đã lưu cài đặt cửa hàng.');
+      onSaved?.(updated);
+      Alert.alert('Thành công', 'Đã lưu cài đặt gian hàng.');
     } catch (saveError) {
-      const message = saveError.message || 'Không lưu được cài đặt.';
-      if (/username shop|tên shop/i.test(message)) {
-        setShopUsernameError(message);
-      }
-      Alert.alert('Lỗi', message);
+      Alert.alert('Lỗi', saveError.message || 'Không lưu được cài đặt.');
     } finally {
       setIsSaving(false);
     }
@@ -280,7 +165,7 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
       <View style={styles.screenWrap}>
         <ProfileSubScreen title="Cài đặt cửa hàng" onBack={onBack}>
           <View style={styles.centered}>
-            <ActivityIndicator color="#0d7377" size="large" />
+            <ActivityIndicator color="#076F32" size="large" />
           </View>
         </ProfileSubScreen>
       </View>
@@ -295,38 +180,13 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
       <ProfileSubScreen title="Cài đặt cửa hàng" onBack={onBack}>
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Thông tin gian hàng</Text>
-          <Field
-            label="Tên gian hàng"
-            value={shopName}
-            onChangeText={(value) => {
-              setShopName(value);
-              if (shopNameError) {
-                setShopNameError('');
-              }
-            }}
-            onFocus={() => setShopNameError('')}
-            onBlur={handleShopNameBlur}
-            placeholder="vd: Nông sản Vy, Bánh mì Huỳnh Hoa..."
-            error={shopNameError}
-            hint="Tên hiển thị công khai của gian hàng (2-80 ký tự)."
-          />
-          <Field
-            label="Username shop"
-            value={shopUsername}
-            onChangeText={(value) => {
-              setShopUsername(value.toLowerCase());
-              if (shopUsernameError) {
-                setShopUsernameError('');
-              }
-            }}
-            onFocus={() => setShopUsernameError('')}
-            onBlur={handleShopUsernameBlur}
-            placeholder="vd: shop_rau_sach"
-            autoCapitalize="none"
-            autoCorrect={false}
-            error={shopUsernameError}
-            hint="Chỉ dùng chữ thường, số và dấu gạch dưới (3-30 ký tự)."
-          />
+          <Text style={styles.hintText}>Tên & username lấy từ tài khoản</Text>
+          <Text style={styles.readOnlyValue}>
+            {profile?.fullName || 'Chưa có họ tên'} · @{profile?.userName || '—'}
+          </Text>
+          <Text style={[styles.hintText, { marginBottom: 12 }]}>
+            Đổi họ tên / username ở tab Tài khoản. Shop chỉ quản lý bio, giờ mở cửa và địa chỉ.
+          </Text>
         </View>
 
       <View style={styles.card}>
@@ -384,7 +244,7 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
               ]}
             >
               {isLocating ? (
-                <ActivityIndicator color="#0d7377" />
+                <ActivityIndicator color="#076F32" />
               ) : (
                 <Text style={styles.locationButtonText}>Vị trí hiện tại</Text>
               )}
@@ -429,9 +289,60 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
             value={isOpen}
             onValueChange={setIsOpen}
             trackColor={{ false: '#cbd5e1', true: '#7dd3c7' }}
-            thumbColor={isOpen ? '#0d7377' : '#f8fafc'}
+            thumbColor={isOpen ? '#076F32' : '#f8fafc'}
           />
         </View>
+        <View style={styles.switchRow}>
+          <View style={styles.switchInfo}>
+            <Text style={styles.switchLabel}>Ghim giờ mở/đóng cửa</Text>
+            <Text style={styles.switchHint}>
+              Hiện khung giờ trên trang shop công khai (khi có gói active)
+            </Text>
+          </View>
+          <Switch
+            value={pinHours}
+            onValueChange={setPinHours}
+            trackColor={{ false: '#cbd5e1', true: '#7dd3c7' }}
+            thumbColor={pinHours ? '#076F32' : '#f8fafc'}
+          />
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Giữ hàng & đặt cọc</Text>
+        <View style={styles.switchRow}>
+          <View style={styles.switchInfo}>
+            <Text style={styles.switchLabel}>Cho phép giữ hàng</Text>
+            <Text style={styles.switchHint}>Buyer có thể gửi yêu cầu giữ sản phẩm</Text>
+          </View>
+          <Switch
+            value={allowReserve}
+            onValueChange={setAllowReserve}
+            trackColor={{ false: '#cbd5e1', true: '#7dd3c7' }}
+            thumbColor={allowReserve ? '#076F32' : '#f8fafc'}
+          />
+        </View>
+        {allowReserve ? (
+          <>
+            <Text style={styles.label}>Phần trăm đặt cọc (0 = không cọc)</Text>
+            <View style={styles.depositChipRow}>
+              {[0, 10, 30, 50].map((pct) => {
+                const active = depositPercent === pct;
+                return (
+                  <Pressable
+                    key={pct}
+                    onPress={() => setDepositPercent(pct)}
+                    style={[styles.depositChip, active && styles.depositChipActive]}
+                  >
+                    <Text style={[styles.depositChipText, active && styles.depositChipTextActive]}>
+                      {pct}%
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
       </View>
 
       <Pressable
@@ -497,17 +408,17 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a', marginBottom: 8 },
   readOnlyValue: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
   hintText: { fontSize: 13, color: '#64748b', lineHeight: 20, marginTop: 6 },
-  verifiedText: { color: '#047857', fontWeight: '700', fontSize: 13, marginTop: 6 },
+  verifiedText: { color: '#076F32', fontWeight: '700', fontSize: 13, marginTop: 6 },
   unverifiedText: { color: '#b45309', fontWeight: '700', fontSize: 13, marginTop: 6 },
   secondaryButton: {
     marginTop: 12,
     minHeight: 42,
     borderRadius: 10,
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryButtonText: { color: '#0d7377', fontWeight: '800' },
+  secondaryButtonText: { color: '#076F32', fontWeight: '800' },
   field: { marginBottom: 12 },
   label: { fontSize: 13, fontWeight: '700', color: '#475569', marginBottom: 6 },
   input: {
@@ -553,13 +464,13 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 42,
     borderRadius: 10,
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#b7dfd8',
   },
-  locationButtonText: { color: '#0d7377', fontWeight: '800', fontSize: 13 },
+  locationButtonText: { color: '#076F32', fontWeight: '800', fontSize: 13 },
   switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -569,10 +480,38 @@ const styles = StyleSheet.create({
   switchInfo: { flex: 1, paddingRight: 12 },
   switchLabel: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
   switchHint: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  depositChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  depositChip: {
+    minWidth: 64,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  depositChipActive: {
+    borderColor: '#076F32',
+    backgroundColor: '#E6F4EC',
+  },
+  depositChipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  depositChipTextActive: {
+    color: '#076F32',
+  },
   saveButton: {
     minHeight: 50,
     borderRadius: 14,
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,

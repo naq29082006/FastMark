@@ -7,6 +7,10 @@ const ProductVariant = require("../models/ProductVariant");
 const Review = require("../models/Review");
 const { USER_ROLE } = require("../constants/sellerVerification");
 const { PRODUCT_STATUS } = require("../constants/productStatus");
+const {
+  isSubscriptionActive,
+  activeSubscriptionFilter,
+} = require("../constants/sellerSubscription");
 
 const EARTH_RADIUS_METERS = 6371000;
 const MAX_SEARCH_RADIUS_METERS = 10000;
@@ -208,6 +212,10 @@ function pickShopText(shop, ...keys) {
   return "";
 }
 
+function pickString(value) {
+  return String(value || "").trim();
+}
+
 function resolveShopCategory(categoryMap, categoryId) {
   const entry = categoryMap.get(String(categoryId));
   if (!entry) {
@@ -230,11 +238,13 @@ function toPublicStore(
   followCount = 0,
   totalLikes = 0
 ) {
+  // Một identity: tên / @ lấy từ User (buyer), shop chỉ là storefront.
+  const ownerName = pickString(user?.FullName) || pickString(user?.UserName) || "";
+  const ownerUsername = pickString(user?.UserName) || "";
   const shopDisplayName =
+    ownerName ||
     shop.shopName ||
     (shop.shopUsername ? `@${shop.shopUsername}` : "") ||
-    user?.FullName ||
-    user?.UserName ||
     "Gian hàng Fastmark";
 
   const systemAddress = pickShopText(
@@ -246,15 +256,21 @@ function toPublicStore(
   );
   const openTime = pickShopText(shop, "openTime", "open_time");
   const closeTime = pickShopText(shop, "closeTime", "close_time");
-  const shopUsername = pickShopText(shop, "shopUsername", "shop_username");
+  const shopUsername = ownerUsername || pickShopText(shop, "shopUsername", "shop_username");
+  const pinHours = Boolean(shop.pinHours);
+  const showHours = pinHours;
+  const ownerFollowers =
+    Number(user?.FollowersCount) || Number(followCount) || Number(shop.followersCount) || 0;
 
   return {
     id: String(shop._id),
     name: shopDisplayName,
-    shop_name: shop.shopName || shopDisplayName,
-    shopName: shop.shopName || shopDisplayName,
+    shop_name: shopDisplayName,
+    shopName: shopDisplayName,
     shop_username: shopUsername,
     shopUsername,
+    fullName: ownerName || shopDisplayName,
+    userName: shopUsername,
     categoryId: shop.categoryId ? String(shop.categoryId) : "",
     categoryName,
     type: "shop",
@@ -266,15 +282,16 @@ function toPublicStore(
     phone: pickShopText(shop, "phone") || user?.Phone || "",
     zalo: pickShopText(shop, "phone") || user?.Phone || "",
     intro: pickShopText(shop, "description") || "",
-    open_time: openTime,
-    openTime,
-    close_time: closeTime,
-    closeTime,
+    open_time: showHours ? openTime : "",
+    openTime: showHours ? openTime : "",
+    close_time: showHours ? closeTime : "",
+    closeTime: showHours ? closeTime : "",
+    pinHours,
     is_open: Number(shop.isOpen) === 1,
     isOpen: Number(shop.isOpen) === 1 ? 1 : 0,
     rating_avg: Number(shop.averageRating) || 0,
     review_count: Number(shop.totalReviews) || 0,
-    follow_count: Number(followCount) || Number(shop.followersCount) || 0,
+    follow_count: ownerFollowers,
     product_count: Number(shop.totalProducts) || Number(productCount) || 0,
     total_products: Number(shop.totalProducts) || Number(productCount) || 0,
     sold_count: Number(shop.soldCount) || 0,
@@ -286,6 +303,9 @@ function toPublicStore(
     cover_image_url: shop?.avatar || "",
     distance_meters: Math.round(distanceMeters),
     is_registered_shop: true,
+    allowReserve: shop.allowReserve !== false,
+    depositPercent: Math.max(0, Math.min(100, Number(shop.depositPercent) || 0)),
+    subscriptionActive: true,
   };
 }
 
@@ -305,6 +325,7 @@ async function listNearbyShops({ latitude, longitude, radiusMeters = 2000, limit
     latitude: { $ne: null },
     longitude: { $ne: null },
     status: { $ne: 0 },
+    ...activeSubscriptionFilter(),
   }).lean();
 
   const sellerIds = shops
@@ -400,6 +421,7 @@ async function searchShops({
     latitude: { $ne: null },
     longitude: { $ne: null },
     status: { $ne: 0 },
+    ...activeSubscriptionFilter(),
   }).lean();
 
   const sellerIds = shops
@@ -531,7 +553,7 @@ async function searchShops({
 
 async function getPublicShopById(shopId, { latitude, longitude } = {}) {
   const shop = await ShopProfile.findById(shopId).lean();
-  if (!shop) {
+  if (!shop || !isSubscriptionActive(shop)) {
     const error = new Error("Không tìm thấy gian hàng.");
     error.statusCode = 404;
     throw error;
@@ -588,7 +610,7 @@ async function getPublicShopById(shopId, { latitude, longitude } = {}) {
 
 async function listPublicProductsByShopId(shopId) {
   const shop = await ShopProfile.findById(shopId).lean();
-  if (!shop) {
+  if (!shop || !isSubscriptionActive(shop)) {
     const error = new Error("Không tìm thấy gian hàng.");
     error.statusCode = 404;
     throw error;
@@ -667,6 +689,7 @@ async function discoverProducts({
     latitude: { $ne: null },
     longitude: { $ne: null },
     status: { $ne: 0 },
+    ...activeSubscriptionFilter(),
   }).lean();
 
   const sellerIds = shops

@@ -5,7 +5,6 @@ const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
 const ShopFollow = require("../models/ShopFollow");
 const { MESSAGE_TYPE } = require("../constants/messageType");
-const { parseOfferMessageContent } = require("../utils/offerMessageFormat");
 const { MESSAGE_READ, MESSAGE_STATUS } = require("../constants/messageStatus");
 const { SENDER_TYPE } = require("../constants/messageSender");
 const { getShopForSeller } = require("./shopSettingsService");
@@ -228,6 +227,27 @@ async function loadMessageImages(messageIds) {
   }, new Map());
 }
 
+function formatLegacyOfferContent(content) {
+  const raw = String(content || "").trim();
+  if (!raw) {
+    return "";
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      if (parsed.text) {
+        return String(parsed.text);
+      }
+      if (parsed.offeredPrice != null) {
+        return `Đề nghị giá: ${Number(parsed.offeredPrice).toLocaleString("vi-VN")}đ`;
+      }
+    }
+  } catch {
+    // Keep plain text / historical content as-is.
+  }
+  return raw;
+}
+
 function mapMessageToBroadcast(message, images = []) {
   const isDeleted = Boolean(message.DeletedAt);
   const isImage = Number(message.messageType) === MESSAGE_TYPE.IMAGE;
@@ -236,7 +256,7 @@ function mapMessageToBroadcast(message, images = []) {
   const textContent = isImage
     ? ""
     : isOffer
-      ? parseOfferMessageContent(message.content)
+      ? formatLegacyOfferContent(message.content)
       : message.content || "";
 
   if (isDeleted) {
@@ -285,7 +305,7 @@ function mapMessageToClient(message, viewer, images = []) {
   const textContent = isImage
     ? ""
     : isOffer
-      ? parseOfferMessageContent(message.content)
+      ? formatLegacyOfferContent(message.content)
       : message.content || "";
 
   if (isDeleted) {
@@ -414,21 +434,12 @@ function resolveMessagePayload(payload = {}) {
   if (messageType === MESSAGE_TYPE.OFFER) {
     const content = pickString(payload.content || payload.message);
     if (!content) {
-      throw createServiceError("Thiếu nội dung đề nghị giá.");
-    }
-    let preview = "Đề nghị deal giá";
-    try {
-      const parsed = JSON.parse(content);
-      if (parsed.offeredPrice) {
-        preview = `Deal: ${Number(parsed.offeredPrice).toLocaleString("vi-VN")}đ`;
-      }
-    } catch {
-      preview = content.slice(0, 80);
+      throw createServiceError("Thiếu nội dung tin nhắn.");
     }
     return {
-      messageType: MESSAGE_TYPE.OFFER,
+      messageType: MESSAGE_TYPE.TEXT,
       content,
-      preview,
+      preview: content.slice(0, 80),
     };
   }
   if (messageType === MESSAGE_TYPE.IMAGE) {

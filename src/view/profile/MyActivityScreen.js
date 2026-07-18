@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tabTextActive: {
-    color: '#0f766e',
+    color: '#076F32',
     fontWeight: '900',
   },
 });

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Khám phá - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed": "#002109",
+                        "on-surface-variant": "#3e4a3d",
+                        "inverse-surface": "#27313f",
+                        "on-error": "#ffffff",
+                        "primary-container": "#00873a",
+                        "outline": "#6e7b6c",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-dim": "#d0dbed",
+                        "secondary-fixed": "#6bff8f",
+                        "tertiary": "#735c00",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "surface-container-highest": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "inverse-primary": "#62df7d",
+                        "surface-container": "#e6eeff",
+                        "surface-container-high": "#dee9fc",
+                        "secondary-container": "#6bff8f",
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "on-tertiary-fixed": "#231b00",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-tertiary-container": "#4e3e00",
+                        "surface-tint": "#006e2d",
+                        "on-primary-container": "#f7fff2",
+                        "on-background": "#121c2a",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "primary-fixed": "#7ffc97",
+                        "on-secondary-container": "#007432",
+                        "primary-fixed-dim": "#62df7d",
+                        "surface-variant": "#d9e3f6",
+                        "surface-bright": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "secondary": "#006e2f",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#002109",
+                        "on-secondary-fixed-variant": "#005321",
+                        "secondary-fixed-dim": "#4ae176",
+                        "outline-variant": "#bdcaba",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#121c2a",
+                        "tertiary-fixed-dim": "#eec200"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "stack-gap-lg": "32px",
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .filled-icon { font-variation-settings: 'FILL' 1; }
+        /* Map background simulation */
+        .map-bg {
+            background-color: #e5e3df; /* Typical map base color */
+            background-image: 
+                linear-gradient(45deg, #f2efe9 25%, transparent 25%, transparent 75%, #f2efe9 75%, #f2efe9),
+                linear-gradient(45deg, #f2efe9 25%, transparent 25%, transparent 75%, #f2efe9 75%, #f2efe9);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background font-body-lg text-on-background m-0 p-0 overflow-hidden h-screen w-full relative">
+<!-- Map Layer -->
+<div class="absolute inset-0 w-full h-full bg-cover bg-center map-bg" data-location="Vietnam local market" style="">
+<!-- Mock Map Markers -->
+<!-- Store Marker (Green) -->
+<button class="absolute top-[30%] left-[25%] w-[48px] h-[48px] bg-primary text-on-primary rounded-full flex items-center justify-center shadow-lg border-2 border-surface-container-lowest transition-transform hover:scale-110 z-0">
+<span class="material-symbols-outlined filled-icon">storefront</span>
+</button>
+<!-- Food Marker (Orange/Reddish based on palette) -->
+<button class="absolute top-[45%] left-[60%] w-[56px] h-[56px] bg-error text-on-error rounded-full flex items-center justify-center shadow-lg border-2 border-surface-container-lowest scale-110 z-10">
+<span class="material-symbols-outlined filled-icon">restaurant</span>
+</button>
+<!-- Another Store Marker -->
+<button class="absolute top-[65%] left-[30%] w-[48px] h-[48px] bg-primary text-on-primary rounded-full flex items-center justify-center shadow-lg border-2 border-surface-container-lowest transition-transform hover:scale-110 z-0">
+<span class="material-symbols-outlined filled-icon">local_mall</span>
+</button>
+</div>
+<!-- Floating Top Bar (Search & Filter) -->
+<div class="absolute top-0 left-0 w-full px-container-margin py-unit mt-4 z-20 flex gap-gutter">
+<div class="flex-1 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant flex items-center h-touch-target-min px-4">
+<span class="material-symbols-outlined text-on-surface-variant mr-3">search</span>
+<input class="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none font-body-lg text-body-lg text-on-surface placeholder:text-on-surface-variant w-full h-full" placeholder="Tìm kiếm món ngon, cửa hàng..." type="text"/>
+</div>
+<button class="w-touch-target-min h-touch-target-min shrink-0 bg-surface-container-lowest rounded-xl shadow-lg border border-outline-variant flex items-center justify-center text-on-surface hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined">tune</span>
+</button>
+</div>
+<!-- Map Controls -->
+<button class="absolute right-container-margin bottom-[260px] w-touch-target-min h-touch-target-min bg-surface-container-lowest rounded-full shadow-lg border border-outline-variant flex items-center justify-center text-primary hover:bg-surface-variant transition-colors z-20">
+<span class="material-symbols-outlined filled-icon">my_location</span>
+</button>
+<!-- Bottom Sheet / Info Popup -->
+<div class="absolute bottom-[90px] left-0 w-full px-container-margin z-30 pb-4">
+<div class="bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant overflow-hidden flex flex-col p-4 gap-4 animate-[slideUp_0.3s_ease-out]">
+<div class="flex gap-4">
+<div class="w-24 h-24 rounded-xl bg-surface-container overflow-hidden shrink-0">
+<img class="w-full h-full object-cover" data-alt="A close up photo of a steaming bowl of traditional Vietnamese Pho, rich broth, fresh green herbs, beef slices, presented in a rustic ceramic bowl on a wooden table, warm inviting lighting, high quality, appetizing." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD06xf_IlN6AuXqe51ucwK4hwmkww7GDnlXmEQE4atH2W3O3xjX5M4-cg0bh2I-mlZoiDuHwkPItuAHyOtjhma9B3ue3wNApTigXlaU_YZHtubuGzJ0Zzvxjs6D-18YWNvtsG5ExpPp79HTRmrDN7vIXup018daPKGImWwxljc0YEhr3DWCfy8-nup7DQHrJrEPYFvnia6-g_J3Jy7O72kKVk383Bs2dX8olYfp_IlElHTzHjH7RR_vzDty7GDp-1bl_CL5HpHbC4b_"/>
+</div>
+<div class="flex-1 flex flex-col justify-center">
+<div class="flex justify-between items-start gap-2">
+<h3 class="font-headline-md text-label-lg text-on-surface line-clamp-2">Quán Phở Bác Nam - Hương vị Gia truyền</h3>
+</div>
+<p class="font-body-md text-label-md text-on-surface-variant mt-1 line-clamp-1">Món nước, Bữa sáng</p>
+<div class="flex items-center justify-between mt-auto pt-2">
+<div class="flex items-center gap-1 text-primary font-label-md text-label-md">
+<span class="material-symbols-outlined text-[18px]">location_on</span> 350m
+                        </div>
+<span class="bg-primary-container text-on-primary-container font-label-md text-label-md px-2 py-1 rounded-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] filled-icon">star</span> 4.9
+                        </span>
+</div>
+</div>
+</div>
+<!-- Action Button -->
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-lg font-headline-md text-label-lg flex items-center justify-center gap-2 hover:bg-surface-tint transition-colors">
+                Xem chi tiết
+                <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- BottomNavBar (Generated from JSON) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-surface px-2 pb-2 pt-2 border-t border-outline-variant shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+<!-- Item 0: Trang chủ -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-variant rounded-full transition-colors min-w-[64px]">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-lg text-[12px] leading-tight font-medium">Trang chủ</span>
+</button>
+<!-- Item 1: Khám phá (ACTIVE) -->
+<button class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-6 py-2 scale-100 transition-transform duration-150 shadow-sm min-w-[64px]">
+<span class="material-symbols-outlined filled-icon mb-1">explore</span>
+<span class="font-label-lg text-[12px] leading-tight font-bold">Khám phá</span>
+</button>
+<!-- Item 2: Đơn hàng -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-variant rounded-full transition-colors min-w-[64px]">
+<span class="material-symbols-outlined mb-1">receipt_long</span>
+<span class="font-label-lg text-[12px] leading-tight font-medium">Đơn hàng</span>
+</button>
+<!-- Item 3: Tin nhắn -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-variant rounded-full transition-colors min-w-[64px]">
+<span class="material-symbols-outlined mb-1">chat</span>
+<span class="font-label-lg text-[12px] leading-tight font-medium">Tin nhắn</span>
+</button>
+<!-- Item 4: Tài khoản -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-variant rounded-full transition-colors min-w-[64px]">
+<span class="material-symbols-outlined mb-1">person</span>
+<span class="font-label-lg text-[12px] leading-tight font-medium">Tài khoản</span>
+</button>
+</nav>
+<style>
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</body></html>

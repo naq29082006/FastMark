@@ -133,7 +133,7 @@ export default function MyReviewsScreen({ refreshKey = 0 }) {
   if (isLoading) {
     return (
       <View style={styles.loaderWrap}>
-        <ActivityIndicator color="#0f766e" />
+        <ActivityIndicator color="#076F32" />
       </View>
     );
   }
@@ -283,10 +283,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
   },
   editButtonText: {
-    color: '#0f766e',
+    color: '#076F32',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   modalSaveText: {
     color: '#ffffff',

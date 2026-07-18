@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Xác thực thành công - Chợ Quê FastMark</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "on-tertiary-fixed": "#231b00",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-tertiary-container": "#4e3e00",
+                        "surface-tint": "#006e2d",
+                        "on-primary-container": "#f7fff2",
+                        "primary-fixed-dim": "#62df7d",
+                        "primary-fixed": "#7ffc97",
+                        "on-secondary-container": "#007432",
+                        "surface-variant": "#d9e3f6",
+                        "surface-bright": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#005321",
+                        "secondary-fixed-dim": "#4ae176",
+                        "secondary": "#006e2f",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#002109",
+                        "on-surface": "#121c2a",
+                        "tertiary-fixed-dim": "#eec200",
+                        "outline-variant": "#bdcaba",
+                        "error-container": "#ffdad6",
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed": "#002109",
+                        "on-surface-variant": "#3e4a3d",
+                        "inverse-surface": "#27313f",
+                        "primary-container": "#00873a",
+                        "outline": "#6e7b6c",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-error": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "surface-dim": "#d0dbed",
+                        "secondary-fixed": "#6bff8f",
+                        "tertiary": "#735c00",
+                        "surface-container-highest": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "inverse-primary": "#62df7d",
+                        "surface-container": "#e6eeff",
+                        "surface-container-high": "#dee9fc",
+                        "secondary-container": "#6bff8f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "container-margin": "24px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "stack-gap-lg": "32px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes floatUp {
+            0% { transform: translateY(20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        .animate-pop-in {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .animate-float-up {
+            opacity: 0;
+            animation: floatUp 0.6s ease-out forwards;
+            animation-delay: 0.2s;
+        }
+        
+        .animate-float-up-delayed {
+            opacity: 0;
+            animation: floatUp 0.6s ease-out forwards;
+            animation-delay: 0.4s;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-sans selection:bg-primary-container selection:text-on-primary-container">
+<!-- 
+      Transactional Screen Logic:
+      The navigation shell (TopAppBar, BottomNavBar) is explicitly suppressed here 
+      because this is a linear "Success/Confirmation" splash screen. 
+      The user must focus solely on the outcome and the single primary call to action.
+    -->
+<main class="flex-1 flex flex-col items-center justify-center px-container-margin py-stack-gap-lg relative overflow-hidden">
+<!-- Subtle decorative background element for depth -->
+<div class="absolute inset-0 z-0 flex items-center justify-center opacity-30 pointer-events-none">
+<div class="w-96 h-96 bg-primary-fixed-dim rounded-full blur-3xl mix-blend-multiply"></div>
+</div>
+<div class="z-10 flex flex-col items-center w-full max-w-md">
+<!-- Success Icon/Illustration Area -->
+<div class="mb-stack-gap-lg animate-pop-in relative">
+<div class="w-32 h-32 md:w-40 md:h-40 bg-surface-container-low rounded-full flex items-center justify-center relative shadow-sm border border-outline-variant/30">
+<!-- Concentric circles for a "ripple" success effect -->
+<div class="absolute inset-0 bg-primary-container rounded-full opacity-20 scale-110"></div>
+<div class="absolute inset-0 bg-primary-container rounded-full opacity-10 scale-125"></div>
+<span class="material-symbols-outlined text-primary text-[72px] md:text-[88px]" style="font-variation-settings: 'FILL' 1;">
+                        check_circle
+                    </span>
+</div>
+</div>
+<!-- Typography & Messaging -->
+<div class="text-center animate-float-up w-full">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary mb-stack-gap-md tracking-tight">
+                    Xác thực thành công!
+                </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-12">
+                    Chúc mừng bạn đã hoàn tất quá trình xác thực. Cửa hàng của bạn đã sẵn sàng. Hãy chọn gói đăng ký phù hợp để bắt đầu đăng bán sản phẩm ngay hôm nay.
+                </p>
+</div>
+<!-- Primary Call to Action -->
+<div class="w-full animate-float-up-delayed">
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-xl flex items-center justify-center gap-unit transition-all duration-200 active:scale-[0.98] active:bg-surface-tint shadow-sm hover:shadow-md group">
+<span class="font-headline-md text-headline-md">Xem các gói đăng ký</span>
+<span class="material-symbols-outlined transition-transform duration-200 group-hover:translate-x-1">
+                        arrow_forward
+                    </span>
+</button>
+</div>
+</div>
+</main>
+</body></html>

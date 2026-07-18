@@ -85,7 +85,7 @@ export default function TimePickerField({
       >
         <Text style={styles.timeValue}>{displayValue}</Text>
         <View style={styles.timeButtonIconWrap}>
-          <Ionicons name="time-outline" size={20} color="#0d7377" />
+          <Ionicons name="time-outline" size={20} color="#076F32" />
         </View>
       </Pressable>
 
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   modalActionPrimary: {
-    color: '#0d7377',
+    color: '#076F32',
   },
   iosPicker: {
     alignSelf: 'center',

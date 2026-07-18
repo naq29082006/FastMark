@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   topBarTitle: {
     flex: 1,
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   segmentTextActive: {
-    color: '#0f766e',
+    color: '#076F32',
     fontWeight: '900',
   },
   body: {
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     borderWidth: 1,
     borderColor: '#b7dfd8',
   },
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   changePhoneButtonText: {
-    color: '#0d7377',
+    color: '#076F32',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -688,7 +688,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f766e',
+    backgroundColor: '#076F32',
   },
   actionButtonPressed: {
     opacity: 0.82,
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
   },
   successText: {
     marginTop: 14,
-    color: '#047857',
+    color: '#076F32',
     fontSize: 13,
     fontWeight: '700',
   },

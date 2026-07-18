@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   orderCode: {
-    color: '#0f766e',
+    color: '#076F32',
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.3,
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   thumbFallback: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0d7377',
+    backgroundColor: '#076F32',
   },
   thumbFallbackText: {
     color: '#ffffff',

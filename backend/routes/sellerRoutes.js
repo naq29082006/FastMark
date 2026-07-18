@@ -95,25 +95,11 @@ router.post(
   requireSeller,
   asyncHandler(sellerOpsController.completeReservation)
 );
-
-router.get("/deals", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.listDeals));
 router.post(
-  "/deals/:id/accept",
+  "/reservations/scan-complete",
   verifyFirebaseToken,
   requireSeller,
-  asyncHandler(sellerOpsController.acceptDeal)
-);
-router.post(
-  "/deals/:id/reject",
-  verifyFirebaseToken,
-  requireSeller,
-  asyncHandler(sellerOpsController.rejectDeal)
-);
-router.post(
-  "/deals/:id/counter",
-  verifyFirebaseToken,
-  requireSeller,
-  asyncHandler(sellerOpsController.counterDeal)
+  asyncHandler(sellerOpsController.completeReservationByScan)
 );
 
 router.get(
@@ -148,5 +134,35 @@ router.get(
 );
 
 router.get("/stats", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.getStats));
+
+const sellerSubscriptionController = require("../controllers/sellerSubscriptionController");
+router.get(
+  "/subscription",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerSubscriptionController.getSubscription)
+);
+router.post(
+  "/subscription/purchase",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerSubscriptionController.purchaseSubscription)
+);
+
+const voucherController = require("../controllers/voucherController");
+router.get("/vouchers", verifyFirebaseToken, requireSeller, asyncHandler(voucherController.listSellerVouchers));
+router.post("/vouchers", verifyFirebaseToken, requireSeller, asyncHandler(voucherController.createSellerVoucher));
+router.put(
+  "/vouchers/:id",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(voucherController.updateSellerVoucher)
+);
+router.delete(
+  "/vouchers/:id",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(voucherController.deleteSellerVoucher)
+);
 
 module.exports = router;

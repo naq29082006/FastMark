@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FastMark Admin - Referral Analytics</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-fixed": "#3f0016",
+                      "on-secondary-fixed-variant": "#005321",
+                      "on-primary": "#ffffff",
+                      "on-surface": "#0b1c30",
+                      "secondary-fixed": "#6bff8f",
+                      "secondary": "#006e2f",
+                      "tertiary": "#a72d51",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-error": "#ffffff",
+                      "primary-fixed": "#7ffc97",
+                      "secondary-container": "#6bff8f",
+                      "on-surface-variant": "#3e4a3d",
+                      "on-secondary-fixed": "#002109",
+                      "tertiary-container": "#c74668",
+                      "surface-variant": "#d3e4fe",
+                      "surface-dim": "#cbdbf5",
+                      "primary": "#006b2c",
+                      "on-primary-fixed-variant": "#005320",
+                      "surface-container": "#e5eeff",
+                      "surface-tint": "#006e2d",
+                      "surface-bright": "#f8f9ff",
+                      "secondary-fixed-dim": "#4ae176",
+                      "tertiary-fixed": "#ffd9de",
+                      "outline-variant": "#bdcaba",
+                      "surface-container-low": "#eff4ff",
+                      "on-tertiary": "#ffffff",
+                      "on-primary-fixed": "#002109",
+                      "outline": "#6e7b6c",
+                      "error": "#ba1a1a",
+                      "surface": "#f8f9ff",
+                      "on-tertiary-fixed-variant": "#8a143c",
+                      "inverse-surface": "#213145",
+                      "inverse-primary": "#62df7d",
+                      "surface-container-high": "#dce9ff",
+                      "error-container": "#ffdad6",
+                      "primary-fixed-dim": "#62df7d",
+                      "on-secondary": "#ffffff",
+                      "on-primary-container": "#f7fff2",
+                      "on-secondary-container": "#007432",
+                      "on-error-container": "#93000a",
+                      "background": "#f8f9ff",
+                      "primary-container": "#00873a",
+                      "tertiary-fixed-dim": "#ffb2bf",
+                      "on-tertiary-container": "#fffbff",
+                      "surface-container-highest": "#d3e4fe",
+                      "on-background": "#0b1c30"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "space-lg": "24px",
+                      "sidebar-width": "260px",
+                      "space-xl": "32px",
+                      "header-height": "64px",
+                      "space-xs": "4px",
+                      "container-max-width": "1440px",
+                      "gutter": "24px",
+                      "space-md": "16px",
+                      "space-sm": "8px",
+                      "margin-page": "32px"
+              },
+              "fontFamily": {
+                      "h5": ["Inter"],
+                      "h2": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "h6": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "caption": ["Inter"],
+                      "body-md": ["Inter"],
+                      "h4": ["Inter"],
+                      "h1": ["Inter"],
+                      "h3": ["Inter"]
+              },
+              "fontSize": {
+                      "h5": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                      "h6": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "h4": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+                      "h1": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "h3": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9ff; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .gradient-text {
+            background: linear-gradient(90deg, #006b2c 0%, #00873a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="text-on-surface bg-background flex">
+<!-- SideNavBar -->
+<nav class="hidden md:flex bg-surface border-r border-outline-variant fixed left-0 top-0 h-screen w-sidebar-width flex-col py-space-md z-50">
+<div class="px-space-md mb-space-lg">
+<h1 class="font-h3 text-h3 font-bold text-primary">FastMark Admin</h1>
+<p class="font-caption text-caption text-on-surface-variant">Management Console</p>
+</div>
+<ul class="flex flex-col gap-1 w-full flex-grow overflow-y-auto px-space-sm font-body-md text-body-md">
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">group</span>
+                    Người dùng
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">storefront</span>
+                    Người bán
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">store</span>
+                    Gian hàng
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">inventory_2</span>
+                    Sản phẩm
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">category</span>
+                    Danh mục
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">shopping_cart</span>
+                    Đơn hàng
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">ad_units</span>
+                    Banner quảng cáo
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">account_balance_wallet</span>
+                    Ví điện tử
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">card_membership</span>
+                    Gói Seller
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">assessment</span>
+                    Báo cáo
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+                    Thông báo
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg bg-primary-container/10 text-primary border-l-4 border-primary transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">analytics</span>
+                    Thống kê
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+                    Cài đặt
+                </a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 md:ml-sidebar-width min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="bg-surface fixed top-0 right-0 w-full md:w-[calc(100%-260px)] h-header-height border-b border-outline-variant flex justify-between items-center px-margin-page z-40 transition-all duration-200 font-body-md text-body-md">
+<div class="flex items-center gap-space-md">
+<h2 class="font-h4 text-h4 font-bold text-primary">Chợ Quê FastMark</h2>
+<div class="hidden lg:flex items-center text-on-surface-variant font-label-sm">
+<span class="material-symbols-outlined text-sm">home</span>
+<span class="mx-2">/</span>
+<span>Thống kê</span>
+<span class="mx-2">/</span>
+<span class="text-primary font-bold">Referral Program</span>
+</div>
+</div>
+<div class="flex items-center gap-space-lg">
+<div class="flex items-center gap-space-md text-on-surface-variant">
+<button class="hover:text-primary transition-colors"><span class="material-symbols-outlined">notifications</span></button>
+<button class="hover:text-primary transition-colors"><span class="material-symbols-outlined">help</span></button>
+</div>
+<div class="flex items-center gap-space-sm border-l border-outline-variant pl-space-lg cursor-pointer hover:text-primary transition-colors">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="Admin user profile picture, professional headshot in a modern office setting, soft natural lighting, high quality." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwnWmI2UlAsryOOsHb-kASbM_KSQLdb2SzHd1O487C3Jq1CwFkKvtmhP1zVt4YtfuDbZ7jnrzK8tJPlOGqFoqgsXJosiomyKH1ptXMEMtBMg3bZdTkh7QCjOpAVYeUnhkiqGHKMlqvTOP5LMf1vRY3lAZe7OxgbuK0Ef9iaHK-pNSkFsVPb0KZFy7eR4kYtXyPK0oqsCc30uRwWaFpJkOMS31TAEL9evVXWkKpuIOUryHfFcZQiQlnKVwt9hmSzoSlQg_JOfNGFK0w"/>
+<span class="font-h6 text-h6">Nguyễn Admin</span>
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 mt-header-height p-margin-page max-w-container-max-width mx-auto w-full">
+<!-- Header Section -->
+<div class="flex justify-between items-end mb-space-lg">
+<div>
+<h1 class="font-h1 text-h1 text-on-surface gradient-text mb-2">Referral Performance</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Analyze growth metrics and top advocates from the referral program.</p>
+</div>
+<div class="flex gap-space-sm">
+<button class="px-space-md py-space-sm bg-surface text-on-surface border border-outline-variant rounded-lg font-h6 text-h6 hover:bg-surface-container-low transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">calendar_today</span> Last 30 Days
+                    </button>
+<button class="px-space-md py-space-sm bg-primary text-on-primary rounded-lg font-h6 text-h6 hover:bg-primary-container transition-colors flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-sm">download</span> Export Report
+                    </button>
+</div>
+</div>
+<!-- Key Metrics Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter mb-space-lg">
+<!-- Metric 1 -->
+<div class="glass-card p-space-lg rounded-xl flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary bg-primary-container/20 p-2 rounded-lg" style="font-variation-settings: 'FILL' 1;">group_add</span>
+<span class="font-label-sm text-label-sm text-secondary flex items-center bg-secondary-fixed/30 px-2 py-1 rounded-full"><span class="material-symbols-outlined text-[14px]">trending_up</span> +12.5%</span>
+</div>
+<div>
+<p class="font-caption text-caption text-on-surface-variant mb-1 uppercase tracking-wider">New Users via Referral</p>
+<p class="font-h1 text-h1 text-on-surface">3,492</p>
+</div>
+</div>
+<!-- Metric 2 -->
+<div class="glass-card p-space-lg rounded-xl flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary bg-primary-container/20 p-2 rounded-lg" style="font-variation-settings: 'FILL' 1;">autorenew</span>
+<span class="font-label-sm text-label-sm text-secondary flex items-center bg-secondary-fixed/30 px-2 py-1 rounded-full"><span class="material-symbols-outlined text-[14px]">trending_up</span> +4.2%</span>
+</div>
+<div>
+<p class="font-caption text-caption text-on-surface-variant mb-1 uppercase tracking-wider">Conversion Rate</p>
+<p class="font-h1 text-h1 text-on-surface">18.7%</p>
+</div>
+</div>
+<!-- Metric 3 -->
+<div class="glass-card p-space-lg rounded-xl flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary bg-primary-container/20 p-2 rounded-lg" style="font-variation-settings: 'FILL' 1;">loyalty</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center bg-surface-variant px-2 py-1 rounded-full"><span class="material-symbols-outlined text-[14px]">remove</span> 0.0%</span>
+</div>
+<div>
+<p class="font-caption text-caption text-on-surface-variant mb-1 uppercase tracking-wider">Active Referrers</p>
+<p class="font-h1 text-h1 text-on-surface">845</p>
+</div>
+</div>
+<!-- Metric 4 -->
+<div class="glass-card p-space-lg rounded-xl flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="material-symbols-outlined text-primary bg-primary-container/20 p-2 rounded-lg" style="font-variation-settings: 'FILL' 1;">payments</span>
+<span class="font-label-sm text-label-sm text-error flex items-center bg-error-container/50 px-2 py-1 rounded-full"><span class="material-symbols-outlined text-[14px]">trending_down</span> -2.1%</span>
+</div>
+<div>
+<p class="font-caption text-caption text-on-surface-variant mb-1 uppercase tracking-wider">Total Bonus Distributed</p>
+<p class="font-h1 text-h1 text-on-surface">142M đ</p>
+</div>
+</div>
+</div>
+<!-- Main Content Bento Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Chart Section (Spans 2 cols) -->
+<div class="lg:col-span-2 glass-card rounded-xl p-space-lg flex flex-col">
+<div class="flex justify-between items-center mb-space-lg">
+<h3 class="font-h3 text-h3 text-on-surface">Acquisition Trend</h3>
+<div class="flex gap-2">
+<button class="px-3 py-1 font-label-sm text-label-sm rounded-md bg-surface-variant text-on-surface">Daily</button>
+<button class="px-3 py-1 font-label-sm text-label-sm rounded-md hover:bg-surface-variant text-on-surface-variant transition-colors">Weekly</button>
+</div>
+</div>
+<!-- Placeholder for Chart -->
+<div class="flex-1 w-full min-h-[300px] rounded-lg relative overflow-hidden bg-surface-container-lowest border border-outline-variant/30 flex items-center justify-center">
+<div class="absolute inset-0 bg-cover bg-center opacity-50" data-alt="A clean, modern line chart showing an upward trend in user acquisition over a 30-day period. The chart uses a soft green primary color against a stark white background with subtle grey grid lines. Minimalist corporate dashboard aesthetic, high resolution, data visualization." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBOxY48T926_c5tUKl3-TjZk8WV1VJmC6N20hyvLI_JcvG5_5nMAm9HlScPHk0zDwr1LdaAXsIIb0VaCzokYn5T4d1lntBsUTWzoaT8d4KGlQxU6hRZz5X-kC756GyoU2lGPk38psSS2nyq27Fa2ydM6N2Fz6A5XbqKd-CqcGiA2KM4aNTlxovfN7rVvyylUCQwVWc3ZA7JLEiSJo__DkSt4ByBG1cvNN96_7EdRCZocekgzfPhEtUtGzqX-xfuaoWs5nxcQNeX15oP')"></div>
+<span class="relative z-10 text-on-surface-variant font-h6"><span class="material-symbols-outlined align-middle mr-2">monitoring</span>Interactive Chart Data</span>
+</div>
+</div>
+<!-- Top Referrers Leaderboard -->
+<div class="glass-card rounded-xl p-space-lg flex flex-col">
+<div class="flex justify-between items-center mb-space-lg">
+<h3 class="font-h3 text-h3 text-on-surface">Top Referrers</h3>
+<button class="text-primary hover:text-primary-container transition-colors"><span class="material-symbols-outlined">more_horiz</span></button>
+</div>
+<div class="flex-1 overflow-y-auto pr-2">
+<ul class="space-y-4">
+<!-- User 1 -->
+<li class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-lowest transition-colors border border-transparent hover:border-outline-variant/50">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="Avatar of a young professional woman smiling warmly, soft lighting, modern corporate style, small circular crop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDiO3P6w_GkSLEYElgzglzdH2GBX4C1aSWdOHnLH3EDtcO0Lr7VzLhqHNYok3jycqHnYA08-2iOJYuZeLvMjLCe-nU6GOnMbERnOh6mV8WEuPv_cMhXMALGvNxttzG9uP7EN0b8RWgn81syLhakCGMiYG4L-pA6g2aM2RzmIfjxBGn0xM9ZwKEqd31K8aRavY86fK1cG4Vg4EqtlZOXGnfw1ikv5v7f-6AZaRRwiH_SzOyeIbMYu-nc6Zes3kx8IWQpAaEm467rABI4"/>
+<span class="absolute -top-1 -left-1 bg-secondary text-white w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]">1</span>
+</div>
+<div>
+<p class="font-h6 text-h6 text-on-surface">Trần Thị Mai</p>
+<p class="font-caption text-caption text-on-surface-variant">Seller Pro</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h5 text-h5 text-primary">142</p>
+<p class="font-caption text-caption text-on-surface-variant">Invites</p>
+</div>
+</li>
+<!-- User 2 -->
+<li class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-lowest transition-colors border border-transparent hover:border-outline-variant/50">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="Avatar of a confident man with glasses, professional attire, neutral background, small circular crop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwAxn49dyrTCvSUw8QbEaXfruEa2QNGP1aUfrRYMmPqyXhn3kICQqUMVUZF_qHRVAQlsWs7JUU5Rzi09VrO8HIsYiGCg4M9yPwYP2-pqPZTHVTyg_gypWR6yfWt9p0KRt_XuDFTHB0kyKGw8DXf0Y5xD6kwqdermt5oVH7oovZNKjDBrNoDgfMAaWoZdQxSgkvYwaQYQO8NrrTAYo-RYUpjTvNXjexZi55-ZXQqKphWZaiR8QpaWVUxGsTvQnQ5sVtk9Xc46S_jP4c"/>
+<span class="absolute -top-1 -left-1 bg-surface-variant text-on-surface-variant border border-outline w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]">2</span>
+</div>
+<div>
+<p class="font-h6 text-h6 text-on-surface">Lê Văn Hùng</p>
+<p class="font-caption text-caption text-on-surface-variant">Basic User</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h5 text-h5 text-primary">98</p>
+<p class="font-caption text-caption text-on-surface-variant">Invites</p>
+</div>
+</li>
+<!-- User 3 -->
+<li class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-lowest transition-colors border border-transparent hover:border-outline-variant/50">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="Avatar of an energetic young man, casual smart clothing, bright lighting, small circular crop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcBoRqzY6cwCbabedZXTiUdygPtQ9MI6gRmqmgN1eevzS-xewYLikbq_AWuJ7qhfGTOYZ6jg1bKXrtP6EbUmdTG6AF80PIospegxrgAdKm3HZE2fQufDOunqL0mSF7LXFklIQHPJzwRJGbiu11ra3WNWN7u16JVX-XkvkoLUDLjQf-_s_IjCp7MUAiRJ_MIa_0pdBh9RiGRj-KIJ5p8bd0w2kMsYBMWnC_KJfwoMzylRQuJuL8vxjwR6TN4V7hdqbWkZbPFMGnoMFc"/>
+<span class="absolute -top-1 -left-1 bg-surface-variant text-on-surface-variant border border-outline w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px]">3</span>
+</div>
+<div>
+<p class="font-h6 text-h6 text-on-surface">Phạm Tuấn</p>
+<p class="font-caption text-caption text-on-surface-variant">Seller Plus</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h5 text-h5 text-primary">76</p>
+<p class="font-caption text-caption text-on-surface-variant">Invites</p>
+</div>
+</li>
+<!-- User 4 -->
+<li class="flex items-center justify-between p-3 rounded-lg hover:bg-surface-container-lowest transition-colors border border-transparent hover:border-outline-variant/50">
+<div class="flex items-center gap-3">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="Avatar of a stylish woman, creative industry look, warm studio background, small circular crop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3MiJcXDx02-pQ9DZ6lWzidY-ByBpgIjb7fb1FvDU2mc-Gujq80tv4OzlEHz_DQF9csqKYUm4JmDmF1j7K0YXFQnY-WQ2Qup6EB4Q5RW6ir6J8BcePfPqnoY_tgM2F4bQRkCjhlIdatZUEiva8S2RSltThzhQKKT_PB5BA_e4uRmq1HQCVso3CooEfjTxl4IqiAAzK2vsOpEEtKYye5NnajNtfyASzdBpI1QjfOxXED32bZsOpYb_YrxZUjKlrhTv7mBFhs9L1gJqa"/>
+</div>
+<div>
+<p class="font-h6 text-h6 text-on-surface">Nguyễn Hoa</p>
+<p class="font-caption text-caption text-on-surface-variant">Seller Pro</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-h5 text-h5 text-on-surface">54</p>
+<p class="font-caption text-caption text-on-surface-variant">Invites</p>
+</div>
+</li>
+</ul>
+</div>
+<button class="mt-4 w-full py-2 font-h6 text-h6 text-primary border border-primary/30 rounded-lg hover:bg-primary-container/10 transition-colors">View Full Leaderboard</button>
+</div>
+</div>
+</main>
+</div>
+</body></html>

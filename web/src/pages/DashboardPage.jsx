@@ -12,7 +12,7 @@ function formatCurrency(value) {
   return `${formatCompact(value)} ₫`;
 }
 
-function LineChart({ data = [], color = '#0d7377', height = 180 }) {
+function LineChart({ data = [], color = '#076F32', height = 180 }) {
   const width = 560;
   const padding = 24;
   const values = data.map((item) => Number(item.value) || 0);
@@ -37,7 +37,7 @@ function LineChart({ data = [], color = '#0d7377', height = 180 }) {
   );
 }
 
-function BarChart({ data = [], color = '#0d7377', valueKey = 'value', labelKey = 'label', height = 220 }) {
+function BarChart({ data = [], color = '#076F32', valueKey = 'value', labelKey = 'label', height = 220 }) {
   const max = Math.max(...data.map((item) => Number(item[valueKey]) || 0), 1);
 
   return (
@@ -62,7 +62,7 @@ function BarChart({ data = [], color = '#0d7377', valueKey = 'value', labelKey =
 
 function PieChart({ data = [], size = 180 }) {
   const total = data.reduce((sum, item) => sum + (Number(item.value) || 0), 0) || 1;
-  const colors = ['#0d7377', '#14b8a6', '#f59e0b', '#ef4444', '#6366f1', '#94a3b8'];
+  const colors = ['#076F32', '#076F32', '#f59e0b', '#ef4444', '#6366f1', '#94a3b8'];
   let current = 0;
   const gradients = data.map((item, index) => {
     const value = Number(item.value) || 0;
@@ -260,7 +260,7 @@ export default function DashboardPage({
 
             <section className="panel panel-wide">
               <h2>Doanh thu theo cửa hàng</h2>
-              <BarChart data={revenueBars} color="#0d7377" />
+              <BarChart data={revenueBars} color="#076F32" />
             </section>
 
             <section className="panel panel-wide">

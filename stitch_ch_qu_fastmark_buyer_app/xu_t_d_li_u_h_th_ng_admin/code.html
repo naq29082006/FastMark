@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VietMarket Admin - Export Data</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "error": "#ba1a1a",
+                            "tertiary-fixed": "#ffd9de",
+                            "primary": "#006b2c",
+                            "tertiary": "#a72d51",
+                            "on-tertiary": "#ffffff",
+                            "on-error-container": "#93000a",
+                            "tertiary-fixed-dim": "#ffb2bf",
+                            "surface": "#f8f9ff",
+                            "surface-tint": "#006e2d",
+                            "secondary-fixed": "#6bff8f",
+                            "on-secondary-container": "#007432",
+                            "surface-container-lowest": "#ffffff",
+                            "tertiary-container": "#c74668",
+                            "on-error": "#ffffff",
+                            "on-tertiary-container": "#fffbff",
+                            "surface-container-highest": "#d3e4fe",
+                            "outline-variant": "#bdcaba",
+                            "background": "#f8f9ff",
+                            "on-primary": "#ffffff",
+                            "on-surface-variant": "#3e4a3d",
+                            "secondary-fixed-dim": "#4ae176",
+                            "surface-variant": "#d3e4fe",
+                            "on-primary-container": "#f7fff2",
+                            "on-secondary-fixed-variant": "#005321",
+                            "inverse-primary": "#62df7d",
+                            "outline": "#6e7b6c",
+                            "on-tertiary-fixed": "#3f0016",
+                            "secondary-container": "#6bff8f",
+                            "on-primary-fixed": "#002109",
+                            "on-background": "#0b1c30",
+                            "on-secondary-fixed": "#002109",
+                            "on-primary-fixed-variant": "#005320",
+                            "on-secondary": "#ffffff",
+                            "primary-fixed": "#7ffc97",
+                            "on-surface": "#0b1c30",
+                            "primary-fixed-dim": "#62df7d",
+                            "surface-dim": "#cbdbf5",
+                            "surface-bright": "#f8f9ff",
+                            "surface-container-low": "#eff4ff",
+                            "surface-container": "#e5eeff",
+                            "primary-container": "#00873a",
+                            "error-container": "#ffdad6",
+                            "surface-container-high": "#dce9ff",
+                            "secondary": "#006e2f",
+                            "inverse-on-surface": "#eaf1ff",
+                            "inverse-surface": "#213145",
+                            "on-tertiary-fixed-variant": "#8a143c"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                    },
+                    "spacing": {
+                            "space-xs": "4px",
+                            "container-max-width": "1440px",
+                            "sidebar-width": "260px",
+                            "space-xl": "32px",
+                            "header-height": "64px",
+                            "margin-page": "32px",
+                            "gutter": "24px",
+                            "space-sm": "8px",
+                            "space-md": "16px",
+                            "space-lg": "24px"
+                    },
+                    "fontFamily": {
+                            "caption": ["Inter"],
+                            "label-sm": ["Inter"],
+                            "body-lg": ["Inter"],
+                            "h5": ["Inter"],
+                            "h4": ["Inter"],
+                            "h1": ["Inter"],
+                            "h2": ["Inter"],
+                            "h3": ["Inter"],
+                            "h6": ["Inter"],
+                            "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                            "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                            "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                            "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                            "h5": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                            "h4": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+                            "h1": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                            "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                            "h3": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                            "h6": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                            "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-surface h-screen w-screen overflow-hidden flex items-center justify-center relative">
+<!-- Dimmed Background Overlay -->
+<div class="absolute inset-0 bg-on-background/40 backdrop-blur-sm z-40 transition-opacity duration-300" id="modal-overlay"></div>
+<!-- Background Content (Simulated for depth) -->
+<div class="absolute inset-0 z-0 flex pointer-events-none opacity-50">
+<!-- SideNav Simulation -->
+<nav class="bg-white dark:bg-surface-container fixed left-0 top-0 h-screen w-[260px] border-r border-outline-variant flex flex-col py-space-lg">
+<div class="px-space-lg mb-space-lg">
+<span class="font-h2 text-h2 font-bold text-primary">VietMarket</span>
+<div class="text-on-surface-variant font-caption text-caption mt-1">Admin Console</div>
+</div>
+</nav>
+<!-- TopNav Simulation -->
+<header class="bg-white dark:bg-surface-container fixed top-0 right-0 w-[calc(100%-260px)] h-header-height border-b border-outline-variant flex justify-between items-center px-margin-page">
+<span class="font-h4 text-h4 font-semibold text-on-surface">VietMarket Admin</span>
+</header>
+<!-- Main Content Area Simulation -->
+<main class="ml-[260px] mt-header-height p-margin-page w-full">
+<div class="h-64 bg-surface-container-low rounded-lg w-full mb-gutter"></div>
+<div class="flex gap-gutter">
+<div class="h-48 bg-surface-container-low rounded-lg w-1/3"></div>
+<div class="h-48 bg-surface-container-low rounded-lg w-2/3"></div>
+</div>
+</main>
+</div>
+<!-- Export Modal Dialog -->
+<dialog class="relative z-50 bg-white rounded-xl shadow-[0_15px_40px_-10px_rgba(0,0,0,0.1),_0_0_15px_4px_rgba(0,0,0,0.04)] w-full max-w-2xl border border-outline-variant overflow-hidden flex flex-col m-0 p-0 transform scale-100 transition-transform duration-300" id="export-modal" open="">
+<!-- Modal Header -->
+<div class="px-space-lg py-space-md border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+<h2 class="font-h3 text-h3 text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">cloud_download</span>
+                Export Data
+            </h2>
+<button aria-label="Close modal" class="text-on-surface-variant hover:bg-surface-container-low p-2 rounded-full transition-colors" onclick="document.getElementById('export-modal').close(); document.getElementById('modal-overlay').style.display='none';">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Modal Body -->
+<div class="p-space-lg overflow-y-auto max-h-[716px]">
+<form class="space-y-space-lg" id="export-form">
+<!-- Data Source Selection -->
+<section>
+<h3 class="font-h6 text-h6 text-on-surface mb-space-sm">Data Source</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-space-md">Select the primary module you wish to export data from.</p>
+<div class="grid grid-cols-3 gap-space-sm">
+<label class="cursor-pointer relative">
+<input checked="" class="peer sr-only" name="data_source" type="radio" value="users"/>
+<div class="p-space-md border border-outline-variant rounded-lg text-center hover:bg-surface-container-low peer-checked:border-primary peer-checked:bg-primary-container/10 transition-colors">
+<span class="material-symbols-outlined mb-2 text-on-surface-variant peer-checked:text-primary">group</span>
+<div class="font-label-sm text-label-sm text-on-surface">Users</div>
+</div>
+</label>
+<label class="cursor-pointer relative">
+<input class="peer sr-only" name="data_source" type="radio" value="orders"/>
+<div class="p-space-md border border-outline-variant rounded-lg text-center hover:bg-surface-container-low peer-checked:border-primary peer-checked:bg-primary-container/10 transition-colors">
+<span class="material-symbols-outlined mb-2 text-on-surface-variant peer-checked:text-primary">shopping_cart</span>
+<div class="font-label-sm text-label-sm text-on-surface">Orders</div>
+</div>
+</label>
+<label class="cursor-pointer relative">
+<input class="peer sr-only" name="data_source" type="radio" value="products"/>
+<div class="p-space-md border border-outline-variant rounded-lg text-center hover:bg-surface-container-low peer-checked:border-primary peer-checked:bg-primary-container/10 transition-colors">
+<span class="material-symbols-outlined mb-2 text-on-surface-variant peer-checked:text-primary">inventory_2</span>
+<div class="font-label-sm text-label-sm text-on-surface">Products</div>
+</div>
+</label>
+</div>
+</section>
+<!-- Date Range -->
+<section>
+<h3 class="font-h6 text-h6 text-on-surface mb-space-sm">Date Range</h3>
+<div class="flex gap-space-md">
+<div class="w-1/2 relative">
+<label class="block font-caption text-caption text-on-surface-variant mb-1" for="start_date">Start Date</label>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded-md py-2 px-3 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" id="start_date" type="date"/>
+</div>
+</div>
+<div class="w-1/2 relative">
+<label class="block font-caption text-caption text-on-surface-variant mb-1" for="end_date">End Date</label>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded-md py-2 px-3 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" id="end_date" type="date"/>
+</div>
+</div>
+</div>
+</section>
+<!-- Fields Configuration -->
+<section>
+<div class="flex justify-between items-center mb-space-sm">
+<h3 class="font-h6 text-h6 text-on-surface">Fields to Include</h3>
+<button class="font-label-sm text-label-sm text-primary hover:underline" type="button">Select All</button>
+</div>
+<div class="bg-surface rounded-lg border border-outline-variant p-space-md grid grid-cols-2 gap-y-space-sm gap-x-space-md max-h-40 overflow-y-auto">
+<!-- Simulated dynamic fields for 'Users' -->
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-4 w-4 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">User ID</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-4 w-4 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">Full Name</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-4 w-4 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">Email Address</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="form-checkbox h-4 w-4 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">Phone Number</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-checkbox h-4 w-4 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">Registration Date</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="form-checkbox h-4 w-4 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">Total Spend</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="form-checkbox h-4 w-4 text-primary border-outline-variant rounded focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">Status</span>
+</label>
+</div>
+</section>
+<!-- Format Selection -->
+<section>
+<h3 class="font-h6 text-h6 text-on-surface mb-space-sm">Export Format</h3>
+<div class="flex gap-space-md">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="form-radio h-4 w-4 text-primary border-outline-variant focus:ring-primary" name="format" type="radio" value="csv"/>
+<span class="font-body-md text-body-md text-on-surface">CSV</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="form-radio h-4 w-4 text-primary border-outline-variant focus:ring-primary" name="format" type="radio" value="excel"/>
+<span class="font-body-md text-body-md text-on-surface">Excel (.xlsx)</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input class="form-radio h-4 w-4 text-primary border-outline-variant focus:ring-primary" name="format" type="radio" value="pdf"/>
+<span class="font-body-md text-body-md text-on-surface">PDF Report</span>
+</label>
+</div>
+</section>
+</form>
+</div>
+<!-- Modal Footer / Actions -->
+<div class="px-space-lg py-space-md border-t border-outline-variant bg-surface-container-lowest flex justify-end gap-space-md">
+<button class="px-6 py-2 rounded-full font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-low transition-colors border border-outline-variant" onclick="document.getElementById('export-modal').close(); document.getElementById('modal-overlay').style.display='none';" type="button">
+                Cancel
+            </button>
+<button class="px-6 py-2 rounded-full bg-primary text-on-primary font-label-sm text-label-sm hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                Start Export
+            </button>
+</div>
+</dialog>
+</body></html>

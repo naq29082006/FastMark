@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chưa có tin nhắn nào</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#735c00",
+                      "secondary-fixed": "#6bff8f",
+                      "on-error-container": "#93000a",
+                      "surface-container-low": "#eff4ff",
+                      "surface-container-highest": "#d9e3f6",
+                      "surface-tint": "#006e2d",
+                      "on-tertiary-container": "#4e3e00",
+                      "on-secondary-container": "#007432",
+                      "tertiary-container": "#cea700",
+                      "on-tertiary-fixed-variant": "#574500",
+                      "on-tertiary": "#ffffff",
+                      "on-primary": "#ffffff",
+                      "on-primary-fixed-variant": "#005320",
+                      "on-surface": "#121c2a",
+                      "secondary-fixed-dim": "#4ae176",
+                      "surface-bright": "#f8f9ff",
+                      "on-surface-variant": "#3e4a3d",
+                      "primary": "#006b2c",
+                      "inverse-surface": "#27313f",
+                      "primary-fixed-dim": "#62df7d",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-secondary-fixed": "#002109",
+                      "on-error": "#ffffff",
+                      "surface-container-high": "#dee9fc",
+                      "on-primary-fixed": "#002109",
+                      "error": "#ba1a1a",
+                      "tertiary-fixed-dim": "#eec200",
+                      "surface-dim": "#d0dbed",
+                      "on-background": "#121c2a",
+                      "surface-variant": "#d9e3f6",
+                      "surface-container": "#e6eeff",
+                      "surface": "#f8f9ff",
+                      "surface-container-lowest": "#ffffff",
+                      "secondary-container": "#6bff8f",
+                      "background": "#f8f9ff",
+                      "primary-fixed": "#7ffc97",
+                      "inverse-primary": "#62df7d",
+                      "secondary": "#006e2f",
+                      "primary-container": "#00873a",
+                      "on-primary-container": "#f7fff2",
+                      "outline": "#6e7b6c",
+                      "error-container": "#ffdad6",
+                      "on-secondary-fixed-variant": "#005321",
+                      "tertiary-fixed": "#ffe083",
+                      "on-tertiary-fixed": "#231b00",
+                      "outline-variant": "#bdcaba"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "gutter": "16px",
+                      "container-margin": "24px",
+                      "stack-gap-md": "16px",
+                      "unit": "8px",
+                      "touch-target-min": "56px",
+                      "stack-gap-lg": "32px"
+              },
+              "fontFamily": {
+                      "body-lg": ["Inter"],
+                      "label-lg": ["Inter"],
+                      "price-display": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-lg-mobile": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "body-md": ["Inter"],
+                      "headline-md": ["Inter"]
+              },
+              "fontSize": {
+                      "body-lg": ["20px", {"lineHeight": "30px", "fontWeight": "400"}],
+                      "label-lg": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "price-display": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                      "label-md": ["16px", {"lineHeight": "20px", "fontWeight": "500"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                      "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-md": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+              }
+            },
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-lg min-h-screen flex flex-col items-center">
+<!-- TopAppBar -->
+<header class="docked full-width top-0 bg-surface flex justify-between items-center w-full px-container-margin h-touch-target-min border-b border-surface-variant max-w-screen-sm mx-auto">
+<button class="flex items-center justify-center h-full text-on-surface-variant active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Chợ Việt</h1>
+<button class="flex items-center justify-center h-full text-on-surface-variant active:scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</header>
+<!-- Main Content Area - Empty State -->
+<main class="flex-grow flex flex-col items-center justify-center w-full max-w-screen-sm mx-auto px-container-margin py-stack-gap-lg">
+<div class="flex flex-col items-center text-center space-y-stack-gap-md max-w-sm">
+<!-- Illustration Placeholder -->
+<div class="w-64 h-64 bg-surface-container-low rounded-xl flex items-center justify-center overflow-hidden border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A friendly, stylized vector illustration of a Vietnamese seller waiting cheerfully at a traditional market stall. The style is modern, minimalist, and uses the primary green color palette of the app. The seller is smiling, looking approachable. Bright, clean lighting, humanist touches, and soft rounded shapes. Designed to be reassuring and encouraging for elderly users in a light mode interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAre9fvX9QpTKBbzp3TNUPvJ-6Wfo_FY3mRUE0oJWsRL029fPkuuL4WeTF5BZp-rlflLDVCpDghH_KbgWRIfryBf37KalhflEiocDai4WGQfR4PrafHm-89Pb8ACXoyUipiVcvsCfF8yY4W13C08yRFMPn726dyllkUZVt9GlF3wjedif-YKvIjXSSQ-_eNzWiHu2K3wgjI32dTbTIyhrA2cz9tWNKdUSkV16L3EbGFADEnPdPdyA3ps30DFjbucX1sBGTRBCGvznEA"/>
+</div>
+<!-- Empty State Text -->
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-surface">Chưa có tin nhắn nào</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Chia sẻ liên kết cửa hàng của bạn để khách hàng dễ dàng liên hệ và đặt mua sản phẩm.
+            </p>
+<!-- Call to Action Button -->
+<button class="mt-stack-gap-md w-full h-touch-target-min bg-primary text-on-primary rounded-lg font-headline-md text-headline-md flex items-center justify-center gap-unit shadow-sm active:bg-primary-container transition-colors duration-200">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+                Chia sẻ cửa hàng
+            </button>
+</div>
+</main>
+<!-- BottomNavBar (Hidden on md and up) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-2 bg-surface max-w-screen-sm mx-auto rounded-t-xl pb-6 pt-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] border-t border-surface-variant">
+<!-- Dashboard -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-lg text-label-lg text-[12px] mt-1">Trang chủ</span>
+</a>
+<!-- Products -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-label-lg text-label-lg text-[12px] mt-1">Sản phẩm</span>
+</a>
+<!-- Messages (Active - Semantic interpretation of empty state context) -->
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-gutter py-2 active:scale-90 transition-transform duration-200" href="#">
+<span class="material-symbols-outlined icon-filled" data-icon="chat">chat</span>
+<span class="font-label-lg text-label-lg text-[12px] mt-1">Tin nhắn</span>
+</a>
+<!-- Orders -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_bag">shopping_bag</span>
+<span class="font-label-lg text-label-lg text-[12px] mt-1">Đơn hàng</span>
+</a>
+<!-- Wallet -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-gutter py-2 hover:bg-surface-container-high rounded-lg transition-colors hidden sm:flex" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-lg text-label-lg text-[12px] mt-1">Ví</span>
+</a>
+</nav>
+<!-- Spacer for fixed bottom nav on mobile -->
+<div class="h-24 md:hidden"></div>
+</body></html>

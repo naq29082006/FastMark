@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FastMark Admin - Security Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-fixed": "#3f0016",
+                      "on-secondary-fixed-variant": "#005321",
+                      "on-primary": "#ffffff",
+                      "on-surface": "#0b1c30",
+                      "secondary-fixed": "#6bff8f",
+                      "secondary": "#006e2f",
+                      "tertiary": "#a72d51",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-on-surface": "#eaf1ff",
+                      "on-error": "#ffffff",
+                      "primary-fixed": "#7ffc97",
+                      "secondary-container": "#6bff8f",
+                      "on-surface-variant": "#3e4a3d",
+                      "on-secondary-fixed": "#002109",
+                      "tertiary-container": "#c74668",
+                      "surface-variant": "#d3e4fe",
+                      "surface-dim": "#cbdbf5",
+                      "primary": "#006b2c",
+                      "on-primary-fixed-variant": "#005320",
+                      "surface-container": "#e5eeff",
+                      "surface-tint": "#006e2d",
+                      "surface-bright": "#f8f9ff",
+                      "secondary-fixed-dim": "#4ae176",
+                      "tertiary-fixed": "#ffd9de",
+                      "outline-variant": "#bdcaba",
+                      "surface-container-low": "#eff4ff",
+                      "on-tertiary": "#ffffff",
+                      "on-primary-fixed": "#002109",
+                      "outline": "#6e7b6c",
+                      "error": "#ba1a1a",
+                      "surface": "#f8f9ff",
+                      "on-tertiary-fixed-variant": "#8a143c",
+                      "inverse-surface": "#213145",
+                      "inverse-primary": "#62df7d",
+                      "surface-container-high": "#dce9ff",
+                      "error-container": "#ffdad6",
+                      "primary-fixed-dim": "#62df7d",
+                      "on-secondary": "#ffffff",
+                      "on-primary-container": "#f7fff2",
+                      "on-secondary-container": "#007432",
+                      "on-error-container": "#93000a",
+                      "background": "#f8f9ff",
+                      "primary-container": "#00873a",
+                      "tertiary-fixed-dim": "#ffb2bf",
+                      "on-tertiary-container": "#fffbff",
+                      "surface-container-highest": "#d3e4fe",
+                      "on-background": "#0b1c30"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "space-lg": "24px",
+                      "sidebar-width": "260px",
+                      "space-xl": "32px",
+                      "header-height": "64px",
+                      "space-xs": "4px",
+                      "container-max-width": "1440px",
+                      "gutter": "24px",
+                      "space-md": "16px",
+                      "space-sm": "8px",
+                      "margin-page": "32px"
+              },
+              "fontFamily": {
+                      "h5": ["Inter"],
+                      "h2": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "h6": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "caption": ["Inter"],
+                      "body-md": ["Inter"],
+                      "h4": ["Inter"],
+                      "h1": ["Inter"],
+                      "h3": ["Inter"]
+              },
+              "fontSize": {
+                      "h5": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                      "h6": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "h4": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+                      "h1": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "h3": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+              }
+            }
+          }
+        }
+      </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9ff; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background flex h-screen overflow-hidden antialiased">
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-0 h-screen w-sidebar-width bg-surface dark:bg-inverse-surface border-r border-outline-variant dark:border-outline flex flex-col h-full py-space-md z-50">
+<div class="px-space-md pb-space-lg">
+<h1 class="font-h3 text-h3 font-bold text-primary dark:text-primary-fixed">FastMark Admin</h1>
+<p class="font-caption text-caption text-on-surface-variant">Management Console</p>
+</div>
+<nav class="flex-1 overflow-y-auto px-space-sm space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary-container/10 dark:bg-primary-container/20 text-primary dark:text-primary-fixed border-l-4 border-primary cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-body-md text-body-md font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-body-md text-body-md">Người dùng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">storefront</span>
+<span class="font-body-md text-body-md">Người bán</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">store</span>
+<span class="font-body-md text-body-md">Gian hàng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md text-body-md">Sản phẩm</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">category</span>
+<span class="font-body-md text-body-md">Danh mục</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">shopping_cart</span>
+<span class="font-body-md text-body-md">Đơn hàng</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">ad_units</span>
+<span class="font-body-md text-body-md">Banner quảng cáo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-body-md text-body-md">Ví điện tử</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">card_membership</span>
+<span class="font-body-md text-body-md">Gói Seller</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">assessment</span>
+<span class="font-body-md text-body-md">Báo cáo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">notifications</span>
+<span class="font-body-md text-body-md">Thông báo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-md text-body-md">Thống kê</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant dark:text-surface-variant hover:bg-surface-container-low hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors cursor-pointer duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Cài đặt</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 ml-[260px] flex flex-col h-screen relative bg-surface-bright">
+<!-- TopNavBar (Shared Component) -->
+<header class="fixed top-0 right-0 w-[calc(100%-260px)] h-header-height bg-surface dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flex justify-between items-center px-margin-page z-40 transition-all duration-200">
+<div class="flex items-center gap-4">
+<span class="font-h4 text-h4 font-bold text-primary hidden md:block">Chợ Quê FastMark</span>
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+<input class="pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:border-primary w-64 transition-colors" placeholder="Search resources..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3">
+<button class="p-2 text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed transition-colors rounded-full hover:bg-surface-container-low relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed transition-colors rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined">help</span>
+</button>
+</div>
+<div class="h-8 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-3 cursor-pointer group">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-h6">
+                        NA
+                    </div>
+<span class="font-body-md text-body-md text-on-surface group-hover:text-primary transition-colors">Nguyễn Admin</span>
+</div>
+</div>
+</header>
+<!-- Scrollable Canvas -->
+<div class="flex-1 overflow-y-auto mt-header-height p-margin-page">
+<div class="max-w-container-max-width mx-auto space-y-gutter">
+<!-- Page Header -->
+<div class="flex justify-between items-end mb-space-xl">
+<div>
+<h2 class="font-h1 text-h1 text-on-surface mb-2">Security Overview</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Real-time monitoring of authentication and system integrity.</p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 border border-outline bg-surface text-on-surface rounded-lg font-h6 text-h6 hover:bg-surface-container-low transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                            Export Audit Log
+                        </button>
+<button class="px-4 py-2 bg-primary text-on-primary rounded-lg font-h6 text-h6 hover:bg-primary/90 transition-colors flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[20px]">shield_lock</span>
+                            Manage Policies
+                        </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Security Score (Hero Card) -->
+<div class="col-span-1 md:col-span-4 bg-surface rounded-xl border border-outline-variant p-space-lg flex flex-col justify-between relative overflow-hidden">
+<div class="absolute -right-10 -top-10 opacity-5 pointer-events-none">
+<span class="material-symbols-outlined text-[200px]" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<div>
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-h4 text-h4 text-on-surface">Platform Security Score</h3>
+<span class="material-symbols-outlined text-primary">info</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Aggregate health based on active policies and recent anomalies.</p>
+</div>
+<div class="flex items-end gap-4">
+<div class="text-[64px] font-bold leading-none text-primary tracking-tighter">
+                                92
+                            </div>
+<div class="pb-2">
+<span class="text-on-surface-variant font-h6">/ 100</span>
+<div class="flex items-center text-secondary gap-1 mt-1">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span class="font-label-sm text-label-sm">+3 pts this week</span>
+</div>
+</div>
+</div>
+<div class="mt-6 w-full bg-surface-container-highest rounded-full h-2">
+<div class="bg-primary h-2 rounded-full" style="width: 92%"></div>
+</div>
+</div>
+<!-- Key Metrics Row -->
+<div class="col-span-1 md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-gutter">
+<!-- Failed Logins -->
+<div class="bg-surface rounded-xl border border-outline-variant p-space-md flex flex-col justify-center">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-full bg-error-container flex items-center justify-center text-on-error-container">
+<span class="material-symbols-outlined">gpp_bad</span>
+</div>
+<span class="font-h6 text-h6 text-on-surface-variant">Failed Logins (24h)</span>
+</div>
+<div class="flex items-baseline gap-2 mt-2">
+<span class="font-h2 text-h2 text-on-surface">1,248</span>
+<span class="text-error font-label-sm flex items-center bg-error-container/50 px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[14px]">arrow_upward</span> 12%
+                                </span>
+</div>
+</div>
+<!-- Active Admins -->
+<div class="bg-surface rounded-xl border border-outline-variant p-space-md flex flex-col justify-center">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined">admin_panel_settings</span>
+</div>
+<span class="font-h6 text-h6 text-on-surface-variant">Active Admin Sessions</span>
+</div>
+<div class="flex items-baseline gap-2 mt-2">
+<span class="font-h2 text-h2 text-on-surface">24</span>
+<span class="text-secondary font-label-sm flex items-center">
+                                    Normal range
+                                </span>
+</div>
+</div>
+<!-- Blocked IPs -->
+<div class="bg-surface rounded-xl border border-outline-variant p-space-md flex flex-col justify-center">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined">block</span>
+</div>
+<span class="font-h6 text-h6 text-on-surface-variant">Auto-Blocked IPs</span>
+</div>
+<div class="flex items-baseline gap-2 mt-2">
+<span class="font-h2 text-h2 text-on-surface">89</span>
+<span class="text-on-surface-variant font-label-sm flex items-center">
+                                    In last 7 days
+                                </span>
+</div>
+</div>
+</div>
+<!-- Auth Spike Chart Area (Placeholder for actual chart) -->
+<div class="col-span-1 md:col-span-8 bg-surface rounded-xl border border-outline-variant p-space-lg">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-h4 text-h4 text-on-surface">Authentication Attempts</h3>
+<select class="bg-surface-container-low border border-outline-variant rounded-md px-3 py-1.5 text-body-sm focus:border-primary outline-none">
+<option>Last 24 Hours</option>
+<option>Last 7 Days</option>
+</select>
+</div>
+<div class="h-64 w-full bg-surface-container-lowest rounded-lg border border-dashed border-outline-variant flex items-center justify-center relative overflow-hidden">
+<!-- Abstract representation of a chart -->
+<div class="absolute bottom-0 left-0 w-full h-full flex items-end px-4 gap-2 opacity-20">
+<div class="w-full h-1/4 bg-primary rounded-t-sm"></div>
+<div class="w-full h-2/4 bg-primary rounded-t-sm"></div>
+<div class="w-full h-1/4 bg-primary rounded-t-sm"></div>
+<div class="w-full h-3/4 bg-error rounded-t-sm relative">
+<div class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-error">Spike</div>
+</div>
+<div class="w-full h-1/4 bg-primary rounded-t-sm"></div>
+<div class="w-full h-1/3 bg-primary rounded-t-sm"></div>
+</div>
+<span class="text-on-surface-variant font-body-md z-10 bg-surface px-4 py-2 rounded-full shadow-sm">Interactive Chart Visualization Area</span>
+</div>
+</div>
+<!-- IP Whitelist Management -->
+<div class="col-span-1 md:col-span-4 bg-surface rounded-xl border border-outline-variant flex flex-col h-full">
+<div class="p-space-md border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest rounded-t-xl">
+<h3 class="font-h5 text-h5 text-on-surface">Admin IP Whitelist</h3>
+<button class="text-primary hover:bg-primary-container/10 p-1.5 rounded-md transition-colors">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+</div>
+<div class="p-space-md flex-1 overflow-y-auto max-h-[300px]">
+<ul class="space-y-3">
+<li class="flex justify-between items-center p-3 hover:bg-surface-container-low rounded-lg transition-colors border border-transparent hover:border-outline-variant">
+<div>
+<div class="font-h6 text-h6 text-on-surface flex items-center gap-2">
+                                            Office HQ (VPN)
+                                            <span class="w-2 h-2 rounded-full bg-secondary"></span>
+</div>
+<div class="font-caption text-caption text-on-surface-variant font-mono mt-0.5">192.168.1.100/24</div>
+</div>
+<button class="text-on-surface-variant hover:text-error transition-colors p-1"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</li>
+<li class="flex justify-between items-center p-3 hover:bg-surface-container-low rounded-lg transition-colors border border-transparent hover:border-outline-variant">
+<div>
+<div class="font-h6 text-h6 text-on-surface">Datacenter Proxies</div>
+<div class="font-caption text-caption text-on-surface-variant font-mono mt-0.5">10.0.0.0/8</div>
+</div>
+<button class="text-on-surface-variant hover:text-error transition-colors p-1"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</li>
+<li class="flex justify-between items-center p-3 hover:bg-surface-container-low rounded-lg transition-colors border border-transparent hover:border-outline-variant">
+<div>
+<div class="font-h6 text-h6 text-on-surface">CEO Home Network</div>
+<div class="font-caption text-caption text-on-surface-variant font-mono mt-0.5">203.0.113.42</div>
+</div>
+<button class="text-on-surface-variant hover:text-error transition-colors p-1"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</li>
+</ul>
+</div>
+</div>
+<!-- Security Audit Trail Table -->
+<div class="col-span-1 md:col-span-12 bg-surface rounded-xl border border-outline-variant overflow-hidden">
+<div class="p-space-lg border-b border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+<div>
+<h3 class="font-h4 text-h4 text-on-surface">Security Config Audit Trail</h3>
+<p class="font-caption text-caption text-on-surface-variant mt-1">Log of changes to sensitive system configurations.</p>
+</div>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">filter_list</span>
+<input class="pl-9 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-md text-body-sm focus:outline-none focus:border-primary transition-colors w-48" placeholder="Filter logs..." type="text"/>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant">
+<th class="px-space-md py-3 font-label-sm text-label-sm text-on-surface uppercase tracking-wider">Timestamp</th>
+<th class="px-space-md py-3 font-label-sm text-label-sm text-on-surface uppercase tracking-wider">Admin User</th>
+<th class="px-space-md py-3 font-label-sm text-label-sm text-on-surface uppercase tracking-wider">Action</th>
+<th class="px-space-md py-3 font-label-sm text-label-sm text-on-surface uppercase tracking-wider">Resource</th>
+<th class="px-space-md py-3 font-label-sm text-label-sm text-on-surface uppercase tracking-wider">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-space-md py-4 font-body-sm text-on-surface-variant whitespace-nowrap">2023-10-27 14:32:01</td>
+<td class="px-space-md py-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center text-[10px] font-bold">NA</div>
+<span class="font-body-md text-on-surface font-medium">nguyen.admin</span>
+</div>
+</td>
+<td class="px-space-md py-4 font-body-md text-on-surface">Modified 2FA Requirement</td>
+<td class="px-space-md py-4 font-body-md text-on-surface-variant">Global Security Policy</td>
+<td class="px-space-md py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/30 text-on-secondary-container font-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                                                Success
+                                            </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-space-md py-4 font-body-sm text-on-surface-variant whitespace-nowrap">2023-10-27 11:15:44</td>
+<td class="px-space-md py-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-surface-variant text-on-surface flex items-center justify-center text-[10px] font-bold">SYS</div>
+<span class="font-body-md text-on-surface font-medium">system.auto</span>
+</div>
+</td>
+<td class="px-space-md py-4 font-body-md text-on-surface">Auto-blocked IP Address</td>
+<td class="px-space-md py-4 font-body-md text-on-surface-variant font-mono text-sm">185.199.108.153</td>
+<td class="px-space-md py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error-container/30 text-on-error-container font-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                                Enforced
+                                            </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-space-md py-4 font-body-sm text-on-surface-variant whitespace-nowrap">2023-10-26 09:05:12</td>
+<td class="px-space-md py-4">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center text-[10px] font-bold">JD</div>
+<span class="font-body-md text-on-surface font-medium">john.doe</span>
+</div>
+</td>
+<td class="px-space-md py-4 font-body-md text-on-surface">Failed Login (Invalid Password)</td>
+<td class="px-space-md py-4 font-body-md text-on-surface-variant">Admin Portal Auth</td>
+<td class="px-space-md py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error-container/30 text-on-error-container font-label-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                                Failed
+                                            </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-space-md border-t border-outline-variant flex justify-between items-center bg-surface-container-lowest">
+<span class="font-body-sm text-on-surface-variant">Showing 3 of 1,024 entries</span>
+<div class="flex gap-1">
+<button class="px-3 py-1 border border-outline-variant rounded hover:bg-surface-container-low text-on-surface-variant font-label-sm">Prev</button>
+<button class="px-3 py-1 border border-primary bg-primary text-on-primary rounded font-label-sm">1</button>
+<button class="px-3 py-1 border border-outline-variant rounded hover:bg-surface-container-low text-on-surface-variant font-label-sm">2</button>
+<button class="px-3 py-1 border border-outline-variant rounded hover:bg-surface-container-low text-on-surface-variant font-label-sm">Next</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

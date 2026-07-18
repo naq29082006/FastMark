@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cấu hình Thông báo &amp; SMS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container": "#e5eeff",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-tertiary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-secondary-container": "#007432",
+                        "surface-tint": "#006e2d",
+                        "outline": "#6e7b6c",
+                        "on-secondary-fixed": "#002109",
+                        "on-primary-fixed-variant": "#005320",
+                        "primary-fixed": "#7ffc97",
+                        "on-error": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb2bf",
+                        "on-surface-variant": "#3e4a3d",
+                        "surface-container-highest": "#d3e4fe",
+                        "primary-container": "#00873a",
+                        "inverse-surface": "#213145",
+                        "surface-bright": "#f8f9ff",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-variant": "#d3e4fe",
+                        "inverse-primary": "#62df7d",
+                        "inverse-on-surface": "#eaf1ff",
+                        "secondary-fixed": "#6bff8f",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#dce9ff",
+                        "surface": "#f8f9ff",
+                        "primary-fixed-dim": "#62df7d",
+                        "primary": "#006b2c",
+                        "background": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "secondary-container": "#6bff8f",
+                        "on-tertiary-fixed": "#3f0016",
+                        "on-background": "#0b1c30",
+                        "on-tertiary-fixed-variant": "#8a143c",
+                        "on-surface": "#0b1c30",
+                        "on-primary-fixed": "#002109",
+                        "secondary": "#006e2f",
+                        "tertiary-fixed": "#ffd9de",
+                        "surface-container-low": "#eff4ff",
+                        "surface-dim": "#cbdbf5",
+                        "tertiary-container": "#c74668",
+                        "tertiary": "#a72d51",
+                        "outline-variant": "#bdcaba",
+                        "on-secondary-fixed-variant": "#005321",
+                        "on-primary-container": "#f7fff2"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "space-xs": "4px",
+                        "container-max-width": "1440px",
+                        "space-md": "16px",
+                        "header-height": "64px",
+                        "space-xl": "32px",
+                        "space-lg": "24px",
+                        "gutter": "24px",
+                        "sidebar-width": "260px",
+                        "margin-page": "32px",
+                        "space-sm": "8px"
+                    },
+                    fontFamily: {
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "h6": ["Inter"],
+                        "h3": ["Inter"],
+                        "h2": ["Inter"],
+                        "h5": ["Inter"],
+                        "caption": ["Inter"],
+                        "h4": ["Inter"],
+                        "h1": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    fontSize: {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "h6": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "h3": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "h2": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "h5": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "h4": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+                        "h1": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased flex">
+<!-- SideNavBar Component -->
+<aside class="fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest border-r border-outline-variant flex flex-col z-20">
+<!-- Brand & Profile -->
+<div class="p-space-lg flex flex-col gap-space-md border-b border-outline-variant">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center overflow-hidden">
+<img alt="Chợ Quê FastMark Logo" class="w-full h-full object-cover" data-alt="A clean, minimalist logo for a modern e-commerce admin panel. The logo is rendered in dark green against a pure white background, showcasing a professional and trustworthy aesthetic suitable for a high-end corporate dashboard." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8oe_C6OGBaVeU64GsnMQYLyny-96T8hKJh4jOaLTh9447Ah2ii3BISBXEtiiNFaH7WtQ_Nxonzr10V4WpJ48JdJokf81nyx8BQoFEkmazsrAsT5bkFtjhEqoV0gjqIIDZ3DdyaO9Mwg2ziJ1y0JfyCxySOOGhGRk-z6EC3l1HqDnssu7Uh_TmR6t0YkM0gvocGAsqwchUS8myDux_SSktyO4cmseFF9Eo0GFPVE1YiecgzEVdXP4RZ3Ecw2lG13RGPyooRROA9hHs"/>
+</div>
+<div>
+<h2 class="font-h5 text-h5 font-bold text-on-surface">FastMark Admin</h2>
+<p class="font-caption text-caption text-on-surface-variant">Management Console</p>
+</div>
+</div>
+<button class="w-full py-2 px-4 bg-primary text-on-primary rounded font-label-sm text-label-sm hover:opacity-90 transition-opacity">
+                Báo cáo mới
+            </button>
+</div>
+<!-- Navigation Tabs -->
+<nav class="flex-1 overflow-y-auto py-space-sm">
+<ul class="flex flex-col">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                        Dashboard
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+                        Đơn hàng
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+                        Sản phẩm
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+                        Người dùng
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="local_offer">local_offer</span>
+                        Khuyến mãi
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container text-on-secondary-container border-l-4 border-primary font-semibold font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="settings" data-weight="fill" style="font-variation-settings: 'FILL' 1;">settings</span>
+                        Cài đặt
+                    </a>
+</li>
+</ul>
+</nav>
+<!-- Footer Tabs -->
+<div class="p-space-sm border-t border-outline-variant mt-auto">
+<ul class="flex flex-col">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+                        Trợ giúp
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                        Đăng xuất
+                    </a>
+</li>
+</ul>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="ml-[260px] flex-1 flex flex-col min-h-screen">
+<!-- TopNavBar Component -->
+<header class="fixed top-0 right-0 left-[260px] h-[64px] bg-surface border-b border-outline-variant flex justify-between items-center px-space-lg w-auto z-10">
+<!-- Left side / Navigation Links -->
+<div class="flex items-center gap-space-lg">
+<span class="font-h5 text-h5 font-bold text-on-surface">Chợ Quê FastMark</span>
+<nav class="hidden md:flex gap-space-md">
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-label-sm text-label-sm" href="#">Hệ thống</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-label-sm text-label-sm" href="#">Kho hàng</a>
+<a class="text-on-surface-variant hover:text-on-surface transition-colors font-label-sm text-label-sm" href="#">Báo cáo</a>
+</nav>
+</div>
+<!-- Right side / Actions -->
+<div class="flex items-center gap-space-md">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 hover:opacity-80">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 hover:opacity-80">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 hover:opacity-80">
+<span class="material-symbols-outlined" data-icon="apps">apps</span>
+</button>
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded font-label-sm text-label-sm hover:opacity-80 transition-opacity ml-2">
+                    Thêm mới
+                </button>
+<div class="w-8 h-8 rounded-full bg-surface-container ml-4 overflow-hidden">
+<img alt="Admin Profile" class="w-full h-full object-cover" data-alt="A professional headshot of an administrative user for a dashboard interface. The lighting is clean and soft, reflecting a modern corporate environment. The background is a subtle, neutral light tone." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBiSmEEKQ2g1BL12xsUUCnZfAyftp2Oa2jbgP4WgQqYObBz0oH6MZJJjYwGH0U8LUD8pZXyKbuVJ1YRL0g1kupJjrN3bPZkr2vqMkJ-tZNV1t44WGE8xjhmVEe4cxq31fcye0AuHS-8MBZdwzsDMRX7VAMBSb1EkGkz1fAe8y0pFh44GassSh-NRpwPLMr7vGzZppF_xFZobd2T7FW922UpXv4sA_W4VrCFUpg0YEa3nN127j8Zhk4TQ3SmJX7UxFEoRHMB-PRQ3hqi"/>
+</div>
+</div>
+</header>
+<!-- Page Content Canvas -->
+<main class="mt-[64px] p-margin-page bg-background flex-1">
+<!-- Page Header -->
+<div class="flex justify-between items-end mb-space-xl">
+<div>
+<div class="flex items-center gap-2 text-on-surface-variant font-caption text-caption mb-1">
+<span>Cài đặt</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface font-medium">Thông báo &amp; SMS</span>
+</div>
+<h1 class="font-h1 text-h1 text-on-background">Cấu hình Thông báo &amp; SMS</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-2xl">
+                        Quản lý các mẫu tin nhắn hệ thống, SMS tiếp thị và cấu hình điều kiện kích hoạt tự động. Theo dõi hiệu suất phân phối tin nhắn.
+                    </p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 border border-outline-variant text-on-surface rounded font-label-sm text-label-sm hover:bg-surface-container-lowest transition-colors flex items-center gap-2 bg-surface-container-lowest">
+<span class="material-symbols-outlined text-[18px]">history</span>
+                        Lịch sử gửi
+                    </button>
+<button class="px-4 py-2 bg-primary text-on-primary rounded font-label-sm text-label-sm hover:opacity-90 transition-opacity flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                        Tạo mẫu mới
+                    </button>
+</div>
+</div>
+<!-- Dashboard Stats Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter mb-space-xl">
+<!-- Stat Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-space-lg flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wide">SMS Đã gửi (Tháng này)</span>
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">sms</span>
+</div>
+</div>
+<div>
+<div class="font-h2 text-h2 text-on-surface mb-1">124,592</div>
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+<span class="font-caption text-caption font-medium">+12.5% so với tháng trước</span>
+</div>
+</div>
+</div>
+<!-- Stat Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-space-lg flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wide">Tỷ lệ Giao thành công</span>
+<div class="w-8 h-8 rounded-full bg-surface-container text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+</div>
+</div>
+<div>
+<div class="font-h2 text-h2 text-on-surface mb-1">98.2%</div>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="font-caption text-caption">Trung bình hệ thống: 95%</span>
+</div>
+</div>
+</div>
+<!-- Stat Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-space-lg flex flex-col justify-between">
+<div class="flex justify-between items-start mb-4">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wide">Tỷ lệ Mở (Push Notifications)</span>
+<div class="w-8 h-8 rounded-full bg-surface-container text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">touch_app</span>
+</div>
+</div>
+<div>
+<div class="font-h2 text-h2 text-on-surface mb-1">24.8%</div>
+<div class="flex items-center gap-1 text-error">
+<span class="material-symbols-outlined text-[14px]">trending_down</span>
+<span class="font-caption text-caption font-medium">-2.1% so với tuần trước</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Content Area: Tabs & Table -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden flex flex-col">
+<!-- Internal Tabs -->
+<div class="border-b border-outline-variant px-space-lg flex gap-space-lg pt-4 bg-surface-bright">
+<button class="pb-3 border-b-2 border-primary text-primary font-h6 text-h6 px-2">
+                        Mẫu tin nhắn Hệ thống
+                    </button>
+<button class="pb-3 border-b-2 border-transparent text-on-surface-variant hover:text-on-surface font-h6 text-h6 px-2 transition-colors">
+                        Chiến dịch SMS Marketing
+                    </button>
+<button class="pb-3 border-b-2 border-transparent text-on-surface-variant hover:text-on-surface font-h6 text-h6 px-2 transition-colors">
+                        Cài đặt API
+                    </button>
+</div>
+<!-- Toolbar -->
+<div class="p-space-md border-b border-outline-variant bg-surface flex justify-between items-center">
+<div class="relative w-72">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]">search</span>
+<input class="w-full pl-10 pr-4 py-2 border border-outline-variant rounded bg-surface-container-lowest text-body-md focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Tìm kiếm mẫu tin nhắn..." type="text"/>
+</div>
+<div class="flex gap-2">
+<button class="p-2 border border-outline-variant rounded text-on-surface-variant hover:bg-surface-container transition-colors flex items-center justify-center bg-surface-container-lowest">
+<span class="material-symbols-outlined text-[20px]">filter_list</span>
+</button>
+</div>
+</div>
+<!-- Data Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wide border-b border-outline-variant">
+<th class="p-4 w-12"><input class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></th>
+<th class="p-4 font-medium">Tên Mẫu &amp; Mã</th>
+<th class="p-4 font-medium">Loại Kênh</th>
+<th class="p-4 font-medium">Sự kiện kích hoạt</th>
+<th class="p-4 font-medium">Trạng thái</th>
+<th class="p-4 font-medium text-right">Thao tác</th>
+</tr>
+</thead>
+<tbody class="text-body-md text-on-surface divide-y divide-outline-variant">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="p-4"><input class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="p-4">
+<div class="font-medium text-on-surface mb-1">Xác nhận Đơn hàng Thành công</div>
+<div class="font-caption text-caption text-on-surface-variant font-mono">TPL_ORDER_SUCCESS_01</div>
+</td>
+<td class="p-4">
+<div class="flex gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container text-on-surface-variant font-caption text-caption">
+<span class="material-symbols-outlined text-[14px]">sms</span> SMS
+                                        </span>
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container text-on-surface-variant font-caption text-caption">
+<span class="material-symbols-outlined text-[14px]">notifications</span> Push
+                                        </span>
+</div>
+</td>
+<td class="p-4">
+<span class="text-on-surface-variant">Khi thanh toán thành công</span>
+</td>
+<td class="p-4">
+<span class="inline-flex items-center px-2 py-1 rounded-full bg-[#E6F4EA] text-[#16A34A] font-label-sm text-label-sm font-medium">
+                                        Hoạt động
+                                    </span>
+</td>
+<td class="p-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]">content_copy</span></button>
+<button class="p-1 text-on-surface-variant hover:text-error transition-colors"><span class="material-symbols-outlined text-[20px]">pause</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="p-4"><input class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="p-4">
+<div class="font-medium text-on-surface mb-1">Nhắc nhở Giỏ hàng Bỏ quên</div>
+<div class="font-caption text-caption text-on-surface-variant font-mono">TPL_CART_ABANDON_02</div>
+</td>
+<td class="p-4">
+<div class="flex gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container text-on-surface-variant font-caption text-caption">
+<span class="material-symbols-outlined text-[14px]">notifications</span> Push
+                                        </span>
+</div>
+</td>
+<td class="p-4">
+<span class="text-on-surface-variant">Sau 2h không thanh toán</span>
+</td>
+<td class="p-4">
+<span class="inline-flex items-center px-2 py-1 rounded-full bg-[#E6F4EA] text-[#16A34A] font-label-sm text-label-sm font-medium">
+                                        Hoạt động
+                                    </span>
+</td>
+<td class="p-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]">content_copy</span></button>
+<button class="p-1 text-on-surface-variant hover:text-error transition-colors"><span class="material-symbols-outlined text-[20px]">pause</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="p-4"><input class="rounded border-outline-variant text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="p-4">
+<div class="font-medium text-on-surface mb-1">Thông báo Giao hàng</div>
+<div class="font-caption text-caption text-on-surface-variant font-mono">TPL_DELIVERY_START_01</div>
+</td>
+<td class="p-4">
+<div class="flex gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-surface-container text-on-surface-variant font-caption text-caption">
+<span class="material-symbols-outlined text-[14px]">sms</span> SMS
+                                        </span>
+</div>
+</td>
+<td class="p-4">
+<span class="text-on-surface-variant">Đơn vị vận chuyển nhận hàng</span>
+</td>
+<td class="p-4">
+<span class="inline-flex items-center px-2 py-1 rounded-full bg-[#F3F4F6] text-[#4B5563] font-label-sm text-label-sm font-medium">
+                                        Tạm dừng
+                                    </span>
+</td>
+<td class="p-4 text-right">
+<div class="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]">edit</span></button>
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]">content_copy</span></button>
+<button class="p-1 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined text-[20px]">play_arrow</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="p-space-md border-t border-outline-variant bg-surface flex justify-between items-center">
+<span class="font-caption text-caption text-on-surface-variant">Hiển thị 1-3 trong số 24 mẫu</span>
+<div class="flex gap-1">
+<button class="p-1 border border-outline-variant rounded text-on-surface-variant hover:bg-surface-container disabled:opacity-50 transition-colors bg-surface-container-lowest" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center border border-primary bg-primary-container text-on-primary-container rounded font-label-sm">1</button>
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant bg-surface-container-lowest text-on-surface rounded font-label-sm hover:bg-surface-container transition-colors">2</button>
+<button class="w-8 h-8 flex items-center justify-center border border-outline-variant bg-surface-container-lowest text-on-surface rounded font-label-sm hover:bg-surface-container transition-colors">3</button>
+<button class="p-1 border border-outline-variant rounded text-on-surface-variant hover:bg-surface-container transition-colors bg-surface-container-lowest">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

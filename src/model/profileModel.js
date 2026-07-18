@@ -171,6 +171,10 @@ export function mergeProfile(authUser, baseProfile, updates = {}) {
       patch.isOpen !== undefined
         ? Number(patch.isOpen) === 1 ? 1 : 0
         : baseProfile?.isOpen ?? 1,
+    walletBalance:
+      patch.walletBalance !== undefined
+        ? Math.max(0, Number(patch.walletBalance) || 0)
+        : Math.max(0, Number(baseProfile?.walletBalance) || 0),
     updatedAt: nowIso(),
   };
 }
@@ -249,5 +253,6 @@ export function mapBackendUserToProfile(backendUser, authUser) {
     openTime: backendUser?.openTime || '',
     closeTime: backendUser?.closeTime || '',
     isOpen: backendUser?.isOpen ?? 1,
+    walletBalance: backendUser?.walletBalance ?? 0,
   });
 }

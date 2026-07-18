@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html class="light" lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Chợ Quê FastMark - Store Settings</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#6e7b6c",
+                        "inverse-primary": "#62df7d",
+                        "tertiary-fixed": "#ffe083",
+                        "inverse-surface": "#27313f",
+                        "surface-dim": "#d0dbed",
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#121c2a",
+                        "surface-container-highest": "#d9e3f6",
+                        "primary-container": "#00873a",
+                        "tertiary": "#735c00",
+                        "secondary": "#006e2f",
+                        "secondary-fixed": "#6bff8f",
+                        "on-secondary-fixed": "#002109",
+                        "background": "#f8f9ff",
+                        "on-primary-container": "#f7fff2",
+                        "on-error": "#ffffff",
+                        "on-surface-variant": "#3e4a3d",
+                        "surface-container-low": "#eff4ff",
+                        "primary": "#006b2c",
+                        "on-secondary-fixed-variant": "#005321",
+                        "tertiary-fixed-dim": "#eec200",
+                        "surface-tint": "#006e2d",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "outline-variant": "#bdcaba",
+                        "on-tertiary-container": "#4e3e00",
+                        "primary-fixed-dim": "#62df7d",
+                        "on-primary-fixed": "#002109",
+                        "error-container": "#ffdad6",
+                        "surface-bright": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "surface": "#f8f9ff",
+                        "on-background": "#121c2a",
+                        "surface-container": "#e6eeff",
+                        "primary-fixed": "#7ffc97",
+                        "on-secondary-container": "#007432",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "surface-container-high": "#dee9fc",
+                        "secondary-container": "#6bff8f",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-tertiary": "#ffffff",
+                        "surface-variant": "#d9e3f6",
+                        "secondary-fixed-dim": "#4ae176",
+                        "on-tertiary-fixed": "#231b00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "touch-target-min": "56px",
+                        "stack-gap-md": "16px",
+                        "stack-gap-lg": "32px",
+                        "gutter": "16px",
+                        "container-margin": "24px",
+                        "unit": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Inter", "sans-serif"],
+                        "price-display": ["Inter", "sans-serif"],
+                        "headline-md": ["Inter", "sans-serif"],
+                        "label-md": ["Inter", "sans-serif"],
+                        "label-lg": ["Inter", "sans-serif"],
+                        "headline-lg": ["Inter", "sans-serif"],
+                        "body-md": ["Inter", "sans-serif"],
+                        "body-lg": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom Toggle Switch Styles */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #00873a;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #00873a;
+        }
+        .toggle-checkbox:checked + .toggle-label:after {
+            transform: translateX(100%);
+            border-color: white;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen pb-24 md:pb-0 flex flex-col md:flex-row">
+<!-- Top App Bar (Mobile) -->
+<header class="md:hidden sticky top-0 z-40 bg-surface border-b border-outline-variant flex flex-col w-full px-container-margin py-unit gap-2">
+<div class="flex items-center justify-between w-full h-touch-target-min">
+<button aria-label="Go back" class="flex items-center justify-center p-2 text-primary">
+<span class="material-symbols-outlined text-3xl" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md-mobile font-bold text-primary flex-1 text-center">Cài đặt Cửa hàng</h1>
+<div class="w-10"></div> <!-- Spacer for centering -->
+</div>
+</header>
+<!-- Side Navigation Drawer (Web) -->
+<nav class="hidden md:flex bg-surface h-full w-80 rounded-r-xl shadow-xl flex-col py-6 sticky top-0 overflow-y-auto">
+<div class="flex items-center left_align px-6 mb-8 gap-4">
+<img alt="User Profile Picture" class="w-16 h-16 rounded-full object-cover border-2 border-primary-container" data-alt="A close-up portrait of a friendly, smiling elderly Vietnamese man, likely a market vendor, with warm, deeply lined skin and kind eyes. He is wearing a simple, clean, traditional pale yellow button-down shirt. The lighting is soft and natural, emphasizing his welcoming expression. The background is a slightly blurred, bright green market setting, conveying a sense of familiarity, trust, and the vibrant 'Chợ Quê' atmosphere. Modern minimalist style with humanist warmth." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA31t_JcOBGFDaKjwRb3sk6FhcSbr6rz_DWzsLIHoBA81v1f7v3V5PGwZwusC2FCDkTgt_36dn7vTrshjfqe0DG-q0B3Cgjf2xz5F1UoSZH7VNp7dBaahKZ21F5Q79wim3X28nFPuF2D0HyTO5lpwZTWT8s6Fntq3OMBmLf53FtdS-yedzsD67tZj5mmr-oI7N1Lqq6kQ9eI6TzMG5VY0NyaMheIk1vS9b1Je1wtqEFuLgn_nJAfobK5HbXiKf1wYf5UjiAuZwJPTkE"/>
+<div>
+<h2 class="font-headline-md text-headline-md-mobile text-primary font-bold">Chào Bác Ba</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Thành viên Thân thiết</p>
+<p class="font-body-md text-body-md text-primary font-bold mt-1">Ví: 500.000đ</p>
+</div>
+</div>
+<ul class="flex flex-col gap-2 flex-1">
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 hover:bg-surface-variant rounded-full transition-colors h-touch-target-min" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="home">home</span>
+<span class="font-body-lg text-body-lg">Trang chủ</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 hover:bg-surface-variant rounded-full transition-colors h-touch-target-min" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-body-lg text-body-lg">Ví điện tử</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 hover:bg-surface-variant rounded-full transition-colors h-touch-target-min" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="qr_code_2">qr_code_2</span>
+<span class="font-body-lg text-body-lg">Mã QR của tôi</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 hover:bg-surface-variant rounded-full transition-colors h-touch-target-min" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="favorite">favorite</span>
+<span class="font-body-lg text-body-lg">Cửa hàng yêu thích</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 text-on-surface-variant mx-2 px-4 py-4 hover:bg-surface-variant rounded-full transition-colors h-touch-target-min" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="help">help</span>
+<span class="font-body-lg text-body-lg">Hỗ trợ</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-4 bg-primary-container text-on-primary-container font-bold rounded-full mx-2 px-4 py-4 h-touch-target-min" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="settings" style="font-variation-settings: 'FILL' 1;">settings</span>
+<span class="font-body-lg text-body-lg">Cài đặt</span>
+</a>
+</li>
+</ul>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 px-container-margin py-stack-gap-lg max-w-4xl mx-auto w-full md:px-12 md:py-16">
+<!-- Web Header -->
+<div class="hidden md:flex justify-between items-center mb-10">
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-bold">Cài đặt Cửa hàng</h1>
+</div>
+<div class="space-y-8">
+<!-- Section: Notifications -->
+<section class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant">
+<div class="flex items-center gap-3 mb-6">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="notifications">notifications</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-semibold">Thông báo</h2>
+</div>
+<div class="space-y-6">
+<!-- Toggle: New Orders -->
+<div class="flex items-center justify-between border-b border-outline-variant pb-4">
+<div class="flex-1 pr-4">
+<label class="font-body-lg text-body-lg text-on-surface font-semibold block cursor-pointer" for="toggle-orders">Đơn hàng mới</label>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Nhận thông báo khi có người đặt mua hàng.</p>
+</div>
+<div class="relative inline-block w-14 align-middle select-none transition duration-200 ease-in h-8">
+<input checked="" class="toggle-checkbox absolute block w-8 h-8 rounded-full bg-white border-4 border-outline appearance-none cursor-pointer z-10 transition-transform duration-300 ease-in-out" id="toggle-orders" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-8 rounded-full bg-surface-container-highest cursor-pointer border-2 border-outline-variant" for="toggle-orders"></label>
+</div>
+</div>
+<!-- Toggle: New Messages -->
+<div class="flex items-center justify-between">
+<div class="flex-1 pr-4">
+<label class="font-body-lg text-body-lg text-on-surface font-semibold block cursor-pointer" for="toggle-messages">Tin nhắn mới</label>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Nhận thông báo khi khách hàng nhắn tin.</p>
+</div>
+<div class="relative inline-block w-14 align-middle select-none transition duration-200 ease-in h-8">
+<input checked="" class="toggle-checkbox absolute block w-8 h-8 rounded-full bg-white border-4 border-outline appearance-none cursor-pointer z-10 transition-transform duration-300 ease-in-out" id="toggle-messages" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-8 rounded-full bg-surface-container-highest cursor-pointer border-2 border-outline-variant" for="toggle-messages"></label>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Language & Display -->
+<section class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant">
+<div class="flex items-center gap-3 mb-6">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="language">language</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-semibold">Ngôn ngữ &amp; Hiển thị</h2>
+</div>
+<div class="space-y-6">
+<!-- Language Selection -->
+<div class="flex flex-col gap-2">
+<label class="font-body-lg text-body-lg text-on-surface font-semibold block">Ngôn ngữ ứng dụng</label>
+<p class="font-body-md text-body-md text-on-surface-variant mb-3">Chọn ngôn ngữ bạn muốn sử dụng.</p>
+<div class="flex flex-col sm:flex-row gap-4">
+<label class="relative flex items-center p-4 border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container-low transition-colors h-touch-target-min flex-1 bg-surface-container-low border-primary-container">
+<input checked="" class="peer sr-only" name="language" type="radio" value="vi"/>
+<span class="material-symbols-outlined text-primary-container mr-3 peer-checked:block hidden" data-icon="radio_button_checked">radio_button_checked</span>
+<span class="material-symbols-outlined text-outline-variant mr-3 peer-checked:hidden block" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="font-body-lg text-body-lg text-on-surface font-semibold">Tiếng Việt</span>
+</label>
+<label class="relative flex items-center p-4 border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container-low transition-colors h-touch-target-min flex-1">
+<input class="peer sr-only" name="language" type="radio" value="en"/>
+<span class="material-symbols-outlined text-primary-container mr-3 peer-checked:block hidden" data-icon="radio_button_checked">radio_button_checked</span>
+<span class="material-symbols-outlined text-outline-variant mr-3 peer-checked:hidden block" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+<span class="font-body-lg text-body-lg text-on-surface font-semibold">English</span>
+</label>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Privacy -->
+<section class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant">
+<div class="flex items-center gap-3 mb-6">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="visibility">visibility</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-semibold">Quyền riêng tư</h2>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex-1 pr-4">
+<label class="font-body-lg text-body-lg text-on-surface font-semibold block cursor-pointer" for="toggle-privacy">Hiển thị Cửa hàng</label>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Bật để khách hàng có thể tìm thấy cửa hàng của bạn trên bản đồ và tìm kiếm.</p>
+</div>
+<div class="relative inline-block w-14 align-middle select-none transition duration-200 ease-in h-8">
+<input checked="" class="toggle-checkbox absolute block w-8 h-8 rounded-full bg-white border-4 border-outline appearance-none cursor-pointer z-10 transition-transform duration-300 ease-in-out" id="toggle-privacy" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-8 rounded-full bg-surface-container-highest cursor-pointer border-2 border-outline-variant" for="toggle-privacy"></label>
+</div>
+</div>
+</section>
+<!-- Support & Actions -->
+<div class="flex flex-col gap-4 mt-8">
+<a class="flex items-center justify-center gap-2 w-full h-touch-target-min bg-surface-container-lowest border border-primary text-primary font-headline-md text-headline-md rounded-lg hover:bg-surface-container-low transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="help_center">help_center</span>
+                    Trung tâm hỗ trợ
+                </a>
+<button class="flex items-center justify-center gap-2 w-full h-touch-target-min bg-primary text-on-primary font-headline-md text-headline-md rounded-lg hover:bg-secondary transition-colors shadow-sm">
+                    Lưu thay đổi
+                    <span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Bottom Nav Bar (Mobile) - Suppressed for Settings Screen as per rules (Linear/Task-focused/Contextual sub-page) -->
+<!-- However, since the instruction asks to use the predicted components as guidance and the JSON provides BottomNavBar for top-level, and the drawer above has "Cài đặt" as a main tab, I will include it to match the requested active state logic if it's considered a main destination. Based on "Semantic Shell Mandate": Settings is a top-level tab in the Drawer, but usually suppressed on mobile. Let's include it to demonstrate active state mapping for "Tài khoản" or similar, or just map it to the closest. The Drawer has "Cài đặt". The BottomNavBar has ["Trang chủ", "Khám phá", "Đơn hàng", "Tin nhắn", "Tài khoản"]. Settings maps closest to "Tài khoản". -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center bg-surface-container-lowest border-t border-outline-variant px-2 pb-2 h-touch-target-min shadow-lg">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-variant transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="home">home</span>
+<span class="font-label-md text-label-md mt-1">Trang chủ</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-variant transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="explore">explore</span>
+<span class="font-label-md text-label-md mt-1">Khám phá</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-variant transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="receipt_long">receipt_long</span>
+<span class="font-label-md text-label-md mt-1">Đơn hàng</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-2 hover:bg-surface-variant transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="chat">chat</span>
+<span class="font-label-md text-label-md mt-1">Tin nhắn</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-6 py-2 transition-transform duration-150 transform scale-90" href="#">
+<span class="material-symbols-outlined text-2xl" data-icon="person" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-label-md text-label-md mt-1 font-bold">Tài khoản</span>
+</a>
+</nav>
+<script>
+        // Simple script to handle custom toggle visual logic if needed, 
+        // though CSS handles the basic state.
+        document.querySelectorAll('.toggle-checkbox').forEach(toggle => {
+            toggle.addEventListener('change', function() {
+                // Future logic for saving state could go here.
+            });
+        });
+    </script>
+</body></html>

@@ -130,7 +130,10 @@ export async function createProductOnBackend({ idToken, payload }) {
   );
 
   const parsed = await parseApiResponse(response);
-  return parsed.data;
+  return {
+    ...(parsed.data || {}),
+    message: parsed.message || '',
+  };
 }
 
 export async function updateProductOnBackend({ idToken, productId, payload }) {

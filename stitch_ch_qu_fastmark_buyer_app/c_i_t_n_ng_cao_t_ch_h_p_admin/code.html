@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Platform Settings - VietMarket Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary-fixed": "#7ffc97",
+                      "inverse-surface": "#213145",
+                      "surface-container": "#e5eeff",
+                      "tertiary-fixed-dim": "#ffb2bf",
+                      "secondary-container": "#6bff8f",
+                      "error-container": "#ffdad6",
+                      "on-primary-container": "#f7fff2",
+                      "primary": "#006b2c",
+                      "tertiary": "#a72d51",
+                      "on-background": "#0b1c30",
+                      "on-tertiary-fixed": "#3f0016",
+                      "on-surface-variant": "#3e4a3d",
+                      "on-error": "#ffffff",
+                      "surface-container-highest": "#d3e4fe",
+                      "outline": "#6e7b6c",
+                      "on-primary-fixed": "#002109",
+                      "on-tertiary-container": "#fffbff",
+                      "surface": "#f8f9ff",
+                      "on-secondary-container": "#007432",
+                      "inverse-primary": "#62df7d",
+                      "primary-container": "#00873a",
+                      "outline-variant": "#bdcaba",
+                      "tertiary-container": "#c74668",
+                      "background": "#f8f9ff",
+                      "on-secondary-fixed": "#002109",
+                      "inverse-on-surface": "#eaf1ff",
+                      "surface-container-low": "#eff4ff",
+                      "tertiary-fixed": "#ffd9de",
+                      "surface-dim": "#cbdbf5",
+                      "primary-fixed-dim": "#62df7d",
+                      "on-secondary": "#ffffff",
+                      "on-surface": "#0b1c30",
+                      "on-primary": "#ffffff",
+                      "surface-tint": "#006e2d",
+                      "secondary-fixed": "#6bff8f",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-fixed-variant": "#005321",
+                      "on-primary-fixed-variant": "#005320",
+                      "surface-bright": "#f8f9ff",
+                      "secondary": "#006e2f",
+                      "surface-container-lowest": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed-dim": "#4ae176",
+                      "error": "#ba1a1a",
+                      "surface-variant": "#d3e4fe",
+                      "on-tertiary-fixed-variant": "#8a143c",
+                      "surface-container-high": "#dce9ff"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "header-height": "64px",
+                      "gutter": "24px",
+                      "space-lg": "24px",
+                      "margin-page": "32px",
+                      "space-xl": "32px",
+                      "space-md": "16px",
+                      "space-xs": "4px",
+                      "space-sm": "8px",
+                      "sidebar-width": "260px",
+                      "container-max-width": "1440px"
+              },
+              "fontFamily": {
+                      "body-md": ["Inter"],
+                      "h5": ["Inter"],
+                      "h6": ["Inter"],
+                      "h1": ["Inter"],
+                      "h2": ["Inter"],
+                      "caption": ["Inter"],
+                      "body-lg": ["Inter"],
+                      "h4": ["Inter"],
+                      "h3": ["Inter"],
+                      "label-sm": ["Inter"]
+              },
+              "fontSize": {
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "h5": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "h6": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                      "h1": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                      "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "h4": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+                      "h3": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        body { background-color: #F8FAF8; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .icon-fill { font-variation-settings: 'FILL' 1; }
+    </style>
+</head>
+<body class="font-body-md text-body-md text-on-surface antialiased bg-background">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest dark:bg-inverse-surface border-r border-outline-variant dark:border-outline flex flex-col h-screen overflow-y-auto">
+<div class="p-6">
+<h1 class="font-h3 text-h3 font-bold text-primary dark:text-primary-fixed-dim">VietMarket</h1>
+<p class="font-caption text-caption text-on-surface-variant mt-1">Admin Console</p>
+</div>
+<div class="flex-1 py-4">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-h6 text-h6">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-h6 text-h6">Users</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="storefront">storefront</span>
+<span class="font-h6 text-h6">Sellers</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span class="font-h6 text-h6">Products</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="category">category</span>
+<span class="font-h6 text-h6">Categories</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+<span class="font-h6 text-h6">Orders</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-h6 text-h6">Financials</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="campaign">campaign</span>
+<span class="font-h6 text-h6">Ads</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-h6 text-h6">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container/10 text-primary font-semibold border-l-4 border-primary opacity-90 transition-all scale-[0.99]" href="#">
+<span class="material-symbols-outlined icon-fill" data-icon="settings">settings</span>
+<span class="font-h6 text-h6">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="ml-[260px] flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-[260px] h-[64px] bg-surface-container-lowest dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flex justify-between items-center px-space-xl z-10">
+<div class="flex items-center gap-4">
+<span class="font-h5 text-h5 text-on-surface">Platform Settings</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-all active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-all active:scale-95 duration-150">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant">
+<img alt="Administrator Profile" class="w-full h-full object-cover" data-alt="A small, professional headshot portrait of a corporate administrator, warm lighting, neutral background, high resolution, suitable for a dashboard profile avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBv4_XyRe75TGxBF2aT_0zFlCQ9GYptM7kqC4b8A5xNvYK4S0WqSAlMhzF1KFCjxO9VgJ86d_0r1-gZfpfV0bAKQKLzBfZXLabRkOjHy8wtuklQRkuQ9VItxNELs78ac5ik5JiybBedcVjCqfbxaEXamjKn28bcjR3XNzLCyGDn8_PiKJyBHOUMpov1x3kKlwTovJ9eAi9WL6I2vT3WDt0uPz1frqR8T34kdxcR3lbsLw4uHSds3Sh1z-IhF0Oe-XoEFNf8bM34ot3I"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 mt-[64px] p-margin-page">
+<div class="max-w-[1024px] mx-auto flex gap-gutter">
+<!-- Settings Tabs (Vertical) -->
+<aside class="w-64 shrink-0">
+<div class="bg-surface-container-lowest rounded-lg border border-outline-variant overflow-hidden">
+<nav class="flex flex-col">
+<a class="px-4 py-3 font-h6 text-h6 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors flex justify-between items-center" href="#">
+                                General
+                            </a>
+<a class="px-4 py-3 font-h6 text-h6 bg-secondary-container/10 text-primary border-r-2 border-primary flex justify-between items-center" href="#">
+                                Integrations &amp; API
+                                <span class="material-symbols-outlined text-[16px]" data-icon="chevron_right">chevron_right</span>
+</a>
+<a class="px-4 py-3 font-h6 text-h6 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors flex justify-between items-center" href="#">
+                                Webhooks
+                            </a>
+<a class="px-4 py-3 font-h6 text-h6 text-on-surface-variant hover:bg-surface-container-low hover:text-primary transition-colors flex justify-between items-center" href="#">
+                                Maintenance
+                            </a>
+</nav>
+</div>
+</aside>
+<!-- Settings Content -->
+<div class="flex-1 flex flex-col gap-gutter">
+<div class="bg-surface-container-lowest rounded-lg border border-outline-variant p-6">
+<h2 class="font-h4 text-h4 text-on-surface mb-6">Payment Gateways</h2>
+<div class="flex flex-col gap-4">
+<!-- VNPAY -->
+<div class="border border-outline-variant rounded-lg p-4 flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-surface-container-low rounded flex items-center justify-center text-primary font-bold">VN</div>
+<div>
+<h3 class="font-h6 text-h6 text-on-surface">VNPAY</h3>
+<p class="font-caption text-caption text-on-surface-variant">Primary payment processor</p>
+</div>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 bg-[#dcfce7] rounded-full">
+<span class="w-2 h-2 rounded-full bg-[#16A34A]"></span>
+<span class="font-label-sm text-label-sm text-[#16A34A]">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1">Terminal ID (vnp_TmnCode)</label>
+<input class="w-full bg-surface border border-outline-variant rounded px-3 py-2 font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none" readonly="" type="text" value="VNP12345"/>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant mb-1">Hash Secret</label>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded px-3 py-2 font-body-md text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none pr-10" readonly="" type="password" value="secret_hash_value_here"/>
+<button class="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary">
+<span class="material-symbols-outlined text-[18px]" data-icon="visibility">visibility</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex justify-end gap-2 mt-2">
+<button class="px-4 py-2 text-primary font-h6 text-h6 hover:bg-surface-container-low rounded transition-colors">Test Connection</button>
+<button class="px-4 py-2 border border-outline-variant text-on-surface font-h6 text-h6 hover:bg-surface-container-low rounded transition-colors">Configure</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

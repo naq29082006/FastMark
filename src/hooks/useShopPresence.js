@@ -6,14 +6,14 @@ import {
   setShopPresenceOfflineOnBackend,
   setShopPresenceOnlineOnBackend,
 } from '../api/presenceApi';
-import { APP_MODE_SELLER } from './useAppMode';
 import { selectAuthStatus, selectIsSeller } from '../viewmodel/auth/authSelectors';
 
-export function useShopPresence(appMode) {
+export function useShopPresence(_appMode) {
   const authStatus = useSelector(selectAuthStatus);
   const isSeller = useSelector(selectIsSeller);
   const appStateRef = useRef(AppState.currentState);
-  const isSellerMode = appMode === APP_MODE_SELLER && isSeller;
+  // Seller đã duyệt: shop presence online khi app foreground (không còn seller mode riêng).
+  const isSellerMode = isSeller;
 
   useEffect(() => {
     if (authStatus !== 'authenticated' || !isSeller) {

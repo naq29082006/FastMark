@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Thiết lập mật khẩu mới - Chợ Quê FastMark</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed": "#ffe083",
+                        "primary": "#006b2c",
+                        "on-tertiary-fixed": "#231b00",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005320",
+                        "on-background": "#121c2a",
+                        "on-tertiary-fixed-variant": "#574500",
+                        "on-tertiary-container": "#4e3e00",
+                        "surface-tint": "#006e2d",
+                        "on-primary-container": "#f7fff2",
+                        "primary-fixed-dim": "#62df7d",
+                        "primary-fixed": "#7ffc97",
+                        "on-secondary-container": "#007432",
+                        "surface-variant": "#d9e3f6",
+                        "surface-bright": "#f8f9ff",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#005321",
+                        "secondary-fixed-dim": "#4ae176",
+                        "secondary": "#006e2f",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#002109",
+                        "on-surface": "#121c2a",
+                        "tertiary-fixed-dim": "#eec200",
+                        "outline-variant": "#bdcaba",
+                        "error-container": "#ffdad6",
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "on-primary-fixed": "#002109",
+                        "on-surface-variant": "#3e4a3d",
+                        "inverse-surface": "#27313f",
+                        "primary-container": "#00873a",
+                        "outline": "#6e7b6c",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-error": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#eff4ff",
+                        "surface-dim": "#d0dbed",
+                        "secondary-fixed": "#6bff8f",
+                        "tertiary": "#735c00",
+                        "surface-container-highest": "#d9e3f6",
+                        "on-primary": "#ffffff",
+                        "tertiary-container": "#cea700",
+                        "inverse-primary": "#62df7d",
+                        "surface-container": "#e6eeff",
+                        "surface-container-high": "#dee9fc",
+                        "secondary-container": "#6bff8f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-gap-lg": "32px",
+                        "stack-gap-md": "16px",
+                        "gutter": "16px",
+                        "unit": "8px",
+                        "touch-target-min": "56px",
+                        "container-margin": "24px"
+                    },
+                    "fontFamily": {
+                        "price-display": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-lg": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "price-display": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "label-md": ["16px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-lg": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-lg": ["20px", { "lineHeight": "30px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col font-sans selection:bg-primary-container selection:text-on-primary-container">
+<!-- Transactional Header: Navigation Shell Suppressed -->
+<header class="flex items-center px-container-margin h-[72px] flex-shrink-0">
+<button aria-label="Quay lại" class="w-touch-target-min h-touch-target-min flex items-center justify-center -ml-4 text-on-surface hover:bg-surface-variant rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary">
+<span class="material-symbols-outlined text-[28px]">arrow_back</span>
+</button>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col px-container-margin py-stack-gap-md max-w-md mx-auto w-full">
+<!-- Header Text -->
+<div class="mb-stack-gap-lg">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary mb-unit">
+                Tạo mật khẩu mới
+            </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                Mật khẩu mới của bạn phải khác với mật khẩu đã sử dụng trước đó.
+            </p>
+</div>
+<!-- Form -->
+<form class="flex flex-col flex-1 gap-stack-gap-lg">
+<div class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface" for="new-password">
+                    Mật khẩu mới
+                </label>
+<div class="relative">
+<input class="w-full h-touch-target-min px-4 rounded-lg border border-outline bg-surface-container-lowest font-body-lg text-body-lg text-on-surface placeholder:text-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" id="new-password" placeholder="Nhập ít nhất 8 ký tự" type="password"/>
+<button aria-label="Hiện mật khẩu" class="absolute right-2 top-1/2 -translate-y-1/2 w-[48px] h-[48px] flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-full" type="button">
+<span class="material-symbols-outlined" id="toggle-new-pwd">visibility_off</span>
+</button>
+</div>
+</div>
+<div class="flex flex-col gap-unit">
+<label class="font-label-lg text-label-lg text-on-surface" for="confirm-password">
+                    Xác nhận mật khẩu
+                </label>
+<div class="relative">
+<input class="w-full h-touch-target-min px-4 rounded-lg border border-outline bg-surface-container-lowest font-body-lg text-body-lg text-on-surface placeholder:text-outline-variant focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors" id="confirm-password" placeholder="Nhập lại mật khẩu mới" type="password"/>
+<button aria-label="Hiện mật khẩu" class="absolute right-2 top-1/2 -translate-y-1/2 w-[48px] h-[48px] flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-full" type="button">
+<span class="material-symbols-outlined" id="toggle-confirm-pwd">visibility_off</span>
+</button>
+</div>
+</div>
+<!-- Spacer to push button to bottom on tall screens -->
+<div class="flex-1"></div>
+<!-- Primary Action -->
+<div class="pb-container-margin pt-stack-gap-lg">
+<button class="w-full h-touch-target-min bg-primary text-on-primary rounded-full flex items-center justify-center gap-2 font-headline-md text-headline-md-mobile hover:bg-surface-tint active:scale-[0.98] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-primary shadow-sm" type="button">
+                    Lưu mật khẩu
+                    <span class="material-symbols-outlined" style="font-variation-settings: 'wght' 600;">arrow_forward</span>
+</button>
+</div>
+</form>
+</main>
+<script>
+        // Simple micro-interaction for password visibility toggles
+        function setupPasswordToggle(inputId, toggleIconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(toggleIconId);
+            const button = icon.parentElement;
+
+            button.addEventListener('click', () => {
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.textContent = 'visibility';
+                } else {
+                    input.type = 'password';
+                    icon.textContent = 'visibility_off';
+                }
+            });
+        }
+
+        setupPasswordToggle('new-password', 'toggle-new-pwd');
+        setupPasswordToggle('confirm-password', 'toggle-confirm-pwd');
+    </script>
+</body></html>

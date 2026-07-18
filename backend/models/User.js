@@ -53,8 +53,10 @@ const userSchema = new mongoose.Schema({
   Role: { type: Number, default: 1 },
   Status: { type: Number, default: 1 },
 
-  // Số gian hàng user đang theo dõi (ShopFollow). Không còn follow user↔user.
+  // Số gian hàng / người bán user đang theo dõi (ShopFollow).
   FollowingCount: { type: Number, default: 0 },
+  // Số người đang theo dõi user này (qua gian hàng của họ).
+  FollowersCount: { type: Number, default: 0 },
 
   DangHoatDong: { type: Boolean, default: false },
   LanHoatDongCuoi: { type: Date, default: null },
@@ -94,6 +96,7 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     verifyAccount: this.VerifyAccount,
     sellerPhoneVerified: Boolean(this.SellerPhoneVerified),
     followingCount: Number(this.FollowingCount) || 0,
+    followersCount: Number(this.FollowersCount) || 0,
     createdAt: this.CreatedAt,
     updatedAt: this.UpdatedAt,
   };

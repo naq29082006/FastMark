@@ -83,7 +83,7 @@ export default function DatePickerField({
       >
         <Text style={styles.dateValue}>{displayValue}</Text>
         <View style={styles.dateButtonIconWrap}>
-          <Ionicons name="calendar-outline" size={20} color="#0d7377" />
+          <Ionicons name="calendar-outline" size={20} color="#076F32" />
         </View>
       </Pressable>
 
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#e8f3f1',
+    backgroundColor: '#E6F4EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   modalActionPrimary: {
-    color: '#0d7377',
+    color: '#076F32',
   },
   iosPicker: {
     alignSelf: 'center',

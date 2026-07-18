@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VietMarket Admin - Order Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "surface-container": "#e5eeff",
+                            "surface-container-low": "#eff4ff",
+                            "primary-fixed-dim": "#62df7d",
+                            "on-primary-container": "#f7fff2",
+                            "on-primary-fixed-variant": "#005320",
+                            "error-container": "#ffdad6",
+                            "on-surface-variant": "#3e4a3d",
+                            "surface": "#f8f9ff",
+                            "secondary": "#006e2f",
+                            "on-tertiary-fixed-variant": "#8a143c",
+                            "surface-container-high": "#dce9ff",
+                            "inverse-primary": "#62df7d",
+                            "tertiary-container": "#c74668",
+                            "surface-variant": "#d3e4fe",
+                            "error": "#ba1a1a",
+                            "secondary-fixed-dim": "#4ae176",
+                            "outline": "#6e7b6c",
+                            "inverse-on-surface": "#eaf1ff",
+                            "on-tertiary": "#ffffff",
+                            "surface-bright": "#f8f9ff",
+                            "secondary-container": "#6bff8f",
+                            "inverse-surface": "#213145",
+                            "surface-container-highest": "#d3e4fe",
+                            "secondary-fixed": "#6bff8f",
+                            "primary-fixed": "#7ffc97",
+                            "on-secondary-fixed": "#002109",
+                            "surface-container-lowest": "#ffffff",
+                            "surface-tint": "#006e2d",
+                            "primary-container": "#00873a",
+                            "on-secondary-container": "#007432",
+                            "on-error": "#ffffff",
+                            "on-error-container": "#93000a",
+                            "on-primary": "#ffffff",
+                            "on-tertiary-fixed": "#3f0016",
+                            "tertiary-fixed-dim": "#ffb2bf",
+                            "on-background": "#0b1c30",
+                            "on-primary-fixed": "#002109",
+                            "on-surface": "#0b1c30",
+                            "background": "#f8f9ff",
+                            "on-secondary-fixed-variant": "#005321",
+                            "tertiary": "#a72d51",
+                            "on-secondary": "#ffffff",
+                            "surface-dim": "#cbdbf5",
+                            "primary": "#006b2c",
+                            "outline-variant": "#bdcaba",
+                            "tertiary-fixed": "#ffd9de",
+                            "on-tertiary-container": "#fffbff"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                    },
+                    "spacing": {
+                            "margin-page": "32px",
+                            "space-lg": "24px",
+                            "sidebar-width": "260px",
+                            "gutter": "24px",
+                            "container-max-width": "1440px",
+                            "space-xl": "32px",
+                            "space-xs": "4px",
+                            "space-md": "16px",
+                            "space-sm": "8px",
+                            "header-height": "64px"
+                    },
+                    "fontFamily": {
+                            "h5": ["Inter"],
+                            "h4": ["Inter"],
+                            "h2": ["Inter"],
+                            "caption": ["Inter"],
+                            "label-sm": ["Inter"],
+                            "h3": ["Inter"],
+                            "body-lg": ["Inter"],
+                            "h1": ["Inter"],
+                            "body-md": ["Inter"],
+                            "h6": ["Inter"]
+                    },
+                    "fontSize": {
+                            "h5": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                            "h4": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+                            "h2": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                            "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                            "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                            "h3": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                            "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                            "h1": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                            "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                            "h6": ["14px", {"lineHeight": "20px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAF8; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1; }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid #E2E8F0; }
+        
+        /* Stepper CSS */
+        .stepper-line { position: absolute; top: 12px; left: 24px; right: 24px; height: 2px; background-color: #E2E8F0; z-index: 0; }
+        .stepper-line-active { position: absolute; top: 12px; left: 24px; height: 2px; background-color: #006b2c; z-index: 1; transition: width 0.3s ease; }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[260px] bg-surface-container-lowest dark:bg-inverse-surface border-r border-outline-variant dark:border-outline flex flex-col h-screen overflow-y-auto z-20">
+<div class="p-6">
+<h1 class="font-h3 text-h3 font-bold text-primary dark:text-primary-fixed-dim">VietMarket</h1>
+<p class="font-caption text-caption text-on-surface-variant">Admin Console</p>
+</div>
+<ul class="flex flex-col gap-1 mt-4">
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="dashboard">dashboard</span><span class="font-h6 text-h6">Dashboard</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="group">group</span><span class="font-h6 text-h6">Users</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="storefront">storefront</span><span class="font-h6 text-h6">Sellers</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span><span class="font-h6 text-h6">Products</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="category">category</span><span class="font-h6 text-h6">Categories</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 bg-secondary-container/10 text-primary font-semibold border-l-4 border-primary" href="#"><span class="material-symbols-outlined filled" data-icon="shopping_cart">shopping_cart</span><span class="font-h6 text-h6">Orders</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="payments">payments</span><span class="font-h6 text-h6">Financials</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="campaign">campaign</span><span class="font-h6 text-h6">Ads</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="analytics">analytics</span><span class="font-h6 text-h6">Reports</span></a></li>
+<li><a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary hover:bg-surface-container-low dark:hover:bg-surface-variant transition-colors duration-200" href="#"><span class="material-symbols-outlined" data-icon="settings">settings</span><span class="font-h6 text-h6">Settings</span></a></li>
+</ul>
+</nav>
+<!-- TopNavBar & Main Content Wrapper -->
+<div class="ml-[260px] flex-1 flex flex-col relative w-full h-full">
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-[260px] h-header-height bg-surface-container-lowest dark:bg-inverse-surface border-b border-outline-variant dark:border-outline flex justify-between items-center px-space-xl z-10">
+<div class="flex items-center gap-4">
+<nav aria-label="Breadcrumb" class="flex items-center text-sm">
+<ol class="flex items-center space-x-2">
+<li><a class="text-on-surface-variant hover:text-primary transition-colors" href="#">Orders</a></li>
+<li><span class="material-symbols-outlined text-sm text-outline-variant">chevron_right</span></li>
+<li aria-current="page" class="font-h6 text-h6 text-on-surface">#ORD-9823</li>
+</ol>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-all"><span class="material-symbols-outlined" data-icon="notifications">notifications</span></button>
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-all"><span class="material-symbols-outlined" data-icon="help_outline">help_outline</span></button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant cursor-pointer ml-2">
+<img alt="Administrator Profile" class="w-full h-full object-cover" data-alt="A close-up portrait of a professional corporate administrator in a bright, modern office setting. The lighting is soft and neutral, enhancing a clean, trustworthy corporate aesthetic. High resolution, shallow depth of field." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWSvAns4xBWYp61mxFQsBMSj6osuJFgHhhp8Z6RTdCKaIjgZ6saUxXiYdTV0lHoNgKdwLlMBB3BExVz-ekup71zp9E0yIu8qeHHLNDU6oE8ec_TC0hFF93WZ9z_Ow-6Qdq6qGcSbi_sO97JVAyih83Gnej450NicBeWUOj-oMNjUH2yTn0Ut0L4VgRLtrToDxiAkGgVb1a9VKjQEZ-akPOcuyeKK1uYD_PUjl-iQh6OuqnrE8hkMrMKuxsRz5Wv8jH5Frrpc0w8KUP"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto pt-header-height bg-surface p-margin-page">
+<div class="max-w-container-max-width mx-auto flex flex-col gap-space-lg">
+<!-- Page Header with Actions -->
+<div class="flex justify-between items-end border-b border-outline-variant pb-4">
+<div>
+<h2 class="font-h2 text-h2 text-on-surface flex items-center gap-3">
+                            Order #ORD-9823
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#e6f4ea] text-[#16a34a]">Shipped</span>
+</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Placed on Oct 24, 2023 at 14:32 PM (GMT+7)</p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 bg-surface-container-lowest border border-outline-variant rounded-lg font-h6 text-h6 text-on-surface hover:bg-surface-container-low transition-colors shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="print">print</span> Print Invoice
+                        </button>
+<button class="px-4 py-2 bg-primary text-on-primary rounded-lg font-h6 text-h6 hover:opacity-90 transition-opacity shadow-sm">
+                            Manage Order
+                        </button>
+</div>
+</div>
+<!-- Main Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- Left Column: Timeline & Items -->
+<div class="lg:col-span-2 flex flex-col gap-gutter">
+<!-- Order Status Timeline (Stepper) -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 relative overflow-hidden">
+<h3 class="font-h4 text-h4 text-on-surface mb-6">Order Status</h3>
+<div class="relative w-full max-w-2xl mx-auto mb-8">
+<!-- Stepper Lines -->
+<div class="stepper-line"></div>
+<div class="stepper-line-active" style="width: 66%;"></div>
+<!-- Stepper Nodes -->
+<div class="relative flex justify-between z-10">
+<div class="flex flex-col items-center">
+<div class="w-6 h-6 rounded-full bg-primary flex items-center justify-center border-4 border-surface-container-lowest">
+<span class="material-symbols-outlined text-on-primary text-[14px]" data-icon="check">check</span>
+</div>
+<span class="font-h6 text-h6 text-on-surface mt-2">Placed</span>
+<span class="font-caption text-caption text-on-surface-variant mt-1 text-center">Oct 24<br/>14:32</span>
+</div>
+<div class="flex flex-col items-center">
+<div class="w-6 h-6 rounded-full bg-primary flex items-center justify-center border-4 border-surface-container-lowest">
+<span class="material-symbols-outlined text-on-primary text-[14px]" data-icon="check">check</span>
+</div>
+<span class="font-h6 text-h6 text-on-surface mt-2">Confirmed</span>
+<span class="font-caption text-caption text-on-surface-variant mt-1 text-center">Oct 24<br/>15:10</span>
+</div>
+<div class="flex flex-col items-center">
+<div class="w-6 h-6 rounded-full bg-primary flex items-center justify-center border-4 border-surface-container-lowest">
+<span class="material-symbols-outlined text-on-primary text-[14px]" data-icon="local_shipping">local_shipping</span>
+</div>
+<span class="font-h6 text-h6 text-primary mt-2">Shipped</span>
+<span class="font-caption text-caption text-on-surface-variant mt-1 text-center">Oct 25<br/>09:45</span>
+</div>
+<div class="flex flex-col items-center">
+<div class="w-6 h-6 rounded-full bg-surface-container border-2 border-outline-variant flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-outline-variant"></div>
+</div>
+<span class="font-h6 text-h6 text-on-surface-variant mt-2">Delivered</span>
+<span class="font-caption text-caption text-outline-variant mt-1 text-center">Est. Oct 27</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Itemized List -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden">
+<div class="p-6 border-b border-outline-variant">
+<h3 class="font-h4 text-h4 text-on-surface">Order Items</h3>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-outline-variant font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+<th class="p-4 font-semibold">Product</th>
+<th class="p-4 font-semibold text-right">Price</th>
+<th class="p-4 font-semibold text-center">Qty</th>
+<th class="p-4 font-semibold text-right">Subtotal</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant bg-surface-container-lowest">
+<!-- Item 1 -->
+<tr class="hover:bg-surface/50 transition-colors">
+<td class="p-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded bg-surface-variant flex-shrink-0 border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A high-quality product photo of a traditional Vietnamese ceramic tea set on a wooden table, shot with studio lighting, shallow depth of field, natural and elegant aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGwRUC108SgIWzFGuqGXmpnK5O-dJ5CdHxjclEds3oQeZacQ7KDEGHgqYRJ9D3_jGlJPLhmjNoDwBgzrKVfhHmdMUaI29YWM2qMQfpJCch5oUzl0HPj7ugE553PFvryOTolojw0guNPDpYV6fxAx_lIOBrt4SpwRsVy8XmuTx9hPUK4KkRkzBCwpXcccr_9DcOow5j1hQCnKfVxItb3K67w3khcCZfex-vaggM4wktAq2acH8QqRJR7VFQyvvNEUsSxp1DLMru4QT0"/>
+</div>
+<div>
+<p class="font-h6 text-h6 text-on-surface">Bát Tràng Ceramic Tea Set (Premium)</p>
+<p class="font-caption text-caption text-on-surface-variant mt-1">SKU: BT-TEA-001 | Variant: Emerald Green</p>
+</div>
+</div>
+</td>
+<td class="p-4 font-body-md text-body-md text-on-surface text-right">850,000 ₫</td>
+<td class="p-4 font-body-md text-body-md text-on-surface text-center">2</td>
+<td class="p-4 font-h6 text-h6 text-on-surface text-right">1,700,000 ₫</td>
+</tr>
+<!-- Item 2 -->
+<tr class="hover:bg-surface/50 transition-colors">
+<td class="p-4">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded bg-surface-variant flex-shrink-0 border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A high-quality product photo of a woven bamboo storage basket, clean white background, soft studio lighting, showcasing texture and craftsmanship." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyqptY8XmGPTlkHMvq-KWXA3mpIDBGRfSbpVBB11-e8N8fLncH2cSJ-cm385AlM7uFAmsHit79obpO1dzdzTDSxIqTZZ_IOz7ArZc_trAbrHLp2hYEjDONnRi4b35k8jnQZjt674S8hLoN-iFS5y6WiIxeSDjsp7gktcN1gCWW9qJoElUtviWQ-pzHLagY7vEEUtkmbXhisZi8PHIuHBIbQLyOJ4bdcUPBPWbAx0Flm3R8e4q4m1XlsI2mySH8zZx_7vsUxKFd-VAd"/>
+</div>
+<div>
+<p class="font-h6 text-h6 text-on-surface">Handwoven Bamboo Storage Basket</p>
+<p class="font-caption text-caption text-on-surface-variant mt-1">SKU: BM-BASK-042 | Variant: Medium</p>
+</div>
+</div>
+</td>
+<td class="p-4 font-body-md text-body-md text-on-surface text-right">240,000 ₫</td>
+<td class="p-4 font-body-md text-body-md text-on-surface text-center">1</td>
+<td class="p-4 font-h6 text-h6 text-on-surface text-right">240,000 ₫</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Totals Area -->
+<div class="bg-surface-container-low p-6 flex flex-col items-end gap-2 border-t border-outline-variant">
+<div class="flex justify-between w-full max-w-xs font-body-md text-body-md text-on-surface-variant">
+<span>Subtotal:</span>
+<span>1,940,000 ₫</span>
+</div>
+<div class="flex justify-between w-full max-w-xs font-body-md text-body-md text-on-surface-variant">
+<span>Shipping Fee:</span>
+<span>35,000 ₫</span>
+</div>
+<div class="flex justify-between w-full max-w-xs font-body-md text-body-md text-on-surface-variant">
+<span>Voucher Discount:</span>
+<span class="text-[#16a34a]">-50,000 ₫</span>
+</div>
+<div class="w-full max-w-xs border-t border-outline-variant my-2"></div>
+<div class="flex justify-between w-full max-w-xs">
+<span class="font-h5 text-h5 text-on-surface">Total:</span>
+<span class="font-h4 text-h4 text-primary">1,925,000 ₫</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Sidebar Info Cards -->
+<div class="flex flex-col gap-gutter">
+<!-- Customer Info Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 shadow-sm">
+<h3 class="font-h5 text-h5 text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-outline" data-icon="person">person</span> Customer Info
+                            </h3>
+<div class="flex items-center gap-4 mb-4">
+<div class="w-12 h-12 rounded-full bg-surface-variant flex-shrink-0 border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A portrait of a young Vietnamese woman, smiling warmly, natural daylight, soft focus background, professional lifestyle photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeOps2KxxmnsGQg6o3To5c9YURFJiXhNpAuznKNs2v7yep_4K3kPtVT4rL7PNTaNIpHvrLAmf5DOOCe0ECdlMEXmEksasP_uFp5VE1r42J8IfZRtgRpTCi-Sqqz855VtnJvTAjrZ7kQofhUxt4jVJwmJpXJoZhBzQmvKhZhIbqEbB7yNG6YZSP_uGUThE4lCziHkKGdf1gLh0DUJvzlJ1bIDR4pVaOR56Ig777mUpvBZ7fQD5pBXhV-Fq6_Ut2X3ZEVO4i8o0sQV5S"/>
+</div>
+<div>
+<p class="font-h6 text-h6 text-on-surface">Nguyen Thi Mai</p>
+<p class="font-caption text-caption text-on-surface-variant mt-0.5">Joined Mar 2022</p>
+</div>
+</div>
+<div class="space-y-3 font-body-md text-body-md text-on-surface">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-[20px] text-outline mt-0.5" data-icon="mail">mail</span>
+<span class="break-all">mai.nguyen.89@example.com</span>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-[20px] text-outline mt-0.5" data-icon="phone">phone</span>
+<span>+84 912 345 678</span>
+</div>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-[20px] text-outline mt-0.5" data-icon="location_on">location_on</span>
+<span>Apt 4B, Building C, Green City<br/>District 7, Ho Chi Minh City<br/>Vietnam</span>
+</div>
+</div>
+</div>
+<!-- Seller Info Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 shadow-sm">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-h5 text-h5 text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-outline" data-icon="store">store</span> Seller Info
+                                </h3>
+<a class="font-label-sm text-label-sm text-primary hover:underline flex items-center" href="#">
+                                    Store Details <span class="material-symbols-outlined text-[14px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<div class="flex items-center gap-4 mb-4">
+<div class="w-10 h-10 rounded bg-surface-variant flex-shrink-0 border border-outline-variant overflow-hidden flex items-center justify-center">
+<span class="material-symbols-outlined text-outline" data-icon="storefront">storefront</span>
+</div>
+<div>
+<p class="font-h6 text-h6 text-on-surface">Crafts of Vietnam (Official)</p>
+<p class="font-caption text-caption text-on-surface-variant mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px] text-[#f59e0b] filled" data-icon="star">star</span> 4.9 (2.4k reviews)
+                                    </p>
+</div>
+</div>
+<div class="pt-3 border-t border-outline-variant">
+<p class="font-body-md text-body-md text-on-surface-variant">Store ID: STR-4092</p>
+</div>
+</div>
+<!-- Payment Details Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-6 shadow-sm">
+<h3 class="font-h5 text-h5 text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-outline" data-icon="credit_card">credit_card</span> Payment Details
+                            </h3>
+<div class="space-y-3 font-body-md text-body-md">
+<div class="flex justify-between">
+<span class="text-on-surface-variant">Method:</span>
+<span class="font-medium text-on-surface flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="account_balance">account_balance</span> Bank Transfer (VNPAY)
+                                    </span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-surface-variant">Transaction ID:</span>
+<span class="font-mono text-xs text-on-surface bg-surface-container-low px-1.5 py-0.5 rounded">TXN-9823-VN</span>
+</div>
+<div class="flex justify-between">
+<span class="text-on-surface-variant">Status:</span>
+<span class="text-[#16a34a] font-medium">Paid</span>
+</div>
+<div class="border-t border-outline-variant my-3 pt-3"></div>
+<div class="flex justify-between text-sm">
+<span class="text-on-surface-variant">Platform Fee (5%):</span>
+<span class="text-on-surface text-error">-96,250 ₫</span>
+</div>
+<div class="flex justify-between font-h6 text-h6">
+<span class="text-on-surface">Seller Payout:</span>
+<span class="text-on-surface">1,828,750 ₫</span>
+</div>
+</div>
+</div>
+<!-- Admin Actions Container -->
+<div class="bg-[#fef2f2] dark:bg-[#450a0a] rounded-xl border border-[#fca5a5] dark:border-[#7f1d1d] p-6 shadow-sm">
+<h3 class="font-h5 text-h5 text-[#991b1b] dark:text-[#fca5a5] mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="admin_panel_settings">admin_panel_settings</span> Admin Actions
+                            </h3>
+<div class="flex flex-col gap-2">
+<button class="w-full py-2 px-4 bg-white dark:bg-inverse-surface border border-outline-variant rounded-lg font-h6 text-h6 text-on-surface hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="chat">chat</span> Contact Customer
+                                </button>
+<button class="w-full py-2 px-4 bg-white dark:bg-inverse-surface border border-outline-variant rounded-lg font-h6 text-h6 text-on-surface hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="store">store</span> Contact Seller
+                                </button>
+<button class="w-full py-2 px-4 bg-[#ffedd5] dark:bg-[#78350f] border border-[#fdba74] dark:border-[#b45309] rounded-lg font-h6 text-h6 text-[#c2410c] dark:text-[#fdba74] hover:bg-[#ffedd5]/80 transition-colors flex items-center justify-center gap-2 mt-2">
+<span class="material-symbols-outlined text-sm" data-icon="gavel">gavel</span> Escalate to Dispute
+                                </button>
+<button class="w-full py-2 px-4 bg-error text-on-error rounded-lg font-h6 text-h6 hover:bg-error/90 transition-colors flex items-center justify-center gap-2 mt-1">
+<span class="material-symbols-outlined text-sm" data-icon="cancel">cancel</span> Cancel Order
+                                </button>
+</div>
+</div>
+</div>
+</div>
+<div class="h-8"></div> <!-- Bottom padding -->
+</div>
+</main>
+</div>
+</body></html>

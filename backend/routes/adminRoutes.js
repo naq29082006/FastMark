@@ -119,20 +119,6 @@ router.post(
   asyncHandler(adminCatalogController.cancelReservation)
 );
 
-router.get("/deals", verifyFirebaseToken, requireAdmin, asyncHandler(adminCatalogController.listDeals));
-router.get(
-  "/deals/:id",
-  verifyFirebaseToken,
-  requireAdmin,
-  asyncHandler(adminCatalogController.getDealDetail)
-);
-router.post(
-  "/deals/:id/lock",
-  verifyFirebaseToken,
-  requireAdmin,
-  asyncHandler(adminCatalogController.lockDeal)
-);
-
 router.get(
   "/reports",
   verifyFirebaseToken,
@@ -189,5 +175,11 @@ router.post(
   requireAdmin,
   asyncHandler(adminNotificationController.sendSystemNotification)
 );
+
+const bannerController = require("../controllers/bannerController");
+router.get("/banners", verifyFirebaseToken, requireAdmin, asyncHandler(bannerController.listAdmin));
+router.post("/banners", verifyFirebaseToken, requireAdmin, asyncHandler(bannerController.create));
+router.put("/banners/:id", verifyFirebaseToken, requireAdmin, asyncHandler(bannerController.update));
+router.delete("/banners/:id", verifyFirebaseToken, requireAdmin, asyncHandler(bannerController.remove));
 
 module.exports = router;

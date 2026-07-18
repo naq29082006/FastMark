@@ -22,7 +22,14 @@
         }
       ],
       "expo-web-browser",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "FastMark cần camera để quét mã nhận hàng của khách.",
+          "barcodeScannerEnabled": true
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,

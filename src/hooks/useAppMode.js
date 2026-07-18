@@ -13,6 +13,12 @@ export function useAppMode(isSeller) {
   useEffect(() => {
     let isCurrent = true;
 
+    const readyFallback = setTimeout(() => {
+      if (isCurrent) {
+        setIsReady(true);
+      }
+    }, 2000);
+
     AsyncStorage.getItem(STORAGE_KEY)
       .then((value) => {
         if (!isCurrent) {
@@ -30,10 +36,14 @@ export function useAppMode(isSeller) {
         if (isCurrent) {
           setIsReady(true);
         }
+      })
+      .finally(() => {
+        clearTimeout(readyFallback);
       });
 
     return () => {
       isCurrent = false;
+      clearTimeout(readyFallback);
     };
   }, [isSeller]);
 

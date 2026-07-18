@@ -17,67 +17,6 @@ exports.listOrders = async (req, res) => {
   return success(res, { data });
 };
 
-exports.createDeal = async (req, res) => {
-  const productId = pickBodyValue(req.body, ["productId", "product_id"]);
-  const variantId = pickBodyValue(req.body, ["variantId", "variant_id"]);
-  const offeredPrice = req.body.offeredPrice ?? req.body.offered_price;
-
-  if (!productId || !variantId || offeredPrice === undefined || offeredPrice === null) {
-    return fail(res, { status: 400, message: "Thiếu sản phẩm, biến thể hoặc giá đề nghị." });
-  }
-
-  const deal = await buyerOpsService.createDealOffer(req.currentUser, req.body);
-  return success(res, {
-    message: "Đã gửi đề nghị deal giá.",
-    data: { deal },
-  });
-};
-
-exports.listDeals = async (req, res) => {
-  const status = req.query.status;
-  const search = pickBodyValue(req.query, ["search", "q"]);
-  const deals = await buyerOpsService.listBuyerDeals(req.currentUser, { status, search });
-  return success(res, { data: { deals } });
-};
-
-exports.getDeal = async (req, res) => {
-  const deal = await buyerOpsService.getBuyerDeal(req.currentUser, req.params.id);
-  return success(res, { data: { deal } });
-};
-
-exports.resubmitDeal = async (req, res) => {
-  const deal = await buyerOpsService.resubmitDealOffer(req.currentUser, req.params.id, req.body);
-  return success(res, {
-    message: "Đã gửi lại đề nghị deal giá.",
-    data: { deal },
-  });
-};
-
-exports.counterDeal = async (req, res) => {
-  const offeredPrice = req.body.offeredPrice ?? req.body.offered_price;
-  if (offeredPrice === undefined || offeredPrice === null) {
-    return fail(res, { status: 400, message: "Thiếu giá đề nghị." });
-  }
-
-  const deal = await buyerOpsService.counterDealOfferByBuyer(
-    req.currentUser,
-    req.params.id,
-    req.body
-  );
-  return success(res, {
-    message: "Đã gửi đề nghị giá mới.",
-    data: { deal },
-  });
-};
-
-exports.acceptCounter = async (req, res) => {
-  const deal = await buyerOpsService.acceptCounterOffer(req.currentUser, req.params.id);
-  return success(res, {
-    message: "Đã chấp nhận mức giá của shop.",
-    data: { deal },
-  });
-};
-
 exports.createReservation = async (req, res) => {
   const productId = pickBodyValue(req.body, ["productId", "product_id"]);
   const variantId = pickBodyValue(req.body, ["variantId", "variant_id"]);

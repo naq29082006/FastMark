@@ -40,79 +40,10 @@ export async function getBuyerOrdersOnBackend({ idToken, tab, search }) {
   return payload.data;
 }
 
-export async function createBuyerDealOnBackend({
-  idToken,
-  productId,
-  variantId,
-  offeredPrice,
-  offeredTotal,
-  quantity = 1,
-  note,
-}) {
-  const totalOffer = offeredTotal ?? offeredPrice;
-  const response = await apiRequest(
-    API_ENDPOINTS.buyerDeals,
-    {
-      method: 'POST',
-      headers: await authHeaders(idToken),
-      body: JSON.stringify({
-        productId,
-        variantId,
-        offeredPrice: totalOffer,
-        offeredTotal: totalOffer,
-        quantity: Number(quantity) || 1,
-        note,
-      }),
-    },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.deal;
-}
-
-export async function resubmitBuyerDealOnBackend({ idToken, dealId, offeredPrice, note }) {
-  const response = await apiRequest(
-    API_ENDPOINTS.buyerDealResubmit(dealId),
-    {
-      method: 'POST',
-      headers: await authHeaders(idToken),
-      body: JSON.stringify({ offeredPrice, note }),
-    },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.deal;
-}
-
-export async function counterBuyerDealOnBackend({ idToken, dealId, offeredPrice, note }) {
-  const response = await apiRequest(
-    API_ENDPOINTS.buyerDealCounter(dealId),
-    {
-      method: 'POST',
-      headers: await authHeaders(idToken),
-      body: JSON.stringify({ offeredPrice, note }),
-    },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.deal;
-}
-
-export async function acceptBuyerCounterOnBackend(idToken, dealId) {
-  const response = await apiRequest(
-    API_ENDPOINTS.buyerDealAcceptCounter(dealId),
-    { method: 'POST', headers: await authHeaders(idToken), body: '{}' },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.deal;
-}
-
 export async function createBuyerReservationOnBackend({
   idToken,
   productId,
   variantId,
-  dealOfferId,
   quantity,
   pickupTime,
   note,
@@ -125,7 +56,6 @@ export async function createBuyerReservationOnBackend({
       body: JSON.stringify({
         productId,
         variantId,
-        dealOfferId,
         quantity,
         pickupTime,
         note,
@@ -159,20 +89,6 @@ export async function completeBuyerReservationOnBackend(idToken, reservationId) 
   );
   const payload = await parseApiResponse(response);
   return payload.data?.reservation;
-}
-
-export async function getBuyerDealOnBackend(idToken, dealId) {
-  const id = encodeURIComponent(String(dealId || '').trim());
-  if (!id) {
-    throw new Error('Không tìm thấy mã deal.');
-  }
-  const response = await apiRequest(
-    API_ENDPOINTS.buyerDeal(id),
-    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.deal;
 }
 
 export async function getBuyerReservationOnBackend(idToken, reservationId) {
