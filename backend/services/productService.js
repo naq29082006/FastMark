@@ -1,11 +1,14 @@
 const Product = require("../models/Product");
-const ProductImage = require("../models/ProductImage");
 const ProductVariant = require("../models/ProductVariant");
 const ProductCategory = require("../models/ProductCategory");
 const { assertProductCategoryExists } = require("./productCategoryService");
 const ShopProfile = require("../models/ShopProfile");
-const { PRODUCT_STATUS } = require("../constants");
-const { isSubscriptionActive } = require("../constants");
+const { PRODUCT_STATUS, PRODUCT_REMOVED_BY } = require("../constants");
+const { isSubscriptionActive, isRecordActive } = require("../constants");
+const {
+  isSellerRemovedProduct,
+  notRemovedProductMatch,
+} = require("../utils/productRemoval");
 const {
   assertCanManageProducts,
 } = require("./sellerPlanAccessService");
@@ -13,6 +16,11 @@ const { assertNoActiveReservationsForProduct } = require("./reservationService")
 const { sanitizeUploadLabel } = require("../utils/sanitizeFileName");
 const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService");
 const { buildPaginationMeta, parsePagination } = require("../utils/pagination");
+const {
+  normalizeEmbeddedImages,
+  resolveImageUrls,
+  toPublicImageList,
+} = require("../utils/embeddedImages");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -49,7 +57,7 @@ function normalizePinProduct(value) {
   return pin;
 }
 
-/** Legacy Product.Thumbnail (string | string[]) — chỉ fallback khi chưa có ProductImage. */
+/** Legacy Product.Thumbnail (string | string[]) — fallback khi chưa có images. */
 function normalizeLegacyThumbnailList(value) {
   if (Array.isArray(value)) {
     return value.map(pickString).filter(Boolean);
@@ -58,22 +66,13 @@ function normalizeLegacyThumbnailList(value) {
   return single ? [single] : [];
 }
 
-function toPublicProductImages(imageDocs = []) {
-  return (imageDocs || [])
-    .slice()
-    .sort((left, right) => (Number(left.Stt) || 0) - (Number(right.Stt) || 0))
-    .map((doc) => ({
-      id: doc._id,
-      productId: doc.ProductId,
-      imageUrl: pickString(doc.ImageUrl),
-      stt: Number(doc.Stt) || 0,
-      uploadedAt: doc.UploadedAt || null,
-    }))
-    .filter((item) => item.imageUrl);
+function toPublicProductImages(imageSource = []) {
+  return toPublicImageList(resolveImageUrls(imageSource));
 }
 
 async function loadProductImages(productId) {
-  return ProductImage.find({ ProductId: productId }).sort({ Stt: 1, UploadedAt: 1 });
+  const product = await Product.findById(productId).select("images").lean();
+  return normalizeEmbeddedImages(product?.images || []);
 }
 
 async function loadProductImagesByProductIds(productIds = []) {
@@ -81,37 +80,20 @@ async function loadProductImagesByProductIds(productIds = []) {
     return new Map();
   }
 
-  const rows = await ProductImage.find({ ProductId: { $in: productIds } }).sort({
-    Stt: 1,
-    UploadedAt: 1,
-  });
+  const rows = await Product.find({ _id: { $in: productIds } })
+    .select("images")
+    .lean();
 
   return rows.reduce((map, row) => {
-    const key = String(row.ProductId);
-    if (!map.has(key)) {
-      map.set(key, []);
-    }
-    map.get(key).push(row);
+    map.set(String(row._id), normalizeEmbeddedImages(row.images || []));
     return map;
   }, new Map());
 }
 
 async function replaceProductImages(productId, imageUrls = []) {
-  await ProductImage.deleteMany({ ProductId: productId });
-  const urls = (imageUrls || []).map(pickString).filter(Boolean);
-  if (!urls.length) {
-    return [];
-  }
-
-  const now = new Date();
-  return ProductImage.insertMany(
-    urls.map((imageUrl, index) => ({
-      ProductId: productId,
-      ImageUrl: imageUrl,
-      Stt: index,
-      UploadedAt: now,
-    }))
-  );
+  const urls = normalizeEmbeddedImages(imageUrls);
+  await Product.updateOne({ _id: productId }, { $set: { images: urls, UpdatedAt: new Date() } });
+  return urls;
 }
 
 function pickVariantImageInput(variant) {
@@ -253,15 +235,21 @@ function toPublicVariant(variant) {
 }
 
 function publicProductFilter(extra = {}) {
-  return {
-    ...extra,
-    IsDeleted: { $ne: true },
-    SellerRemovedAt: null,
-    $or: [
-      { Status: PRODUCT_STATUS.ACTIVE },
-      { Status: { $exists: false } },
-    ],
-  };
+  const parts = [];
+  if (extra && Object.keys(extra).length) {
+    parts.push(extra);
+  }
+  parts.push(
+    notRemovedProductMatch(),
+    {
+      $or: [
+        { Status: PRODUCT_STATUS.ACTIVE },
+        { Status: true },
+        { Status: { $exists: false } },
+      ],
+    }
+  );
+  return parts.length === 1 ? parts[0] : { $and: parts };
 }
 
 function activeProductFilter(extra = {}) {
@@ -271,8 +259,7 @@ function activeProductFilter(extra = {}) {
 function sellerManagedProductFilter(extra = {}) {
   return {
     ...extra,
-    IsDeleted: { $ne: true },
-    SellerRemovedAt: null,
+    ...notRemovedProductMatch(),
     $or: [
       { Status: PRODUCT_STATUS.ACTIVE },
       { Status: PRODUCT_STATUS.HIDDEN },
@@ -302,11 +289,11 @@ function toPublicProduct(product, variants = [], category = null, imageDocs = nu
   const status =
     typeof product.Status === "number"
       ? product.Status
-      : product.IsDeleted
+      : Number(product.IsDeleted) === 0 || product.IsDeleted === true
         ? PRODUCT_STATUS.HIDDEN
         : PRODUCT_STATUS.ACTIVE;
 
-  const images = toPublicProductImages(imageDocs || []);
+  const images = toPublicProductImages(product.images?.length ? product.images : imageDocs || []);
   let thumbnails = images.map((image) => image.imageUrl);
   if (thumbnails.length === 0) {
     thumbnails = normalizeLegacyThumbnailList(product.Thumbnail);
@@ -331,7 +318,6 @@ function toPublicProduct(product, variants = [], category = null, imageDocs = nu
     shopId: product.ShopId,
     categoryId: product.CategoryId,
     categoryName: category?.name || category?.categoryName || product.CategoryName || "",
-    categoryIcon: String(category?.icon || "").trim(),
     productName: product.ProductName,
     description: product.Description || "",
     donVi: product.DonVi || "",
@@ -637,7 +623,7 @@ async function getProductById(productId) {
   }
 
   const shop = await ShopProfile.findById(product.ShopId).lean();
-  if (!shop || !isSubscriptionActive(shop) || shop.isActive === false) {
+  if (!shop || !isSubscriptionActive(shop) || !isRecordActive(shop.isActive)) {
     throw createServiceError("Không tìm thấy sản phẩm.", 404);
   }
 
@@ -740,21 +726,22 @@ async function softDeleteProduct(user, productId) {
   const product = await Product.findOne({
     _id: productId,
     ShopId: shop._id,
-    IsDeleted: { $ne: true },
-    SellerRemovedAt: null,
+    ...notRemovedProductMatch(),
   });
   if (!product) {
     throw createServiceError("Không tìm thấy sản phẩm.", 404);
   }
 
-  if (product.SellerRemovedAt) {
+  if (isSellerRemovedProduct(product)) {
     return { product };
   }
 
   await assertNoActiveReservationsForProduct(product._id);
 
   product.Status = PRODUCT_STATUS.HIDDEN;
-  product.SellerRemovedAt = new Date();
+  product.IsDeleted = 0;
+  product.RemovedBy = PRODUCT_REMOVED_BY.SELLER;
+  product.RemovedAt = new Date();
   product.pinProduct = 0;
   product.IsPromotion = false;
   product.DiscountPercent = 0;
@@ -859,7 +846,6 @@ async function listCategories() {
     name: category.name || category.categoryName || "",
     categoryName: category.name || category.categoryName || "",
     description: category.description || "",
-    icon: String(category.icon || "").trim(),
     isDeleted: Number(category.IsDeleted) === 0 ? 0 : 1,
   }));
 }

@@ -39,6 +39,22 @@ export function normalizeWallet(row) {
   };
 }
 
+/** Số dư hiển thị: ưu tiên balanceAfter của giao dịch thành công mới nhất nếu cao hơn API wallet. */
+export function resolveWalletDisplayBalance(wallet, transactions = []) {
+  let display = Math.max(0, Number(wallet?.balance) || 0);
+  const list = Array.isArray(transactions) ? transactions : [];
+  for (const tx of list) {
+    if (Number(tx?.status) !== WALLET_TX_STATUS.SUCCESS) {
+      continue;
+    }
+    const after = Number(tx?.balanceAfter);
+    if (Number.isFinite(after) && after > display) {
+      display = after;
+    }
+  }
+  return display;
+}
+
 export function normalizeWalletTransaction(row) {
   const amount = Number(row?.amount) || 0;
   const type = Number(row?.type) || WALLET_TX_TYPE.TOPUP;

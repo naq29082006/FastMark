@@ -10,6 +10,8 @@ const {
 } = require("../utils/pagination");
 
 const { resolveShopDisplayName } = require("../utils/shopIdentity");
+const { resolveShopLatlong, hasShopLatlong } = require("../utils/shopCoordinates");
+const { notRemovedProductMatch } = require("../utils/productRemoval");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -354,8 +356,7 @@ function activePromotionFilter(now = new Date()) {
   return {
     IsPromotion: true,
     Status: PRODUCT_STATUS.ACTIVE,
-    IsDeleted: { $ne: true },
-    SellerRemovedAt: null,
+    ...notRemovedProductMatch(),
     $and: [
       {
         $or: [
@@ -450,12 +451,13 @@ async function listActivePromotions({
     const storeName = resolveShopDisplayName(shop, owner);
 
     let distanceMeters = null;
-    if (hasOrigin && shop && hasValidCoordinate(shop.latitude) && hasValidCoordinate(shop.longitude)) {
+    const shopCoords = resolveShopLatlong(shop);
+    if (hasOrigin && shop && hasShopLatlong(shop)) {
       const meters = calculateDistanceMeters(
         originLat,
         originLng,
-        shop.latitude,
-        shop.longitude
+        shopCoords.lat,
+        shopCoords.long
       );
       if (meters != null && Number.isFinite(meters)) {
         distanceMeters = Math.round(meters);
@@ -469,8 +471,8 @@ async function listActivePromotions({
       store_id: shopId,
       storeName,
       distanceMeters,
-      shopLatitude: hasValidCoordinate(shop?.latitude) ? Number(shop.latitude) : null,
-      shopLongitude: hasValidCoordinate(shop?.longitude) ? Number(shop.longitude) : null,
+      shopLatitude: shopCoords.lat,
+      shopLongitude: shopCoords.long,
     };
   });
 

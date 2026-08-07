@@ -7,6 +7,7 @@ const Reservation = require("../models/Reservation");
 const Report = require("../models/Report");
 const Review = require("../models/Review");
 const { USER_ROLE, SELLER_VERIFICATION_STATUS, RESERVATION_STATUS } = require("../constants");
+const { notDeletedReviewFilter } = require("../utils/reviewVisibility");
 const { USER_STATUS } = require("../constants");
 const { SHOP_STATUS } = require("../constants");
 const { PRODUCT_STATUS } = require("../constants");
@@ -19,12 +20,13 @@ const {
   resolveStatusesFromLabelSearch,
 } = require("../utils/adminSearchHelpers");
 const { applyCreatedAtRange } = require("../utils/dateRangeFilter");
+const { buildReportsReceivedFilter } = require("../utils/reportType");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
 
 const CANCELLED_RESERVATION_STATUSES = [
   RESERVATION_STATUS.REJECTED,
   RESERVATION_STATUS.REFUNDED,
-  RESERVATION_STATUS.DISPUTE_RESOLVED,
+  RESERVATION_STATUS.CANCELLED,
 ];
 
 const COMPLETED_RESERVATION_STATUSES = [
@@ -34,7 +36,7 @@ const COMPLETED_RESERVATION_STATUSES = [
 
 const DISPUTE_RESERVATION_STATUSES = [
   RESERVATION_STATUS.DISPUTED,
-  RESERVATION_STATUS.DISPUTE_RESOLVED,
+  RESERVATION_STATUS.CANCELLED,
 ];
 const { cancelActiveReservationsForAccountLock } = require("./reservationService");
 const {
@@ -42,6 +44,7 @@ const {
   resolveShopUsername,
   resolveShopAvatar,
 } = require("../utils/shopIdentity");
+const { notRemovedProductMatch } = require("../utils/productRemoval");
 
 const ROLE_LABELS = {
   [USER_ROLE.BUYER]: "Người mua",
@@ -77,9 +80,10 @@ function pickString(value) {
 function activeProductFilter(extra = {}) {
   return {
     ...extra,
+    ...notRemovedProductMatch(),
     $or: [
       { Status: PRODUCT_STATUS.ACTIVE },
-      { Status: { $exists: false }, IsDeleted: { $ne: true } },
+      { Status: { $exists: false } },
     ],
   };
 }
@@ -106,7 +110,6 @@ function toAdminUserBase(user, shop = null) {
     createdAt: user.CreatedAt || null,
     updatedAt: user.UpdatedAt || null,
     lastActiveAt: user.LanHoatDongCuoi || null,
-    followersCount: Number(user.FollowersCount) || 0,
     followingCount: user.FollowingCount || 0,
     verifyAccount: Boolean(user.VerifyAccount),
     sellerPhoneVerified: require("../models/User").isPhoneVerified(user),
@@ -152,6 +155,11 @@ function toAdminVerificationSummary(verification) {
     cccdFrontImage: verification.cccdFrontImage || "",
     cccdBackImage: verification.cccdBackImage || "",
     selfieImage: verification.selfieImage || "",
+    businessImage:
+      verification.businessImage ||
+      verification.businessDocImage ||
+      verification.businessDoc?.imageUrl ||
+      "",
     address:
       verification.addressHeThong ||
       verification.DiaChiHeThong ||
@@ -414,8 +422,8 @@ async function getAccountStats(user) {
       ...buyerFilter,
       status: { $in: DISPUTE_RESERVATION_STATUSES },
     }),
-    Review.countDocuments({ userId, isDeleted: { $ne: true } }),
-    Report.countDocuments({ targetUserId: userId }),
+    Review.countDocuments({ userId, ...notDeletedReviewFilter() }),
+    Report.countDocuments(await buildReportsReceivedFilter(userId)),
   ]);
 
   return {
@@ -428,8 +436,9 @@ async function getAccountStats(user) {
   };
 }
 
-async function getRecentReports(targetUserId, limit = 5) {
-  const reports = await Report.find({ targetUserId })
+async function getRecentReports(userId, limit = 5) {
+  const filter = await buildReportsReceivedFilter(userId);
+  const reports = await Report.find(filter)
     .sort({ CreatedAt: -1 })
     .limit(limit)
     .lean();
@@ -659,9 +668,7 @@ async function getAccountStatistics(query = {}) {
     }),
     ShopProfile.countDocuments({}),
 
-    Product.countDocuments({
-      IsDeleted: { $ne: true }
-    }),
+    Product.countDocuments(notRemovedProductMatch()),
 
     Reservation.countDocuments({})
 

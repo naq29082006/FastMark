@@ -98,7 +98,7 @@ function buildProductStats(product) {
     { icon: ShoppingBag, label: 'Đã bán', value: product.soldCount || 0, tone: 'green' },
     {
       icon: ShoppingBag,
-      label: 'Đơn giữ hàng',
+      label: 'Đơn hàng',
       value: product.reservationCount || 0,
       tone: 'green',
     },

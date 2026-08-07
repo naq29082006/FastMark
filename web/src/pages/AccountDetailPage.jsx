@@ -141,7 +141,7 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
     wallet: 'Chi tiết giao dịch ví',
     withdrawals: 'Chi tiết rút tiền',
     products: 'Chi tiết sản phẩm',
-    reservations: 'Chi tiết đơn giữ hàng',
+    reservations: 'Chi tiết đơn hàng',
     'shop-reservations': 'Chi tiết đơn của shop',
     'reports-filed': 'Chi tiết báo cáo đã gửi',
     'reports-received': 'Chi tiết báo cáo bị nhận',
@@ -256,7 +256,7 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
               <DetailField label="Lượt xem">{product.viewCount ?? item.viewCount ?? 0}</DetailField>
               <DetailField label="Lượt thích">{product.likeCount ?? item.likeCount ?? 0}</DetailField>
               <DetailField label="Yêu thích">{product.favoriteCount ?? ''}</DetailField>
-              <DetailField label="Đơn giữ hàng">
+              <DetailField label="Đơn hàng">
                 {product.reservationCount ?? 0} (hoàn thành {product.completedReservations ?? 0})
               </DetailField>
               <DetailField label="Gian hàng">
@@ -1430,7 +1430,7 @@ export default function AccountDetailPage() {
   return (
     <div className="admin-detail-page account-detail-page account-detail-page-v2 shop-detail-page-v2">
       <header className="admin-detail-toolbar">
-        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/accounts')}>
+        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/users')}>
           ← Quay lại
         </button>
         <div className="header-actions">
@@ -1508,7 +1508,7 @@ export default function AccountDetailPage() {
                   <FollowStatButton
                     icon={Users}
                     label="Đã theo dõi"
-                    count={user.followersCount ?? 0}
+                    count={shop?.followersCount ?? 0}
                     onClick={() => setFollowDialog('followers')}
                   />
                 </div>
@@ -1704,7 +1704,7 @@ export default function AccountDetailPage() {
       {!loading && !user ? (
         <div className="empty-card">
           Không tìm thấy người dùng.{' '}
-          <button type="button" className="link-btn" onClick={() => goBackOr(navigate, '/accounts')}>
+          <button type="button" className="link-btn" onClick={() => goBackOr(navigate, '/users')}>
             Quay lại
           </button>
         </div>

@@ -24,30 +24,32 @@ const MODEL_RELATIONS = {
   Product: [
     "N-1 → ShopProfile (ShopId)",
     "N-1 → ProductCategory (CategoryId)",
-    "1-N → ProductVariant, ProductImage, FavoriteProduct, Review",
+    "1-N → ProductVariant, FavoriteProduct, Review",
+    "images[] — gallery URL (tối đa 5, phần tử đầu = cover)",
   ],
   ProductVariant: ["N-1 → Product (ProductId)", "1-N → Reservation (variantId)"],
-  ProductImage: ["N-1 → Product (productId)"],
   FavoriteProduct: ["N-1 → User; N-1 → Product (bảng nối N-N User↔Product)"],
   Follow: ["N-1 → User (follower); N-1 → User (following) — N-N User↔User"],
   Reservation: [
     "N-1 → User (buyer)",
     "N-1 → ShopProfile, Product, ProductVariant",
-    "1-0..N → Report (tranh chấp), ReservationAuditLog",
+    "1-0..1 → ReservationDispute (khiếu nại + auditLogs)",
     "1-0..N → WalletTransaction (cọc)",
   ],
-  ReservationAuditLog: ["N-1 → Reservation; N-1 → User (admin)"],
+  ReservationDispute: [
+    "N-1 → Reservation (unique)",
+    "N-1 → User (người khiếu nại)",
+    "auditLogs[] — nhật ký admin xử lý",
+  ],
   Report: [
     "N-1 → User (reporter)",
     "N-1 → User/Shop/Product/Reservation (tùy reportType)",
-    "1-N → ReportImage",
+    "images[] — ảnh minh chứng (tối đa 5)",
   ],
-  ReportImage: ["N-1 → Report"],
   Review: [
     "N-1 → User, Product, ShopProfile, Reservation (optional)",
-    "1-N → ReviewImage",
+    "images[] — ảnh đính kèm (tối đa 5)",
   ],
-  ReviewImage: ["N-1 → Review"],
   Conversation: [
     "N-1 → User (participantA)",
     "N-1 → User (participantB)",
@@ -127,11 +129,11 @@ md.push("```");
 md.push("User 1──1 Wallet");
 md.push("User 1──0..1 ShopProfile N──1 ShopCategory");
 md.push("ShopProfile 1──N Product N──1 ProductCategory");
-md.push("Product 1──N ProductVariant | ProductImage");
+md.push("Product 1──N ProductVariant (images[] embedded on Product)");
 md.push("User N──N Product (FavoriteProduct)");
 md.push("User N──N User (Follow)");
 md.push("User + Shop + Product + Variant → Reservation");
-md.push("Reservation 1──0..N Report 1──N ReportImage");
+md.push("Reservation 1──0..1 ReservationDispute (title, content, images[], auditLogs[])");
 md.push("Reservation ↔ WalletTransaction (cọc SystemWallet)");
 md.push("User ↔ User Conversation 1──N Message");
 md.push("SellerPlan 1──N SellerSubscription → ShopProfile");

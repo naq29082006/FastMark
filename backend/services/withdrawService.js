@@ -13,6 +13,7 @@ const {
   MAX_WITHDRAW_AMOUNT,
   NOTIFICATION_AUDIENCE,
   NOTIFICATION_INDEX,
+  isRecordActive,
 } = require("../constants");
 const { buildSearchRegex } = require("../utils/searchText");
 const { buildPaginationMeta, parsePagination } = require("../utils/pagination");
@@ -88,7 +89,7 @@ async function createWithdrawRequest(user, payload = {}) {
   }
 
   const bank = await Bank.findById(bankId);
-  if (!bank || bank.isActive === false) {
+  if (!bank || !isRecordActive(bank.isActive)) {
     throw createServiceError("Ngân hàng không khả dụng. Vui lòng chọn ngân hàng khác.", 400);
   }
 

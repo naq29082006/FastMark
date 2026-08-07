@@ -2,15 +2,15 @@ const mongoose = require("mongoose");
 
 /**
  * Bank — ngân hàng do admin cấu hình cho tính năng rút tiền.
- * Chỉ bank isActive=true mới hiện cho user khi rút.
+ * isActive: 1 = đang dùng, 0 = xóa mềm (user không chọn khi rút).
  */
 const BankSchema = new mongoose.Schema({
   // Tên ngân hàng (VD: Vietcombank).
   name: { type: String, required: true, trim: true },
   // Mã ngắn (VD: VCB) — unique không phân biệt hoa thường.
   code: { type: String, required: true, trim: true, uppercase: true },
-  // Bật = user được chọn khi rút tiền.
-  isActive: { type: Boolean, default: true, index: true },
+  // 1 = đang dùng, 0 = xóa mềm.
+  isActive: { type: Number, default: 1, index: true },
   // Thời điểm thêm ngân hàng.
   CreatedAt: { type: Date, default: Date.now },
   // Thời điểm cập nhật gần nhất (auto trong pre-save).

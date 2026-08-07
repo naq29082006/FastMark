@@ -1,7 +1,9 @@
 const mongoose = require("mongoose");
+const { embeddedImagesField } = require("../utils/embeddedImages");
 
 /**
- * Review — đánh giá sản phẩm đã mua (qua đơn giữ hàng hoàn thành).
+ * Review — đánh giá sản phẩm sau khi đơn giữ hàng hoàn thành.
+ * Xóa mềm / ẩn theo mẫu Product: isDeleted + removedBy + adminRemovalReason + removedAt.
  */
 const ReviewSchema = new mongoose.Schema({
   // Người viết đánh giá (ref User).
@@ -41,14 +43,17 @@ const ReviewSchema = new mongoose.Schema({
   // Nội dung chữ.
   comment: { type: String, default: "" },
 
-  // Admin ẩn khỏi trang công khai.
-  isHidden: { type: Boolean, default: false, index: true },
-  // Lý do admin ẩn / xóa đánh giá.
-  moderationReason: { type: String, default: "" },
-  // Xóa mềm.
-  isDeleted: { type: Boolean, default: false, index: true },
-  // Thời điểm xóa mềm (null nếu chưa xóa).
-  deletedAt: { type: Date, default: null },
+  // Ảnh đính kèm (URL, tối đa 5).
+  images: embeddedImagesField,
+
+  /** Trạng thái xóa mềm: 1 = còn hiệu lực, 0 = đã gỡ. */
+  isDeleted: { type: Number, default: 1, index: true },
+  /** Ai gỡ / ẩn: buyer | admin — rỗng khi còn hiển thị công khai. */
+  removedBy: { type: String, default: "", trim: true, index: true },
+  /** Lý do gỡ (bắt buộc khi removedBy = admin). */
+  adminRemovalReason: { type: String, default: "", trim: true },
+  /** Thời điểm gỡ hoặc admin ẩn. */
+  removedAt: { type: Date, default: null },
 
   // Thời điểm tạo đánh giá.
   CreatedAt: { type: Date, default: Date.now },
@@ -63,7 +68,13 @@ ReviewSchema.index(
   { reservationId: 1 },
   {
     unique: true,
-    partialFilterExpression: { isDeleted: { $ne: true } },
+    partialFilterExpression: {
+      $or: [
+        { isDeleted: 1 },
+        { isDeleted: false },
+        { isDeleted: { $exists: false } },
+      ],
+    },
     name: "reservationId_1_active",
   }
 );

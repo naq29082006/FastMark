@@ -69,6 +69,8 @@ export function normalizeStore(row) {
     category_name: row.categoryName || row.category_name || '',
     categoryId: row.categoryId || row.category_id || '',
     category_id: row.categoryId || row.category_id || '',
+    categoryIcon: pickText(row.categoryIcon, row.category_icon),
+    category_icon: pickText(row.category_icon, row.categoryIcon),
     depositPercent: Math.max(0, Math.min(100, Number(row.depositPercent) || 0)),
     status: row.status ?? 1,
     isShopLocked: Boolean(row.isShopLocked || row.isLocked || Number(row.status) === 0),

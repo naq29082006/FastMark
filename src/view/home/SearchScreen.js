@@ -33,6 +33,9 @@ import LoadMoreButton from '../shared/components/LoadMoreButton';
 import SubScreenHeader from '../shared/components/SubScreenHeader';
 import { DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { useSearchSuggestions } from '../../hooks/useSearchSuggestions';
+import SearchSuggestionsDropdown from '../shared/components/SearchSuggestionsDropdown';
+import { SEARCH_SUGGEST_MIN_LENGTH } from '../../core/utils/searchSuggestions';
 
 const SEARCH_TABS = [
   { key: 'all', label: 'Tất cả' },
@@ -40,8 +43,6 @@ const SEARCH_TABS = [
   { key: 'users', label: 'Người dùng' },
 ];
 
-const SUGGEST_DEBOUNCE_MS = 300;
-const SUGGEST_LIMIT = 6;
 const RESULT_LIMIT = DEFAULT_PAGE_SIZE;
 
 function appendUniqueByKey(existing, incoming, getKey) {
@@ -266,65 +267,11 @@ function HistoryRow({ keyword, onPress, onRemove }) {
   );
 }
 
-function SuggestionRow({ item, onPress }) {
-  const isProduct = item.type === 'product';
-  const isUser = item.type === 'user';
-  const label = isProduct
-    ? item.data.name
-    : isUser
-      ? item.data.fullName || item.data.displayName || item.data.userName || 'Người dùng'
-      : item.data.shop_name || item.data.name || 'Gian hàng';
-  const username = isUser
-    ? item.data.userName || item.data.username || ''
-    : item.data.shop_username || item.data.shopUsername || item.data.userName || '';
-  const subtitle = isProduct
-    ? item.data.storeName || 'Sản phẩm'
-    : isUser
-      ? username
-        ? `@${String(username).replace(/^@+/, '')}`
-        : 'Người dùng'
-      : username
-        ? `@${String(username).replace(/^@+/, '')}`
-        : 'Gian hàng';
-  const distance = isUser ? '' : formatDistance(item.distance);
-  const iconName = isProduct ? 'cube-outline' : isUser ? 'person-outline' : 'storefront-outline';
-  const typeLabel = isProduct ? 'Sản phẩm' : isUser ? 'Người dùng' : 'Gian hàng';
-
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.suggestRow, pressed && styles.pressed]}
-      onPress={() => onPress?.(item)}
-    >
-      {isUser ? (
-        <AvatarBadge
-          name={label}
-          uri={item.data.avatarUrl || item.data.avatar || ''}
-          size={28}
-        />
-      ) : (
-        <Ionicons name={iconName} size={18} color="#076F32" />
-      )}
-      <View style={styles.suggestBody}>
-        <Text style={styles.suggestText} numberOfLines={1}>
-          {label}
-        </Text>
-        <Text style={styles.suggestSubText} numberOfLines={1}>
-          {`${typeLabel} · ${subtitle}`}
-        </Text>
-      </View>
-      {distance && distance !== '--' ? (
-        <Text style={styles.suggestDistance}>{distance}</Text>
-      ) : null}
-    </Pressable>
-  );
-}
-
 export default function SearchScreen({ currentLocation, onBack, onOpenProduct, onOpenShop, onOpenBuyer }) {
   const insets = useScreenInsets();
   const authUser = useSelector(selectAuthUser);
   const profile = useSelector(selectAuthProfile);
   const historyUserId = String(profile?.id || authUser?.uid || '').trim();
-  const suggestRequestIdRef = useRef(0);
   const searchRequestIdRef = useRef(0);
   const [query, setQuery] = useState('');
   const [committedQuery, setCommittedQuery] = useState('');
@@ -332,9 +279,7 @@ export default function SearchScreen({ currentLocation, onBack, onOpenProduct, o
   const [products, setProducts] = useState([]);
   const [shops, setShops] = useState([]);
   const [users, setUsers] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
   const [history, setHistory] = useState([]);
-  const [isSuggesting, setIsSuggesting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [errorText, setErrorText] = useState('');
@@ -353,6 +298,12 @@ export default function SearchScreen({ currentLocation, onBack, onOpenProduct, o
   const locationReady = hasValidLocation(currentLocation);
   const trimmedQuery = query.trim();
   const showResults = Boolean(committedQuery) && trimmedQuery === committedQuery;
+
+  const { items: suggestions, isLoading: isSuggesting } = useSearchSuggestions({
+    query: trimmedQuery,
+    location: currentLocation,
+    enabled: !showResults && locationReady && trimmedQuery.length >= SEARCH_SUGGEST_MIN_LENGTH,
+  });
 
   useEffect(() => {
     let alive = true;
@@ -385,7 +336,6 @@ export default function SearchScreen({ currentLocation, onBack, onOpenProduct, o
       setQuery(keyword);
       setCommittedQuery(keyword);
       setActiveTab('all');
-      setSuggestions([]);
       setErrorText('');
       setIsSearching(true);
       productsPageRef.current = 1;
@@ -595,117 +545,6 @@ export default function SearchScreen({ currentLocation, onBack, onOpenProduct, o
     usersHasMore,
   ]);
 
-  useEffect(() => {
-    if (showResults || !trimmedQuery) {
-      suggestRequestIdRef.current += 1;
-      setSuggestions([]);
-      setIsSuggesting(false);
-      return undefined;
-    }
-
-    if (!locationReady) {
-      setSuggestions([]);
-      setIsSuggesting(false);
-      return undefined;
-    }
-
-    const requestId = ++suggestRequestIdRef.current;
-    setIsSuggesting(true);
-
-    const timer = setTimeout(async () => {
-      try {
-        const idToken = await getCurrentUserIdToken().catch(() => null);
-        const [productPage, shopResult, userResult] = await Promise.all([
-          discoverProductsOnBackend({
-            latitude: currentLocation.latitude,
-            longitude: currentLocation.longitude,
-            radiusMeters: 0,
-            search: trimmedQuery,
-            page: 1,
-            limit: SUGGEST_LIMIT,
-          }),
-          fetchSearchShopsFromNode({
-            latitude: currentLocation.latitude,
-            longitude: currentLocation.longitude,
-            radiusMeters: 0,
-            shopQuery: trimmedQuery,
-            identityOnly: true,
-            page: 1,
-            limit: SUGGEST_LIMIT,
-          }),
-          idToken
-            ? searchUsersOnBackend(idToken, { search: trimmedQuery, limit: SUGGEST_LIMIT }).catch(
-                () => ({ items: [] })
-              )
-            : Promise.resolve({ items: [] }),
-        ]);
-
-        if (suggestRequestIdRef.current !== requestId) {
-          return;
-        }
-
-        const productSuggestions = sortByDistanceAsc(
-          (productPage.items || []).map((row) => normalizeProduct(row)),
-          productDistance
-        )
-          .slice(0, SUGGEST_LIMIT)
-          .map((product) => ({
-            id: `product-${product.id}`,
-            type: 'product',
-            data: product,
-            distance: productDistance(product),
-          }));
-
-        const shopSuggestions = sortByDistanceAsc(
-          Array.isArray(shopResult?.items)
-            ? shopResult.items
-            : Array.isArray(shopResult?.shops)
-              ? shopResult.shops
-              : [],
-          shopDistance
-        )
-          .slice(0, SUGGEST_LIMIT)
-          .map((shop) => ({
-            id: `shop-${shop.id}`,
-            type: 'shop',
-            data: shop,
-            distance: shopDistance(shop),
-          }));
-
-        const userSuggestions = (Array.isArray(userResult?.items) ? userResult.items : [])
-          .slice(0, SUGGEST_LIMIT)
-          .map((user) => ({
-            id: `user-${user.id}`,
-            type: 'user',
-            data: user,
-            distance: Number.POSITIVE_INFINITY,
-          }));
-
-        const merged = [...productSuggestions, ...shopSuggestions, ...userSuggestions].sort(
-          (left, right) => left.distance - right.distance
-        );
-
-        setSuggestions(merged);
-      } catch {
-        if (suggestRequestIdRef.current === requestId) {
-          setSuggestions([]);
-        }
-      } finally {
-        if (suggestRequestIdRef.current === requestId) {
-          setIsSuggesting(false);
-        }
-      }
-    }, SUGGEST_DEBOUNCE_MS);
-
-    return () => clearTimeout(timer);
-  }, [
-    trimmedQuery,
-    showResults,
-    locationReady,
-    currentLocation?.latitude,
-    currentLocation?.longitude,
-  ]);
-
   function handleChangeQuery(nextValue) {
     setQuery(nextValue);
     if (String(nextValue || '').trim() !== committedQuery) {
@@ -753,7 +592,7 @@ export default function SearchScreen({ currentLocation, onBack, onOpenProduct, o
       if (name && historyUserId) {
         addSearchHistory(historyUserId, name).then(setHistory);
       }
-      onOpenBuyer?.(item.data.id);
+      onOpenBuyer?.(item.data?.id || item.data?.userId || item.data?._id);
       return;
     }
     const name = String(item.data?.shop_name || item.data?.name || '').trim();
@@ -949,12 +788,17 @@ export default function SearchScreen({ currentLocation, onBack, onOpenProduct, o
           </View>
           {!locationReady ? (
             <Text style={styles.panelEmpty}>Bật vị trí để xem gợi ý quanh bạn.</Text>
-          ) : suggestions.length === 0 && !isSuggesting ? (
-            <Text style={styles.panelEmpty}>Không có gợi ý phù hợp.</Text>
+          ) : trimmedQuery.length < SEARCH_SUGGEST_MIN_LENGTH ? (
+            <Text style={styles.panelEmpty}>Nhập ít nhất {SEARCH_SUGGEST_MIN_LENGTH} ký tự.</Text>
           ) : (
-            suggestions.map((item) => (
-              <SuggestionRow key={item.id} item={item} onPress={handleSuggestionPress} />
-            ))
+            <SearchSuggestionsDropdown
+              items={suggestions}
+              loading={isSuggesting}
+              visible
+              embedded
+              onPressItem={handleSuggestionPress}
+              emptyHint="Không có gợi ý phù hợp."
+            />
           )}
           {trimmedQuery ? (
             <Pressable

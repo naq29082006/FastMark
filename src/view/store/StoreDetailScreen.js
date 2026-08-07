@@ -530,7 +530,7 @@ export default function StoreDetailScreen({
 
       await submitReportOnBackend({
         idToken,
-        reportType: 3,
+        reportType: 2,
         shopId: store.id,
         shopName: store.name,
         title,

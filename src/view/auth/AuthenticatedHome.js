@@ -33,12 +33,23 @@ import ShopTabPanel from '../seller/ShopTabPanel';
 
 const ACTIVE_COLOR = '#076F32';
 const INACTIVE_COLOR = '#94A3B8';
+const TAB_LABEL_COLOR = '#0f172a';
 const ICON_SIZE = 24;
 
 const TABS = [
   { key: 'home', label: 'Trang chủ', icon: 'home-outline', activeIcon: 'home' },
-  { key: 'map', label: 'Khám phá', icon: 'compass-outline', activeIcon: 'compass' },
-  { key: 'orders', label: 'Đơn hàng', icon: 'receipt-outline', activeIcon: 'receipt' },
+  {
+    key: 'products',
+    label: 'Sản phẩm',
+    icon: 'bag-outline',
+    activeIcon: 'bag',
+  },
+  {
+    key: 'orders',
+    label: 'Đơn hàng',
+    icon: 'receipt-outline',
+    activeIcon: 'receipt',
+  },
   {
     key: 'shop',
     label: 'Gian hàng',
@@ -121,8 +132,8 @@ export default function AuthenticatedHome() {
     (isNested) => updateNestedTabState('home', isNested),
     [updateNestedTabState]
   );
-  const reportMapNested = useCallback(
-    (isNested) => updateNestedTabState('map', isNested),
+  const reportProductsNested = useCallback(
+    (isNested) => updateNestedTabState('products', isNested),
     [updateNestedTabState]
   );
   const reportOrdersNested = useCallback(
@@ -175,7 +186,7 @@ export default function AuthenticatedHome() {
         setProductDetailId(null);
         setProfileNavRequest(null);
       }
-      if (leavingTab === 'map' && !keepNested) {
+      if (leavingTab === 'home' && !keepNested) {
         setMapFocusRequest(null);
       }
       if (leavingTab === 'shop') {
@@ -267,14 +278,13 @@ export default function AuthenticatedHome() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'favorites' || activeTab === 'products') {
-      setActiveTab('orders');
-    }
-    if (activeTab === 'inbox') {
-      setActiveTab('notifications');
-    }
-    if (activeTab === 'overview') {
-      setActiveTab('home');
+    const legacyTabMap = {
+      map: 'home',
+      inbox: 'profile',
+      favorites: 'products',
+    };
+    if (legacyTabMap[activeTab]) {
+      setActiveTab(legacyTabMap[activeTab]);
     }
   }, [activeTab]);
 
@@ -300,7 +310,7 @@ export default function AuthenticatedHome() {
       storeId: String(storeId),
       at: Date.now(),
     });
-    handleSelectTab('map');
+    handleSelectTab('home');
   }
 
   function handleNavigateToStore({ shopId, storeName }) {
@@ -310,7 +320,7 @@ export default function AuthenticatedHome() {
       showDirections: true,
       at: Date.now(),
     });
-    handleSelectTab('map');
+    handleSelectTab('home');
   }
 
   function handleNavigatePickup({ shopId, reservationId, storeName }) {
@@ -321,7 +331,7 @@ export default function AuthenticatedHome() {
       showDirections: true,
       at: Date.now(),
     });
-    handleSelectTab('map');
+    handleSelectTab('home');
   }
 
   function handleOpenProductsFromHome(options = {}) {
@@ -330,10 +340,11 @@ export default function AuthenticatedHome() {
       at: Date.now(),
     });
     setBuyerOverlay('products');
+    handleSelectTab('products');
   }
 
   function handleOpenMapFromHome() {
-    handleSelectTab('map');
+    handleSelectTab('home');
   }
 
   function handleCloseBuyerOverlay() {
@@ -423,16 +434,16 @@ export default function AuthenticatedHome() {
     setResumeReserveRequest(resume);
 
     const source = resume.source;
-    if (source === 'map') {
+    if (source === 'map' || source === 'home') {
       setProductDetailId(null);
       setBuyerOverlay(null);
-      setActiveTab('map');
+      setActiveTab('home');
       return;
     }
 
     if (source === 'products') {
       setProductDetailId(null);
-      setActiveTab('home');
+      setActiveTab('products');
       setBuyerOverlay('products');
       return;
     }
@@ -446,12 +457,34 @@ export default function AuthenticatedHome() {
 
     setProductDetailId(null);
     setBuyerOverlay(null);
-    setActiveTab('home');
+    setActiveTab('products');
   }
 
   const tabPanes = useMemo(
     () => ({
       home: (
+        <MapScreen
+          focusStoreRequest={mapFocusRequest}
+          onClearFocus={handleClearMapFocus}
+          onPickupCompleted={handlePickupCompleted}
+          onOpenBuyerOrders={handleOpenBuyerOrders}
+          onOpenWalletTopUp={handleOpenWalletTopUp}
+          onEditAccount={() => handleOpenProfileNav('edit-account')}
+          onOpenWallet={() => handleOpenProfileNav('wallet')}
+          onOpenFavoriteProducts={() => handleOpenProfileNav('favorite-products')}
+          onOpenReport={() => handleOpenProfileNav('account-report')}
+          resumeReserveRequest={
+            resumeReserveRequest?.source === 'home' || resumeReserveRequest?.source === 'map'
+              ? resumeReserveRequest
+              : null
+          }
+          onResumeReserveHandled={() => setResumeReserveRequest(null)}
+          keepNestedAcrossTabs={keepNestedAcrossTabs}
+          onNavigationStateChange={reportHomeNested}
+          isScreenActive={activeTab === 'home'}
+        />
+      ),
+      products: (
         <HomeScreen
           onOpenMap={handleOpenMapFromHome}
           onOpenProducts={handleOpenProductsFromHome}
@@ -466,30 +499,16 @@ export default function AuthenticatedHome() {
           onOpenWalletTopUp={handleOpenWalletTopUp}
           onNavigateDirections={handleNavigateToStore}
           resumeReserveRequest={
-            !resumeReserveRequest?.source || resumeReserveRequest.source === 'home'
+            !resumeReserveRequest?.source ||
+            resumeReserveRequest.source === 'products' ||
+            resumeReserveRequest.source === 'home'
               ? resumeReserveRequest
               : null
           }
           onResumeReserveHandled={() => setResumeReserveRequest(null)}
           keepNestedAcrossTabs={keepNestedAcrossTabs}
-          isScreenActive={activeTab === 'home'}
-          onNavigationStateChange={reportHomeNested}
-        />
-      ),
-      map: (
-        <MapScreen
-          focusStoreRequest={mapFocusRequest}
-          onClearFocus={handleClearMapFocus}
-          onPickupCompleted={handlePickupCompleted}
-          onOpenBuyerOrders={handleOpenBuyerOrders}
-          onOpenWalletTopUp={handleOpenWalletTopUp}
-          resumeReserveRequest={
-            resumeReserveRequest?.source === 'map' ? resumeReserveRequest : null
-          }
-          onResumeReserveHandled={() => setResumeReserveRequest(null)}
-          keepNestedAcrossTabs={keepNestedAcrossTabs}
-          onNavigationStateChange={reportMapNested}
-          isScreenActive={activeTab === 'map'}
+          isScreenActive={activeTab === 'products'}
+          onNavigationStateChange={reportProductsNested}
         />
       ),
       orders: (
@@ -543,6 +562,7 @@ export default function AuthenticatedHome() {
           }
           onResumeReserveHandled={() => setResumeReserveRequest(null)}
           onNavigationStateChange={reportProfileNested}
+          onOpenBuyerOrdersTab={handleOpenBuyerOrders}
         />
       ),
     }),
@@ -558,9 +578,9 @@ export default function AuthenticatedHome() {
       resumeReserveRequest,
       profileNavRequest,
       reportHomeNested,
-      reportMapNested,
-      reportNotificationsNested,
+      reportProductsNested,
       reportOrdersNested,
+      reportNotificationsNested,
       reportProfileNested,
       reportShopNested,
       sellerRegisterRequest,
@@ -609,7 +629,7 @@ export default function AuthenticatedHome() {
           <View style={styles.tabBar}>
             {tabs.map((tab) => {
               const isActive = activeTab === tab.key;
-              const color = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+              const iconColor = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
               return (
                 <Pressable
                   key={tab.key}
@@ -621,11 +641,11 @@ export default function AuthenticatedHome() {
                 >
                   <TabIcon
                     icon={getTabIconName(tab, isActive)}
-                    color={color}
+                    color={iconColor}
                     badgeCount={getBadgeCount(tab)}
                   />
                   <Text
-                    style={[styles.tabLabel, { color }, isActive && styles.tabLabelActive]}
+                    style={[styles.tabLabel, { color: TAB_LABEL_COLOR }, isActive && styles.tabLabelActive]}
                     numberOfLines={1}
                   >
                     {tab.label}

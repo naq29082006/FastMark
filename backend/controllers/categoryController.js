@@ -7,8 +7,8 @@ function pickPayload(body = {}) {
     description: body.description,
   };
 
-  if (body.icon !== undefined) {
-    payload.icon = body.icon;
+  if (body.disputeDays !== undefined || body.dispute_days !== undefined) {
+    payload.disputeDays = body.disputeDays ?? body.dispute_days;
   }
 
   return payload;
@@ -46,8 +46,8 @@ exports.restoreProductCategory = async (req, res) => {
   return success(res, { message: "Đã khôi phục danh mục sản phẩm.", data: { category } });
 };
 
-exports.uploadProductCategoryIcon = async (req, res) => {
-  const uploaded = await categoryService.uploadProductCategoryIcon({
+exports.uploadShopCategoryIcon = async (req, res) => {
+  const uploaded = await categoryService.uploadShopCategoryIcon({
     file: req.file,
     categoryId: req.params.id,
   });

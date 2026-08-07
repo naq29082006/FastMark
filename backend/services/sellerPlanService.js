@@ -1,4 +1,9 @@
 const SellerPlan = require("../models/SellerPlan");
+const {
+  RECORD_STATUS,
+  isRecordActive,
+  activeRecordFilter,
+} = require("../constants");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -29,7 +34,7 @@ function toPlanDto(doc) {
     durationDays,
     durationMonths: planMonths,
     price: Math.max(0, Number(doc.price) || 0),
-    isActive: Boolean(doc.isActive),
+    isActive: isRecordActive(doc.isActive),
     createdAt: doc.CreatedAt || null,
     updatedAt: doc.UpdatedAt || null,
     // Compat aliases
@@ -39,21 +44,21 @@ function toPlanDto(doc) {
 }
 
 async function listAdminPlans() {
-  const rows = await SellerPlan.find({ isActive: true })
-    .sort({ price: 1, CreatedAt: 1 })
+  const rows = await SellerPlan.find({})
+    .sort({ isActive: -1, price: 1, CreatedAt: 1 })
     .limit(100);
   return rows.map(toPlanDto);
 }
 
 async function listActivePlans() {
-  const rows = await SellerPlan.find({ isActive: true })
+  const rows = await SellerPlan.find(activeRecordFilter())
     .sort({ price: 1, CreatedAt: 1 })
     .limit(50);
   return rows.map(toPlanDto);
 }
 
 async function getActivePlanById(planId) {
-  const plan = await SellerPlan.findOne({ _id: planId, isActive: true });
+  const plan = await SellerPlan.findOne({ _id: planId, ...activeRecordFilter() });
   return plan || null;
 }
 
@@ -65,7 +70,7 @@ async function createPlan(payload = {}) {
   const isActive =
     payload.isActive === undefined
       ? payload.status === undefined || Number(payload.status) === 1
-      : Boolean(payload.isActive);
+      : isRecordActive(payload.isActive);
 
   if (!name) {
     throw createServiceError("Thiếu tên gói.");
@@ -79,11 +84,11 @@ async function createPlan(payload = {}) {
 
   const existing = await SellerPlan.findOne({ name });
   if (existing) {
-    if (existing.isActive === false) {
+    if (!isRecordActive(existing.isActive)) {
       existing.description = description;
       existing.durationDays = Math.round(durationDays);
       existing.price = price;
-      existing.isActive = true;
+      existing.isActive = RECORD_STATUS.ACTIVE;
       existing.UpdatedAt = new Date();
       await existing.save();
       return { plan: toPlanDto(existing), restored: true };
@@ -96,7 +101,7 @@ async function createPlan(payload = {}) {
     description,
     durationDays: Math.round(durationDays),
     price,
-    isActive,
+    isActive: isActive ? RECORD_STATUS.ACTIVE : RECORD_STATUS.HIDDEN,
   });
   return { plan: toPlanDto(plan), restored: false };
 }
@@ -138,6 +143,14 @@ async function updatePlan(planId, payload = {}) {
     plan.price = price;
   }
 
+  if (payload.isActive !== undefined || payload.status !== undefined) {
+    const nextActive =
+      payload.isActive !== undefined
+        ? isRecordActive(payload.isActive)
+        : Number(payload.status) === RECORD_STATUS.ACTIVE;
+    plan.isActive = nextActive ? RECORD_STATUS.ACTIVE : RECORD_STATUS.HIDDEN;
+  }
+
   await plan.save();
   return toPlanDto(plan);
 }
@@ -147,7 +160,7 @@ async function deletePlan(planId) {
   if (!plan) {
     throw createServiceError("Không tìm thấy gói.", 404);
   }
-  plan.isActive = false;
+  plan.isActive = RECORD_STATUS.HIDDEN;
   await plan.save();
   return toPlanDto(plan);
 }
@@ -157,10 +170,10 @@ async function restorePlan(planId) {
   if (!plan) {
     throw createServiceError("Không tìm thấy gói.", 404);
   }
-  if (plan.isActive !== false) {
+  if (isRecordActive(plan.isActive)) {
     return toPlanDto(plan);
   }
-  plan.isActive = true;
+  plan.isActive = RECORD_STATUS.ACTIVE;
   await plan.save();
   return toPlanDto(plan);
 }

@@ -32,6 +32,11 @@ exports.listReviews = async (req, res) => {
   return success(res, { data });
 };
 
+exports.getReviewDetail = async (req, res) => {
+  const review = await adminReviewService.getReviewDetail(req.params.id);
+  return success(res, { data: { review } });
+};
+
 exports.hideReview = async (req, res) => {
   const review = await adminReviewService.setReviewVisibility(req.params.id, true, {
     reason: req.body?.reason,

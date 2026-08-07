@@ -28,13 +28,13 @@ export async function loadWalletViewModel() {
   return { wallet, transactions: txPage.transactions || txPage.items || [] };
 }
 
-export async function loadWalletTransactionsViewModel({ page = 1, limit = 20 } = {}) {
+export async function loadWalletTransactionsViewModel({ page = 1, limit = 20, type } = {}) {
   const idToken = await getCurrentUserIdToken();
   if (!idToken) {
     throw new Error('Vui lòng đăng nhập để xem giao dịch.');
   }
 
-  const result = await getWalletTransactionsOnBackend(idToken, { page, limit });
+  const result = await getWalletTransactionsOnBackend(idToken, { page, limit, type });
   return {
     transactions: result.transactions || result.items || [],
     page: result.page,

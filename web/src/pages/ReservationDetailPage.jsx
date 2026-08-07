@@ -15,7 +15,6 @@ import { formatReservationOrderCode } from '../utils/reservationOrderCode';
 import { keepIfSame } from '../utils/realtimeList';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { resolveAdminListStatusMeta } from '../utils/reservationOrderTimeline';
-import { reverseGeocode } from '../utils/reverseGeocode';
 
 const AUDIT_ACTION_LABELS = {
   ADMIN_REFUND_BUYER: 'Hoàn cọc cho người mua',
@@ -38,66 +37,6 @@ function DetailSkeleton() {
         ))}
       </div>
     </div>
-  );
-}
-
-function DisputeGpsBlock({ latitude, longitude, storedAddress }) {
-  const [resolvedAddress, setResolvedAddress] = useState(storedAddress || '');
-
-  useEffect(() => {
-    setResolvedAddress(storedAddress || '');
-    if (storedAddress || latitude == null || longitude == null) {
-      return undefined;
-    }
-    let cancelled = false;
-    (async () => {
-      const label = await reverseGeocode(latitude, longitude);
-      if (!cancelled && label) {
-        setResolvedAddress(label);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [latitude, longitude, storedAddress]);
-
-  return (
-    <>
-      <p className="cell-sub">
-        GPS:{' '}
-        {latitude != null && longitude != null ? (
-          <a
-            className="link-btn"
-            href={`https://www.google.com/maps?q=${latitude},${longitude}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}
-          </a>
-        ) : (
-          ''
-        )}
-      </p>
-      {resolvedAddress ? (
-        <p className="cell-sub dispute-report-address">
-          Địa chỉ:{' '}
-          {latitude != null && longitude != null ? (
-            <a
-              className="link-btn"
-              href={`https://www.google.com/maps?q=${latitude},${longitude}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {resolvedAddress}
-            </a>
-          ) : (
-            resolvedAddress
-          )}
-        </p>
-      ) : latitude != null && longitude != null ? (
-        <p className="cell-sub muted">Đang lấy địa chỉ…</p>
-      ) : null}
-    </>
   );
 }
 
@@ -272,7 +211,7 @@ export default function ReservationDetailPage() {
         if (silent) {
           return;
         }
-        setError(loadError.message || 'Không tải được chi tiết đơn giữ hàng.');
+        setError(loadError.message || 'Không tải được chi tiết đơn hàng.');
         setReservation(null);
       } finally {
         if (!silent) {
@@ -361,8 +300,13 @@ export default function ReservationDetailPage() {
   const auditLogs = reservation?.auditLogs || [];
   const isDisputed = Number(reservation?.status) === DISPUTED_STATUS;
   const bothReported = Boolean(reservation?.disputeByBuyer) && Boolean(reservation?.disputeBySeller);
-  const canAdminProcessDispute = isDisputed && bothReported;
-  const singleSideDispute = isDisputed && !bothReported;
+  const isPostDeliveryDispute = Boolean(reservation?.isPostDeliveryDispute);
+  const canAdminProcessDispute =
+    isDisputed &&
+    (bothReported ||
+      (isPostDeliveryDispute && reservation?.awaitingAdminDisputeReview === true));
+  const singleSideDispute = isDisputed && !bothReported && !canAdminProcessDispute;
+  const sellerResponse = reservation?.sellerResponse;
 
   const orderCode = formatReservationOrderCode(reservation);
   const statusMeta = resolveListStatusMeta(reservation);
@@ -437,7 +381,7 @@ export default function ReservationDetailPage() {
 
       {!loading && !reservation ? (
         <section className="table-card">
-          <p>Không tìm thấy đơn giữ hàng.</p>
+          <p>Không tìm thấy đơn hàng.</p>
           <button
             type="button"
             className="ghost-btn"
@@ -500,6 +444,61 @@ export default function ReservationDetailPage() {
                   </div>
                 ) : null}
               </div>
+
+              {Array.isArray(reservation.adjustments) && reservation.adjustments.length ? (
+                <div className="reservation-order-adjustments">
+                  <h3>Lịch sử thay đổi số lượng</h3>
+                  {(() => {
+                    const chronological = [...reservation.adjustments].sort(
+                      (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+                    );
+                    const first = chronological[0];
+                    const initialQty = Number(first?.oldQuantity) || 0;
+                    const initialUnit = Number(first?.oldReservedPrice) || 0;
+                    const initialTotal = Math.round(initialUnit * initialQty);
+                    const initialDeposit = Number(first?.oldDepositAmount) || 0;
+                    return (
+                      <>
+                        <div className="reservation-order-adjustment-item reservation-order-adjustment-initial">
+                          <strong>Ban đầu</strong>
+                          <span>Số lượng: {initialQty}</span>
+                          <span>Tổng tiền: {formatPrice(initialTotal)}</span>
+                          <span>Tiền cọc: {formatPrice(initialDeposit)}</span>
+                        </div>
+                        <div className="reservation-order-adjustments-list">
+                          {chronological.map((item, index) => {
+                            const depositRefund = Math.max(
+                              0,
+                              Math.round(Number(item.oldDepositAmount) || 0) -
+                                Math.round(Number(item.newDepositAmount) || 0)
+                            );
+                            return (
+                              <div
+                                key={item.id || item.createdAt}
+                                className="reservation-order-adjustment-item"
+                              >
+                                <strong>
+                                  Lần điều chỉnh
+                                  {chronological.length > 1 ? ` ${index + 1}` : ''}
+                                </strong>
+                                <span>
+                                  Số lượng: {item.oldQuantity} → {item.newQuantity}
+                                </span>
+                                {depositRefund > 0 ? (
+                                  <span className="reservation-order-adjustment-refund">
+                                    Hoàn cọc cho người mua: {formatPrice(depositRefund)}
+                                  </span>
+                                ) : null}
+                                <time>{formatDateTimeDetail(item.createdAt)}</time>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : null}
 
               <div className="reservation-order-total-row">
                 <span>Thanh toán khi nhận hàng</span>
@@ -606,7 +605,7 @@ export default function ReservationDetailPage() {
             <section className="reservation-order-info-card reservation-order-dispute-card">
               <h2>Tranh chấp</h2>
 
-              {singleSideDispute ? (
+              {singleSideDispute && !isPostDeliveryDispute ? (
                 <p className="cell-sub reservation-dispute-hint">
                   Chỉ một bên đã báo cáo. Admin chỉ xử lý khi cả buyer và seller đều gửi báo cáo.
                   Nếu sau 24 giờ kể từ giờ nhận hàng vẫn chỉ một bên báo cáo, hệ thống tự hoàn
@@ -614,30 +613,55 @@ export default function ReservationDetailPage() {
                 </p>
               ) : null}
 
+              {singleSideDispute && isPostDeliveryDispute ? (
+                <p className="cell-sub reservation-dispute-hint">
+                  Khiếu nại sau khi nhận hàng. Shop có 2 ngày để phản hồi. Admin chỉ xử lý sau khi
+                  shop phản hồi hoặc hết thời hạn phản hồi.
+                </p>
+              ) : null}
+
               {canAdminProcessDispute ? (
                 <p className="cell-sub reservation-dispute-hint">
-                  Cả hai bên đã báo cáo. Bạn có thể xử lý tranh chấp — bắt buộc nhập nội dung gửi
-                  thông báo cho buyer và seller.
+                  {isPostDeliveryDispute
+                    ? 'Shop đã phản hồi hoặc hết thời hạn phản hồi. Bạn có thể xử lý tranh chấp — bắt buộc nhập nội dung gửi thông báo cho buyer và seller.'
+                    : 'Cả hai bên đã báo cáo. Bạn có thể xử lý tranh chấp — bắt buộc nhập nội dung gửi thông báo cho buyer và seller.'}
                 </p>
+              ) : null}
+
+              {sellerResponse?.content ? (
+                <div className="dispute-report-card seller">
+                  <strong>Seller: Phản hồi khiếu nại</strong>
+                  <p>{sellerResponse.content}</p>
+                  <p className="cell-sub">
+                    {reservation.sellerRespondedAt
+                      ? formatDate(reservation.sellerRespondedAt)
+                      : ''}
+                  </p>
+                  {Array.isArray(sellerResponse.images) && sellerResponse.images.length ? (
+                    <div className="dispute-report-images">
+                      {sellerResponse.images.map((image) => (
+                        <a
+                          key={image.id || image.imageUrl}
+                          href={image.imageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <img src={image.imageUrl} alt="seller response" />
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
 
               {(reservation.disputeReports || []).map((report) => {
                 const isSellerReport = report.reporterSide === 'seller';
                 const title = isSellerReport
-                  ? report.sellerTitle || report.title || 'Báo cáo seller'
+                  ? report.title || report.reasonLabel || 'Báo cáo seller'
                   : report.title || report.reasonLabel || 'Báo cáo buyer';
                 const content = isSellerReport
                   ? report.sellerContent || report.content
                   : report.content;
-                const lat = isSellerReport
-                  ? report.sellerLatitude ?? report.latitude
-                  : report.latitude;
-                const lng = isSellerReport
-                  ? report.sellerLongitude ?? report.longitude
-                  : report.longitude;
-                const address = isSellerReport
-                  ? report.sellerAddress || report.address || ''
-                  : report.address || '';
                 return (
                   <div
                     key={report.id}
@@ -647,11 +671,6 @@ export default function ReservationDetailPage() {
                       {isSellerReport ? 'Seller' : 'Buyer'}: {title}
                     </strong>
                     <p>{content || ''}</p>
-                    <DisputeGpsBlock
-                      latitude={lat}
-                      longitude={lng}
-                      storedAddress={address}
-                    />
                     <p className="cell-sub">{formatDate(report.createdAt)}</p>
                     {Array.isArray(report.images) && report.images.length ? (
                       <div className="dispute-report-images">

@@ -20,11 +20,17 @@ import SubScreenHeader from '../shared/components/SubScreenHeader';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
 import KeyboardAwareScrollView from '../shared/components/KeyboardAwareScrollView';
 import KeyboardAwareTextInput from '../shared/components/KeyboardAwareTextInput';
+import PlanTabPanel from '../shared/components/PlanTabPanel';
 import {
   createWithdrawViewModel,
   loadMyWithdrawsViewModel,
   loadWithdrawBanksViewModel,
 } from '../../viewmodel/wallet/withdrawViewModel';
+
+const WITHDRAW_SCREEN_TABS = [
+  { key: 'withdraw', label: 'Rút tiền' },
+  { key: 'history', label: 'Lịch sử rút' },
+];
 
 const MIN_WITHDRAW = 50000;
 
@@ -74,6 +80,8 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
   const [amountText, setAmountText] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
+  const [screenTab, setScreenTab] = useState('withdraw');
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const amount = useMemo(
     () => Math.round(Number(String(amountText).replace(/\D/g, '')) || 0),
@@ -85,33 +93,33 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
     [banks, selectedBankId]
   );
 
-  const load = useCallback(async ({ nextPage = 1, silent = false } = {}) => {
+  const load = useCallback(async ({ nextPage = 1, silent = false, banksOnly = false } = {}) => {
     if (!silent) {
-      if (nextPage === 1) {
+      if (banksOnly) {
         setLoading(true);
+      } else if (nextPage === 1) {
+        setHistoryLoading(true);
       } else {
         setLoadingMore(true);
       }
     }
     try {
-      const requests = [
-        loadMyWithdrawsViewModel({ page: nextPage, limit: DEFAULT_PAGE_SIZE }),
-      ];
-      if (nextPage === 1) {
-        requests.unshift(loadWithdrawBanksViewModel());
-      }
-      const results = await Promise.all(requests);
-      const bankRows = nextPage === 1 ? results[0] : null;
-      const withdrawPage = nextPage === 1 ? results[1] : results[0];
-      const withdrawRows =
-        withdrawPage?.items || (Array.isArray(withdrawPage) ? withdrawPage : []);
-      if (nextPage === 1) {
+      if (banksOnly) {
+        const bankRows = await loadWithdrawBanksViewModel();
         setBanks(Array.isArray(bankRows) ? bankRows : []);
         setSelectedBankId((current) => {
           if (current) return current;
           return bankRows?.[0]?.id ? String(bankRows[0].id) : '';
         });
+        return;
       }
+
+      const withdrawPage = await loadMyWithdrawsViewModel({
+        page: nextPage,
+        limit: DEFAULT_PAGE_SIZE,
+      });
+      const withdrawRows =
+        withdrawPage?.items || (Array.isArray(withdrawPage) ? withdrawPage : []);
       setWithdraws((current) =>
         nextPage === 1
           ? mergeListById(current, withdrawRows)
@@ -125,8 +133,9 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
         return;
       }
       Alert.alert('Lỗi', error.message || 'Không tải được dữ liệu rút tiền.');
-      if (nextPage === 1) {
+      if (banksOnly) {
         setBanks([]);
+      } else if (nextPage === 1) {
         setWithdraws([]);
         setHasMore(false);
         setTotalCount(0);
@@ -134,14 +143,22 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
     } finally {
       if (!silent) {
         setLoading(false);
+        setHistoryLoading(false);
         setLoadingMore(false);
       }
     }
   }, []);
 
   useEffect(() => {
-    load({ nextPage: 1 });
+    load({ banksOnly: true });
   }, [load]);
+
+  useEffect(() => {
+    if (screenTab !== 'history') {
+      return;
+    }
+    load({ nextPage: 1 });
+  }, [screenTab, load]);
 
   const handleWithdrawRealtime = useCallback(
     (payload) => {
@@ -149,9 +166,11 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
       if (type !== 'withdraw' && type !== 'wallet') {
         return;
       }
-      load({ nextPage: 1, silent: true });
+      if (screenTab === 'history') {
+        load({ nextPage: 1, silent: true });
+      }
     },
-    [load]
+    [load, screenTab]
   );
 
   useResourceSocket({
@@ -203,6 +222,7 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
               setAmountText('');
               setAccountNumber('');
               setAccountName('');
+              setScreenTab('history');
               await load({ nextPage: 1 });
             } catch (error) {
               Alert.alert('Không rút được', error.message || 'Vui lòng thử lại.');
@@ -212,6 +232,61 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
           },
         },
       ]
+    );
+  }
+
+  function renderWithdrawHistoryList() {
+    if (withdraws.length === 0) {
+      return <Text style={styles.empty}>Chưa có yêu cầu rút tiền.</Text>;
+    }
+    return (
+      <>
+        {withdraws.map((item) => (
+          <Pressable
+            key={item.id}
+            onPress={() => setSelectedWithdraw(item)}
+            style={({ pressed }) => [
+              styles.historyCard,
+              pressed && styles.historyCardPressed,
+            ]}
+          >
+            <View style={styles.historyTop}>
+              <Text style={styles.historyAmount}>{formatPrice(item.amount)}</Text>
+              <View style={styles.historyTopRight}>
+                <Text
+                  style={[
+                    styles.historyStatus,
+                    item.status === 1 && styles.statusOk,
+                    item.status === 2 && styles.statusBad,
+                  ]}
+                >
+                  {item.statusLabel || STATUS_LABEL[item.status] || '—'}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+              </View>
+            </View>
+            <Text style={styles.historyMeta}>
+              {item.bankName} · {item.accountNumber}
+            </Text>
+            {item.accountName ? (
+              <Text style={styles.historyMeta}>{item.accountName}</Text>
+            ) : null}
+            {item.adminNote ? (
+              <Text style={styles.historyNote}>Ghi chú: {item.adminNote}</Text>
+            ) : null}
+          </Pressable>
+        ))}
+        <LoadMoreButton
+          currentCount={withdraws.length}
+          totalCount={
+            hasMore
+              ? Math.max(totalCount, withdraws.length + DEFAULT_PAGE_SIZE)
+              : withdraws.length
+          }
+          loading={loadingMore}
+          onPress={() => load({ nextPage: page + 1 })}
+        />
+      </>
     );
   }
 
@@ -282,206 +357,176 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
         </>
       ) : (
         <>
-      <SubScreenHeader title="Rút tiền" onBack={onBack} />
+          <SubScreenHeader title="Rút tiền" onBack={onBack} />
 
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={t.primary} size="large" />
-        </View>
-      ) : (
-        <KeyboardAwareScrollView
-          contentContainerStyle={styles.content}
-        >
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Số dư khả dụng</Text>
-            <Text style={styles.balanceValue}>{formatPrice(balance)}</Text>
+          <View style={styles.tabShell}>
+            <PlanTabPanel
+              tabs={WITHDRAW_SCREEN_TABS}
+              activeTab={screenTab}
+              onChangeTab={setScreenTab}
+            >
+              {screenTab === 'withdraw' ? (
+                loading ? (
+                  <View style={styles.tabLoading}>
+                    <ActivityIndicator color={t.primary} size="large" />
+                  </View>
+                ) : (
+                  <KeyboardAwareScrollView
+                    style={styles.scroll}
+                    contentContainerStyle={styles.tabContent}
+                  >
+                    <View style={styles.balanceCard}>
+                      <Text style={styles.balanceLabel}>Số dư khả dụng</Text>
+                      <Text style={styles.balanceValue}>{formatPrice(balance)}</Text>
+                    </View>
+
+                    <Text style={styles.label}>Ngân hàng</Text>
+                    {banks.length === 0 ? (
+                      <Text style={styles.warn}>
+                        Hiện chưa có ngân hàng nào được admin bật. Vui lòng thử lại sau.
+                      </Text>
+                    ) : (
+                      <Pressable
+                        style={styles.comboBox}
+                        onPress={() => setBankPickerOpen(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Chọn ngân hàng"
+                      >
+                        <View style={styles.comboBoxCopy}>
+                          {selectedBank ? (
+                            <>
+                              <Text style={styles.comboBoxValue} numberOfLines={1}>
+                                {selectedBank.name}
+                              </Text>
+                              <Text style={styles.comboBoxMeta} numberOfLines={1}>
+                                {selectedBank.code}
+                                {selectedBank.note ? ` · ${selectedBank.note}` : ''}
+                              </Text>
+                            </>
+                          ) : (
+                            <Text style={styles.comboBoxPlaceholder}>Chọn ngân hàng</Text>
+                          )}
+                        </View>
+                        <Ionicons name="chevron-down" size={18} color="#64748b" />
+                      </Pressable>
+                    )}
+
+                    <Text style={styles.label}>Số tiền rút (đ)</Text>
+                    <KeyboardAwareTextInput
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      value={amountText}
+                      onChangeText={setAmountText}
+                      placeholder={`Tối thiểu ${MIN_WITHDRAW.toLocaleString('vi-VN')}`}
+                      placeholderTextColor="#94a3b8"
+                    />
+
+                    <Text style={styles.label}>Số tài khoản</Text>
+                    <KeyboardAwareTextInput
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      value={accountNumber}
+                      onChangeText={setAccountNumber}
+                      placeholder="Nhập số tài khoản"
+                      placeholderTextColor="#94a3b8"
+                    />
+
+                    <Text style={styles.label}>Tên chủ tài khoản</Text>
+                    <KeyboardAwareTextInput
+                      style={styles.input}
+                      autoCapitalize="characters"
+                      value={accountName}
+                      onChangeText={setAccountName}
+                      placeholder="NGUYEN VAN A"
+                      placeholderTextColor="#94a3b8"
+                    />
+
+                    <Pressable
+                      style={[
+                        styles.submitBtn,
+                        (submitting || banks.length === 0) && styles.submitDisabled,
+                      ]}
+                      onPress={handleSubmit}
+                      disabled={submitting || banks.length === 0}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <>
+                          <Text style={styles.submitText}>Gửi yêu cầu rút tiền</Text>
+                          <Ionicons name="arrow-forward" size={18} color="#fff" />
+                        </>
+                      )}
+                    </Pressable>
+                  </KeyboardAwareScrollView>
+                )
+              ) : historyLoading ? (
+                <View style={styles.tabLoading}>
+                  <ActivityIndicator color={t.primary} size="large" />
+                </View>
+              ) : (
+                <KeyboardAwareScrollView
+                  style={styles.scroll}
+                  contentContainerStyle={styles.historyTabContent}
+                >
+                  {renderWithdrawHistoryList()}
+                </KeyboardAwareScrollView>
+              )}
+            </PlanTabPanel>
           </View>
 
-          <Text style={styles.label}>Ngân hàng</Text>
-          {banks.length === 0 ? (
-            <Text style={styles.warn}>
-              Hiện chưa có ngân hàng nào được admin bật. Vui lòng thử lại sau.
-            </Text>
-          ) : (
-            <>
-              <Pressable
-                style={styles.comboBox}
-                onPress={() => setBankPickerOpen(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Chọn ngân hàng"
-              >
-                <View style={styles.comboBoxCopy}>
-                  {selectedBank ? (
-                    <>
-                      <Text style={styles.comboBoxValue} numberOfLines={1}>
-                        {selectedBank.name}
-                      </Text>
-                      <Text style={styles.comboBoxMeta} numberOfLines={1}>
-                        {selectedBank.code}
-                        {selectedBank.note ? ` · ${selectedBank.note}` : ''}
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.comboBoxPlaceholder}>Chọn ngân hàng</Text>
-                  )}
-                </View>
-                <Ionicons name="chevron-down" size={18} color="#64748b" />
-              </Pressable>
-
-              <Modal
-                visible={bankPickerOpen}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setBankPickerOpen(false)}
-              >
-                <Pressable
-                  style={styles.comboOverlay}
-                  onPress={() => setBankPickerOpen(false)}
-                >
-                  <Pressable style={styles.comboSheet} onPress={(e) => e.stopPropagation?.()}>
-                    <Text style={styles.comboSheetTitle}>Chọn ngân hàng</Text>
-                    <ScrollView
-                      style={styles.comboSheetList}
-                      bounces={false}
-                      keyboardShouldPersistTaps="handled"
-                    >
-                      {banks.map((bank) => {
-                        const active = String(bank.id) === String(selectedBankId);
-                        return (
-                          <Pressable
-                            key={bank.id}
-                            onPress={() => {
-                              setSelectedBankId(String(bank.id));
-                              setBankPickerOpen(false);
-                            }}
-                            style={[styles.comboOption, active && styles.comboOptionActive]}
-                          >
-                            <View style={styles.comboOptionCopy}>
-                              <Text
-                                style={[
-                                  styles.comboOptionName,
-                                  active && styles.comboOptionNameActive,
-                                ]}
-                              >
-                                {bank.name}
-                              </Text>
-                              <Text style={styles.comboOptionMeta}>
-                                {bank.code}
-                                {bank.note ? ` · ${bank.note}` : ''}
-                              </Text>
-                            </View>
-                            {active ? (
-                              <Ionicons name="checkmark" size={18} color={t.primary} />
-                            ) : null}
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-                  </Pressable>
-                </Pressable>
-              </Modal>
-            </>
-          )}
-
-          <Text style={styles.label}>Số tiền rút (đ)</Text>
-          <KeyboardAwareTextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={amountText}
-            onChangeText={setAmountText}
-            placeholder={`Tối thiểu ${MIN_WITHDRAW.toLocaleString('vi-VN')}`}
-            placeholderTextColor="#94a3b8"
-          />
-
-          <Text style={styles.label}>Số tài khoản</Text>
-          <KeyboardAwareTextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={accountNumber}
-            onChangeText={setAccountNumber}
-            placeholder="Nhập số tài khoản"
-            placeholderTextColor="#94a3b8"
-          />
-
-          <Text style={styles.label}>Tên chủ tài khoản</Text>
-          <KeyboardAwareTextInput
-            style={styles.input}
-            autoCapitalize="characters"
-            value={accountName}
-            onChangeText={setAccountName}
-            placeholder="NGUYEN VAN A"
-            placeholderTextColor="#94a3b8"
-          />
-
-          <Pressable
-            style={[styles.submitBtn, (submitting || banks.length === 0) && styles.submitDisabled]}
-            onPress={handleSubmit}
-            disabled={submitting || banks.length === 0}
+          <Modal
+            visible={bankPickerOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setBankPickerOpen(false)}
           >
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Text style={styles.submitText}>Gửi yêu cầu rút tiền</Text>
-                <Ionicons name="arrow-forward" size={18} color="#fff" />
-              </>
-            )}
-          </Pressable>
-
-          <Text style={styles.sectionTitle}>Yêu cầu gần đây</Text>
-          {withdraws.length === 0 ? (
-            <Text style={styles.empty}>Chưa có yêu cầu rút tiền.</Text>
-          ) : (
-            <>
-            {withdraws.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => setSelectedWithdraw(item)}
-                style={({ pressed }) => [
-                  styles.historyCard,
-                  pressed && styles.historyCardPressed,
-                ]}
-              >
-                <View style={styles.historyTop}>
-                  <Text style={styles.historyAmount}>{formatPrice(item.amount)}</Text>
-                  <View style={styles.historyTopRight}>
-                    <Text
-                      style={[
-                        styles.historyStatus,
-                        item.status === 1 && styles.statusOk,
-                        item.status === 2 && styles.statusBad,
-                      ]}
-                    >
-                      {item.statusLabel || STATUS_LABEL[item.status] || '—'}
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
-                  </View>
-                </View>
-                <Text style={styles.historyMeta}>
-                  {item.bankName} · {item.accountNumber}
-                </Text>
-                {item.accountName ? (
-                  <Text style={styles.historyMeta}>{item.accountName}</Text>
-                ) : null}
-                {item.adminNote ? (
-                  <Text style={styles.historyNote}>Ghi chú: {item.adminNote}</Text>
-                ) : null}
+            <Pressable
+              style={styles.comboOverlay}
+              onPress={() => setBankPickerOpen(false)}
+            >
+              <Pressable style={styles.comboSheet} onPress={(e) => e.stopPropagation?.()}>
+                <Text style={styles.comboSheetTitle}>Chọn ngân hàng</Text>
+                <ScrollView
+                  style={styles.comboSheetList}
+                  bounces={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {banks.map((bank) => {
+                    const active = String(bank.id) === String(selectedBankId);
+                    return (
+                      <Pressable
+                        key={bank.id}
+                        onPress={() => {
+                          setSelectedBankId(String(bank.id));
+                          setBankPickerOpen(false);
+                        }}
+                        style={[styles.comboOption, active && styles.comboOptionActive]}
+                      >
+                        <View style={styles.comboOptionCopy}>
+                          <Text
+                            style={[
+                              styles.comboOptionName,
+                              active && styles.comboOptionNameActive,
+                            ]}
+                          >
+                            {bank.name}
+                          </Text>
+                          <Text style={styles.comboOptionMeta}>
+                            {bank.code}
+                            {bank.note ? ` · ${bank.note}` : ''}
+                          </Text>
+                        </View>
+                        {active ? (
+                          <Ionicons name="checkmark" size={18} color={t.primary} />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </Pressable>
-            ))}
-            <LoadMoreButton
-              currentCount={withdraws.length}
-              totalCount={
-                hasMore
-                  ? Math.max(totalCount, withdraws.length + DEFAULT_PAGE_SIZE)
-                  : withdraws.length
-              }
-              loading={loadingMore}
-              onPress={() => load({ nextPage: page + 1 })}
-            />
-            </>
-          )}
-        </KeyboardAwareScrollView>
-      )}
+            </Pressable>
+          </Modal>
         </>
       )}
     </View>
@@ -490,8 +535,18 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f8fafc' },
+  scroll: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, gap: 10 },
+  tabShell: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  tabContent: { gap: 10, paddingBottom: 16 },
+  historyTabContent: { gap: 10, paddingBottom: 24 },
+  tabLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   balanceCard: {
     backgroundColor: t.primaryDark,
     borderRadius: t.radiusLg,

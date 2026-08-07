@@ -112,31 +112,20 @@ exports.reportReservation = async (req, res) => {
     pickBodyValue(req.body, ["reservationId", "reservation_id", "id"]) || req.params.id;
   const reason = pickBodyValue(req.body, ["reason"]);
   const description = pickBodyValue(req.body, ["description", "note"]);
-  const latitude = req.body.latitude ?? req.body.lat;
-  const longitude = req.body.longitude ?? req.body.lng ?? req.body.lon;
   const images = req.body.images || req.body.imageUrls || [];
 
   if (!reservationId) {
     return fail(res, { status: 400, message: "Thiếu reservationId." });
   }
 
-  // Luồng mới (GPS) không bắt buộc reason string cũ.
-  const hasGps =
-    latitude !== undefined &&
-    latitude !== null &&
-    String(latitude).trim() !== "" &&
-    longitude !== undefined &&
-    longitude !== null &&
-    String(longitude).trim() !== "";
-
-  if (!hasGps && !reason) {
+  if (!reason) {
     return fail(res, { status: 400, message: "Thiếu lý do báo cáo." });
   }
 
   const result = await buyerOpsService.reportReservationByBuyer(
     req.currentUser,
     reservationId,
-    { reason, description, latitude, longitude, images }
+    { reason, description, images }
   );
 
   // buyerReportSeller trả { report, reservation }; legacy trả reservation thuần.

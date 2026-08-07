@@ -28,7 +28,11 @@ initSocket(server);
 server.listen(port, '0.0.0.0', () => {
   const { isPayosConfigured } = require('./services/payosClient');
   const { isPusherConfigured } = require('./services/pusherService');
+  const { isSupabaseStorageConfigured, getSupabaseConfigErrorMessage } = require('./config/supabase');
   console.log(`Server running on port ${port}`);
   console.log(`PayOS: ${isPayosConfigured() ? 'configured' : 'NOT configured (check FastMark/.env)'}`);
   console.log(`Pusher: ${isPusherConfigured() ? 'configured' : 'NOT configured (add PUSHER_* to FastMark/.env and restart)'}`);
+  console.log(
+    `Supabase storage: ${isSupabaseStorageConfigured() ? 'configured' : `NOT configured (${getSupabaseConfigErrorMessage()})`}`
+  );
 });

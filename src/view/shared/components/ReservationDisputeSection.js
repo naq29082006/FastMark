@@ -5,8 +5,10 @@ import {
   RESERVATION_DISPUTE_REASON_LABELS,
   RESERVATION_STATUS,
   VIEWER_ROLE,
-  DISPUTE_ADMIN_PENDING_FOOTER,
+  buildDisputeAdminPendingFooter,
   buildDisputeReportOrder,
+  hasSellerPostDeliveryResponse,
+  isPostDeliveryDisputeReservation,
   reservationHasDisputeContext,
 } from '../../../constants/sellerOrders';
 
@@ -89,6 +91,44 @@ function getSummaryLine(side, viewerRole, reasonLabel) {
     : `Bạn đã báo cáo: ${reason}`;
 }
 
+function SellerResponseBlock({ reservation, viewerRole }) {
+  const response = reservation?.sellerResponse;
+  const content = String(response?.content || '').trim();
+  const images = Array.isArray(response?.images) ? response.images.filter(Boolean) : [];
+  const respondedAt = reservation?.sellerRespondedAt || null;
+  const isViewerBuyer = viewerRole === VIEWER_ROLE.BUYER;
+
+  if (!hasSellerPostDeliveryResponse(reservation) || !content) {
+    return null;
+  }
+
+  return (
+    <View style={styles.reportItem}>
+      <Text style={styles.reportItemTitle}>
+        {isViewerBuyer ? 'Phản hồi của shop' : 'Phản hồi của bạn'}
+      </Text>
+      <Text style={styles.summaryLine}>
+        {isViewerBuyer ? 'Shop đã phản hồi khiếu nại' : 'Bạn đã phản hồi khiếu nại'}
+      </Text>
+      <Text style={styles.reportBody}>{content}</Text>
+      {respondedAt ? (
+        <Text style={styles.reportMeta}>Lúc: {formatDateTime(respondedAt)}</Text>
+      ) : null}
+      {images.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reportPhotos}>
+          {images.map((image) => (
+            <Image
+              key={image.id || image.imageUrl}
+              source={{ uri: image.imageUrl }}
+              style={styles.reportPhoto}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+
 function DisputeReportBlock({ side, report, reservation, viewerRole }) {
   const reasonLabel =
     side === 'buyer'
@@ -139,6 +179,12 @@ export default function ReservationDisputeSection({
   const orderedReports = buildOrderedReports(buyerReport, sellerReport, reservation);
   const showPendingAdminNotice =
     Number(reservation?.status) === RESERVATION_STATUS.DISPUTED;
+  const pendingFooter = buildDisputeAdminPendingFooter(reservation, viewerRole);
+  const showPostDeliverySellerWait =
+    showPendingAdminNotice &&
+    isPostDeliveryDisputeReservation(reservation) &&
+    reservation?.disputeByBuyer &&
+    !hasSellerPostDeliveryResponse(reservation);
 
   return (
     <View style={styles.section}>
@@ -155,10 +201,22 @@ export default function ReservationDisputeSection({
         />
       ))}
 
-      {showPendingAdminNotice ? (
+      {showPostDeliverySellerWait ? (
+        <View style={styles.waitNotice}>
+          <Text style={styles.waitNoticeText}>
+            {viewerRole === VIEWER_ROLE.BUYER
+              ? 'Khiếu nại đã gửi tới shop. Shop có 2 ngày để phản hồi trước khi admin xử lý.'
+              : 'Khách đã khiếu nại sau khi nhận hàng. Vui lòng phản hồi trong 2 ngày.'}
+          </Text>
+        </View>
+      ) : null}
+
+      <SellerResponseBlock reservation={reservation} viewerRole={viewerRole} />
+
+      {showPendingAdminNotice && pendingFooter ? (
         <>
           <View style={styles.divider} />
-          <Text style={styles.adminPendingNotice}>{DISPUTE_ADMIN_PENDING_FOOTER}</Text>
+          <Text style={styles.adminPendingNotice}>{pendingFooter}</Text>
         </>
       ) : null}
     </View>
@@ -226,6 +284,20 @@ const styles = StyleSheet.create({
   adminPendingNotice: {
     fontSize: 13,
     color: '#64748b',
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  waitNotice: {
+    backgroundColor: '#fff7ed',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    marginBottom: 10,
+  },
+  waitNoticeText: {
+    fontSize: 13,
+    color: '#9a3412',
     fontWeight: '600',
     lineHeight: 20,
   },

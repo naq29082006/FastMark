@@ -79,12 +79,16 @@ export async function uploadShopAvatarOnBackend({ idToken, imageBase64, mimeType
   return parsed.data?.shop || null;
 }
 
-export async function getSellerOrdersOnBackend({ idToken, tab, page = 1, limit = 20 }) {
+export async function getSellerOrdersOnBackend({ idToken, tab, search, page = 1, limit = 20 }) {
   const params = new URLSearchParams({
     tab: tab || 'pending',
     page: String(page),
     limit: String(limit),
   });
+  const trimmedSearch = String(search || '').trim();
+  if (trimmedSearch) {
+    params.set('search', trimmedSearch);
+  }
   const response = await apiRequest(
     `${API_ENDPOINTS.sellerOrders}?${params.toString()}`,
     { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
@@ -92,6 +96,30 @@ export async function getSellerOrdersOnBackend({ idToken, tab, page = 1, limit =
   );
   const payload = await parseApiResponse(response);
   return payload.data;
+}
+
+export async function getSellerReviewsOnBackend({ idToken, page = 1, limit = 20 }) {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  const response = await apiRequest(
+    `${API_ENDPOINTS.sellerReviews}?${params.toString()}`,
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data;
+}
+
+export async function getSellerReviewDetailOnBackend(idToken, reviewId) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReview(reviewId),
+    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.review;
 }
 
 export async function getSellerReservationDetailOnBackend(idToken, reservationId) {
@@ -167,9 +195,6 @@ export async function reportBuyerNoShowOnBackend({
   description,
   note,
   title,
-  latitude,
-  longitude,
-  address,
   images,
 }) {
   const id = String(reservationId || '').trim();
@@ -187,9 +212,82 @@ export async function reportBuyerNoShowOnBackend({
         title: title || 'Người mua không đến nhận hàng',
         description: description || note || '',
         note: note || description || '',
-        latitude,
-        longitude,
-        address: address || '',
+        images: images || [],
+      }),
+    },
+    hasImages ? SELLER_UPLOAD_TIMEOUT_MS : AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation || payload.data;
+}
+
+export async function validateSellerPickupQrOnBackend(idToken, { qrPayload }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservationValidatePickupQr,
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ qrPayload }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation || payload.data;
+}
+
+export async function confirmSellerDeliveredOnBackend(idToken, reservationId) {
+  const id = String(reservationId || '').trim();
+  if (!id) {
+    throw new Error('Thiếu reservationId.');
+  }
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservationConfirmDelivered(id),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: '{}',
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation;
+}
+
+export async function adjustSellerReservationAtPickupOnBackend(idToken, reservationId, { quantity }) {
+  const id = String(reservationId || '').trim();
+  if (!id) {
+    throw new Error('Thiếu reservationId.');
+  }
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservationAdjustAtPickup(id),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({ quantity }),
+    },
+    AUTH_TIMEOUT_MS
+  );
+  const payload = await parseApiResponse(response);
+  return payload.data?.reservation;
+}
+
+export async function respondSellerPostDeliveryComplaintOnBackend(
+  idToken,
+  { reservationId, description, images }
+) {
+  const id = String(reservationId || '').trim();
+  if (!id) {
+    throw new Error('Thiếu reservationId.');
+  }
+  const hasImages = Array.isArray(images) && images.length > 0;
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerReservationDisputeResponse(id),
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify({
+        reservationId: id,
+        description: description || '',
         images: images || [],
       }),
     },
@@ -211,73 +309,6 @@ export async function getReservationDisputeReportsOnBackend(idToken, reservation
   );
   const payload = await parseApiResponse(response);
   return payload.data?.reports || [];
-}
-
-export async function getSellerConversationsOnBackend(idToken) {
-  const response = await apiRequest(
-    API_ENDPOINTS.sellerConversations,
-    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.conversations || [];
-}
-
-export async function getSellerMessagesOnBackend(idToken, conversationId) {
-  const response = await apiRequest(
-    API_ENDPOINTS.sellerConversationMessages(conversationId),
-    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return {
-    messages: payload.data?.messages || [],
-    sequence: payload.data?.sequence || null,
-  };
-}
-
-export async function sendSellerMessageOnBackend({ idToken, conversationId, content, imageContent }) {
-  const response = await apiRequest(
-    API_ENDPOINTS.sellerConversationMessages(conversationId),
-    {
-      method: 'POST',
-      headers: await authHeaders(idToken),
-      body: JSON.stringify({
-        content,
-        imageContent,
-        messageType: imageContent ? 1 : undefined,
-      }),
-    },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.message;
-}
-
-export async function deleteSellerMessageOnBackend(idToken, conversationId, messageId) {
-  const response = await apiRequest(
-    API_ENDPOINTS.sellerConversationMessage(conversationId, messageId),
-    {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${idToken}` },
-    },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return {
-    message: payload.data?.message,
-    lastMessage: payload.data?.lastMessage || payload.data?.message?.conversationLastMessage || '',
-  };
-}
-
-export async function getSellerConversationPeerOnBackend(idToken, conversationId) {
-  const response = await apiRequest(
-    API_ENDPOINTS.sellerConversationPeer(conversationId),
-    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.peer;
 }
 
 export async function getSellerStatsOnBackend(idToken, { range, from, to } = {}) {

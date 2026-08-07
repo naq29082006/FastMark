@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 /**
  * SellerPlan — gói bán hàng do admin cấu hình (thời hạn + giá).
  * Seller mua bằng ví → gian hàng hiện công khai đến hết hạn.
- * Không giới hạn số bài / sản phẩm.
+ * isActive: 1 = đang bán, 0 = xóa mềm.
  */
 const SellerPlanSchema = new mongoose.Schema({
   // Tên gói (VD: Gói 1 tháng).
@@ -14,8 +14,8 @@ const SellerPlanSchema = new mongoose.Schema({
   durationDays: { type: Number, required: true, min: 1 },
   // Giá gói (VND), trừ từ ví seller khi mua.
   price: { type: Number, required: true, min: 0 },
-  // Bật = seller được mua; tắt = ẩn khỏi danh sách bán.
-  isActive: { type: Boolean, default: true, index: true },
+  // 1 = đang bán, 0 = xóa mềm.
+  isActive: { type: Number, default: 1, index: true },
   // Thời điểm tạo gói.
   CreatedAt: { type: Date, default: Date.now },
   // Thời điểm cập nhật gần nhất (auto trong pre-save).

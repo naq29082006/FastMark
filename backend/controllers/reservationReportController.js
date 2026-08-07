@@ -21,9 +21,6 @@ exports.buyerReportSeller = async (req, res) => {
     reservationId: String(reservationId).trim(),
     description: pickBodyValue(req.body, ["description", "content", "note"]),
     reason: pickBodyValue(req.body, ["reason"]),
-    latitude: pickBodyValue(req.body, ["latitude", "lat"]),
-    longitude: pickBodyValue(req.body, ["longitude", "lng", "lon"]),
-    address: pickBodyValue(req.body, ["address", "systemAddress", "diaChi"]),
     images: req.body.images || req.body.imageUrls || [],
   });
 
@@ -42,11 +39,7 @@ exports.sellerReportBuyer = async (req, res) => {
 
   const data = await reservationDisputeService.sellerReportBuyer(req.currentUser, {
     reservationId: String(reservationId).trim(),
-    title: pickBodyValue(req.body, ["title", "sellerTitle"]),
     description: pickBodyValue(req.body, ["description", "content", "note", "sellerContent"]),
-    latitude: pickBodyValue(req.body, ["latitude", "lat", "sellerLatitude"]),
-    longitude: pickBodyValue(req.body, ["longitude", "lng", "lon", "sellerLongitude"]),
-    address: pickBodyValue(req.body, ["address", "sellerAddress", "systemAddress", "diaChi"]),
     images: req.body.images || req.body.imageUrls || [],
   });
 

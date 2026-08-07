@@ -49,9 +49,17 @@ export default function ProfileSideDrawer({
   userName = '',
   photoUrl = null,
   walletBalance = 0,
+  holdingOrdersCount = null,
+  holdingOrdersLoading = false,
+  onOpenWallet,
+  onOpenHoldingOrders,
   sections = [],
 }) {
   const insets = useSafeAreaInsets();
+  const holdingCountLabel = holdingOrdersLoading
+    ? '…'
+    : String(Math.max(0, Number(holdingOrdersCount) || 0));
+  const showHoldingCard = typeof onOpenHoldingOrders === 'function';
 
   return (
     <Modal
@@ -93,6 +101,11 @@ export default function ProfileSideDrawer({
 
           <Pressable
             onPress={() => {
+              if (typeof onOpenWallet === 'function') {
+                onClose();
+                onOpenWallet();
+                return;
+              }
               const walletAction = sections
                 .flatMap((section) => section.items || [])
                 .find((item) => item.key === 'wallet');
@@ -112,6 +125,27 @@ export default function ProfileSideDrawer({
             </View>
             <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
           </Pressable>
+
+          {showHoldingCard ? (
+            <Pressable
+              onPress={() => {
+                onClose();
+                onOpenHoldingOrders();
+              }}
+              style={({ pressed }) => [styles.holdingCard, pressed && styles.menuRowPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Giữ hàng"
+            >
+              <View style={styles.holdingIcon}>
+                <Ionicons name="bookmark-outline" size={18} color="#c2410c" />
+              </View>
+              <View style={styles.holdingCopy}>
+                <Text style={styles.holdingTitle}>Giữ hàng</Text>
+                <Text style={styles.holdingCount}>{holdingCountLabel}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
+          ) : null}
 
           <ScrollView
             style={styles.scroll}
@@ -196,7 +230,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 14,
     backgroundColor: '#E6F4EC',
-    marginBottom: 18,
+    marginBottom: 10,
   },
   balanceIcon: {
     width: 40,
@@ -220,6 +254,40 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     color: '#076F32',
+  },
+  holdingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: '#ffedd5',
+    marginBottom: 18,
+  },
+  holdingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  holdingCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  holdingTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  holdingCount: {
+    marginTop: 2,
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0f172a',
+    lineHeight: 26,
   },
   scroll: {
     flex: 1,

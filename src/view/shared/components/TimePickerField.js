@@ -18,6 +18,7 @@ import {
   BottomSheetHandle,
   BottomSheetPanel,
 } from './bottomSheetChrome';
+import { usePickerDismissGuard } from './pickerDismissGuard';
 
 export default function TimePickerField({
   label,
@@ -30,6 +31,7 @@ export default function TimePickerField({
   const [showPicker, setShowPicker] = useState(false);
   const [draftDate, setDraftDate] = useState(() => parseTimeString(value, placeholder));
   const draftRef = useRef(draftDate);
+  const { guardOpen, closeWithGuard } = usePickerDismissGuard();
   const hasValue = Boolean(String(value || '').trim());
   const displayValue = hasValue ? String(value).trim() : placeholder;
 
@@ -42,14 +44,16 @@ export default function TimePickerField({
   }, [placeholder, showPicker, value]);
 
   function openPicker() {
-    const next = parseTimeString(value, placeholder);
-    draftRef.current = next;
-    setDraftDate(next);
-    setShowPicker(true);
+    guardOpen(() => {
+      const next = parseTimeString(value, placeholder);
+      draftRef.current = next;
+      setDraftDate(next);
+      setShowPicker(true);
+    });
   }
 
   function closePicker() {
-    setShowPicker(false);
+    closeWithGuard(() => setShowPicker(false));
   }
 
   function confirmPicker() {
@@ -65,7 +69,7 @@ export default function TimePickerField({
   }
 
   function handleAndroidChange(event, selectedDate) {
-    setShowPicker(false);
+    closeWithGuard(() => setShowPicker(false));
     if (event?.type === 'dismissed' || !selectedDate) {
       return;
     }
@@ -117,7 +121,7 @@ export default function TimePickerField({
           value={draftDate}
           mode="time"
           is24Hour
-          display="spinner"
+          display="default"
           onChange={handleAndroidChange}
         />
       ) : null}

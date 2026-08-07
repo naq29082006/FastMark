@@ -13,12 +13,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { BOTTOM_SHEET_BORDER, BottomSheetHandle } from './bottomSheetChrome';
+import { BottomSheetHandle } from './bottomSheetChrome';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
-import KeyboardStickyFooter from './KeyboardStickyFooter';
 import KeyboardAwareTextInput from './KeyboardAwareTextInput';
-
-const ACTIONS_BAR_ESTIMATE = 72;
+import { FormSheetActions, FormSheetBackdrop, FormSheetHeader, FormSheetShell, FORM_SHEET_SCROLL_STYLE } from './formSheetLayout';
 
 const MAX_IMAGES = 5;
 const MIN_REASON_LENGTH = 5;
@@ -140,23 +138,21 @@ export default function SellerCancelAcceptedModal({ visible, onClose, onSubmit }
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Đóng" />
-        <View style={styles.sheet}>
-          <BottomSheetHandle />
-          <View style={styles.header}>
-            <Text style={styles.title}>Hủy đơn đã xác nhận</Text>
-            <Pressable onPress={onClose} hitSlop={8} disabled={isSubmitting}>
-              <Ionicons name="close" size={22} color="#64748b" />
-            </Pressable>
-          </View>
+        <FormSheetBackdrop onClose={onClose} />
+        <FormSheetShell panelStyle={styles.sheet}>
+            <BottomSheetHandle />
+            <FormSheetHeader
+              title="Hủy đơn đã xác nhận"
+              onClose={onClose}
+              disabled={isSubmitting}
+            />
 
-          <KeyboardAwareScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.body}
-            extraBottomInset={ACTIONS_BAR_ESTIMATE}
-            nestedScrollPadding={false}
-            showsVerticalScrollIndicator={false}
-          >
+            <KeyboardAwareScrollView
+              style={FORM_SHEET_SCROLL_STYLE}
+              contentContainerStyle={styles.body}
+              nestedScrollPadding={false}
+              showsVerticalScrollIndicator={false}
+            >
             <Text style={styles.warning}>
               Tiền cọc sẽ được hoàn cho người mua. Cần lý do cụ thể và ảnh chứng minh.
             </Text>
@@ -206,29 +202,29 @@ export default function SellerCancelAcceptedModal({ visible, onClose, onSubmit }
                 Cần ít nhất 1 ảnh. Có thể chụp hoặc chọn từ thư viện.
               </Text>
             )}
-          </KeyboardAwareScrollView>
 
-          <KeyboardStickyFooter style={styles.footer}>
-            <Pressable
-              style={styles.cancelBtn}
-              onPress={onClose}
-              disabled={isSubmitting}
-            >
-              <Text style={styles.cancelBtnText}>Đóng</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.submitBtnText}>Xác nhận hủy</Text>
-              )}
-            </Pressable>
-          </KeyboardStickyFooter>
-        </View>
+              <FormSheetActions style={styles.footer}>
+                <Pressable
+                  style={styles.cancelBtn}
+                  onPress={onClose}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.cancelBtnText}>Đóng</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
+                  onPress={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.submitBtnText}>Xác nhận hủy</Text>
+                  )}
+                </Pressable>
+              </FormSheetActions>
+            </KeyboardAwareScrollView>
+        </FormSheetShell>
       </View>
     </Modal>
   );
@@ -244,29 +240,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   sheet: {
-    maxHeight: '88%',
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    ...BOTTOM_SHEET_BORDER,
     paddingTop: 10,
-    position: 'relative',
   },
-  scroll: {
-    flex: 0,
-    flexGrow: 0,
-    flexShrink: 1,
-    maxHeight: 460,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  title: { fontSize: 17, fontWeight: '800', color: '#0f172a' },
   body: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
   warning: {
     fontSize: 13,
@@ -321,10 +296,8 @@ const styles = StyleSheet.create({
   },
   hint: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
   footer: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: 0,
+    marginTop: 16,
   },
   cancelBtn: {
     flex: 1,

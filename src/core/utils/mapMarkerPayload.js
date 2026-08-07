@@ -4,17 +4,24 @@ export function buildMapMarkerPayload(shops = []) {
     return [];
   }
 
-  return shops.map((shop) => ({
-    id: shop.id,
-    latitude: shop.latitude,
-    longitude: shop.longitude,
-    name: shop.shop_name || shop.name || 'Gian hàng',
-    shop_name: shop.shop_name || shop.name || 'Gian hàng',
-    rating_avg: shop.rating_avg ?? shop.averageRating ?? 0,
-    is_open: shop.is_open,
-    address: shop.address || shop.user_address || '',
-    distance_meters: shop.distance_meters ?? shop.distanceMeters ?? null,
-  }));
+  return shops.map((shop) => {
+    const categoryId = String(shop.category_id || shop.categoryId || '');
+
+    return {
+      id: shop.id,
+      latitude: shop.latitude,
+      longitude: shop.longitude,
+      name: shop.shop_name || shop.name || 'Gian hàng',
+      shop_name: shop.shop_name || shop.name || 'Gian hàng',
+      category_id: categoryId,
+      categoryId,
+      category_name: shop.category_name || shop.categoryName || '',
+      categoryName: shop.category_name || shop.categoryName || '',
+      is_open: shop.is_open,
+      address: shop.address || shop.user_address || '',
+      distance_meters: shop.distance_meters ?? shop.distanceMeters ?? null,
+    };
+  });
 }
 
 /** Signature for deduping WebView marker updates. */

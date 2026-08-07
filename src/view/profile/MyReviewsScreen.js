@@ -21,11 +21,11 @@ import { mergeListById, removeById } from '../../core/utils/realtimeList';
 import { useResourceSocket } from '../../hooks/useResourceSocket';
 import StarRating from '../store/components/StarRating';
 import KeyboardAwareScrollView from '../shared/components/KeyboardAwareScrollView';
-import KeyboardStickyFooter from '../shared/components/KeyboardStickyFooter';
+import FormSheetActions from '../shared/components/KeyboardStickyFooter';
 import KeyboardAwareTextInput from '../shared/components/KeyboardAwareTextInput';
+import { FormSheetBackdrop, FormSheetHeader, FormSheetShell, FORM_SHEET_SCROLL_STYLE } from '../shared/components/formSheetLayout';
+import { BottomSheetHandle } from '../shared/components/bottomSheetChrome';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
-
-const ACTIONS_BAR_ESTIMATE = 72;
 
 function formatDateTime(iso) {
   if (!iso) return '';
@@ -265,46 +265,58 @@ export default function MyReviewsScreen({ refreshKey = 0 }) {
         </>
       )}
 
-      <Modal visible={Boolean(editingReview)} transparent animationType="fade">
+      <Modal
+        visible={Boolean(editingReview)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditingReview(null)}
+      >
         <View style={styles.modalOverlay}>
-          <KeyboardAwareScrollView
-            contentContainerStyle={styles.modalScrollContent}
-            extraBottomInset={ACTIONS_BAR_ESTIMATE}
-            nestedScrollPadding={false}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Sửa đánh giá</Text>
-              <Text style={styles.modalLabel}>Số sao</Text>
-              <View style={styles.ratingRow}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Pressable key={star} onPress={() => setEditRating(star)}>
-                    <Text style={[styles.starButton, editRating >= star && styles.starButtonActive]}>
-                      {editRating >= star ? '★' : '☆'}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Text style={styles.modalLabel}>Nội dung</Text>
-              <KeyboardAwareTextInput
-                value={editComment}
-                onChangeText={setEditComment}
-                style={styles.input}
-                multiline
-                placeholder="Nhập đánh giá..."
-                placeholderTextColor="#94a3b8"
+          <FormSheetBackdrop onClose={() => setEditingReview(null)} />
+          <FormSheetShell panelStyle={styles.modalSheet}>
+              <BottomSheetHandle />
+              <FormSheetHeader
+                title="Sửa đánh giá"
+                onClose={() => setEditingReview(null)}
               />
-            </View>
-          </KeyboardAwareScrollView>
+              <KeyboardAwareScrollView
+                contentContainerStyle={styles.modalScrollContent}
+                nestedScrollPadding={false}
+                showsVerticalScrollIndicator={false}
+                style={FORM_SHEET_SCROLL_STYLE}
+              >
+              <View style={styles.modalCard}>
+                <Text style={styles.modalLabel}>Số sao</Text>
+                <View style={styles.ratingRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Pressable key={star} onPress={() => setEditRating(star)}>
+                      <Text style={[styles.starButton, editRating >= star && styles.starButtonActive]}>
+                        {editRating >= star ? '★' : '☆'}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.modalLabel}>Nội dung</Text>
+                <KeyboardAwareTextInput
+                  value={editComment}
+                  onChangeText={setEditComment}
+                  style={styles.input}
+                  multiline
+                  placeholder="Nhập đánh giá..."
+                  placeholderTextColor="#94a3b8"
+                />
+              </View>
 
-          <KeyboardStickyFooter style={styles.modalActions}>
-            <Pressable style={styles.modalCancel} onPress={() => setEditingReview(null)}>
-              <Text style={styles.modalCancelText}>Hủy</Text>
-            </Pressable>
-            <Pressable style={styles.modalSave} onPress={saveEdit}>
-              <Text style={styles.modalSaveText}>Lưu</Text>
-            </Pressable>
-          </KeyboardStickyFooter>
+              <FormSheetActions style={styles.modalActions}>
+                <Pressable style={styles.modalCancel} onPress={() => setEditingReview(null)}>
+                  <Text style={styles.modalCancelText}>Hủy</Text>
+                </Pressable>
+                <Pressable style={styles.modalSave} onPress={saveEdit}>
+                  <Text style={styles.modalSaveText}>Lưu</Text>
+                </Pressable>
+              </FormSheetActions>
+              </KeyboardAwareScrollView>
+          </FormSheetShell>
         </View>
       </Modal>
     </View>
@@ -420,25 +432,17 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    position: 'relative',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    paddingTop: 8,
   },
   modalScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 16,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginBottom: 12,
   },
   modalLabel: {
     color: '#64748b',
@@ -468,10 +472,11 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   modalActions: {
-    flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingHorizontal: 0,
+    maxWidth: 420,
+    width: '100%',
+    alignSelf: 'center',
   },
   modalCancel: {
     flex: 1,

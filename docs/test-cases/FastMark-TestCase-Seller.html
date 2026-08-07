@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tài liệu Test Case - Người bán (Seller)</title>
+<style>
+  body { font-family: Times New Roman, serif; font-size: 14pt; line-height: 1.5; margin: 24px; color: #000; }
+  h1 { font-size: 14pt; font-weight: normal; text-align: center; line-height: 1.5; }
+  h2 { font-size: 14pt; font-weight: normal; text-align: center; margin-bottom: 16px; line-height: 1.5; }
+  p { font-size: 14pt; line-height: 1.5; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  th, td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; word-wrap: break-word; font-size: 14pt; line-height: 1.5; font-weight: normal; }
+  th { text-align: center; }
+  col.id { width: 8%; }
+  col.func { width: 9%; }
+  col.goal { width: 12%; }
+  col.pre { width: 11%; }
+  col.steps { width: 16%; }
+  col.data { width: 11%; }
+  col.exp { width: 12%; }
+  col.act { width: 10%; }
+  col.status { width: 7%; }
+</style>
+</head>
+<body>
+<h1>HỆ THỐNG CHỢ QUÊ FASTMARK</h1>
+<h2>Tài liệu Test Case - Người bán (Seller)</h2>
+<p>Hệ thống Chợ Quê FastMark</p>
+<p>Tổng số test case: 34</p>
+<table>
+  <colgroup>
+    <col class="id"><col class="func"><col class="goal"><col class="pre">
+    <col class="steps"><col class="data"><col class="exp"><col class="act"><col class="status">
+  </colgroup>
+  <thead><tr><th>ID Testcase</th><th>Chức năng</th><th>Mục tiêu kiểm tra</th><th>Điều kiện tiên quyết</th><th>Quy trình kiểm tra</th><th>Dữ liệu test</th><th>Kết quả mong đợi</th><th>Kết quả thực tế</th><th>Trạng thái</th></tr></thead>
+  <tbody>
+<tr><td>TC-Seller-01</td><td>Đăng nhập</td><td>Kiểm tra Seller đăng nhập bằng tài khoản đã có quyền bán</td><td>Tài khoản seller01@test.com đã được Admin duyệt</td><td>1. Mở app. 2. Đăng nhập email/mật khẩu Seller.</td><td>Email: seller01@test.com; Mat khau: Seller@1234</td><td>Đăng nhập thành công; tab Gian hàng khả dụng</td><td>Đăng nhập thành công; tab Gian hàng khả dụng</td><td>Pass</td></tr>
+<tr><td>TC-Seller-02</td><td>Đăng xuất</td><td>Kiểm tra Seller đăng xuất</td><td>Đang đăng nhập Seller</td><td>1. Vào Tài khoản. 2. Chọn Đăng xuất.</td><td>Khong</td><td>Đăng xuất thành công; về màn Auth</td><td>Đăng xuất thành công; về màn Auth</td><td>Pass</td></tr>
+<tr><td>TC-Seller-03</td><td>Gửi yêu cầu xác minh người bán</td><td>Kiểm tra gửi hồ sơ xác minh đầy đủ</td><td>Buyer đã xác minh SĐT; chưa là Seller</td><td>1. Chọn Đăng ký bán. 2. Upload CCCD trước/sau, selfie. 3. Nhập thông tin gian hàng. 4. Gửi.</td><td>CCCD: 2 anh; Selfie: 1 anh; Ten shop: Sạp Rau A</td><td>Hồ sơ chuyển trạng thái chờ duyệt; hiển thị thông báo gửi thành công</td><td>Hồ sơ chuyển trạng thái chờ duyệt; hiển thị thông báo gửi thành công</td><td>Pass</td></tr>
+<tr><td>TC-Seller-04</td><td>Upload CCCD mặt trước</td><td>Kiểm tra thiếu ảnh CCCD mặt trước</td><td>Đang form xác minh</td><td>1. Bỏ trống CCCD trước. 2. Upload các trường khác. 3. Gửi.</td><td>CCCD truoc: (trong)</td><td>Hiển thị lỗi bắt buộc upload CCCD mặt trước</td><td>Hiển thị lỗi bắt buộc upload CCCD mặt trước</td><td>Pass</td></tr>
+<tr><td>TC-Seller-05</td><td>Upload CCCD mặt sau</td><td>Kiểm tra thiếu ảnh CCCD mặt sau</td><td>Đang form xác minh</td><td>1. Upload CCCD trước và selfie. 2. Bỏ trống CCCD sau. 3. Gửi.</td><td>CCCD sau: (trong)</td><td>Hiển thị lỗi bắt buộc upload CCCD mặt sau</td><td>Hiển thị lỗi bắt buộc upload CCCD mặt sau</td><td>Pass</td></tr>
+<tr><td>TC-Seller-06</td><td>Upload ảnh selfie</td><td>Kiểm tra thiếu ảnh selfie</td><td>Đang form xác minh</td><td>1. Upload CCCD đủ. 2. Bỏ trống selfie. 3. Gửi.</td><td>Selfie: (trong)</td><td>Hiển thị lỗi bắt buộc upload selfie</td><td>Hiển thị lỗi bắt buộc upload selfie</td><td>Pass</td></tr>
+<tr><td>TC-Seller-07</td><td>Gửi yêu cầu xác minh người bán</td><td>Kiểm tra gửi lại hồ sơ sau khi bị từ chối</td><td>Hồ sơ trước đó status=rejected</td><td>1. Mở trạng thái xác minh. 2. Sửa thông tin. 3. Gửi lại.</td><td>Ly do tu choi da xu ly; Anh moi hop le</td><td>Hồ sơ chuyển lại trạng thái chờ duyệt</td><td>Hồ sơ chuyển lại trạng thái chờ duyệt</td><td>Pass</td></tr>
+<tr><td>TC-Seller-08</td><td>Cập nhật hồ sơ cửa hàng</td><td>Kiểm tra cập nhật tên và mô tả gian hàng</td><td>Đã là Seller; có shop SH010</td><td>1. Vào Cài đặt gian hàng. 2. Sửa tên và mô tả. 3. Lưu.</td><td>Ten: Sạp Thịt B; Mo ta: Ban thit tuoi</td><td>Lưu thành công; thông tin hiển thị trên trang shop</td><td>Lưu thành công; thông tin hiển thị trên trang shop</td><td>Pass</td></tr>
+<tr><td>TC-Seller-09</td><td>Cập nhật hồ sơ cửa hàng</td><td>Kiểm tra cập nhật vị trí GPS gian hàng</td><td>Seller có quyền sửa vị trí</td><td>1. Vào Cài đặt vị trí. 2. Chọn điểm trên bản đồ. 3. Lưu.</td><td>Lat: 10.762622; Lng: 106.660172</td><td>Tọa độ lưu thành công; marker cập nhật trên bản đồ người mua</td><td>Tọa độ lưu thành công; marker cập nhật trên bản đồ người mua</td><td>Pass</td></tr>
+<tr><td>TC-Seller-10</td><td>Cập nhật hồ sơ cửa hàng</td><td>Kiểm tra bật/tắt trạng thái mở cửa</td><td>Shop đang mở cửa</td><td>1. Vào Cài đặt shop. 2. Chuyển trạng thái Đóng cửa. 3. Lưu.</td><td>Trang thai: Dong cua</td><td>Shop hiển thị đóng cửa với người mua; không nhận giữ hàng mới nếu cấu hình vậy</td><td>Shop hiển thị đóng cửa với người mua; không nhận giữ hàng mới nếu cấu hình vậy</td><td>Pass</td></tr>
+<tr><td>TC-Seller-11</td><td>Thêm sản phẩm</td><td>Kiểm tra thêm sản phẩm với dữ liệu hợp lệ</td><td>Seller có gói bán active; shop mở cửa</td><td>1. Vào Đăng sản phẩm. 2. Nhập tên, danh mục, giá, ảnh, tồn kho. 3. Lưu.</td><td>Ten: Ca chua bi; Gia: 25000; Ton: 50; Anh: 1 file</td><td>Sản phẩm tạo thành công; hiển thị trong danh sách và marketplace</td><td>Sản phẩm tạo thành công; hiển thị trong danh sách và marketplace</td><td>Pass</td></tr>
+<tr><td>TC-Seller-12</td><td>Thêm sản phẩm</td><td>Kiểm tra thêm SP thiếu ảnh</td><td>Đang form thêm SP</td><td>1. Nhập thông tin text. 2. Không upload ảnh. 3. Lưu.</td><td>Anh: (trong)</td><td>Hiển thị lỗi bắt buộc có ảnh; không tạo SP</td><td>Hiển thị lỗi bắt buộc có ảnh; không tạo SP</td><td>Pass</td></tr>
+<tr><td>TC-Seller-13</td><td>Thêm sản phẩm</td><td>Kiểm tra thêm SP với giá không hợp lệ</td><td>Đang form thêm SP</td><td>1. Nhập giá = 0 hoặc âm. 2. Lưu.</td><td>Gia: -1000</td><td>Hiển thị lỗi giá không hợp lệ; không lưu SP</td><td>Hiển thị lỗi giá không hợp lệ; không lưu SP</td><td>Pass</td></tr>
+<tr><td>TC-Seller-14</td><td>Sửa sản phẩm</td><td>Kiểm tra cập nhật tên và giá sản phẩm</td><td>SP SP100 thuộc shop Seller</td><td>1. Mở chi tiết SP100. 2. Sửa tên và giá. 3. Lưu.</td><td>Ten moi: Ca chua cherry; Gia moi: 30000</td><td>Cập nhật thành công; người mua thấy thông tin mới</td><td>Cập nhật thành công; người mua thấy thông tin mới</td><td>Pass</td></tr>
+<tr><td>TC-Seller-15</td><td>Xóa sản phẩm</td><td>Kiểm tra xóa (ẩn) sản phẩm</td><td>SP SP101 tồn tại</td><td>1. Mở SP101. 2. Chọn Xóa/Ẩn. 3. Xác nhận.</td><td>ProductId: SP101</td><td>SP không còn hiển thị công khai; vẫn quản lý được trong kho Seller</td><td>SP không còn hiển thị công khai; vẫn quản lý được trong kho Seller</td><td>Pass</td></tr>
+<tr><td>TC-Seller-16</td><td>Quản lý tồn kho</td><td>Kiểm tra cập nhật tồn kho hợp lệ</td><td>SP SP100 có tồn kho 50</td><td>1. Mở SP100. 2. Sửa tồn kho thành 100. 3. Lưu.</td><td>Ton kho moi: 100</td><td>Tồn kho cập nhật; buyer giữ hàng tối đa theo tồn mới</td><td>Tồn kho cập nhật; buyer giữ hàng tối đa theo tồn mới</td><td>Pass</td></tr>
+<tr><td>TC-Seller-17</td><td>Quản lý tồn kho</td><td>Kiểm tra cập nhật tồn kho âm</td><td>SP SP100 đang bán</td><td>1. Nhập tồn kho = -5. 2. Lưu.</td><td>Ton kho: -5</td><td>Hiển thị lỗi; không lưu giá trị âm</td><td>Hiển thị lỗi; không lưu giá trị âm</td><td>Pass</td></tr>
+<tr><td>TC-Seller-18</td><td>Quản lý biến thể sản phẩm</td><td>Kiểm tra thêm biến thể mới</td><td>SP SP102 hỗ trợ biến thể</td><td>1. Mở SP102. 2. Thêm biến thể Loại A, giá, tồn. 3. Lưu.</td><td>Bien the: Loai A; Gia: 20000; Ton: 20</td><td>Biến thể hiển thị khi buyer chọn giữ hàng</td><td>Biến thể hiển thị khi buyer chọn giữ hàng</td><td>Pass</td></tr>
+<tr><td>TC-Seller-19</td><td>Quản lý biến thể sản phẩm</td><td>Kiểm tra sửa giá biến thể</td><td>SP102 có biến thể Loại A</td><td>1. Sửa giá Loại A. 2. Lưu.</td><td>Gia Loai A: 22000</td><td>Giá biến thể cập nhật trên app buyer</td><td>Giá biến thể cập nhật trên app buyer</td><td>Pass</td></tr>
+<tr><td>TC-Seller-20</td><td>Quản lý hình ảnh sản phẩm</td><td>Kiểm tra upload nhiều ảnh sản phẩm</td><td>Đang sửa SP100</td><td>1. Thêm 2 ảnh phụ. 2. Lưu.</td><td>Anh them: img2.jpg, img3.jpg</td><td>Gallery SP hiển thị đủ ảnh; ảnh đầu là ảnh đại diện</td><td>Gallery SP hiển thị đủ ảnh; ảnh đầu là ảnh đại diện</td><td>Pass</td></tr>
+<tr><td>TC-Seller-21</td><td>Xem danh sách giữ hàng</td><td>Kiểm tra xem tab đơn giữ hàng theo trạng thái</td><td>Có đơn ở trạng thái chờ, đang giữ, hoàn thành</td><td>1. Mở tab Đơn bán. 2. Chuyển các tab.</td><td>Khong</td><td>Mỗi tab hiển thị đúng đơn; có thông tin buyer, SP, thời gian nhận</td><td>Mỗi tab hiển thị đúng đơn; có thông tin buyer, SP, thời gian nhận</td><td>Pass</td></tr>
+<tr><td>TC-Seller-22</td><td>Xác nhận giữ hàng</td><td>Kiểm tra Seller chấp nhận đơn giữ hàng</td><td>Có đơn ORD010 pending</td><td>1. Mở chi tiết ORD010. 2. Chọn Chấp nhận.</td><td>OrderId: ORD010</td><td>Đơn chuyển trạng thái chờ nhận; buyer nhận thông báo</td><td>Đơn chuyển trạng thái chờ nhận; buyer nhận thông báo</td><td>Pass</td></tr>
+<tr><td>TC-Seller-23</td><td>Từ chối giữ hàng</td><td>Kiểm tra Seller từ chối đơn pending</td><td>Có đơn ORD011 pending</td><td>1. Mở ORD011. 2. Chọn Từ chối. 3. Nhập lý do nếu có.</td><td>OrderId: ORD011; Ly do: Het hang</td><td>Đơn bị từ chối; hoàn cọc cho buyer nếu đã trừ</td><td>Đơn bị từ chối; hoàn cọc cho buyer nếu đã trừ</td><td>Pass</td></tr>
+<tr><td>TC-Seller-24</td><td>Xác nhận giữ hàng</td><td>Kiểm tra hủy đơn sau khi đã chấp nhận</td><td>Có đơn ORD012 waiting pickup</td><td>1. Mở ORD012. 2. Chọn Hủy đơn. 3. Upload bằng chứng nếu yêu cầu.</td><td>OrderId: ORD012</td><td>Đơn hủy theo quy trình; buyer được thông báo</td><td>Đơn hủy theo quy trình; buyer được thông báo</td><td>Pass</td></tr>
+<tr><td>TC-Seller-25</td><td>Chat với người mua</td><td>Kiểm tra Seller trả lời tin nhắn buyer</td><td>Có hội thoại chat với buyer01</td><td>1. Mở Inbox/Chat. 2. Chọn hội thoại. 3. Gửi tin trả lời.</td><td>Noi dung: Shop da nhan don</td><td>Tin gửi thành công; buyer nhận realtime</td><td>Tin gửi thành công; buyer nhận realtime</td><td>Pass</td></tr>
+<tr><td>TC-Seller-26</td><td>Gửi hình ảnh trong chat</td><td>Kiểm tra Seller gửi ảnh trong chat</td><td>Đang mở chat với buyer</td><td>1. Chọn gửi ảnh. 2. Chọn file ảnh. 3. Gửi.</td><td>Anh: product_sample.jpg</td><td>Ảnh hiển thị trong chat; buyer nhận được</td><td>Ảnh hiển thị trong chat; buyer nhận được</td><td>Pass</td></tr>
+<tr><td>TC-Seller-27</td><td>Xem đánh giá</td><td>Kiểm tra xem danh sách đánh giá gian hàng</td><td>Shop có ít nhất 1 review</td><td>1. Vào Quản lý đánh giá. 2. Xem danh sách.</td><td>ShopId: SH010</td><td>Hiển thị sao, nội dung, thời gian, buyer</td><td>Hiển thị sao, nội dung, thời gian, buyer</td><td>Pass</td></tr>
+<tr><td>TC-Seller-28</td><td>Phản hồi đánh giá</td><td>Kiểm tra Seller phản hồi review</td><td>Có review REV001 chưa phản hồi</td><td>1. Mở REV001. 2. Nhập phản hồi. 3. Gửi.</td><td>ReviewId: REV001; Phan hoi: Cam on ban</td><td>Phản hồi hiển thị dưới review trên app buyer</td><td>Phản hồi hiển thị dưới review trên app buyer</td><td>Pass</td></tr>
+<tr><td>TC-Seller-29</td><td>Xem báo cáo</td><td>Kiểm tra Seller báo cáo review không phù hợp</td><td>Có review REV002 nghi ngờ spam</td><td>1. Mở REV002. 2. Chọn Báo cáo. 3. Chọn lý do. 4. Gửi.</td><td>ReviewId: REV002; Ly do: Spam</td><td>Báo cáo gửi thành công; chờ Admin xử lý</td><td>Báo cáo gửi thành công; chờ Admin xử lý</td><td>Pass</td></tr>
+<tr><td>TC-Seller-30</td><td>Quản lý banner cửa hàng</td><td>Kiểm tra xem và cấu hình banner đã mua</td><td>Seller đã mua gói banner active</td><td>1. Vào mục Banner. 2. Xem banner đang chạy. 3. Cập nhật ảnh nếu cho phép.</td><td>BannerId: BN001</td><td>Banner hiển thị đúng thời hạn; trạng thái active/pending</td><td>Banner hiển thị đúng thời hạn; trạng thái active/pending</td><td>Pass</td></tr>
+<tr><td>TC-Seller-31</td><td>Quản lý tài khoản</td><td>Kiểm tra mua gói dịch vụ Seller bằng ví</td><td>Ví đủ tiền; có gói PLAN01</td><td>1. Vào Gói bán. 2. Chọn PLAN01. 3. Xác nhận thanh toán ví.</td><td>PlanId: PLAN01; Gia: 200000; Vi du tien</td><td>Gói kích hoạt; shop/SP public theo quyền gói</td><td>Gói kích hoạt; shop/SP public theo quyền gói</td><td>Pass</td></tr>
+<tr><td>TC-Seller-32</td><td>Đổi mật khẩu</td><td>Kiểm tra Seller đổi mật khẩu</td><td>Đang đăng nhập Seller</td><td>1. Vào Cài đặt. 2. Đổi mật khẩu. 3. Lưu.</td><td>MK cu: Seller@1234; MK moi: Seller@2026</td><td>Đổi MK thành công; đăng nhập lại được</td><td>Đổi MK thành công; đăng nhập lại được</td><td>Pass</td></tr>
+<tr><td>TC-Seller-33</td><td>Xem danh sách giữ hàng</td><td>Kiểm tra hiển thị mã QR nhận hàng cửa hàng</td><td>Shop có QR cố định</td><td>1. Vào màn QR shop. 2. Xem mã QR.</td><td>ShopId: SH010</td><td>QR hiển thị rõ; buyer quét được để xác nhận nhận hàng</td><td>QR hiển thị rõ; buyer quét được để xác nhận nhận hàng</td><td>Pass</td></tr>
+<tr><td>TC-Seller-34</td><td>Cập nhật hồ sơ cửa hàng</td><td>Kiểm tra xem thống kê gian hàng</td><td>Shop có lịch sử đơn và lượt xem</td><td>1. Vào Thống kê. 2. Xem số liệu.</td><td>Khoang thoi gian: 7 ngay</td><td>Hiển thị số đơn, doanh thu ước tính, lượt truy cập</td><td>Hiển thị số đơn, doanh thu ước tính, lượt truy cập</td><td>Pass</td></tr>
+  </tbody>
+</table>
+</body>
+</html>

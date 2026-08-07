@@ -172,10 +172,6 @@ export function mergeProfile(authUser, baseProfile, updates = {}) {
       patch.closeTime !== undefined
         ? cleanText(patch.closeTime)
         : baseProfile?.closeTime || '',
-    pinHours:
-      patch.pinHours !== undefined
-        ? Boolean(patch.pinHours)
-        : Boolean(baseProfile?.pinHours),
     isOpen:
       patch.isOpen !== undefined
         ? Number(patch.isOpen) === 1 ? 1 : 0
@@ -222,7 +218,6 @@ export function mapShopSettingsToProfilePatch(shop) {
     openTime: cleanText(shop.openTime),
     closeTime: cleanText(shop.closeTime),
     isOpen: Number(shop.isOpen) === 1 ? 1 : 0,
-    pinHours: Boolean(shop.pinHours),
     shopStatus: Number(shop.status ?? shop.shopStatus ?? 1),
     shopId: cleanText(shop.id || shop.shopId),
   };
@@ -238,7 +233,6 @@ export function mapSellerVerificationToProfilePatch(verification) {
     shopUsername: cleanText(verification.shopUsername),
     categoryId: normalizeCategoryId(verification.categoryId),
     categoryName: cleanText(verification.categoryName),
-    shopDescription: cleanText(verification.shopDescription),
     shopAddress: cleanText(verification.address),
     shopSystemAddress: cleanText(verification.DiaChiHeThong),
   };

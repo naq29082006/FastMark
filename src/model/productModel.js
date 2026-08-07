@@ -62,7 +62,6 @@ export function normalizeProduct(row) {
     thumbnail,
     donVi: row.donVi || '',
     categoryName: row.categoryName || '',
-    categoryIcon: row.categoryIcon || '',
     categoryId: String(row.categoryId || row.CategoryId || '').trim(),
     storeName: row.storeName || row.shopName || row.shop_name || '',
     location: row.location || '',

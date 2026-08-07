@@ -30,12 +30,16 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { normalizeProduct } from '../../model/productModel';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import StoreDetailScreen from '../store/StoreDetailScreen';
+import BuyerProfileScreen from '../profile/BuyerProfileScreen';
 import ProductCard from '../shared/components/ProductCard';
 import AvatarBadge from '../shared/components/AvatarBadge';
 import ClearableSearchField from '../shared/components/ClearableSearchField';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
+import SearchSuggestionsDropdown from '../shared/components/SearchSuggestionsDropdown';
+import { useSearchSuggestions } from '../../hooks/useSearchSuggestions';
+import { SEARCH_SUGGEST_MIN_LENGTH } from '../../core/utils/searchSuggestions';
 
-const SEARCH_DEBOUNCE_MS = 400;
+const SEARCH_DEBOUNCE_MS = 300;
 const NEARBY_RADIUS_METERS = 5000;
 const ALL_PRODUCTS_RADIUS_METERS = 20000;
 const UNLIMITED_SEARCH_RADIUS = 0;
@@ -91,6 +95,8 @@ export default function ProductsScreen({
   const [isLoadingShops, setIsLoadingShops] = useState(false);
   const [browseNearbyShops, setBrowseNearbyShops] = useState(false);
   const [autoFocusSearch, setAutoFocusSearch] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [selectedBuyerUserId, setSelectedBuyerUserId] = useState(null);
   const [productsHasMore, setProductsHasMore] = useState(false);
   const [shopsHasMore, setShopsHasMore] = useState(false);
   const [productsTotal, setProductsTotal] = useState(0);
@@ -100,8 +106,23 @@ export default function ProductsScreen({
   const searchInputRef = useRef(null);
   const productsPageRef = useRef(1);
   const shopsPageRef = useRef(1);
+  /** Quay lại từ chi tiết → giữ màn tìm kiếm (ô query + kết quả). */
+  const searchReturnRef = useRef({ active: false, productId: null, storeId: null });
 
   const isSearching = Boolean(debouncedSearch) || browseNearbyShops;
+
+  const {
+    items: suggestionItems,
+    isLoading: isSuggesting,
+    canSuggest,
+  } = useSearchSuggestions({
+    query: search,
+    location: currentLocation,
+    enabled: searchFocused && !selectedBuyerUserId,
+  });
+
+  const showSuggestionDropdown =
+    searchFocused && canSuggest && String(search || '').trim().length >= SEARCH_SUGGEST_MIN_LENGTH;
 
   useEffect(() => {
     onNavigationStateChange?.(Boolean(selectedProductId || selectedStoreId));
@@ -508,9 +529,92 @@ export default function ProductsScreen({
     setSelectedCategoryId((current) => (current === categoryId ? '' : categoryId));
   }
 
+  function markSearchReturnContext() {
+    if (isSearching || String(search || '').trim() || String(debouncedSearch || '').trim()) {
+      searchReturnRef.current = {
+        active: true,
+        productId: searchReturnRef.current.productId,
+        storeId: searchReturnRef.current.storeId,
+      };
+    }
+  }
+
   function handleOpenProduct(productId) {
+    markSearchReturnContext();
     setSelectedStoreId(null);
     setSelectedProductId(productId);
+  }
+
+  function handleBackFromProductDetail() {
+    setSelectedProductId(null);
+    onResumeReserveHandled?.();
+    const returnStoreId = searchReturnRef.current.storeId;
+    if (returnStoreId) {
+      searchReturnRef.current.storeId = null;
+      setSelectedStoreId(String(returnStoreId));
+      return;
+    }
+    if (searchReturnRef.current.active) {
+      searchReturnRef.current.productId = null;
+      setSearchFocused(true);
+      setTimeout(() => searchInputRef.current?.focus?.(), 0);
+    }
+  }
+
+  function handleBackFromStoreDetail() {
+    setSelectedStoreId(null);
+    const returnProductId = searchReturnRef.current.productId;
+    if (returnProductId) {
+      searchReturnRef.current.productId = null;
+      setSelectedProductId(String(returnProductId));
+      return;
+    }
+    if (searchReturnRef.current.active) {
+      searchReturnRef.current.storeId = null;
+      setSearchFocused(true);
+      setTimeout(() => searchInputRef.current?.focus?.(), 0);
+    }
+  }
+
+  function handleSuggestionPress(item) {
+    setSearchFocused(false);
+    if (item.type === 'product') {
+      handleOpenProduct(item.data.id);
+      return;
+    }
+    if (item.type === 'user') {
+      const userId = String(item.data?.id || item.data?.userId || item.data?._id || '').trim();
+      if (userId) {
+        markSearchReturnContext();
+        setSelectedBuyerUserId(userId);
+      }
+      return;
+    }
+    const shopId = String(item.data?.id || '').trim();
+    if (shopId) {
+      markSearchReturnContext();
+      setSelectedStoreId(shopId);
+    }
+  }
+
+  if (selectedBuyerUserId) {
+    return (
+      <BuyerProfileScreen
+        userId={selectedBuyerUserId}
+        onBack={() => {
+          setSelectedBuyerUserId(null);
+          if (searchReturnRef.current.active) {
+            setSearchFocused(true);
+            setTimeout(() => searchInputRef.current?.focus?.(), 0);
+          }
+        }}
+        onOpenShop={(shopId) => {
+          setSelectedBuyerUserId(null);
+          setSelectedStoreId(String(shopId));
+        }}
+        onOpenUser={(nextUserId) => setSelectedBuyerUserId(String(nextUserId))}
+      />
+    );
   }
 
   if (selectedStoreId) {
@@ -518,8 +622,12 @@ export default function ProductsScreen({
       <StoreDetailScreen
         storeId={selectedStoreId}
         originLocation={currentLocation}
-        onBack={() => setSelectedStoreId(null)}
+        onBack={handleBackFromStoreDetail}
         onProductPress={(productId) => {
+          if (searchReturnRef.current.active) {
+            searchReturnRef.current.productId = null;
+            searchReturnRef.current.storeId = String(selectedStoreId || '');
+          }
           setSelectedStoreId(null);
           setSelectedProductId(productId);
         }}
@@ -532,11 +640,15 @@ export default function ProductsScreen({
     return (
       <ProductDetailScreen
         productId={selectedProductId}
-        onBack={() => {
+        onBack={handleBackFromProductDetail}
+        onStorePress={(storeId) => {
+          if (searchReturnRef.current.active) {
+            searchReturnRef.current.productId = String(selectedProductId || '');
+            searchReturnRef.current.storeId = null;
+          }
           setSelectedProductId(null);
-          onResumeReserveHandled?.();
+          setSelectedStoreId(storeId);
         }}
-        onStorePress={(storeId) => setSelectedStoreId(storeId)}
         onOrderSuccess={(tab) => {
           setSelectedProductId(null);
           onOpenBuyerOrders?.(tab);
@@ -599,6 +711,15 @@ export default function ProductsScreen({
         style={styles.searchField}
         autoFocus={autoFocusSearch}
         inputRef={searchInputRef}
+        onFocus={() => setSearchFocused(true)}
+        onBlur={() => setSearchFocused(false)}
+      />
+
+      <SearchSuggestionsDropdown
+        items={suggestionItems}
+        loading={isSuggesting}
+        visible={showSuggestionDropdown}
+        onPressItem={handleSuggestionPress}
       />
 
       {isSearching ? (

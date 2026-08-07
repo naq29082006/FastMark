@@ -21,8 +21,8 @@ import ProfileSubScreen from './ProfileSubScreen';
 const MAX_IMAGES = 5;
 
 export const ACCOUNT_REPORT_TYPE_OPTIONS = [
-  { value: 8, label: 'Hệ thống lỗi' },
-  { value: 9, label: 'Khác' },
+  { value: 4, label: 'Hệ thống lỗi' },
+  { value: 5, label: 'Khác' },
 ];
 
 async function assetToDataUri(asset) {
@@ -45,7 +45,7 @@ async function assetsToDataUris(assets = []) {
 }
 
 export default function AccountReportScreen({ onBack }) {
-  const [reportType, setReportType] = useState(8);
+  const [reportType, setReportType] = useState(4);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [content, setContent] = useState('');
   const [imageUris, setImageUris] = useState([]);

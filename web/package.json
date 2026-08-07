@@ -5,16 +5,21 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "dev:clean": "vite --host --force",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.3.2",
+    "antd": "^6.5.3",
+    "dayjs": "^1.11.21",
     "firebase": "^12.16.0",
     "lucide-react": "^1.27.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "react-router-dom": "^7.18.1",
+    "recharts": "^3.10.1",
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {

@@ -2,18 +2,22 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useDispatch, useSelector } from 'react-redux';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import {
   getSellerShopSettingsOnBackend,
   updateSellerShopSettingsOnBackend,
+  uploadShopAvatarOnBackend,
   checkSellerShopUsernameAvailabilityOnBackend,
 } from '../../api/sellerOpsApi';
 import { syncSellerAccess, applyShopSettingsToProfile } from '../../viewmodel/auth/authSlice';
@@ -23,6 +27,7 @@ import ProfileSubScreen from '../profile/ProfileSubScreen';
 import SellerLocationPickerScreen from './SellerLocationPickerScreen';
 import TimePickerField from '../shared/components/TimePickerField';
 import KeyboardAwareTextInput from '../shared/components/KeyboardAwareTextInput';
+import AvatarBadge from '../shared/components/AvatarBadge';
 
 const SHOP_USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 
@@ -49,17 +54,117 @@ function getShopUsernameFormatError(value) {
   return '';
 }
 
+function parseAvatarAsset(result) {
+  if (result.canceled || !result.assets?.[0]?.base64) {
+    return null;
+  }
+  const asset = result.assets[0];
+  return {
+    imageBase64: asset.base64,
+    mimeType: asset.mimeType || 'image/jpeg',
+  };
+}
+
+async function pickAvatarFromLibrary() {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error('Cần quyền truy cập thư viện ảnh.');
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.7,
+    base64: true,
+  });
+
+  return parseAvatarAsset(result);
+}
+
+async function takeAvatarPhoto() {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error('Cần quyền truy cập camera.');
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.7,
+    base64: true,
+  });
+
+  return parseAvatarAsset(result);
+}
+
+function chooseShopAvatarSource() {
+  if (Platform.OS === 'web') {
+    return pickAvatarFromLibrary();
+  }
+
+  return new Promise((resolve, reject) => {
+    Alert.alert(
+      'Đổi ảnh gian hàng',
+      'Bạn muốn chụp ảnh bằng camera hay chọn từ thư viện?',
+      [
+        { text: 'Huỷ', style: 'cancel', onPress: () => resolve(null) },
+        {
+          text: 'Chụp ảnh',
+          onPress: () => {
+            takeAvatarPhoto().then(resolve).catch(reject);
+          },
+        },
+        {
+          text: 'Thư viện ảnh',
+          onPress: () => {
+            pickAvatarFromLibrary().then(resolve).catch(reject);
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: () => resolve(null) }
+    );
+  });
+}
+
+function ShopAvatarField({ name, photoUrl, isUploading, onPress }) {
+  return (
+    <View style={styles.avatarSection}>
+      <View style={styles.avatarWrap}>
+        <AvatarBadge name={name || 'Shop'} uri={photoUrl} size={88} />
+        <Pressable
+          onPress={onPress}
+          disabled={isUploading}
+          style={({ pressed }) => [styles.avatarPlusButton, pressed && styles.buttonPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Đổi ảnh đại diện gian hàng"
+        >
+          {isUploading ? (
+            <ActivityIndicator color="#ffffff" size="small" />
+          ) : (
+            <Ionicons name="camera" size={14} color="#ffffff" />
+          )}
+        </Pressable>
+      </View>
+      <Text style={styles.avatarHint}>Ảnh đại diện gian hàng</Text>
+      <Text style={styles.avatarSubHint}>Nhấn biểu tượng camera để đổi ảnh</Text>
+    </View>
+  );
+}
+
 export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSaved }) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isPickingLocation, setIsPickingLocation] = useState(false);
 
   const [systemAddress, setSystemAddress] = useState('');
   const [shopName, setShopName] = useState('');
   const [shopUsername, setShopUsername] = useState('');
+  const [shopAvatar, setShopAvatar] = useState('');
   const [initialShopUsername, setInitialShopUsername] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [isCheckingShopUsername, setIsCheckingShopUsername] = useState(false);
@@ -78,10 +183,23 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
       const shop = await getSellerShopSettingsOnBackend(idToken);
       setShopName(shop.shopName || '');
       setShopUsername(shop.shopUsername || '');
+      setShopAvatar(shop.shopAvatar || shop.avatar || profile?.shopAvatar || '');
       setInitialShopUsername(normalizeShopUsername(shop.shopUsername || ''));
       setSystemAddress(shop.systemAddress || shop.addressHeThong || '');
-      setLatitude(Number.isFinite(Number(shop.latitude)) ? Number(shop.latitude) : null);
-      setLongitude(Number.isFinite(Number(shop.longitude)) ? Number(shop.longitude) : null);
+      setLatitude(
+        Number.isFinite(Number(shop.latlong?.lat))
+          ? Number(shop.latlong.lat)
+          : Number.isFinite(Number(shop.latitude))
+            ? Number(shop.latitude)
+            : null
+      );
+      setLongitude(
+        Number.isFinite(Number(shop.latlong?.long))
+          ? Number(shop.latlong.long)
+          : Number.isFinite(Number(shop.longitude))
+            ? Number(shop.longitude)
+            : null
+      );
       setDescription(shop.description || '');
       setOpenTime(shop.openTime || '08:00');
       setCloseTime(shop.closeTime || '21:00');
@@ -93,11 +211,46 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
     } finally {
       setIsLoading(false);
     }
-  }, [dispatch]);
+  }, [dispatch, profile?.shopAvatar]);
 
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
+
+  async function handlePickShopAvatar() {
+    try {
+      const picked = await chooseShopAvatarSource();
+      if (!picked?.imageBase64) {
+        return;
+      }
+
+      setIsUploadingAvatar(true);
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        throw new Error('Phiên đăng nhập đã hết hạn.');
+      }
+
+      const updated = await uploadShopAvatarOnBackend({
+        idToken,
+        imageBase64: picked.imageBase64,
+        mimeType: picked.mimeType,
+      });
+
+      const nextAvatar =
+        updated?.shopAvatar || updated?.avatar || profile?.shopAvatar || '';
+      setShopAvatar(nextAvatar);
+      if (updated) {
+        dispatch(applyShopSettingsToProfile(updated));
+        onSaved?.(updated);
+      }
+      await dispatch(syncSellerAccess());
+      Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện gian hàng.');
+    } catch (pickError) {
+      Alert.alert('Lỗi', pickError.message || 'Không upload được ảnh gian hàng.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
 
   async function handleUseCurrentLocation() {
     setIsLocating(true);
@@ -251,6 +404,7 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
           description: description.trim(),
           systemAddress: systemAddress.trim(),
           addressHeThong: systemAddress.trim(),
+          latlong: { lat: latitude, long: longitude },
           latitude,
           longitude,
           openTime: nextOpenTime,
@@ -318,6 +472,15 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
     <View style={styles.screenWrap}>
       <ProfileSubScreen title="Cài đặt cửa hàng" onBack={onBack}>
         <View style={styles.card}>
+          <ShopAvatarField
+            name={shopName || profile?.shopName}
+            photoUrl={shopAvatar}
+            isUploading={isUploadingAvatar}
+            onPress={handlePickShopAvatar}
+          />
+
+          <View style={styles.divider} />
+
           <Field
             label="Tên gian hàng"
             value={shopName}
@@ -546,6 +709,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centered: { alignItems: 'center', paddingVertical: 40 },
+  avatarSection: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  avatarWrap: {
+    position: 'relative',
+  },
+  avatarPlusButton: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#076F32',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  avatarHint: {
+    marginTop: 12,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  avatarSubHint: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 16,

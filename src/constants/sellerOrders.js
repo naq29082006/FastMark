@@ -9,10 +9,14 @@ export const RESERVATION_STATUS = {
   PENDING_SELLER_CONFIRMATION: 0,
   REJECTED: 1,
   WAITING_PICKUP: 2,
-  COMPLETED: 3,
+  RECEIVED: 3,
+  DELIVERED_PENDING_DISPUTE: 3,
   DISPUTED: 4,
+  COMPLETED: 5,
   AUTO_COMPLETED: 5,
   REFUNDED: 6,
+  /** Đồng bộ backend RESERVATION_STATUS.CANCELLED */
+  CANCELLED: 6,
   DISPUTE_RESOLVED: 7,
 };
 
@@ -20,10 +24,12 @@ export const RESERVATION_STATUS_LABELS = {
   [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION]: 'Chờ xác nhận',
   [RESERVATION_STATUS.REJECTED]: 'Đã hủy',
   [RESERVATION_STATUS.WAITING_PICKUP]: 'Giữ hàng',
+  [RESERVATION_STATUS.RECEIVED]: 'Đã giao',
   [RESERVATION_STATUS.COMPLETED]: 'Hoàn thành',
   [RESERVATION_STATUS.DISPUTED]: 'Tranh chấp',
   [RESERVATION_STATUS.AUTO_COMPLETED]: 'Hoàn thành',
   [RESERVATION_STATUS.REFUNDED]: 'Đã hủy',
+  [RESERVATION_STATUS.CANCELLED]: 'Đã hủy',
   [RESERVATION_STATUS.DISPUTE_RESOLVED]: 'Đã hủy',
 };
 
@@ -54,6 +60,24 @@ export const ORDER_STATUS_TABS = [
 ];
 
 export { RESERVATION_CANCEL_REASON, VIEWER_ROLE, getReservationReasonLabel, inferCancelReasonCode };
+
+export const BUYER_COMPLAINT_REASON_OPTIONS = [
+  'damaged_item',
+  'missing_item',
+  'wrong_item',
+  'not_as_described',
+  'expired',
+  'other',
+];
+
+export const BUYER_COMPLAINT_REASON_LABELS = {
+  damaged_item: 'Hàng bị hư hỏng',
+  missing_item: 'Thiếu hàng',
+  wrong_item: 'Giao sai hàng',
+  not_as_described: 'Không đúng mô tả',
+  expired: 'Hết hạn',
+  other: 'Khác',
+};
 
 export const RESERVATION_DISPUTE_REASON = {
   SELLER_ABSENT: 'seller_absent',
@@ -91,6 +115,7 @@ export const DEPOSIT_SETTLE_TO = {
 const CANCELLED_RESERVATION_STATUSES = new Set([
   RESERVATION_STATUS.REJECTED,
   RESERVATION_STATUS.REFUNDED,
+  RESERVATION_STATUS.CANCELLED,
   RESERVATION_STATUS.DISPUTE_RESOLVED,
 ]);
 
@@ -116,19 +141,33 @@ export function isDisputeRelatedCancellation(item) {
   return DISPUTE_RELATED_CANCEL_REASONS.has(inferCancelReasonCode(item));
 }
 
+/** Shop hủy đơn sau khi đã xác nhận giữ hàng. */
+export function isSellerCancelAfterAcceptOrder(item) {
+  if (!item) {
+    return false;
+  }
+  if (item.cancelledBySellerAfterAccept === true) {
+    return true;
+  }
+  if (String(item.cancelledBy || '').trim() === 'seller_after_accept') {
+    return true;
+  }
+  const code = inferCancelReasonCode(item);
+  return (
+    code === RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING ||
+    code === RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP
+  );
+}
+
 /** Lý do cụ thể shop nhập khi hủy đơn đã xác nhận (kèm ảnh chứng minh). */
 export function getSellerCancelNote(item) {
   if (!item) {
     return '';
   }
-  const note = String(item.cancelNote || '').trim();
-  if (!note) {
+  if (!isSellerCancelAfterAcceptOrder(item)) {
     return '';
   }
-  const isSellerCancelAfterAccept =
-    Boolean(item.cancelledBySellerAfterAccept) ||
-    item.cancelledBy === 'seller_after_accept';
-  return isSellerCancelAfterAccept ? note : '';
+  return String(item.cancelNote || '').trim();
 }
 
 function getBuyerDisputeReasonLabel(item) {
@@ -217,6 +256,53 @@ export function shouldShowDisputeListHints(item) {
 export const DISPUTE_ADMIN_PENDING_FOOTER =
   'Admin sẽ xử lý sau 24 giờ kể từ thời gian nhận hàng.';
 
+export const DISPUTE_KIND = {
+  PICKUP: 'pickup',
+  POST_DELIVERY: 'post_delivery',
+};
+
+export function isPostDeliveryDisputeReservation(item) {
+  if (!item) {
+    return false;
+  }
+  return (
+    Boolean(item.isPostDeliveryDispute) ||
+    item.disputeKind === DISPUTE_KIND.POST_DELIVERY
+  );
+}
+
+export function hasSellerPostDeliveryResponse(item) {
+  return Boolean(
+    item?.sellerRespondedAt ||
+      String(item?.sellerResponse?.content || '').trim()
+  );
+}
+
+/** Ghi chú cuối khối tranh chấp — khác nhau giữa quá giờ nhận và sau giao hàng. */
+export function buildDisputeAdminPendingFooter(
+  reservation,
+  viewerRole = VIEWER_ROLE.BUYER
+) {
+  if (!isActiveDisputeOrder(reservation)) {
+    return '';
+  }
+  if (isPostDeliveryDisputeReservation(reservation)) {
+    const isViewerBuyer = viewerRole === VIEWER_ROLE.BUYER;
+    const sellerStillCanRespond =
+      reservation.canSellerRespondToComplaint === true ||
+      (reservation.disputeByBuyer &&
+        !hasSellerPostDeliveryResponse(reservation) &&
+        reservation.sellerResponseDeadlineAt);
+    if (sellerStillCanRespond && !hasSellerPostDeliveryResponse(reservation)) {
+      return isViewerBuyer
+        ? 'Shop có 2 ngày để phản hồi khiếu nại. Sau đó admin sẽ xử lý.'
+        : 'Bạn có 2 ngày để phản hồi khiếu nại của khách. Sau đó admin sẽ xử lý.';
+    }
+    return 'Admin sẽ xử lý tranh chấp sau khi shop phản hồi hoặc hết thời hạn phản hồi (2 ngày).';
+  }
+  return DISPUTE_ADMIN_PENDING_FOOTER;
+}
+
 /** Dòng hiển thị tranh chấp trên thẻ đơn (danh sách). */
 export function buildDisputeOrderListDisplay(item, viewerRole = VIEWER_ROLE.BUYER) {
   if (!shouldShowDisputeListHints(item)) {
@@ -242,7 +328,7 @@ export function buildDisputeOrderListDisplay(item, viewerRole = VIEWER_ROLE.BUYE
 
   return {
     lines,
-    footer: isActiveDisputeOrder(item) ? DISPUTE_ADMIN_PENDING_FOOTER : '',
+    footer: buildDisputeAdminPendingFooter(item, viewerRole),
   };
 }
 
@@ -252,6 +338,22 @@ export function isCancelledReservationStatus(status) {
 
 export function isCompletedReservationStatus(status) {
   return COMPLETED_RESERVATION_STATUSES.has(Number(status));
+}
+
+/** Shop đã quét QR giao hàng (COMPLETED hoặc RECEIVED data cũ). */
+export function isDeliveredReservationStatus(status) {
+  const code = Number(status);
+  return (
+    code === RESERVATION_STATUS.RECEIVED || isCompletedReservationStatus(code)
+  );
+}
+
+/** Nhãn trạng thái tab Hoàn thành phía seller (RECEIVED hiển thị như Hoàn thành). */
+export function getSellerCompletedOrderStatusLabel(status) {
+  if (isDeliveredReservationStatus(status)) {
+    return RESERVATION_STATUS_LABELS[RESERVATION_STATUS.COMPLETED];
+  }
+  return RESERVATION_STATUS_LABELS[Number(status)] || 'Không rõ';
 }
 
 /**
@@ -475,6 +577,9 @@ export function getAdminDisputeResolutionLabel(reservation, reports = []) {
 
 export function getReservationTabForStatus(status) {
   const code = Number(status);
+  if (isCancelledReservationStatus(code)) {
+    return RESERVATION_TAB.CANCELLED;
+  }
   if (code === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION) {
     return RESERVATION_TAB.PENDING;
   }
@@ -484,11 +589,8 @@ export function getReservationTabForStatus(status) {
   if (code === RESERVATION_STATUS.DISPUTED) {
     return RESERVATION_TAB.DISPUTE;
   }
-  if (isCompletedReservationStatus(code)) {
+  if (code === RESERVATION_STATUS.RECEIVED || isCompletedReservationStatus(code)) {
     return RESERVATION_TAB.COMPLETED;
-  }
-  if (isCancelledReservationStatus(code)) {
-    return RESERVATION_TAB.CANCELLED;
   }
   return RESERVATION_TAB.ALL;
 }

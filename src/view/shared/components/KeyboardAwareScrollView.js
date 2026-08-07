@@ -3,6 +3,7 @@ import { Platform, ScrollView } from 'react-native';
 
 import { scrollInputIntoView } from '../../../core/utils/scrollInputIntoView';
 import { useKeyboardInset } from '../../../hooks/useKeyboardInset';
+import { FORM_SHEET_SCROLL_PADDING_BOTTOM } from './formSheetLayout';
 
 const KeyboardScrollContext = createContext(null);
 
@@ -20,6 +21,7 @@ const KeyboardAwareScrollView = forwardRef(function KeyboardAwareScrollView(
     contentContainerStyle,
     extraBottomInset = 0,
     nestedScrollPadding = true,
+    inputObstructionBottom = 0,
     suppressHideRef,
     keyboardDismissMode,
     onScroll,
@@ -41,14 +43,16 @@ const KeyboardAwareScrollView = forwardRef(function KeyboardAwareScrollView(
         keyboardInset,
         scrollY: scrollYRef.current,
         getScrollY: () => scrollYRef.current,
+        obstructionBottom: inputObstructionBottom,
       });
     },
     [keyboardInset]
   );
 
-  const paddingBottom = getScrollPaddingBottom(extraBottomInset, {
-    nestedWhenClosed: nestedScrollPadding,
-  });
+  const paddingBottom =
+    getScrollPaddingBottom(extraBottomInset, {
+      nestedWhenClosed: nestedScrollPadding,
+    }) + (nestedScrollPadding ? 0 : FORM_SHEET_SCROLL_PADDING_BOTTOM);
 
   return (
     <KeyboardScrollContext.Provider value={{ scrollRef, scrollToInput, keyboardInset, isKeyboardVisible }}>
@@ -58,7 +62,12 @@ const KeyboardAwareScrollView = forwardRef(function KeyboardAwareScrollView(
         contentContainerStyle={[contentContainerStyle, { paddingBottom }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={
-          keyboardDismissMode ?? (Platform.OS === 'ios' ? 'interactive' : 'on-drag')
+          keyboardDismissMode ??
+          (nestedScrollPadding === false
+            ? 'none'
+            : Platform.OS === 'ios'
+              ? 'interactive'
+              : 'on-drag')
         }
         onScroll={(event) => {
           scrollYRef.current = event.nativeEvent.contentOffset.y;

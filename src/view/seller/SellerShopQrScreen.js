@@ -40,12 +40,12 @@ export default function SellerShopQrScreen({ onBack }) {
         throw new Error('Phiên đăng nhập đã hết hạn.');
       }
       const shop = await getSellerShopSettingsOnBackend(idToken);
-      const shopId = String(shop?.id || shop?.shopId || shop?.qrCodeValue || '');
+      const shopId = String(shop?.id || shop?.shopId || '');
       const payload =
         shop?.qrPayload ||
         (shopId ? JSON.stringify({ shopId }) : '');
       setQrPayload(payload);
-      setQrCodeValue(String(shop?.qrCodeValue || shopId || ''));
+      setQrCodeValue(shopId);
       setShopName(shop?.shopName || shop?.name || 'Gian hàng');
     } catch (loadError) {
       showErrorAlert(loadError.message || 'Không tải được QR gian hàng.');

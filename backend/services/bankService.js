@@ -1,4 +1,9 @@
 const Bank = require("../models/Bank");
+const {
+  RECORD_STATUS,
+  isRecordActive,
+  activeRecordFilter,
+} = require("../constants");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -12,19 +17,23 @@ function toPublicBank(doc) {
     id: String(doc._id),
     name: doc.name || "",
     code: doc.code || "",
-    isActive: doc.isActive !== false,
+    isActive: isRecordActive(doc.isActive),
     createdAt: doc.CreatedAt || null,
     updatedAt: doc.UpdatedAt || null,
   };
 }
 
 async function listBanksAdmin() {
-  const rows = await Bank.find({ isActive: true }).sort({ CreatedAt: 1 }).limit(200);
+  const rows = await Bank.find(activeRecordFilter())
+    .sort({ CreatedAt: 1 })
+    .limit(200);
   return rows.map(toPublicBank);
 }
 
 async function listActiveBanksForUser() {
-  const rows = await Bank.find({ isActive: true }).sort({ CreatedAt: 1 }).limit(100);
+  const rows = await Bank.find(activeRecordFilter())
+    .sort({ CreatedAt: 1 })
+    .limit(100);
   return rows.map(toPublicBank);
 }
 
@@ -40,9 +49,9 @@ async function createBank(payload = {}) {
 
   const existing = await Bank.findOne({ code });
   if (existing) {
-    if (existing.isActive === false) {
+    if (!isRecordActive(existing.isActive)) {
       existing.name = name;
-      existing.isActive = true;
+      existing.isActive = RECORD_STATUS.ACTIVE;
       existing.UpdatedAt = new Date();
       await existing.save();
       return { bank: toPublicBank(existing), restored: true };
@@ -54,15 +63,15 @@ async function createBank(payload = {}) {
     const bank = await Bank.create({
       name,
       code,
-      isActive: payload.isActive !== false && payload.isActive !== 0,
+      isActive: RECORD_STATUS.ACTIVE,
     });
     return { bank: toPublicBank(bank), restored: false };
   } catch (error) {
     if (error?.code === 11000) {
       const duplicate = await Bank.findOne({ code });
-      if (duplicate?.isActive === false) {
+      if (duplicate && !isRecordActive(duplicate.isActive)) {
         duplicate.name = name;
-        duplicate.isActive = true;
+        duplicate.isActive = RECORD_STATUS.ACTIVE;
         duplicate.UpdatedAt = new Date();
         await duplicate.save();
         return { bank: toPublicBank(duplicate), restored: true };
@@ -109,8 +118,7 @@ async function deleteBank(bankId) {
   if (!bank) {
     throw createServiceError("Không tìm thấy ngân hàng.", 404);
   }
-  // Xóa mềm — user không chọn được khi rút tiền mới.
-  bank.isActive = false;
+  bank.isActive = RECORD_STATUS.HIDDEN;
   bank.UpdatedAt = new Date();
   await bank.save();
   return toPublicBank(bank);
@@ -121,10 +129,10 @@ async function restoreBank(bankId) {
   if (!bank) {
     throw createServiceError("Không tìm thấy ngân hàng.", 404);
   }
-  if (bank.isActive !== false) {
+  if (isRecordActive(bank.isActive)) {
     return toPublicBank(bank);
   }
-  bank.isActive = true;
+  bank.isActive = RECORD_STATUS.ACTIVE;
   bank.UpdatedAt = new Date();
   await bank.save();
   return toPublicBank(bank);

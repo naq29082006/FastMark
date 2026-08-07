@@ -258,6 +258,12 @@ router.get(
   requireAdmin,
   asyncHandler(adminReviewController.listReviews)
 );
+router.get(
+  "/reviews/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminReviewController.getReviewDetail)
+);
 router.post(
   "/reviews/:id/hide",
   verifyFirebaseToken,

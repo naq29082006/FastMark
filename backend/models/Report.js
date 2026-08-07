@@ -1,64 +1,33 @@
 const mongoose = require("mongoose");
+const { embeddedImagesField } = require("../utils/embeddedImages");
 
 /**
- * Report — báo cáo / khiếu nại.
+ * Report — báo cáo nội dung (review / shop / product / system / khiếu nại khóa).
  *
- * Ba nhóm:
- * 1) Nội dung: review / user / shop / product / system / other (reportType 1–4, 8–9).
- * 2) Giữ hàng / tranh chấp cọc: BUYER_NO_SHOW / SELLER_NO_SHOW / … (5–7, 9)
- *    — gắn reservationId, GPS, mô tả; tối đa 5 ReportImage.
- * 3) Khiếu nại khóa: ACCOUNT_LOCK_APPEAL (10) | SHOP_LOCK_APPEAL (11) — 1 lần/lượt khóa.
+ * Tranh chấp giữ hàng (buyer/seller khiếu nại) dùng ReservationDispute — không tạo Report.
+ * Không lưu GPS — tranh chấp giữ hàng dùng ReservationDispute (lý do + mô tả + ảnh).
  */
 const ReportSchema = new mongoose.Schema({
   // Người gửi báo cáo (ref User).
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
-  // User bị báo cáo (buyer hoặc seller tùy loại).
-  targetUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  // Sản phẩm bị báo cáo (nếu reportType = product / product issue).
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
-  // Gian hàng bị báo cáo / liên quan.
+  // Sản phẩm bị báo cáo (reportType = 3).
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", index: true },
+  // Gian hàng bị báo cáo (reportType = 2 hoặc khiếu nại khóa shop).
   shopId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopProfile", index: true },
-  // Đơn giữ hàng liên quan (bắt buộc với reportType 5–7).
-  reservationId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Reservation",
-    default: null,
-    index: true,
-  },
-  // ID đánh giá bị báo cáo (string, legacy; khi reportType = 1).
-  reviewId: { type: String, default: "" },
+  // Đánh giá bị báo cáo (reportType = 1).
+  reviewId: { type: mongoose.Schema.Types.ObjectId, ref: "Review", default: null, index: true },
 
   /**
-   * Loại báo cáo:
-   * 1 đánh giá | 2 user | 3 shop | 4 product
-   * 5 BUYER_NO_SHOW | 6 SELLER_NO_SHOW | 7 PRODUCT_ISSUE
-   * 8 SYSTEM | 9 OTHER | 10 ACCOUNT_LOCK_APPEAL | 11 SHOP_LOCK_APPEAL
+   * Loại báo cáo (mã tuần tự):
+   * 1 đánh giá | 2 gian hàng | 3 sản phẩm | 4 hệ thống | 5 khác
+   * 6 khiếu nại khóa tài khoản | 7 khiếu nại khóa gian hàng
    */
   reportType: { type: Number, required: true, index: true },
-  /**
-   * Vai trò người gửi báo cáo tranh chấp giữ hàng:
-   * 1 = người mua báo người bán | 2 = người bán báo người mua.
-   * null với các báo cáo nội dung (reportType 1–4).
-   */
-  reporterRole: { type: Number, default: null, index: true },
-  // Tiêu đề ngắn.
+
+  // Tiêu đề / nội dung / ảnh minh chứng (báo cáo nội dung).
   title: String,
-  // Nội dung chi tiết / mô tả chứng cứ.
   content: String,
-
-  // GPS lúc gửi báo cáo (tranh chấp giữ hàng) — dùng chung / buyer.
-  latitude: { type: Number, default: null },
-  longitude: { type: Number, default: null },
-  // Địa chỉ reverse-geocode tại thời điểm báo cáo (buyer / chung).
-  address: { type: String, default: "" },
-
-  // Trường riêng khi người bán báo cáo (BUYER_NO_SHOW).
-  sellerTitle: { type: String, default: "" },
-  sellerContent: { type: String, default: "" },
-  sellerLatitude: { type: Number, default: null },
-  sellerLongitude: { type: Number, default: null },
-  // Địa chỉ reverse-geocode khi seller báo cáo.
-  sellerAddress: { type: String, default: "" },
+  images: embeddedImagesField,
 
   // Trạng thái: 0 = chờ xử lý, 1 = đã duyệt/xử lý, 2 = bác bỏ.
   status: { type: Number, default: 0, index: true },
@@ -84,16 +53,5 @@ const ReportSchema = new mongoose.Schema({
 ReportSchema.pre("save", function saveHook() {
   this.UpdatedAt = new Date();
 });
-
-ReportSchema.index(
-  { reservationId: 1, reportType: 1, userId: 1 },
-  {
-    unique: true,
-    partialFilterExpression: {
-      reservationId: { $type: "objectId" },
-      status: { $in: [0, 1] },
-    },
-  }
-);
 
 module.exports = mongoose.model("Report", ReportSchema);

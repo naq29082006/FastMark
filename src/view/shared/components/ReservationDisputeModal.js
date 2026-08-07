@@ -12,19 +12,22 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 
 import {
   BUYER_DISPUTE_REASON_OPTIONS,
   RESERVATION_DISPUTE_REASON,
   RESERVATION_DISPUTE_REASON_LABELS,
 } from '../../../constants/sellerOrders';
-import { reverseGeocodeLocation } from '../../../viewmodel/map/mapViewModel';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
-import KeyboardStickyFooter from './KeyboardStickyFooter';
+import FormSheetActions from './KeyboardStickyFooter';
 import KeyboardAwareTextInput from './KeyboardAwareTextInput';
-
-const ACTIONS_BAR_ESTIMATE = 72;
+import {
+  FormSheetBackdrop,
+  FormSheetHeader,
+  FormSheetShell,
+  FORM_SHEET_SCROLL_STYLE,
+} from './formSheetLayout';
+import { BottomSheetHandle } from './bottomSheetChrome';
 
 const MAX_IMAGES = 5;
 
@@ -36,24 +39,10 @@ function assetToDataUri(asset) {
   return asset?.uri || '';
 }
 
-async function captureCurrentLocation() {
-  const permission = await Location.requestForegroundPermissionsAsync();
-  if (!permission.granted) {
-    throw new Error('Cần quyền vị trí để gửi báo cáo có tọa độ GPS.');
-  }
-  const position = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
-  });
-  const latitude = Number(position?.coords?.latitude);
-  const longitude = Number(position?.coords?.longitude);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    throw new Error('Không lấy được tọa độ GPS. Vui lòng thử lại.');
-  }
-  return { latitude, longitude };
-}
-
 /**
  * mode: 'buyer' | 'seller'
+ *
+ * Không thu thập GPS khi gửi khiếu nại — admin xử lý theo lý do, mô tả và ảnh.
  */
 export default function ReservationDisputeModal({
   visible,
@@ -62,6 +51,8 @@ export default function ReservationDisputeModal({
   onSubmit,
 }) {
   const isBuyer = mode === 'buyer';
+  const isSellerResponse = mode === 'seller_response';
+  const isSellerReport = mode === 'seller';
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
   const [imageUris, setImageUris] = useState([]);
@@ -148,8 +139,13 @@ export default function ReservationDisputeModal({
       Alert.alert('Thiếu mô tả', 'Vui lòng nhập giải thích khi chọn lý do Khác.');
       return;
     }
-    if (!isBuyer && !trimmedNote) {
-      Alert.alert('Thiếu mô tả', 'Vui lòng nhập ghi chú báo cáo người mua không đến.');
+    if ((isSellerReport || isSellerResponse) && !trimmedNote) {
+      Alert.alert(
+        'Thiếu mô tả',
+        isSellerResponse
+          ? 'Vui lòng nhập nội dung phản hồi khiếu nại.'
+          : 'Vui lòng nhập ghi chú báo cáo người mua không đến.'
+      );
       return;
     }
     if (!imageUris.length) {
@@ -159,24 +155,16 @@ export default function ReservationDisputeModal({
 
     setIsSubmitting(true);
     try {
-      const coords = await captureCurrentLocation();
-      let address = '';
-      try {
-        address = (await reverseGeocodeLocation(coords.latitude, coords.longitude)) || '';
-      } catch {
-        address = '';
-      }
       await onSubmit?.({
         reason: isBuyer ? reason : RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW,
         description: trimmedNote,
         note: trimmedNote,
-        title: isBuyer
-          ? RESERVATION_DISPUTE_REASON_LABELS[reason]
-          : 'Người mua không đến nhận hàng',
+        title: isSellerResponse
+          ? 'Phản hồi khiếu nại'
+          : isBuyer
+            ? RESERVATION_DISPUTE_REASON_LABELS[reason]
+            : 'Người mua không đến nhận hàng',
         images: imageUris,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        address,
       });
     } catch (error) {
       Alert.alert('Không gửi được báo cáo', error.message || 'Vui lòng thử lại.');
@@ -185,20 +173,30 @@ export default function ReservationDisputeModal({
     }
   }
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <KeyboardAwareScrollView
-          contentContainerStyle={styles.scrollContent}
-          extraBottomInset={ACTIONS_BAR_ESTIMATE}
-          nestedScrollPadding={false}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.card}>
-            <Text style={styles.title}>
-              {isBuyer ? 'Báo cáo người bán' : 'Báo cáo người mua không đến'}
-            </Text>
+  const modalTitle = isSellerResponse
+    ? 'Phản hồi khiếu nại của khách'
+    : isBuyer
+      ? 'Báo cáo người bán'
+      : 'Báo cáo người mua không đến';
 
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <FormSheetBackdrop onClose={onClose} />
+        <FormSheetShell panelStyle={styles.sheet}>
+            <BottomSheetHandle />
+            <FormSheetHeader
+              title={modalTitle}
+              onClose={onClose}
+              disabled={isSubmitting}
+            />
+            <KeyboardAwareScrollView
+              style={FORM_SHEET_SCROLL_STYLE}
+              contentContainerStyle={styles.scrollContent}
+              nestedScrollPadding={false}
+              showsVerticalScrollIndicator={false}
+            >
+            <View style={styles.card}>
             {isBuyer ? (
               <View style={styles.reasonBlock}>
                 <Text style={styles.label}>Lý do</Text>
@@ -222,20 +220,24 @@ export default function ReservationDisputeModal({
             ) : null}
 
             <Text style={styles.label}>
-              {isBuyer
-                ? reason === RESERVATION_DISPUTE_REASON.OTHER
-                  ? 'Giải thích lý do *'
-                  : 'Ghi chú thêm (tuỳ chọn)'
-                : 'Ghi chú *'}
+              {isSellerResponse
+                ? 'Nội dung phản hồi *'
+                : isBuyer
+                  ? reason === RESERVATION_DISPUTE_REASON.OTHER
+                    ? 'Giải thích lý do *'
+                    : 'Ghi chú thêm (tuỳ chọn)'
+                  : 'Ghi chú *'}
             </Text>
             <KeyboardAwareTextInput
               style={styles.input}
               value={note}
               onChangeText={setNote}
               placeholder={
-                isBuyer
-                  ? 'Mô tả tình huống tại điểm nhận hàng...'
-                  : 'Mô tả: người mua không đến nhận hàng...'
+                isSellerResponse
+                  ? 'Giải thích tình huống, bổ sung thông tin cho admin...'
+                  : isBuyer
+                    ? 'Mô tả tình huống tại điểm nhận hàng...'
+                    : 'Mô tả: người mua không đến nhận hàng...'
               }
               placeholderTextColor="#94a3b8"
               multiline
@@ -264,28 +266,31 @@ export default function ReservationDisputeModal({
               <Text style={styles.hint}>Cần ít nhất 1 ảnh. Có thể chụp hoặc chọn từ thư viện.</Text>
             )}
           </View>
-        </KeyboardAwareScrollView>
 
-        <KeyboardStickyFooter style={styles.actions}>
-          <Pressable
-            style={[styles.btn, styles.btnGhost]}
-            onPress={onClose}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.btnGhostText}>Huỷ</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.btn, styles.btnPrimary, isSubmitting && styles.btnDisabled]}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.btnPrimaryText}>Gửi báo cáo</Text>
-            )}
-          </Pressable>
-        </KeyboardStickyFooter>
+          <FormSheetActions style={styles.actions}>
+            <Pressable
+              style={[styles.btn, styles.btnGhost]}
+              onPress={onClose}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.btnGhostText}>Huỷ</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.btn, styles.btnPrimary, isSubmitting && styles.btnDisabled]}
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.btnPrimaryText}>
+                  {isSellerResponse ? 'Gửi phản hồi' : 'Gửi báo cáo'}
+                </Text>
+              )}
+            </Pressable>
+          </FormSheetActions>
+            </KeyboardAwareScrollView>
+        </FormSheetShell>
       </View>
     </Modal>
   );
@@ -295,24 +300,17 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15,23,42,0.45)',
-    justifyContent: 'center',
-    position: 'relative',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    paddingTop: 8,
   },
   scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
     gap: 10,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
   },
   label: {
     fontSize: 13,
@@ -400,10 +398,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actions: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: 0,
   },
   btn: {
     flex: 1,

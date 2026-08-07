@@ -16,7 +16,6 @@ const {
 } = require("../constants");
 const {
   toPublicReservation,
-  loadDisputeReportTimesMap,
   reserveVariantInventory,
   releaseVariantInventory,
   processReservationLifecycle,
@@ -28,12 +27,11 @@ const {
   isPastPickupTime,
   isWithinDepositDecisionWindow,
 } = require("./reservationService");
-const { holdDepositToSystem } = require("./walletService");
+const { loadDisputesByReservationIds } = require("../utils/reservationDisputeView");
+const { holdDepositToSystem, notifyWalletBalanceUpdated, getWalletBalance } = require("./walletService");
 const { createNotification, NOTIFICATION_INDEX } = require("./notificationService");
 const { emitOrderUpdated } = require("./orderRealtimeService");
 const { loadActiveReviewsByReservationIds } = require("./buyerReviewService");
-const { normalizeSearchText } = require("../utils/searchText");
-
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -163,21 +161,22 @@ async function createReservation(user, payload) {
             variantId: variant._id,
             shopId: shop._id,
             productId: product._id,
-            userId: user._id,
+            buyerId: user._id,
+            sellerId: shop.userId || null,
+            pickupCode: require("../utils/reservationCompat").generatePickupCode(),
             quantity,
             reservedPrice: agreedPrice,
-            agreedPrice,
             pickupTime,
             note,
-            status: RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION,
+            status: RESERVATION_STATUS.PENDING,
             inventoryHeld: true,
             depositPercent,
             depositAmount,
             depositPaidAt: null,
             depositSettledAt: null,
             depositSettleTo: 0,
-            CreatedAt: now,
-            UpdatedAt: now,
+            createdAt: now,
+            updatedAt: now,
           },
         ],
         { session }
@@ -213,6 +212,12 @@ async function createReservation(user, payload) {
     });
 
     await emitOrderUpdated(reservation, { action: "created" });
+    if (depositAmount > 0) {
+      const wallet = await getWalletBalance(user._id);
+      notifyWalletBalanceUpdated(user._id, wallet.balance, {
+        reservationId: String(reservation._id),
+      });
+    }
     return toPublicReservation(reservation);
   } finally {
     session.endSession();
@@ -253,64 +258,32 @@ async function listBuyerReservations(user, { tab = "pending", search, page, limi
     reservationQuery.status = { $in: statusFilter };
   }
 
-  // _id là tiebreaker để phân trang không bị trùng/thiếu khi trùng thời gian.
-  const sort =
-    tab === "completed"
-      ? { completedAt: -1, CreatedAt: -1, _id: -1 }
-      : { UpdatedAt: -1, _id: -1 };
+  const { listReservationsWithSearch } = require("../utils/reservationSearch");
 
-  const { page: safePage, limit: safeLimit, skip } = parsePagination({ page, limit });
-  const total = await Reservation.countDocuments(reservationQuery);
-  const reservations = await Reservation.find(reservationQuery)
-    .sort(sort)
-    .skip(skip)
-    .limit(safeLimit);
-
-  const activeReviewByReservation = await loadActiveReviewsByReservationIds(
-    reservations.map((doc) => doc._id),
-    user._id
-  );
-  const disputeTimesMap = await loadDisputeReportTimesMap(
-    reservations.map((doc) => doc._id)
-  );
-
-  let mapped = await Promise.all(
-    reservations.map(async (doc) => {
+  return listReservationsWithSearch({
+    reservationQuery,
+    tab,
+    search,
+    page,
+    limit,
+    searchRole: "buyer",
+    mapReservation: async (doc) => {
       const reservationId = String(doc._id);
+      const activeReviewByReservation = await loadActiveReviewsByReservationIds(
+        [doc._id],
+        user._id
+      );
+      const disputesMap = await loadDisputesByReservationIds([doc._id]);
       const publicReservation = await toPublicReservation(doc, {
         activeReview: activeReviewByReservation.get(reservationId) || null,
-        disputeTimes: disputeTimesMap.get(reservationId) || {},
+        disputeRecord: disputesMap.get(reservationId) || null,
       });
       return {
         ...publicReservation,
         shopId: doc.shopId ? String(doc.shopId) : publicReservation.shopId || "",
       };
-    })
-  );
-
-  const keyword = normalizeSearchText(search);
-  if (keyword) {
-    mapped = mapped.filter((item) => {
-      const haystack = normalizeSearchText(
-        [
-          item.product?.productName,
-          item.variant?.variantName,
-          item.storeName,
-          item.id,
-          item.orderCode,
-          item._id,
-        ]
-          .filter(Boolean)
-          .join(" ")
-      );
-      return haystack.includes(keyword);
-    });
-  }
-
-  return {
-    reservations: mapped,
-    ...buildPaginationMeta({ page: safePage, limit: safeLimit, total }),
-  };
+    },
+  });
 }
 
 async function listBuyerOrders(user, { tab = "pending", search, page, limit } = {}) {
@@ -328,10 +301,23 @@ async function getBuyerReservation(user, reservationId) {
     [reservation._id],
     user._id
   );
-  const disputeTimesMap = await loadDisputeReportTimesMap([reservation._id]);
+  const disputeRecord = await loadDisputesByReservationIds([reservation._id]).then(
+    (map) => map.get(String(reservation._id)) || null
+  );
+  const product = reservation.productId
+    ? await Product.findById(reservation.productId).select("ProductName").lean()
+    : null;
+  const { loadAdjustmentsForReservation } = require("./reservationAdjustmentService");
+  const adjustments = await loadAdjustmentsForReservation(reservation._id, {
+    productName: product?.ProductName || "",
+  });
+  const { loadWalletTransactionsForReservation } = require("./walletService");
+  const walletTransactions = await loadWalletTransactionsForReservation(reservation._id);
   const publicReservation = await toPublicReservation(reservation, {
     activeReview: activeReviewByReservation.get(String(reservation._id)) || null,
-    disputeTimes: disputeTimesMap.get(String(reservation._id)) || {},
+    disputeRecord,
+    adjustments,
+    walletTransactions,
   });
   return {
     ...publicReservation,
@@ -355,10 +341,10 @@ async function cancelReservationByBuyer(user, reservationId) {
         403
       );
     }
-    if (reservation.disputeByBuyer || reservation.disputeBySeller) {
+    if (reservation.disputed) {
       throw createServiceError("Không thể hủy đơn đang tranh chấp.", 403);
     }
-    reservation.status = RESERVATION_STATUS.DISPUTE_RESOLVED;
+    reservation.status = RESERVATION_STATUS.CANCELLED;
     reservation.cancelledAt = now;
     reservation.cancelledBy = "buyer";
     reservation.cancelReason = RESERVATION_CANCEL_REASON.BUYER_CANCEL_HOLDING;
@@ -386,11 +372,11 @@ async function cancelReservationByBuyer(user, reservationId) {
     return toPublicReservation(reservation);
   }
 
-  if (reservation.status !== RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION) {
+  if (reservation.status !== RESERVATION_STATUS.PENDING) {
     throw createServiceError("Không thể hủy đơn ở trạng thái này.");
   }
 
-  reservation.status = RESERVATION_STATUS.REFUNDED;
+  reservation.status = RESERVATION_STATUS.CANCELLED;
   reservation.cancelledAt = now;
   reservation.cancelledBy = "buyer";
   reservation.cancelReason = RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING;
@@ -416,128 +402,48 @@ async function cancelReservationByBuyer(user, reservationId) {
   return toPublicReservation(reservation);
 }
 
-/** Buyer xác nhận đã nhận hàng sau khi quét QR cố định của shop. */
-async function confirmReceivedByBuyer(user, reservationId, { scannedShopId } = {}) {
-  await processReservationLifecycle();
-  const reservation = await Reservation.findOne({ _id: reservationId, userId: user._id });
-  if (!reservation) {
-    throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
-  }
-
-  if (reservation.status !== RESERVATION_STATUS.WAITING_PICKUP) {
-    throw createServiceError("Chỉ xác nhận nhận hàng khi đơn đang chờ nhận.");
-  }
-  if (!isBeforePickupTime(reservation)) {
-    throw createServiceError(
-      "Đã quá giờ nhận hàng. Bạn không thể quét mã — hãy dùng Báo cáo shop nếu cần.",
-      403
-    );
-  }
-
-  const scanned = pickString(scannedShopId);
-  if (!scanned) {
-    throw createServiceError("Thiếu mã shop đã quét (scannedShopId).");
-  }
-
-  const shop = await ShopProfile.findById(reservation.shopId);
-  if (!shop) {
-    throw createServiceError("Không tìm thấy cửa hàng.", 404);
-  }
-
-  const shopId = String(shop._id);
-  const qrValue = pickString(shop.qrCodeValue) || shopId;
-  const scannedMatches =
-    scanned === shopId ||
-    scanned === qrValue ||
-    scanned.toLowerCase() === shopId.toLowerCase() ||
-    scanned.toLowerCase() === qrValue.toLowerCase();
-
-  if (!scannedMatches) {
-    throw createServiceError("QR không thuộc cửa hàng này", 400);
-  }
-
-  const now = new Date();
-  const result = await finalizeCompleted(reservation, shop, {
-    status: RESERVATION_STATUS.COMPLETED,
-    now,
-    reasonCode: RESERVATION_CANCEL_REASON.BUYER_RECEIVED,
-  });
-
-  if (shop.userId) {
-    await createNotification(shop.userId, {
-      title: "Khách đã nhận hàng",
-      content: `${user.FullName || user.UserName} đã quét QR shop và xác nhận nhận hàng. Cọc đã vào ví của bạn.`,
-      audience: NOTIFICATION_AUDIENCE.SELLER,
-    index: NOTIFICATION_INDEX.ORDER,
-    });
-  }
-
-  const product = await Product.findById(reservation.productId).select("ProductName").lean();
-  const productName = product?.ProductName || "sản phẩm";
-  await createNotification(user._id, {
-    title: "Đơn hoàn thành",
-    content: `Bạn đã nhận ${productName} thành công. Cảm ơn bạn đã mua hàng!`,
-    audience: NOTIFICATION_AUDIENCE.BUYER,
-    index: NOTIFICATION_INDEX.ORDER,
-  });
-
-  return result;
+/** Luồng cũ (buyer quét QR shop) — đã thay bằng seller quét QR đơn. */
+async function confirmReceivedByBuyer(user, reservationId) {
+  throw createServiceError(
+    "Vui lòng đưa mã QR đơn hàng cho shop quét để xác nhận giao hàng.",
+    410
+  );
 }
 
-/** Chỉ kiểm tra QR shop khớp đơn (trước popup xác nhận phía app). */
+/** Luồng cũ — buyer quét QR shop (deprecated). */
 async function validateShopQrScan(user, reservationId, scannedShopId) {
-  await processReservationLifecycle();
+  throw createServiceError(
+    "Vui lòng mở mã QR đơn hàng và đưa cho shop quét.",
+    410
+  );
+}
+
+/** Buyer báo cáo / khiếu nại — pickup-time (Report) hoặc sau giao (ReservationDispute). */
+async function reportReservationByBuyer(user, reservationId, payload = {}) {
+  const { reason, description, images, videos } = payload || {};
+  const reservationDisputeService = require("./reservationDisputeService");
   const reservation = await Reservation.findOne({ _id: reservationId, userId: user._id });
   if (!reservation) {
     throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
   }
-  if (reservation.status !== RESERVATION_STATUS.WAITING_PICKUP) {
-    throw createServiceError("Đơn không ở trạng thái chờ nhận hàng.");
+  const status = Number(reservation.status);
+  if (
+    status === RESERVATION_STATUS.RECEIVED ||
+    status === RESERVATION_STATUS.COMPLETED
+  ) {
+    const result = await reservationDisputeService.buyerPostDeliveryComplaint(user, {
+      reservationId,
+      reason,
+      description: description || reason,
+      images,
+      videos,
+    });
+    return result.reservation;
   }
-  if (!isBeforePickupTime(reservation)) {
-    throw createServiceError("Đã quá giờ nhận hàng.", 403);
-  }
-
-  const scanned = pickString(scannedShopId);
-  if (!scanned) {
-    throw createServiceError("Thiếu mã shop đã quét.");
-  }
-
-  const shop = await ShopProfile.findById(reservation.shopId);
-  if (!shop) {
-    throw createServiceError("Không tìm thấy cửa hàng.", 404);
-  }
-
-  const shopId = String(shop._id);
-  const qrValue = pickString(shop.qrCodeValue) || shopId;
-  const scannedMatches =
-    scanned === shopId ||
-    scanned === qrValue ||
-    scanned.toLowerCase() === shopId.toLowerCase() ||
-    scanned.toLowerCase() === qrValue.toLowerCase();
-
-  if (!scannedMatches) {
-    throw createServiceError("QR không thuộc cửa hàng này", 400);
-  }
-
-  return {
-    ok: true,
-    reservationId: String(reservation._id),
-    shopId,
-    message: "QR hợp lệ. Vui lòng xác nhận đã nhận hàng.",
-  };
-}
-
-/** Buyer báo cáo shop sau pickupTime — luôn qua luồng evidence (GPS + ảnh). */
-async function reportReservationByBuyer(user, reservationId, payload = {}) {
-  const { reason, description, latitude, longitude, images } = payload || {};
-  const { buyerReportSeller } = require("./reservationDisputeService");
-  return buyerReportSeller(user, {
+  return reservationDisputeService.buyerReportSeller(user, {
     reservationId,
     description: description || reason,
     reason,
-    latitude,
-    longitude,
     images,
   });
 }
@@ -583,7 +489,7 @@ async function forfeitDepositByBuyer(user, reservationId) {
   ) {
     throw createServiceError("Cọc đã được xử lý trước đó.", 400);
   }
-  if (reservation.disputeByBuyer) {
+  if (reservation.disputed) {
     throw createServiceError(
       "Bạn đã gửi báo cáo tranh chấp. Không thể đồng ý mất cọc.",
       403
@@ -599,26 +505,18 @@ async function forfeitDepositByBuyer(user, reservationId) {
   const result = await finalizeBuyerForfeit(reservation, shop, { now });
 
   try {
-    const Report = require("../models/Report");
-    const { REPORT_STATUS, RESERVATION_REPORT_TYPES } = require("../constants");
-    await Report.updateMany(
-      {
-        reservationId: reservation._id,
-        reportType: { $in: RESERVATION_REPORT_TYPES },
-        status: REPORT_STATUS.PENDING,
-      },
-      {
-        $set: {
-          status: REPORT_STATUS.APPROVED,
-          processedAt: now,
-          adminDecision: "buyer_forfeit",
-          adminNote: "Buyer đồng ý mất cọc.",
-          UpdatedAt: now,
-        },
-      }
-    );
+    const ReservationDispute = require("../models/ReservationDispute");
+    const { RESERVATION_DISPUTE_STATUS } = require("../constants");
+    const dispute = await ReservationDispute.findOne({ reservationId: reservation._id });
+    if (dispute) {
+      dispute.status = RESERVATION_DISPUTE_STATUS.SELLER_WIN;
+      dispute.adminNote = "Buyer đồng ý mất cọc.";
+      dispute.resolvedAt = now;
+      dispute.updatedAt = now;
+      await dispute.save();
+    }
   } catch (error) {
-    console.warn("forfeitDepositByBuyer close reports:", error.message);
+    console.warn("forfeitDepositByBuyer close dispute:", error.message);
   }
 
   if (shop.userId) {

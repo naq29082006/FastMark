@@ -11,7 +11,6 @@ import {
   Minus,
   Package,
   ShoppingCart,
-  Store,
   TrendingDown,
   TrendingUp,
   UserCheck,
@@ -19,7 +18,7 @@ import {
   Wallet,
 } from 'lucide-react';
 
-import { getAdminDashboard } from '../api/dashboardApi';
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 import DashboardDateRange, { presetDates } from '../components/DashboardDateRange';
 import { useAuth } from '../context/AuthContext';
 import { useAdminRealtimeRefresh } from '../hooks/useAdminRealtimeRefresh';
@@ -258,7 +257,7 @@ const METRIC_DEFS = [
   {
     key: 'newSellers',
     label: 'Gian hàng mới',
-    icon: Store,
+    icon: FastMarkShopPinIcon,
     tone: 'green',
     isCurrency: false,
     seriesKey: 'sellersOverTime',
@@ -376,7 +375,7 @@ const METRIC_DEFS = [
   {
     key: 'reportedShops',
     label: 'Shop bị báo cáo',
-    icon: Store,
+    icon: FastMarkShopPinIcon,
     tone: 'red',
     isCurrency: false,
     seriesKey: 'reportedShopsOverTime',

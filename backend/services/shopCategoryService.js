@@ -63,7 +63,10 @@ async function getShopCategoryNameMap(categoryIds = []) {
     .lean();
 
   return new Map(
-    categories.map((category) => [String(category._id), pickString(category.name)])
+    categories.map((category) => [
+      String(category._id),
+      { name: pickString(category.name) },
+    ])
   );
 }
 
@@ -118,9 +121,8 @@ async function updateCategory(categoryId, { name, description }) {
   category.description = pickString(description);
   category.UpdatedAt = new Date();
   await category.save();
-  await ShopCategory.updateOne({ _id: category._id }, { $unset: { icon: "" } });
 
-  return toPublicCategory(await ShopCategory.findById(category._id));
+  return toPublicCategory(category);
 }
 
 async function deleteCategory(categoryId) {
@@ -153,6 +155,10 @@ async function restoreCategory(categoryId) {
   return toPublicCategory(category);
 }
 
+async function uploadCategoryIcon() {
+  throw createServiceError("Danh mục shop không còn dùng icon tùy chỉnh.", 410);
+}
+
 module.exports = {
   listCategories,
   assertShopCategoryExists,
@@ -161,4 +167,5 @@ module.exports = {
   updateCategory,
   deleteCategory,
   restoreCategory,
+  uploadCategoryIcon,
 };

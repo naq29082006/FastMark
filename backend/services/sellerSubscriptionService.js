@@ -3,7 +3,7 @@ const SellerSubscription = require("../models/SellerSubscription");
 const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
 const WalletTransaction = require("../models/WalletTransaction");
-const { SELLER_SUBSCRIPTION_STATUS, SELLER_SUBSCRIPTION_STATUS_LABEL, WALLET_TX_TYPE } = require("../constants");
+const { SELLER_SUBSCRIPTION_STATUS, SELLER_SUBSCRIPTION_STATUS_LABEL, WALLET_TX_TYPE, isRecordActive } = require("../constants");
 const { listActivePlans, getActivePlanById } = require("./sellerPlanService");
 const { debitWallet, getWalletBalance } = require("./walletService");
 const { getShopForSeller } = require("./shopSettingsService");
@@ -138,7 +138,7 @@ async function toSubscriptionDto(shop, walletBalance = null) {
       active?.startDate ||
       null,
     subscriptionActive: hasActive,
-    isActive: Boolean(shop.isActive && hasActive),
+    isActive: isRecordActive(shop.isActive) && hasActive,
     daysLeft,
     canBuyBanner: hasActive,
     walletBalance: walletBalance == null ? null : Number(walletBalance) || 0,
@@ -293,13 +293,30 @@ async function listAdminSubscriptions({
 
   applyCreatedAtRange(filter, { from, to });
 
-  const [rows, total] = await Promise.all([
+  const paidStatuses = [
+    SELLER_SUBSCRIPTION_STATUS.ACTIVE,
+    SELLER_SUBSCRIPTION_STATUS.EXPIRED,
+  ];
+  const now = new Date();
+
+  const [rows, total, summaryTotal, summaryActive, summaryRevenue, summaryShops] =
+    await Promise.all([
     SellerSubscription.find(filter)
       .sort({ ngayMua: -1, CreatedAt: -1 })
       .skip(skip)
       .limit(pageSize)
       .lean(),
     SellerSubscription.countDocuments(filter),
+    SellerSubscription.countDocuments({ status: { $in: paidStatuses } }),
+    SellerSubscription.countDocuments({
+      status: SELLER_SUBSCRIPTION_STATUS.ACTIVE,
+      endDate: { $gte: now },
+    }),
+    SellerSubscription.aggregate([
+      { $match: { status: { $in: paidStatuses } } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ["$amount", 0] } } } },
+    ]),
+    SellerSubscription.distinct("shopId", { status: { $in: paidStatuses } }),
   ]);
 
   const sellerIds = rows.map((r) => r.sellerId).filter(Boolean);
@@ -417,6 +434,12 @@ async function listAdminSubscriptions({
       limit: pageSize,
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    },
+    summary: {
+      total: summaryTotal,
+      active: summaryActive,
+      totalRevenue: Number(summaryRevenue[0]?.total) || 0,
+      uniqueShops: summaryShops.length,
     },
   };
 }

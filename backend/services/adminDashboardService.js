@@ -2,8 +2,8 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
 const Product = require("../models/Product");
-const ProductImage = require("../models/ProductImage");
 const Reservation = require("../models/Reservation");
+const ReservationDispute = require("../models/ReservationDispute");
 const FavoriteProduct = require("../models/FavoriteProduct");
 const Follow = require("../models/Follow");
 const SystemWallet = require("../models/SystemWallet");
@@ -11,6 +11,7 @@ const SellerSubscription = require("../models/SellerSubscription");
 const SellerBannerPlan = require("../models/SellerBannerPlan");
 const SellerVerification = require("../models/SellerVerification");
 const Report = require("../models/Report");
+const Review = require("../models/Review");
 const WithdrawRequest = require("../models/WithdrawRequest");
 const WalletTransaction = require("../models/WalletTransaction");
 const { USER_ROLE } = require("../constants");
@@ -27,8 +28,11 @@ const {
   WITHDRAW_STATUS,
   WALLET_TX_TYPE,
   WALLET_TX_STATUS,
+  DISPUTE_STATUS,
 } = require("../constants");
 const { computeTotal } = require("./reservationService");
+const { notRemovedProductMatch } = require("../utils/productRemoval");
+const { notDeletedReviewFilter } = require("../utils/reviewRemoval");
 const {
   resolveShopDisplayName,
   resolveShopAvatar,
@@ -461,7 +465,7 @@ async function collectPeriodMetrics(from, to) {
   ] = await Promise.all([
     User.countDocuments({ ...createdInWindow, Role: { $ne: USER_ROLE.ADMIN } }),
     ShopProfile.countDocuments(createdInWindow),
-    Product.countDocuments({ ...createdInWindow, IsDeleted: { $ne: true } }),
+    Product.countDocuments({ ...createdInWindow, ...notRemovedProductMatch() }),
     Reservation.countDocuments(createdInWindow),
     Reservation.find(completedInWindowMatch(from, to))
       .select("agreedPrice reservedPrice quantity")
@@ -473,7 +477,7 @@ async function collectPeriodMetrics(from, to) {
         { cancelledAt: null, UpdatedAt: { $gte: from, $lte: to } },
       ],
     }),
-    Reservation.countDocuments({ disputedAt: { $gte: from, $lte: to } }),
+    ReservationDispute.countDocuments({ createdAt: { $gte: from, $lte: to } }),
     aggregatePackageSales(SellerSubscription, from, to, {
       status: { $ne: SELLER_SUBSCRIPTION_STATUS.PENDING_PAYMENT },
     }),
@@ -549,6 +553,10 @@ async function collectPeriodMetrics(from, to) {
     escrowCount: Number(escrowRows[0]?.count) || 0,
     orderRevenue,
     revenue: sellerPlanSales.revenue + bannerPlanSales.revenue,
+    platformRevenue:
+      (Number(depositRows[0]?.amount) || 0) +
+      sellerPlanSales.revenue +
+      bannerPlanSales.revenue,
   };
 }
 
@@ -625,15 +633,19 @@ async function getAdminDashboard(query = {}) {
     reportedShopDaily,
     bannerDaily,
     escrowDaily,
+    totalReviews,
+    totalReports,
+    pendingReservationDisputes,
+    depositAllTimeRows,
   ] = await Promise.all([
     User.countDocuments({ Role: { $ne: USER_ROLE.ADMIN } }),
-    User.countDocuments({ Role: { $ne: USER_ROLE.ADMIN } }),
+    User.countDocuments({ Role: USER_ROLE.BUYER }),
     ShopProfile.countDocuments({}),
     User.countDocuments({ Role: USER_ROLE.ADMIN }),
     ShopProfile.countDocuments({}),
     ShopProfile.countDocuments({ status: SHOP_STATUS.ACTIVE }),
-    Product.countDocuments({ IsDeleted: { $ne: true } }),
-    Product.countDocuments({ IsDeleted: { $ne: true }, Status: PRODUCT_STATUS.ACTIVE }),
+    Product.countDocuments(notRemovedProductMatch()),
+    Product.countDocuments({ ...notRemovedProductMatch(), Status: PRODUCT_STATUS.ACTIVE }),
     Reservation.countDocuments({}),
     Reservation.aggregate([
       { $group: { _id: "$status", count: { $sum: 1 } } },
@@ -646,7 +658,7 @@ async function getAdminDashboard(query = {}) {
     aggregateDailyCount(ShopProfile, createdInRange),
     aggregateDailyCount(Product, {
       ...createdInRange,
-      IsDeleted: { $ne: true },
+      ...notRemovedProductMatch(),
     }),
     aggregateDailyCount(Reservation, createdInRange),
     Reservation.find({
@@ -794,9 +806,9 @@ async function getAdminDashboard(query = {}) {
       "UpdatedAt"
     ),
     aggregateDailyCount(
-      Reservation,
-      { disputedAt: { $gte: from, $lte: to } },
-      "disputedAt"
+      ReservationDispute,
+      { createdAt: { $gte: from, $lte: to } },
+      "createdAt"
     ),
     aggregateDailySum(
       Reservation,
@@ -848,6 +860,18 @@ async function getAdminDashboard(query = {}) {
       "depositPaidAt",
       "depositAmount"
     ),
+    Review.countDocuments(notDeletedReviewFilter()),
+    Report.countDocuments({}),
+    ReservationDispute.countDocuments({ status: DISPUTE_STATUS.PENDING }),
+    Reservation.aggregate([
+      {
+        $match: {
+          depositPaidAt: { $ne: null },
+          depositAmount: { $gt: 0 },
+        },
+      },
+      { $group: { _id: null, amount: { $sum: "$depositAmount" } } },
+    ]),
   ]);
 
   const topShopOwnerIds = [
@@ -928,30 +952,21 @@ async function getAdminDashboard(query = {}) {
     (a, b) => b.soldQuantity - a.soldQuantity || b.revenue - a.revenue
   );
   const topProductIds = topProductRows.map((row) => row.productId);
-  const [topProductDocs, topProductCovers] = topProductIds.length
+  const [topProductDocs] = topProductIds.length
     ? await Promise.all([
         Product.find({ _id: { $in: topProductIds } })
-          .select("ProductName Thumbnail")
+          .select("ProductName Thumbnail images")
           .lean(),
-        // Ảnh đại diện lấy từ ProductImage (Stt nhỏ nhất = cover).
-        ProductImage.aggregate([
-          {
-            $match: {
-              ProductId: {
-                $in: topProductIds.map((id) => new mongoose.Types.ObjectId(id)),
-              },
-            },
-          },
-          { $sort: { Stt: 1, UploadedAt: 1 } },
-          { $group: { _id: "$ProductId", url: { $first: "$ImageUrl" } } },
-        ]),
       ])
-    : [[], []];
+    : [[]];
   const topProductById = new Map(
     topProductDocs.map((product) => [String(product._id), product])
   );
   const coverByProductId = new Map(
-    topProductCovers.map((row) => [String(row._id), row.url || ""])
+    topProductDocs.map((product) => [
+      String(product._id),
+      (Array.isArray(product.images) && product.images[0]) || product.Thumbnail || "",
+    ])
   );
   const topSellingProducts = topProductRows.map((row) => {
     const product = topProductById.get(row.productId);
@@ -987,6 +1002,11 @@ async function getAdminDashboard(query = {}) {
       value: Number(found?.count) || 0,
     };
   });
+
+  const disputedReservationsCount =
+    Number(
+      reservationsByStatus.find((row) => Number(row._id) === RESERVATION_STATUS.DISPUTED)?.count
+    ) || 0;
 
   const rolePie = [
     { key: "buyers", label: "Người mua", value: totalBuyers },
@@ -1027,6 +1047,9 @@ async function getAdminDashboard(query = {}) {
     0
   );
   const escrowByReservations = unsettledDeposits[0] || {};
+  const depositAllTime = Number(depositAllTimeRows[0]?.amount) || 0;
+  const platformRevenueAllTime =
+    sellerPlanSalesAllTime.revenue + bannerPlanSalesAllTime.revenue + depositAllTime;
 
   // Chuỗi doanh thu theo ngày = gói seller + banner (tiền nền tảng thu).
   const sellerRevenueSeries = fillSeries(emptySeries, sellerPlanRevenueDaily);
@@ -1063,6 +1086,7 @@ async function getAdminDashboard(query = {}) {
       banners: pendingBanners,
       withdrawAmount: Number(pendingWithdrawRows[0]?.amount) || 0,
       withdrawCount: Number(pendingWithdrawRows[0]?.count) || 0,
+      reservationDisputes: pendingReservationDisputes,
     },
     cards: {
       totalUsers,
@@ -1073,6 +1097,9 @@ async function getAdminDashboard(query = {}) {
       totalProducts,
       totalActiveProducts,
       totalReservations,
+      totalReviews,
+      totalReports,
+      disputedReservations: disputedReservationsCount,
       periodRevenue,
       activeUsers,
       blockedUsers,
@@ -1094,6 +1121,8 @@ async function getAdminDashboard(query = {}) {
       sellerPlanRevenueThisMonth: sellerPlanSalesThisMonth.revenue,
       bannerPlansSoldThisMonth: bannerPlanSalesThisMonth.count,
       bannerPlanRevenueThisMonth: bannerPlanSalesThisMonth.revenue,
+      platformRevenueAllTime,
+      depositAllTime,
     },
     charts: {
       usersOverTime: fillSeries(emptySeries, usersInRange),

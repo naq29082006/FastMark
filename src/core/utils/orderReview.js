@@ -7,6 +7,7 @@ import { getCurrentUserIdToken } from '../../repository/authRepository';
 import {
   RESERVATION_STATUS,
   RESERVATION_STATUS_LABELS,
+  isDeliveredReservationStatus,
 } from '../../constants/sellerOrders';
 
 export const PURCHASE_REVIEW_STATUSES = ['Hoàn thành', 'Đã giao'];
@@ -33,8 +34,7 @@ export function canReviewReservationOrder(order) {
     return false;
   }
   return (
-    order?.status === RESERVATION_STATUS.COMPLETED ||
-    order?.status === RESERVATION_STATUS.AUTO_COMPLETED ||
+    isDeliveredReservationStatus(order?.status) ||
     order?.status === 'picked_up'
   );
 }
@@ -68,6 +68,9 @@ export function hasActiveReviewOnOrder(order, reviewsByOrderId = null) {
 }
 
 export function canShowReviewButton(order, reviewedOrderCodes) {
+  if (order?.canReview === false) {
+    return false;
+  }
   if (!canReviewOrder(order)) {
     return false;
   }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -33,18 +33,15 @@ import {
   RESERVATION_TAB,
   ORDER_STATUS_TABS,
   getCancelledReservationReason,
-  getReservationTabForStatus,
   isActiveDisputeOrder,
+  isCancelledReservationStatus,
+  isDeliveredReservationStatus,
   VIEWER_ROLE,
 } from '../../constants/sellerOrders';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
+import { applyReservationRealtimeRow, syncOrderListAfterMutation } from '../../core/utils/orderRealtimeSync';
 import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
-import {
-  hasItemId,
-  mergeListById,
-  removeById,
-  upsertById,
-} from '../../core/utils/realtimeList';
+import { orderMatchesSearch, isOrderSearchActive } from '../../core/utils/reservationOrderSearch';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
 import { formatPrice } from '../../core/utils/productFormat';
 import { getBuyerCancelConfirmMessage } from '../../core/utils/buyerCancelReservation';
@@ -54,9 +51,14 @@ import { submitShopReview, canShowReviewButton, canViewExistingReview, buildView
 import ShopReviewModal from '../shared/components/ShopReviewModal';
 import MyReviewDetailModal from '../shared/components/MyReviewDetailModal';
 import OrderItemHeader from '../shared/components/OrderItemHeader';
+import {
+  isDepositAlreadySettled,
+  isWithinDepositDecisionWindowForItem,
+} from '../../core/utils/escrowHold';
+import { useMinuteNow } from '../../hooks/useMinuteNow';
 import OrderStatusTabBar from '../shared/components/OrderStatusTabBar';
 import BuyerOrderDetailScreen from './BuyerOrderDetailScreen';
-import BuyerShopQrScanScreen from './BuyerShopQrScanScreen';
+import BuyerPickupQrDisplayScreen from './BuyerPickupQrDisplayScreen';
 import StoreDetailScreen from '../store/StoreDetailScreen';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import { deleteBuyerReviewOnBackend } from '../../api/reviewApi';
@@ -70,43 +72,17 @@ function isPastPickup(item) {
   return !Number.isFinite(pickup.getTime()) || Date.now() >= pickup.getTime();
 }
 
-/** Còn trong 24h sau giờ nhận (chưa tới hạn auto-release). */
-function isWithinDepositDecisionWindow(item) {
-  if (item?.withinDepositDecisionWindow === true) {
-    return true;
-  }
-  if (item?.withinDepositDecisionWindow === false) {
-    return false;
-  }
-  const deadlineRaw = item?.depositDecisionDeadline || item?.autoReleaseAt || item?.reviewDeadlineAt;
-  if (deadlineRaw) {
-    const deadline = new Date(deadlineRaw);
-    return Number.isFinite(deadline.getTime()) && Date.now() < deadline.getTime();
-  }
-  if (!item?.pickupTime) {
-    return false;
-  }
-  const pickup = new Date(item.pickupTime);
-  if (!Number.isFinite(pickup.getTime())) {
-    return false;
-  }
-  return Date.now() < pickup.getTime() + 24 * 60 * 60 * 1000;
-}
-
-function isDepositAlreadySettled(item) {
-  const settleTo = Number(item?.depositSettleTo);
-  return (
-    settleTo === 1 ||
-    settleTo === 2 ||
-    Boolean(item?.depositSettledAt) ||
-    Boolean(item?.depositReleasedAt) ||
-    Boolean(item?.depositRefundedAt)
-  );
+/** Còn trong hạn khiếu nại / giữ cọc. */
+function isWithinDepositDecisionWindow(item, now = Date.now()) {
+  return isWithinDepositDecisionWindowForItem(item, now);
 }
 
 function getReservationStatusStyle(status) {
   if (status === RESERVATION_STATUS.WAITING_PICKUP) {
     return { badge: styles.statusBadgePending, text: styles.statusBadgeTextPending };
+  }
+  if (status === RESERVATION_STATUS.RECEIVED) {
+    return { badge: styles.statusBadgeInfo, text: styles.statusBadgeTextInfo };
   }
   if (
     status === RESERVATION_STATUS.COMPLETED ||
@@ -165,6 +141,9 @@ function normalizeOrderItem(item) {
 
 function BuyerOrdersContent({
   activeTab,
+  searchInput,
+  setSearchInput,
+  search,
   onNavigatePickup,
   onReviewStore,
   onViewReview,
@@ -175,7 +154,6 @@ function BuyerOrdersContent({
   orderReviewPatches = {},
   refreshKey = 0,
   embedded = true,
-  isScreenActive = true,
 }) {
   const insets = useScreenInsets();
   const holdingListExtra = activeTab === RESERVATION_TAB.HOLDING ? 56 : 0;
@@ -192,37 +170,25 @@ function BuyerOrdersContent({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-  const loadingGuardRef = useRef(false);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const ordersFetchSeqRef = useRef(0);
+  const loadingMoreGuardRef = useRef(false);
   const [disputeTarget, setDisputeTarget] = useState(null);
+  const currentTime = useMinuteNow(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearch(searchInput.trim());
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
+  const loadOrders = useCallback(async ({ refresh = false, nextPage = 1, silent = false } = {}) => {
+    const fetchSeq = ++ordersFetchSeqRef.current;
 
-  // Rời màn hình → xóa ô tìm kiếm (chỉ reset UI, không đụng dữ liệu server).
-  useEffect(() => {
-    if (isScreenActive) {
-      return;
+    if (nextPage > 1) {
+      if (loadingMoreGuardRef.current) {
+        return;
+      }
+      loadingMoreGuardRef.current = true;
     }
-    setSearchInput('');
-    setSearch('');
-  }, [isScreenActive]);
 
-  const loadOrders = useCallback(async ({ refresh = false, nextPage = 1 } = {}) => {
-    if (loadingGuardRef.current) {
-      return;
-    }
-    loadingGuardRef.current = true;
-
-    if (refresh || nextPage === 1) {
+    if (nextPage === 1) {
       if (refresh) {
         setIsRefreshing(true);
-      } else {
+      } else if (!silent) {
         setIsLoading(true);
       }
     } else {
@@ -238,9 +204,12 @@ function BuyerOrdersContent({
         page: nextPage,
         limit: DEFAULT_PAGE_SIZE,
       });
+      if (fetchSeq !== ordersFetchSeqRef.current) {
+        return;
+      }
       const rows = data?.reservations || data?.items || [];
       setItems((current) =>
-        nextPage === 1 ? mergeListById(current, rows) : appendUniqueById(current, rows)
+        nextPage === 1 ? rows : appendUniqueById(current, rows)
       );
       setPage(Number(data?.page) || nextPage);
       setHasMore(
@@ -256,6 +225,9 @@ function BuyerOrdersContent({
             (data?.hasMore ? DEFAULT_PAGE_SIZE : 0)
       );
     } catch (loadError) {
+      if (fetchSeq !== ordersFetchSeqRef.current) {
+        return;
+      }
       showErrorAlert(loadError.message || 'Không tải được đơn hàng.');
       if (nextPage === 1) {
         setItems([]);
@@ -263,16 +235,51 @@ function BuyerOrdersContent({
         setTotalCount(0);
       }
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-      setIsLoadingMore(false);
-      loadingGuardRef.current = false;
+      if (nextPage > 1) {
+        loadingMoreGuardRef.current = false;
+      }
+      if (fetchSeq !== ordersFetchSeqRef.current) {
+        return;
+      }
+      if (nextPage === 1) {
+        setIsRefreshing(false);
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
-  }, [activeTab, search, refreshKey]);
+  }, [activeTab, search]);
 
   useEffect(() => {
     loadOrders({ nextPage: 1 });
   }, [loadOrders]);
+
+  const prevRefreshKeyRef = useRef(refreshKey);
+  useEffect(() => {
+    if (prevRefreshKeyRef.current === refreshKey) {
+      return;
+    }
+    prevRefreshKeyRef.current = refreshKey;
+    if (refreshKey > 0) {
+      loadOrders({ nextPage: 1, silent: true });
+    }
+  }, [refreshKey, loadOrders]);
+
+  const syncListAfterMutation = useCallback(
+    (reservation, reservationId) => {
+      syncOrderListAfterMutation({
+        reservation,
+        reservationId,
+        activeTab,
+        search,
+        itemsRef,
+        setItems,
+        setTotalCount,
+        loadOrders,
+      });
+    },
+    [activeTab, search, loadOrders]
+  );
 
   /**
    * Realtime: chỉ đồng bộ đúng đơn vừa thay đổi (không tải lại cả danh sách).
@@ -286,23 +293,6 @@ function BuyerOrdersContent({
         return;
       }
 
-      const eventTab = getReservationTabForStatus(payload?.status);
-      const belongsToTab = activeTab === RESERVATION_TAB.ALL || eventTab === activeTab;
-      const isInList = hasItemId(itemsRef.current, reservationId);
-
-      if (!belongsToTab) {
-        if (isInList) {
-          setItems((current) => removeById(current, reservationId));
-          setTotalCount((current) => Math.max(0, current - 1));
-        }
-        return;
-      }
-
-      // Đang tìm kiếm: không tự chèn đơn mới (có thể không khớp từ khóa).
-      if (!isInList && search.trim()) {
-        return;
-      }
-
       try {
         const idToken = await getCurrentUserIdToken();
         if (!idToken) {
@@ -312,19 +302,24 @@ function BuyerOrdersContent({
         if (!reservation?.id) {
           return;
         }
-        setItems((current) => upsertById(current, reservation, { position: 'start' }));
-        if (!isInList) {
-          setTotalCount((current) => current + 1);
-        }
+        applyReservationRealtimeRow({
+          reservation,
+          reservationId,
+          activeTab,
+          search,
+          currentItems: itemsRef.current,
+          setItems,
+          setTotalCount,
+        });
       } catch {
-        // Bỏ qua lỗi tạm thời: danh sách hiện tại vẫn giữ nguyên, không nháy.
+        // Giữ danh sách hiện tại nếu tải lỗi.
       }
     },
     [activeTab, search]
   );
 
   const handleLoadMore = useCallback(() => {
-    if (!hasMore || isLoading || isRefreshing || isLoadingMore || loadingGuardRef.current) {
+    if (!hasMore || isLoading || isRefreshing || isLoadingMore || loadingMoreGuardRef.current) {
       return;
     }
     loadOrders({ nextPage: page + 1 });
@@ -334,6 +329,17 @@ function BuyerOrdersContent({
     enabled: true,
     onOrderUpdated: handleOrderUpdated,
   });
+
+  const visibleItems = useMemo(() => {
+    let list = items;
+    if (activeTab === RESERVATION_TAB.HOLDING) {
+      list = list.filter((item) => !isCancelledReservationStatus(item.status));
+    }
+    if (isOrderSearchActive(searchInput)) {
+      list = list.filter((item) => orderMatchesSearch(item, searchInput, 'buyer'));
+    }
+    return list;
+  }, [activeTab, items, searchInput]);
 
   function handleNavigatePickup(item) {
     onNavigatePickup?.({
@@ -355,8 +361,8 @@ function BuyerOrdersContent({
           onPress: async () => {
             try {
               const idToken = await getCurrentUserIdToken();
-              await cancelBuyerReservationOnBackend(idToken, reservation.id);
-              loadOrders({ refresh: true, nextPage: 1 });
+              const updated = await cancelBuyerReservationOnBackend(idToken, reservation.id);
+              syncListAfterMutation(updated, reservation.id);
             } catch (actionError) {
               Alert.alert('Lỗi', actionError.message || 'Không hủy được đơn.');
             }
@@ -366,7 +372,7 @@ function BuyerOrdersContent({
     );
   }
 
-  function handleConfirmReceived(reservation) {
+  function handleShowPickupQr(reservation) {
     onOpenShopScan?.(reservation);
   }
 
@@ -380,18 +386,16 @@ function BuyerOrdersContent({
     }
     try {
       const idToken = await getCurrentUserIdToken();
-      await reportBuyerReservationOnBackend(idToken, {
-        reservationId: disputeTarget.id,
+      const reservationId = disputeTarget.id;
+      const updated = await reportBuyerReservationOnBackend(idToken, {
+        reservationId,
         reason: payload.reason,
         description: payload.description,
-        latitude: payload.latitude,
-        longitude: payload.longitude,
-        address: payload.address,
         images: payload.images,
       });
       setDisputeTarget(null);
       Alert.alert('Đã gửi', 'Khiếu nại đã gửi. Admin sẽ xử lý, cọc tạm giữ.');
-      loadOrders({ refresh: true, nextPage: 1 });
+      syncListAfterMutation(updated, reservationId);
     } catch (actionError) {
       Alert.alert('Lỗi', actionError.message || 'Không gửi được khiếu nại.');
       throw actionError;
@@ -410,9 +414,9 @@ function BuyerOrdersContent({
           onPress: async () => {
             try {
               const idToken = await getCurrentUserIdToken();
-              await forfeitBuyerDepositOnBackend(idToken, reservation.id);
+              const updated = await forfeitBuyerDepositOnBackend(idToken, reservation.id);
               Alert.alert('Xong', 'Cọc đã chuyển cho người bán.');
-              loadOrders({ refresh: true, nextPage: 1 });
+              syncListAfterMutation(updated, reservation.id);
             } catch (actionError) {
               Alert.alert('Lỗi', actionError.message || 'Không xử lý được mất cọc.');
             }
@@ -441,20 +445,26 @@ function BuyerOrdersContent({
       (item.canCancel === true ||
         item.status === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION ||
         (item.status === RESERVATION_STATUS.WAITING_PICKUP && !pastPickup));
-    const canScanShopQr =
+    const canShowPickupQr =
       isHolding &&
-      (item.canScanShopQr === true ||
-        item.canConfirmReceived === true ||
-        (item.status === RESERVATION_STATUS.WAITING_PICKUP && !pastPickup));
-    const canReport =
-      canShowDepositActions &&
+      (item.canShowPickupQr === true ||
+        item.status === RESERVATION_STATUS.WAITING_PICKUP);
+    const isCompletedTab = activeTab === RESERVATION_TAB.COMPLETED;
+    const canReportRaw =
       !item.disputeByBuyer &&
       (item.canComplaint === true ||
         item.canReportShop === true ||
+        (isDeliveredReservationStatus(item.status) &&
+          isWithinDepositDecisionWindow(item, currentTime)) ||
         (item.status === RESERVATION_STATUS.WAITING_PICKUP &&
           pastPickup &&
-          isWithinDepositDecisionWindow(item)) ||
+          isWithinDepositDecisionWindow(item, currentTime)) ||
         item.status === RESERVATION_STATUS.DISPUTED);
+    const canReport =
+      canReportRaw &&
+      !isDepositAlreadySettled(item) &&
+      (item.status === RESERVATION_STATUS.DISPUTED ||
+        isWithinDepositDecisionWindow(item, currentTime));
     const canForfeitDeposit =
       canShowDepositActions &&
       !item.disputeByBuyer &&
@@ -462,12 +472,15 @@ function BuyerOrdersContent({
         ((item.status === RESERVATION_STATUS.WAITING_PICKUP ||
           item.status === RESERVATION_STATUS.DISPUTED) &&
           pastPickup &&
-          isWithinDepositDecisionWindow(item) &&
+          isWithinDepositDecisionWindow(item, currentTime) &&
           !isDepositAlreadySettled(item)));
-    const isCompletedTab = activeTab === RESERVATION_TAB.COMPLETED;
     const storeName = pickStoreName(item.storeName, item.shopUsername, item.shop?.shopName);
     const productName = item.product?.productName || 'Sản phẩm';
-    const canReview = isCompletedTab && canShowReviewButton(item, reviewedOrderCodes);
+    const canReview =
+      isCompletedTab &&
+      item.canReview !== false &&
+      isDeliveredReservationStatus(item.status) &&
+      canShowReviewButton(item, reviewedOrderCodes);
     const canViewReview =
       isCompletedTab && canViewExistingReview(item, reviewsByOrderId);
     const existingReview = canViewReview
@@ -528,11 +541,21 @@ function BuyerOrdersContent({
               priceRowMeta
             >
               {item.pickupTime ? (
-                <Text style={styles.infoLinePickup}>
-                  Giờ nhận hàng: {formatOrderTime(item.pickupTime)}
+                <Text
+                  style={
+                    isCompletedTab ? styles.infoLinePickupCompletedList : styles.infoLinePickup
+                  }
+                >
+                  Thời gian nhận: {formatOrderTime(item.pickupTime)}
                 </Text>
               ) : (
-                <Text style={styles.infoLinePickup}>Giữ: {formatOrderTime(item.createdAt)}</Text>
+                <Text
+                  style={
+                    isCompletedTab ? styles.infoLinePickupCompletedList : styles.infoLinePickup
+                  }
+                >
+                  Giữ: {formatOrderTime(item.createdAt)}
+                </Text>
               )}
               {item.status === RESERVATION_STATUS.WAITING_PICKUP &&
               pastPickup &&
@@ -576,9 +599,9 @@ function BuyerOrdersContent({
             </Pressable>
             <Pressable
               style={[styles.actionButton, styles.actionButtonFlex]}
-              onPress={() => handleConfirmReceived(item)}
+              onPress={() => handleShowPickupQr(item)}
             >
-              <Text style={styles.actionButtonText}>Quét mã shop</Text>
+              <Text style={styles.actionButtonText}>Mã QR nhận hàng</Text>
             </Pressable>
           </View>
         ) : (
@@ -596,12 +619,12 @@ function BuyerOrdersContent({
             </Pressable>
           ) : null}
 
-          {canScanShopQr ? (
+          {canShowPickupQr ? (
             <Pressable
               style={[styles.actionButton, styles.actionButtonFlex]}
-              onPress={() => handleConfirmReceived(item)}
+              onPress={() => handleShowPickupQr(item)}
             >
-              <Text style={styles.actionButtonText}>Quét mã Shop</Text>
+              <Text style={styles.actionButtonText}>Mã QR nhận hàng</Text>
             </Pressable>
           ) : null}
 
@@ -616,11 +639,16 @@ function BuyerOrdersContent({
         </View>
         )}
 
-        {!showHoldingPrimaryActions && (canReport || canForfeitDeposit) ? (
+        {!showHoldingPrimaryActions &&
+        (canForfeitDeposit || (canReport && !isCompletedTab)) ? (
           <View style={styles.holdingActionRow}>
             {canReport ? (
               <Pressable
-                style={[styles.actionButton, styles.actionButtonDanger, styles.actionButtonFlex]}
+                style={[
+                  styles.actionButton,
+                  styles.actionButtonDanger,
+                  styles.actionButtonFlex,
+                ]}
                 onPress={() => handleReportShop(item)}
               >
                 <Text style={styles.actionButtonTextDanger}>Khiếu nại</Text>
@@ -637,23 +665,44 @@ function BuyerOrdersContent({
           </View>
         ) : null}
 
-        {canReview ? (
-          <Pressable
-            style={styles.reviewOrderButton}
-            onPress={() =>
-              onReviewStore?.({
-                shopId: item.shopId ? String(item.shopId) : '',
-                storeId: item.shopId ? String(item.shopId) : '',
-                storeName,
-                productId: item.product?.id ? String(item.product.id) : '',
-                productName,
-                reservationId: item.id ? String(item.id) : '',
-                orderCode: item.id ? String(item.id) : '',
-              })
-            }
-          >
-            <Text style={styles.reviewOrderButtonText}>Đánh giá đơn đã nhận</Text>
-          </Pressable>
+        {isCompletedTab && (canReport || canReview) ? (
+          <View style={styles.holdingActionRow}>
+            {canReport ? (
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.actionButtonDisputeSolid,
+                  styles.actionButtonFlex,
+                  canReview ? null : styles.actionButtonFull,
+                ]}
+                onPress={() => handleReportShop(item)}
+              >
+                <Text style={styles.actionButtonTextLight}>Khiếu nại</Text>
+              </Pressable>
+            ) : null}
+            {canReview ? (
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.actionButtonFlex,
+                  canReport ? null : styles.actionButtonFull,
+                ]}
+                onPress={() =>
+                  onReviewStore?.({
+                    shopId: item.shopId ? String(item.shopId) : '',
+                    storeId: item.shopId ? String(item.shopId) : '',
+                    storeName,
+                    productId: item.product?.id ? String(item.product.id) : '',
+                    productName,
+                    reservationId: item.id ? String(item.id) : '',
+                    orderCode: item.id ? String(item.id) : '',
+                  })
+                }
+              >
+                <Text style={styles.actionButtonText}>Đánh giá</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
 
         {canViewReview ? (
@@ -678,17 +727,8 @@ function BuyerOrdersContent({
 
   return (
     <View style={styles.contentWrap}>
-      <View style={styles.searchRow}>
-        <ClearableSearchField
-          value={searchInput}
-          onChangeText={setSearchInput}
-          placeholder="Tìm sản phẩm, cửa hàng..."
-          style={styles.searchFieldWrap}
-        />
-      </View>
-
       <FlatList
-        data={items}
+        data={visibleItems}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={[styles.listContent, { paddingBottom: listPaddingBottom }]}
         renderItem={renderReservationItem}
@@ -700,9 +740,9 @@ function BuyerOrdersContent({
           />
         }
         ListFooterComponent={
-          items.length > 0 ? (
+          visibleItems.length > 0 ? (
             <LoadMoreButton
-              currentCount={items.length}
+              currentCount={visibleItems.length}
               totalCount={
                 hasMore ? Math.max(totalCount, items.length + DEFAULT_PAGE_SIZE) : items.length
               }
@@ -717,7 +757,9 @@ function BuyerOrdersContent({
           ) : (
             <OrderTabEmptyState
               message={
-                search.trim() ? ORDER_TAB_SEARCH_EMPTY_MESSAGE : ORDER_TAB_EMPTY_MESSAGE
+                isOrderSearchActive(searchInput)
+                  ? ORDER_TAB_SEARCH_EMPTY_MESSAGE
+                  : ORDER_TAB_EMPTY_MESSAGE
               }
             />
           )
@@ -736,6 +778,7 @@ function BuyerOrdersContent({
 
 function resolveInitialTab(tab) {
   if (
+    tab === RESERVATION_TAB.ALL ||
     tab === RESERVATION_TAB.PENDING ||
     tab === RESERVATION_TAB.HOLDING ||
     tab === RESERVATION_TAB.DISPUTE ||
@@ -777,21 +820,38 @@ export default function BuyerOrdersScreen({
   const [listRefreshKey, setListRefreshKey] = useState(0);
   const [detailTarget, setDetailTarget] = useState(null);
   const [detailNestedNav, setDetailNestedNav] = useState(null);
-  const [scanTarget, setScanTarget] = useState(null);
+  const [pickupQrTarget, setPickupQrTarget] = useState(null);
   const [reviewsRefreshKey, setReviewsRefreshKey] = useState(0);
   const [orderReviewPatches, setOrderReviewPatches] = useState({});
   const lastTabRequestKeyRef = useRef(0);
   const wasOrdersActiveRef = useRef(isScreenActive);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const { reviewedOrderCodes, reviewsByOrderId, markReviewed, unmarkReviewed } =
     useReviewedOrderCodes(reviewsRefreshKey);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (isScreenActive) {
+      return;
+    }
+    setSearchInput('');
+    setSearch('');
+  }, [isScreenActive]);
 
   useEffect(() => {
     setOrderReviewPatches({});
   }, [listRefreshKey, activeTab]);
 
   useEffect(() => {
-    onNavigationStateChange?.(Boolean(isScreenActive && (detailTarget || scanTarget)));
-  }, [detailTarget, isScreenActive, scanTarget, onNavigationStateChange]);
+    onNavigationStateChange?.(Boolean(isScreenActive && (detailTarget || pickupQrTarget)));
+  }, [detailTarget, isScreenActive, pickupQrTarget, onNavigationStateChange]);
 
   useEffect(() => {
     const wasActive = wasOrdersActiveRef.current;
@@ -805,7 +865,7 @@ export default function BuyerOrdersScreen({
       }
       onActiveTabChange?.(defaultTab);
       setDetailTarget(null);
-      setScanTarget(null);
+      setPickupQrTarget(null);
       setReviewTarget(null);
       setViewReviewTarget(null);
       return;
@@ -843,6 +903,9 @@ export default function BuyerOrdersScreen({
     <>
       <BuyerOrdersContent
         activeTab={activeTab}
+        searchInput={searchInput}
+        setSearchInput={setSearchInput}
+        search={search}
         onNavigatePickup={onNavigatePickup}
         onReviewStore={(target) => {
           setReviewTarget(target);
@@ -861,13 +924,12 @@ export default function BuyerOrdersScreen({
             fromTab: activeTab,
           })
         }
-        onOpenShopScan={(item) => setScanTarget(normalizeOrderItem(item))}
+        onOpenShopScan={(item) => setPickupQrTarget(normalizeOrderItem(item))}
         reviewedOrderCodes={reviewedOrderCodes}
         reviewsByOrderId={reviewsByOrderId}
         orderReviewPatches={orderReviewPatches}
         refreshKey={listRefreshKey}
         embedded={embedded}
-        isScreenActive={isScreenActive}
       />
       <ShopReviewModal
         visible={Boolean(reviewTarget)}
@@ -962,19 +1024,13 @@ export default function BuyerOrdersScreen({
     </>
   );
 
-  if (scanTarget) {
+  if (pickupQrTarget) {
     return (
       <View style={styles.screen}>
-        <BuyerShopQrScanScreen
-          reservationId={String(scanTarget.id || '')}
-          expectedShopId={String(scanTarget.shopId || '')}
-          storeName={scanTarget.storeName || ''}
-          onBack={() => setScanTarget(null)}
-          onCompleted={() => {
-            setScanTarget(null);
-            setDetailTarget(null);
-            setListRefreshKey((value) => value + 1);
-          }}
+        <BuyerPickupQrDisplayScreen
+          reservation={pickupQrTarget}
+          onBack={() => setPickupQrTarget(null)}
+          onReservationUpdated={setPickupQrTarget}
         />
       </View>
     );
@@ -1052,7 +1108,7 @@ export default function BuyerOrdersScreen({
           }}
           onOpenShopScan={(item) => {
             setDetailTarget(null);
-            setScanTarget(normalizeOrderItem(item || detailTarget.item));
+            setPickupQrTarget(normalizeOrderItem(item || detailTarget.item));
           }}
           onNavigatePickup={(payload) => {
             setDetailTarget(null);
@@ -1088,6 +1144,14 @@ export default function BuyerOrdersScreen({
   return (
     <View style={styles.screen}>
       <SubScreenHeader title="Đơn hàng" onBack={onBack} />
+      <View style={styles.searchRow}>
+        <ClearableSearchField
+          value={searchInput}
+          onChangeText={setSearchInput}
+          placeholder="Tìm mã đơn hoặc tên sản phẩm..."
+          style={styles.searchFieldWrap}
+        />
+      </View>
       {tabBar}
       <View style={styles.body}>{body}</View>
     </View>
@@ -1217,6 +1281,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 4,
   },
+  infoLinePickupCompletedList: {
+    color: '#0f172a',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
+  },
   infoLineMuted: {
     color: '#94a3b8',
     fontSize: 12,
@@ -1319,7 +1389,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0f2f1',
   },
   actionButtonDanger: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#DC2626',
+  },
+  actionButtonDisputeSolid: {
+    backgroundColor: '#DC2626',
+  },
+  actionButtonFull: {
+    flex: 1,
+    width: '100%',
   },
   actionButtonPressed: {
     opacity: 0.85,
@@ -1330,9 +1407,30 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   actionButtonTextDanger: {
-    color: '#b91c1c',
+    color: '#ffffff',
     fontSize: 13,
     fontWeight: '900',
+  },
+  actionButtonStacked: {
+    paddingVertical: 8,
+    gap: 3,
+  },
+  actionButtonSubtitleDanger: {
+    color: '#076F32',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  actionButtonTextLight: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  actionButtonSubtitleLight: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   actionButtonTextSecondary: {
     color: '#076F32',

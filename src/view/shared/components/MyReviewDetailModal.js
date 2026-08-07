@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { getMyReviewsOnBackend } from '../../../api/reviewApi';
 import { getCurrentUserIdToken } from '../../../repository/authRepository';
 import StarRating from '../../store/components/StarRating';
-import { BOTTOM_SHEET_BORDER, BottomSheetDismissOverlay, BottomSheetHandle, BottomSheetPanel } from './bottomSheetChrome';
+import { BottomSheetDismissOverlay, BottomSheetHandle } from './bottomSheetChrome';
+import { FormSheetHeader, FormSheetShell, FORM_SHEET_SCROLL_STYLE } from './formSheetLayout';
 
 function formatDateTime(iso) {
   if (!iso) return '';
@@ -40,8 +40,6 @@ export default function MyReviewDetailModal({
   onClose,
   onDelete,
 }) {
-  const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, 12);
   const [resolvedReview, setResolvedReview] = useState(review);
 
   useEffect(() => {
@@ -111,27 +109,28 @@ export default function MyReviewDetailModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <BottomSheetDismissOverlay onClose={onClose}>
-        <BottomSheetPanel style={[styles.sheet, { paddingBottom: bottomInset }]}>
+        <FormSheetShell panelStyle={styles.sheet}>
           <BottomSheetHandle />
-          <View style={styles.header}>
-            <Text style={styles.title}>Đánh giá của bạn</Text>
-            {displayReview.id ? (
-              <Pressable
-                onPress={handleMenuPress}
-                style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
-                accessibilityRole="button"
-                accessibilityLabel="Gỡ bỏ đánh giá"
-                hitSlop={8}
-              >
-                <Ionicons name="ellipsis-vertical" size={18} color="#0f172a" />
-              </Pressable>
-            ) : (
-              <View style={styles.menuBtnSpacer} />
-            )}
-          </View>
+          <FormSheetHeader
+            title="Đánh giá của bạn"
+            onClose={onClose}
+            rightSlot={
+              displayReview.id ? (
+                <Pressable
+                  onPress={handleMenuPress}
+                  style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Gỡ bỏ đánh giá"
+                  hitSlop={8}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color="#0f172a" />
+                </Pressable>
+              ) : null
+            }
+          />
 
           <ScrollView
-            style={styles.body}
+            style={FORM_SHEET_SCROLL_STYLE}
             contentContainerStyle={styles.bodyContent}
             showsVerticalScrollIndicator={false}
           >
@@ -161,11 +160,7 @@ export default function MyReviewDetailModal({
               ) : null}
             </View>
           </ScrollView>
-
-          <Pressable style={styles.closeBtn} onPress={onClose}>
-            <Text style={styles.closeBtnText}>Đóng</Text>
-          </Pressable>
-        </BottomSheetPanel>
+        </FormSheetShell>
       </BottomSheetDismissOverlay>
     </Modal>
   );
@@ -173,29 +168,13 @@ export default function MyReviewDetailModal({
 
 const styles = StyleSheet.create({
   sheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    ...BOTTOM_SHEET_BORDER,
     paddingHorizontal: 16,
     paddingTop: 10,
-    maxHeight: '78%',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
   },
   menuBtn: {
     width: 36,
@@ -205,14 +184,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#f1f5f9',
   },
-  menuBtnSpacer: {
-    width: 36,
-    height: 36,
-  },
   pressed: { opacity: 0.75 },
-  body: {
-    flexGrow: 0,
-  },
   bodyContent: {
     paddingBottom: 8,
   },
@@ -258,20 +230,5 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 10,
     backgroundColor: '#e2e8f0',
-  },
-  closeBtn: {
-    marginTop: 12,
-    minHeight: 46,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#e2e8f0',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  closeBtnText: {
-    color: '#334155',
-    fontSize: 14,
-    fontWeight: '800',
   },
 });

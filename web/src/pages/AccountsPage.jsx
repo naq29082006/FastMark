@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, Lock, ShoppingCart, Store, Unlock, UserCheck, Users, UserX } from 'lucide-react';
+import { Eye, Lock, ShoppingCart, Unlock, UserCheck, Users, UserX } from 'lucide-react';
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 
 import {
   blockAccount,
@@ -378,7 +379,7 @@ export default function AccountsPage() {
       stats={[
         { label: 'Tổng người dùng', value: loading ? '…' : totalUsers, icon: Users, tone: 'green' },
         { label: 'Người mua (trang)', value: loading ? '…' : buyers, icon: ShoppingCart, tone: 'blue' },
-        { label: 'Có gian hàng', value: loading ? '…' : sellerCount, icon: Store, tone: 'amber' },
+        { label: 'Có gian hàng', value: loading ? '…' : sellerCount, icon: FastMarkShopPinIcon, tone: 'amber' },
         { label: 'Đang hoạt động', value: loading ? '…' : activeCount, icon: UserCheck, tone: 'green' },
         { label: 'Bị khóa', value: loading ? '…' : lockedCount, icon: UserX, tone: 'red' },
       ]}

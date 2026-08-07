@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const { USER_ROLE } = require("../constants");
-const { createNotification } = require("./notificationService");
+const { createNotificationsBulk } = require("./notificationService");
 const { NOTIFICATION_AUDIENCE, NOTIFICATION_INDEX } = require("../constants");
 const { applyCreatedAtRange } = require("../utils/dateRangeFilter");
 
@@ -61,6 +61,17 @@ function getAudienceLabel(audience) {
   }
 }
 
+async function runBroadcastBulk(recipientIds, payload) {
+  try {
+    const inAppCount = await createNotificationsBulk(recipientIds, payload);
+    console.log(
+      `[admin-broadcast] inserted=${inAppCount} audience=${payload.audience} recipients=${recipientIds.length}`
+    );
+  } catch (error) {
+    console.error("[admin-broadcast] bulk insert failed:", error?.message || error);
+  }
+}
+
 async function sendSystemNotification(adminUser, { title, content, audience = AUDIENCE.ALL } = {}) {
   const normalizedTitle = pickString(title);
   const normalizedContent = pickString(content);
@@ -86,29 +97,29 @@ async function sendSystemNotification(adminUser, { title, content, audience = AU
     throw createServiceError("Không tìm thấy người dùng phù hợp để gửi thông báo.", 404);
   }
 
-  let inAppCount = 0;
-  await Promise.all(
-    recipients.map(async (user) => {
-      const created = await createNotification(user._id, {
-        title: normalizedTitle,
-        content: normalizedContent,
-        audience: mapSystemAudienceToNotificationAudience(normalizedAudience),
-        index: NOTIFICATION_INDEX.SYSTEM,
-        isAdminBroadcast: true,
-      });
-      if (created) {
-        inAppCount += 1;
-      }
-    })
-  );
+  const recipientIds = recipients.map((user) => user._id);
+  const notificationAudience = mapSystemAudienceToNotificationAudience(normalizedAudience);
+  const bulkPayload = {
+    title: normalizedTitle,
+    content: normalizedContent,
+    audience: notificationAudience,
+    index: NOTIFICATION_INDEX.SYSTEM,
+    isAdminBroadcast: true,
+  };
+
+  // Trả response ngay — ghi DB hàng loạt nền (không socket/FCM từng user).
+  setImmediate(() => {
+    runBroadcastBulk(recipientIds, bulkPayload);
+  });
 
   return {
     audience: normalizedAudience,
     audienceLabel: getAudienceLabel(normalizedAudience),
     title: normalizedTitle,
     content: normalizedContent,
-    recipientCount: recipients.length,
-    inAppCount,
+    recipientCount: recipientIds.length,
+    inAppCount: recipientIds.length,
+    status: "queued",
     sentBy: {
       id: String(adminUser._id),
       fullName: adminUser.FullName || "",
@@ -150,13 +161,10 @@ async function listBroadcastHistory({ page = 1, limit = 20, from = "", to = "" }
     { $sort: { sentAt: -1 } },
     {
       $facet: {
-        items: [
-          { $skip: (currentPage - 1) * pageSize },
-          { $limit: pageSize },
-        ],
+        items: [{ $skip: (currentPage - 1) * pageSize }, { $limit: pageSize }],
         total: [{ $count: "count" }],
       },
-    },
+    }
   );
 
   const rows = await Notification.aggregate(pipeline);

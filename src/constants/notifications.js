@@ -68,3 +68,14 @@ export function filterNotificationsByTab(items, tabKey) {
   }
   return list.filter((item) => resolveNotificationIndex(item) === tab.index);
 }
+
+export function notificationMatchesTab(item, tabKey) {
+  if (tabKey === NOTIFICATION_TAB.ALL) {
+    return true;
+  }
+  const tab = NOTIFICATION_TABS.find((entry) => entry.key === tabKey);
+  if (!tab?.index) {
+    return true;
+  }
+  return resolveNotificationIndex(item) === tab.index;
+}

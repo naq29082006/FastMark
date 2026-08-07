@@ -76,8 +76,12 @@ export function mergeListById(current = [], incoming = [], resolveKey = getItemI
   return changed ? next : currentList;
 }
 
-/** Thay item cũ tại đúng vị trí, hoặc chèn item mới nếu chưa có. */
-export function upsertById(current = [], item, { position = 'start' } = {}) {
+/** Thay item cũ, hoặc chèn mới; có thể đưa item lên đầu khi cập nhật (realtime đơn hàng). */
+export function upsertById(
+  current = [],
+  item,
+  { position = 'start', moveToStartOnUpdate = false } = {}
+) {
   const list = Array.isArray(current) ? current : [];
   const id = getItemId(item);
   if (!id) {
@@ -86,7 +90,26 @@ export function upsertById(current = [], item, { position = 'start' } = {}) {
 
   const index = list.findIndex((row) => getItemId(row) === id);
   if (index >= 0) {
-    if (isSameData(list[index], item)) {
+    const sameAtIndex = isSameData(list[index], item);
+    if (sameAtIndex && !moveToStartOnUpdate) {
+      return list;
+    }
+    if (sameAtIndex && moveToStartOnUpdate && index === 0) {
+      return list;
+    }
+
+    if (moveToStartOnUpdate) {
+      const next = list.slice();
+      next.splice(index, 1);
+      if (position === 'end') {
+        next.push(item);
+      } else {
+        next.unshift(item);
+      }
+      return next;
+    }
+
+    if (sameAtIndex) {
       return list;
     }
     const next = list.slice();

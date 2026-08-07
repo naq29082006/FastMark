@@ -27,6 +27,8 @@ const RESERVATION_CANCEL_REASON = {
   SELLER_REPORT_BUYER_NO_SHOW: "seller_report_buyer_no_show",
   /** Cả hai báo cáo — chờ admin. */
   DISPUTE_BOTH_REPORTED: "dispute_both_reported",
+  /** Buyer khiếu nại sau khi đã nhận hàng (hàng thiếu, hỏng…). */
+  BUYER_POST_DELIVERY_COMPLAINT: "buyer_post_delivery_complaint",
   /** Quá 24h sau giờ nhận, không ai báo cáo. */
   PICKUP_TIMEOUT: "pickup_timeout",
   /** Admin: buyer thắng tranh chấp. */
@@ -51,7 +53,7 @@ const RESERVATION_CANCEL_REASON = {
   SELLER_REFUND_AFTER_PICKUP: "seller_refund_after_pickup",
 };
 
-/** Mã lý do tranh chấp (disputeReason trên Reservation / Report). */
+/** Mã lý do tranh chấp (ReservationDispute.reason / Report). */
 const RESERVATION_DISPUTE_REASON_CODE = {
   SELLER_ABSENT: "seller_absent",
   SHOP_CLOSED: "shop_closed",
@@ -102,6 +104,10 @@ const CANCEL_REASON_VIEW_LABELS = {
   [RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED]: {
     buyer: "Đang tranh chấp",
     seller: "Đang tranh chấp",
+  },
+  [RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT]: {
+    buyer: "Đã gửi khiếu nại sau nhận hàng",
+    seller: "Khách khiếu nại sau nhận hàng",
   },
   [RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT]: {
     buyer:
@@ -204,9 +210,11 @@ function wasCancelledAfterPickup(reservation) {
 /** Map tab API → status filter. */
 const RESERVATION_TAB_STATUS_MAP = {
   pending: [0],
+  /** Chỉ đơn đang chờ khách nhận (xác nhận xong → 2). */
   holding: [2],
   dispute: [4],
   completed: [3, 5],
+  /** Legacy từ chối/hủy (1), hủy chuẩn (6), resolved (7). */
   cancelled: [1, 6, 7],
   all: null,
 };

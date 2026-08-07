@@ -1,6 +1,6 @@
 const ProductCategory = require("../models/ProductCategory");
 const { normalizeCategoryId, isValidCategoryId } = require("../utils/categoryId");
-const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService");
+const { normalizeEscrowProtectionDays } = require("../utils/escrowProtectionDays");
 
 const CATEGORY_SORT = { IsDeleted: -1, CreatedAt: 1, _id: 1 };
 
@@ -18,13 +18,20 @@ function resolveCategoryName(category) {
   return pickString(category?.name || category?.categoryName);
 }
 
+function resolveDisputeDays(category) {
+  if (category?.disputeDays != null) {
+    return normalizeEscrowProtectionDays(category.disputeDays);
+  }
+  return normalizeEscrowProtectionDays(undefined);
+}
+
 function toPublicCategory(category) {
   return {
     id: String(category._id),
     name: resolveCategoryName(category),
     categoryName: resolveCategoryName(category),
     description: category.description || "",
-    icon: pickString(category.icon),
+    disputeDays: resolveDisputeDays(category),
     isDeleted: Number(category.IsDeleted) === 0 ? 0 : 1,
     IsDeleted: Number(category.IsDeleted) === 0 ? 0 : 1,
     createdAt: category.CreatedAt,
@@ -65,7 +72,7 @@ async function getProductCategoryNameMap(categoryIds = []) {
   }
 
   const categories = await ProductCategory.find({ _id: { $in: uniqueIds } })
-    .select("name categoryName icon")
+    .select("name categoryName")
     .lean();
 
   return new Map(
@@ -73,7 +80,7 @@ async function getProductCategoryNameMap(categoryIds = []) {
   );
 }
 
-async function createCategory({ name, description, icon }) {
+async function createCategory({ name, description, disputeDays }) {
   const categoryName = pickString(name);
   if (!categoryName) {
     throw createServiceError("Vui lòng nhập tên danh mục.");
@@ -87,8 +94,8 @@ async function createCategory({ name, description, icon }) {
       existing.name = categoryName;
       existing.categoryName = categoryName;
       existing.description = pickString(description);
-      if (icon !== undefined) {
-        existing.icon = pickString(icon);
+      if (disputeDays !== undefined) {
+        existing.disputeDays = normalizeEscrowProtectionDays(disputeDays);
       }
       existing.IsDeleted = 1;
       existing.UpdatedAt = new Date();
@@ -102,14 +109,14 @@ async function createCategory({ name, description, icon }) {
     name: categoryName,
     categoryName,
     description: pickString(description),
-    icon: pickString(icon),
+    disputeDays: normalizeEscrowProtectionDays(disputeDays),
     IsDeleted: 1,
   });
 
   return { category: toPublicCategory(category), restored: false };
 }
 
-async function updateCategory(categoryId, { name, description, icon }) {
+async function updateCategory(categoryId, { name, description, disputeDays }) {
   const category = await ProductCategory.findById(categoryId);
   if (!category) {
     throw createServiceError("Không tìm thấy danh mục.", 404);
@@ -131,8 +138,8 @@ async function updateCategory(categoryId, { name, description, icon }) {
   category.name = categoryName;
   category.categoryName = categoryName;
   category.description = pickString(description);
-  if (icon !== undefined) {
-    category.icon = pickString(icon);
+  if (disputeDays !== undefined) {
+    category.disputeDays = normalizeEscrowProtectionDays(disputeDays);
   }
   category.UpdatedAt = new Date();
   await category.save();
@@ -170,23 +177,16 @@ async function restoreCategory(categoryId) {
   return toPublicCategory(category);
 }
 
-async function uploadCategoryIcon({ file, categoryId }) {
-  if (!file?.buffer?.length) {
-    throw createServiceError("Vui lòng chọn ảnh icon.", 400);
+async function resolveDisputeDaysForCategoryId(categoryId) {
+  const id = normalizeCategoryId(categoryId);
+  if (!isValidCategoryId(id)) {
+    return null;
   }
-
-  const extension = resolveFileExtension(file.mimetype, file.originalname);
-  const folder = categoryId ? `categories/products/${categoryId}` : "categories/products/temp";
-  const fileName = `icon-${Date.now()}.${extension}`;
-
-  const uploaded = await uploadImageToSupabase({
-    buffer: file.buffer,
-    mimeType: file.mimetype,
-    folder,
-    fileName,
-  });
-
-  return { icon: uploaded.publicUrl };
+  const category = await ProductCategory.findById(id).select("disputeDays").lean();
+  if (!category) {
+    return null;
+  }
+  return resolveDisputeDays(category);
 }
 
 module.exports = {
@@ -197,5 +197,6 @@ module.exports = {
   updateCategory,
   deleteCategory,
   restoreCategory,
-  uploadCategoryIcon,
+  resolveDisputeDaysForCategoryId,
+  resolveDisputeDays,
 };

@@ -248,7 +248,7 @@ export default function ShopDetailPage() {
     return (
       <div className="page shop-detail-page shop-detail-page-v2">
         <p className="error-banner">{error || 'Không tìm thấy gian hàng.'}</p>
-        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/shops')}>
+        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/sellers')}>
           ← Quay lại
         </button>
       </div>
@@ -335,7 +335,7 @@ export default function ShopDetailPage() {
   return (
     <div className="admin-detail-page shop-detail-page shop-detail-page-v2">
       <header className="admin-detail-toolbar">
-        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/shops')}>
+        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/sellers')}>
           ← Quay lại
         </button>
         <div className="header-actions">
@@ -518,6 +518,11 @@ export default function ShopDetailPage() {
                           <VerifyDocCard
                             label="Selfie"
                             url={shop.verification?.selfieImage}
+                            onPreview={setPreviewImage}
+                          />
+                          <VerifyDocCard
+                            label="Giấy tờ kinh doanh"
+                            url={shop.verification?.businessImage}
                             onPreview={setPreviewImage}
                           />
                         </div>

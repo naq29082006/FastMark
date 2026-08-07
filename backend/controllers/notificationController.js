@@ -21,10 +21,12 @@ function resolveAudience(req) {
 
 exports.listMyNotifications = async (req, res) => {
   const audience = resolveAudience(req);
+  const tab = String(req.query.tab || "all").trim().toLowerCase();
   const data = await listNotificationsForUser(req.currentUser._id, {
     page: req.query.page,
     limit: req.query.limit,
     audience,
+    tab,
   });
 
   return success(res, { data });

@@ -141,19 +141,14 @@ const MODEL_META = {
   },
   Product: {
     collection: "products",
-    desc: "Sản phẩm của shop (có khuyến mãi theo % giảm giá).",
+    desc: "Sản phẩm của shop (có khuyến mãi theo % giảm giá). Gallery ảnh trong images[] (tối đa 5).",
     relations:
-      "N-1 → ShopProfile, ProductCategory; 1-N → ProductVariant, ProductImage, FavoriteProduct, Review.",
+      "N-1 → ShopProfile, ProductCategory; 1-N → ProductVariant, FavoriteProduct, Review.",
   },
   ProductVariant: {
     collection: "productvariants",
     desc: "Biến thể sản phẩm (tên phân loại, giá, tồn kho).",
     relations: "N-1 → Product; 1-N → Reservation.",
-  },
-  ProductImage: {
-    collection: "productimages",
-    desc: "Ảnh gallery của sản phẩm (Stt sắp xếp).",
-    relations: "N-1 → Product.",
   },
   FavoriteProduct: {
     collection: "favoriteproducts",
@@ -169,22 +164,17 @@ const MODEL_META = {
     collection: "reservations",
     desc: "Đơn giữ hàng / nhận sau; cọc escrow qua SystemWallet.",
     relations:
-      "N-1 → User, ShopProfile, Product, ProductVariant; 1-N → Report, ReservationAuditLog, WalletTransaction.",
+      "N-1 → User, ShopProfile, Product, ProductVariant; 1-0..1 ReservationDispute; 1-N → WalletTransaction.",
   },
-  ReservationAuditLog: {
-    collection: "reservationauditlogs",
-    desc: "Nhật ký admin xử lý tranh chấp đơn giữ hàng.",
-    relations: "N-1 → Reservation; N-1 → User (admin).",
+  ReservationDispute: {
+    collection: "reservationdisputes",
+    desc: "Tranh chấp 1 đơn: buyerUserId + sellerShopId (ShopProfile), auditLogs[]. Không lưu GPS.",
+    relations: "N-1 → Reservation (unique); buyer/seller complaint embed.",
   },
   Review: {
     collection: "reviews",
-    desc: "Đánh giá sản phẩm / gian hàng sau đơn hoàn thành.",
-    relations: "N-1 → User, Product, ShopProfile, Reservation; 1-N → ReviewImage.",
-  },
-  ReviewImage: {
-    collection: "reviewimages",
-    desc: "Ảnh đính kèm đánh giá.",
-    relations: "N-1 → Review.",
+    desc: "Đánh giá sản phẩm / gian hàng sau đơn hoàn thành. Ảnh đính kèm trong images[] (tối đa 5).",
+    relations: "N-1 → User, Product, ShopProfile, Reservation.",
   },
   Conversation: {
     collection: "conversations",
@@ -204,14 +194,8 @@ const MODEL_META = {
   },
   Report: {
     collection: "reports",
-    desc: "Báo cáo nội dung hoặc khiếu nại giữ hàng (có GPS + ảnh).",
-    relations:
-      "N-1 → User (reporter); optional → User/Shop/Product/Reservation; 1-N → ReportImage.",
-  },
-  ReportImage: {
-    collection: "reportimages",
-    desc: "Ảnh chứng cứ đính kèm báo cáo (tối đa 5/report tranh chấp).",
-    relations: "N-1 → Report.",
+    desc: "Báo cáo nội dung (review/shop/product) hoặc khiếu nại khóa tài khoản.",
+    relations: "N-1 → User (reporter); optional → User/Shop/Product.",
   },
 };
 
@@ -523,18 +507,15 @@ function extractModels() {
     "ProductCategory",
     "Product",
     "ProductVariant",
-    "ProductImage",
     "FavoriteProduct",
     "Follow",
     "Reservation",
-    "ReservationAuditLog",
+    "ReservationDispute",
     "Review",
-    "ReviewImage",
     "Conversation",
     "Message",
     "Notification",
     "Report",
-    "ReportImage",
     "BannerPlan",
     "SellerBannerPlan",
   ];

@@ -1,10 +1,10 @@
 const mongoose = require("mongoose");
+const { embeddedImagesField } = require("../utils/embeddedImages");
 
 /**
  * Product — sản phẩm thuộc một gian hàng.
  */
-const ProductSchema = new mongoose.Schema({
-  // Gian hàng sở hữu sản phẩm (ref ShopProfile).
+const ProductSchema = new mongoose.Schema({  // Gian hàng sở hữu sản phẩm (ref ShopProfile).
   ShopId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopProfile", required: true, index: true },
   // Danh mục sản phẩm (ref ProductCategory).
   CategoryId: { type: mongoose.Schema.Types.ObjectId, ref: "ProductCategory", required: true, index: true },
@@ -16,7 +16,8 @@ const ProductSchema = new mongoose.Schema({
   // Đơn vị bán (kg, bó, hộp…).
   DonVi: { type: String, default: "", trim: true },
 
-  // Gallery ảnh: collection ProductImage (Stt; ảnh đầu = cover list).
+  // Gallery ảnh (URL, tối đa 5 — phần tử đầu = cover).
+  images: embeddedImagesField,
 
   // Số lượt xem.
   ViewCount: { type: Number, default: 0 },
@@ -50,12 +51,14 @@ const ProductSchema = new mongoose.Schema({
    */
   pinProduct: { type: Number, default: 0, min: 0, max: 2, index: true },
 
-  /** Admin gỡ sản phẩm vi phạm (xóa mềm — không hiện cho buyer/seller quản lý thường). */
-  IsDeleted: { type: Boolean, default: false, index: true },
+  /** Trạng thái xóa mềm: 1 = còn hiệu lực, 0 = đã gỡ. */
+  IsDeleted: { type: Number, default: 1, index: true },
+  /** Ai gỡ sản phẩm: admin | seller — chỉ có khi IsDeleted = 0. */
+  RemovedBy: { type: String, default: "", trim: true, index: true },
+  /** Lý do gỡ (bắt buộc khi RemovedBy = admin). */
   AdminRemovalReason: { type: String, default: "", trim: true },
-  AdminRemovedAt: { type: Date, default: null },
-  /** Seller tự gỡ sản phẩm — ẩn khỏi quản lý shop, admin vẫn có thể gỡ vi phạm. */
-  SellerRemovedAt: { type: Date, default: null, index: true },
+  /** Thời điểm gỡ (admin hoặc seller). */
+  RemovedAt: { type: Date, default: null },
 
   // Thời điểm tạo sản phẩm.
   CreatedAt: { type: Date, default: Date.now },

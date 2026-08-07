@@ -270,7 +270,7 @@ function enrichRoutes(routes) {
     createProductCategory: { desc: "Tạo DM SP", params: "Header: Bearer token (Admin); Body: { name }", result: '{ "success": true }' },
     updateProductCategory: { desc: "Sửa DM SP", params: "Header: Bearer token (Admin); Path: :id", result: '{ "success": true }' },
     deleteProductCategory: { desc: "Xóa DM SP", params: "Header: Bearer token (Admin); Path: :id", result: '{ "success": true }' },
-    uploadProductCategoryIcon: { desc: "Upload icon DM SP", params: "Header: Bearer token (Admin); multipart icon", result: '{ "success": true }' },
+    uploadShopCategoryIcon: { desc: "Upload icon DM shop", params: "Header: Bearer token (Admin); multipart icon", result: '{ "success": true }' },
     listShopCategories: { desc: "DM shop admin", params: "Header: Bearer token (Admin)", result: '{ "success": true, "data": [...] }' },
     createShopCategory: { desc: "Tạo DM shop", params: "Header: Bearer token (Admin)", result: '{ "success": true }' },
     updateShopCategory: { desc: "Sửa DM shop", params: "Header: Bearer token (Admin); Path: :id", result: '{ "success": true }' },

@@ -2,6 +2,7 @@ const ShopProfile = require("../models/ShopProfile");
 const Product = require("../models/Product");
 const { NOTIFICATION_AUDIENCE } = require("../constants");
 const { createNotification, NOTIFICATION_INDEX } = require("./notificationService");
+const { buildOrderCode } = require("../utils/pickupQr");
 
 async function resolveShop(reservation, shop = null) {
   if (shop?.userId) {
@@ -73,10 +74,33 @@ async function notifyAdminDisputeResolution(reservation, adminMessage, outcomeLa
   await notifyReservationBoth(reservation, { title, content });
 }
 
+/** Seller: cọc treo escrow đã giải phóng vào ví (sau hạn bảo vệ hoặc tương đương). */
+async function notifySellerDepositReleased(reservation, shop = null, { title, content } = {}) {
+  const resolvedShop = await resolveShop(reservation, shop);
+  if (!resolvedShop?.userId) {
+    return;
+  }
+  const productName = await resolveProductName(reservation);
+  const orderCode = buildOrderCode(reservation._id || reservation.id);
+  const amount = Math.max(0, Math.round(Number(reservation.depositAmount) || 0));
+  const amountLabel = amount > 0 ? `${amount.toLocaleString("vi-VN")}đ` : "cọc";
+
+  const resolvedTitle = String(title || "Tiền cọc đã về ví").trim();
+  const resolvedContent =
+    String(content || "").trim() ||
+    `Tiền ${amountLabel} của đơn ${orderCode || "giữ hàng"} (${productName}) đã chuyển vào ví gian hàng FastMark.`;
+
+  await notifyReservationSeller(reservation, resolvedShop, {
+    title: resolvedTitle,
+    content: resolvedContent,
+  });
+}
+
 module.exports = {
   notifyReservationBuyer,
   notifyReservationSeller,
   notifyReservationBoth,
   notifyAdminDisputeResolution,
+  notifySellerDepositReleased,
   resolveProductName,
 };

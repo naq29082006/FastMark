@@ -23,7 +23,6 @@ import {
 import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
 import {
   hasItemId,
-  mergeListById,
   removeById,
   upsertById,
 } from '../../core/utils/realtimeList';
@@ -183,7 +182,7 @@ export default function ReservationHistoryScreen({
       });
       const rows = (data?.reservations || []).map(toHistoryRow);
       setReservations((current) =>
-        nextPage === 1 ? mergeListById(current, rows) : appendUniqueById(current, rows)
+        nextPage === 1 ? rows : appendUniqueById(current, rows)
       );
       setPage(Number(data?.page) || nextPage);
       setHasMore(
@@ -221,17 +220,7 @@ export default function ReservationHistoryScreen({
       return;
     }
 
-    const stillPending =
-      Number(payload?.status) === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION;
     const isInList = hasItemId(reservationsRef.current, reservationId);
-
-    if (!stillPending) {
-      if (isInList) {
-        setReservations((current) => removeById(current, reservationId));
-        setTotalCount((current) => Math.max(0, current - 1));
-      }
-      return;
-    }
 
     try {
       const idToken = await getCurrentUserIdToken();
@@ -242,8 +231,23 @@ export default function ReservationHistoryScreen({
       if (!reservation?.id) {
         return;
       }
+
+      const stillPending =
+        Number(reservation.status) === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION;
+
+      if (!stillPending) {
+        if (isInList) {
+          setReservations((current) => removeById(current, reservationId));
+          setTotalCount((current) => Math.max(0, current - 1));
+        }
+        return;
+      }
+
       setReservations((current) =>
-        upsertById(current, toHistoryRow(reservation), { position: 'start' })
+        upsertById(current, toHistoryRow(reservation), {
+          position: 'start',
+          moveToStartOnUpdate: true,
+        })
       );
       if (!isInList) {
         setTotalCount((current) => current + 1);

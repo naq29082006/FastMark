@@ -18,6 +18,33 @@ const USER_STATUS = {
   ACTIVE: 1,
 };
 
+/** Catalog soft-delete / visibility: 1 = đang dùng, 0 = xóa mềm. */
+const RECORD_STATUS = {
+  HIDDEN: 0,
+  ACTIVE: 1,
+};
+
+function isRecordActive(value) {
+  if (value === true) {
+    return true;
+  }
+  if (value === false) {
+    return false;
+  }
+  return Number(value) === RECORD_STATUS.ACTIVE;
+}
+
+/** Mongo filter — hỗ trợ data cũ boolean true/false và string "1"/"0". */
+function activeRecordFilter(field = "isActive") {
+  const activeValues = [RECORD_STATUS.ACTIVE, true, "1"];
+  return {
+    $or: [
+      { $expr: { $in: [`$${field}`, activeValues] } },
+      { [field]: { $exists: false } },
+    ],
+  };
+}
+
 // ── Shop & product ───────────────────────────────────────────────────
 const SHOP_STATUS = {
   BLOCKED: 0,
@@ -34,51 +61,104 @@ const PRODUCT_STATUS = {
   ACTIVE: 1,
 };
 
+const PRODUCT_REMOVED_BY = {
+  ADMIN: "admin",
+  SELLER: "seller",
+};
+
+const REVIEW_REMOVED_BY = {
+  ADMIN: "admin",
+  BUYER: "buyer",
+};
+
 // ── Reservations ─────────────────────────────────────────────────────
 /**
- * Trạng thái đơn giữ hàng (escrow System Wallet).
- * Giữ nguyên mã số DB hiện có để không phá data / client cũ.
- *
- * Alias nghiệp vụ (cùng giá trị):
- * PENDING ≈ PENDING_SELLER_CONFIRMATION (0)
- * ACCEPTED / READY ≈ WAITING_PICKUP (2)
- * COMPLETED (3) | CANCELLED ≈ REJECTED (1) | DISPUTED (4)
- *
- * 0 PendingSellerConfirmation — chờ shop đồng ý
- * 1 Rejected — shop từ chối (đã hoàn cọc)
- * 2 WaitingPickup — đã đồng ý, chờ nhận hàng
- * 3 Completed — buyer xác nhận nhận hàng
- * 4 Disputed — có báo cáo sau giờ lấy
- * 5 AutoCompleted — hết hạn báo cáo, tự hoàn tất + release cọc
- * 6 Refunded — hoàn cọc (buyer hủy / admin buyer thắng)
+ * Reservation status:
+ * 0 Pending | 1 Confirmed | 2 WaitingPickup | 3 Received
+ * 4 Disputed | 5 Completed | 6 Cancelled
  */
 const RESERVATION_STATUS = {
-  PENDING_SELLER_CONFIRMATION: 0,
-  REJECTED: 1,
-  WAITING_PICKUP: 2,
-  COMPLETED: 3,
-  DISPUTED: 4,
-  AUTO_COMPLETED: 5,
-  REFUNDED: 6,
-  // Tranh chấp đã xử lý (đền cọc cho seller): đơn hủy, không phải bán thành công.
-  DISPUTE_RESOLVED: 7,
-  // Alias đọc spec / code mới (không đổi DB).
   PENDING: 0,
-  ACCEPTED: 2,
-  READY: 2,
-  CANCELLED: 1,
+  CONFIRMED: 1,
+  WAITING_PICKUP: 2,
+  RECEIVED: 3,
+  DISPUTED: 4,
+  COMPLETED: 5,
+  CANCELLED: 6,
+  /** @deprecated */ PENDING_SELLER_CONFIRMATION: 0,
+  /** @deprecated */ REJECTED: 6,
+  /** @deprecated */ DELIVERED_PENDING_DISPUTE: 3,
+  /** @deprecated */ AUTO_COMPLETED: 5,
+  /** @deprecated */ REFUNDED: 6,
+  /** @deprecated */ DISPUTE_RESOLVED: 6,
+  /** @deprecated */ ACCEPTED: 2,
+  /** @deprecated */ READY: 2,
 };
 
 const RESERVATION_STATUS_LABEL = {
-  [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION]: "Chờ shop xác nhận",
-  [RESERVATION_STATUS.REJECTED]: "Đã từ chối",
-  [RESERVATION_STATUS.WAITING_PICKUP]: "Chờ nhận hàng",
-  [RESERVATION_STATUS.COMPLETED]: "Hoàn thành",
+  [RESERVATION_STATUS.PENDING]: "Chờ xác nhận",
+  [RESERVATION_STATUS.CONFIRMED]: "Giữ hàng",
+  [RESERVATION_STATUS.WAITING_PICKUP]: "Giữ hàng",
+  [RESERVATION_STATUS.RECEIVED]: "Hoàn thành",
   [RESERVATION_STATUS.DISPUTED]: "Tranh chấp",
-  [RESERVATION_STATUS.AUTO_COMPLETED]: "Tự hoàn thành",
-  [RESERVATION_STATUS.REFUNDED]: "Đã hủy",
-  [RESERVATION_STATUS.DISPUTE_RESOLVED]: "Đã hủy",
+  [RESERVATION_STATUS.COMPLETED]: "Hoàn thành",
+  [RESERVATION_STATUS.CANCELLED]: "Đã hủy",
 };
+
+const DISPUTE_CREATED_BY = {
+  BUYER: 1,
+  SELLER: 2,
+};
+
+const DISPUTE_REASON_TYPE = {
+  SHOP_NOT_FOUND: 1,
+  SHOP_CLOSED: 2,
+  OUT_OF_STOCK: 3,
+  WRONG_PRODUCT: 4,
+  DAMAGED_PRODUCT: 5,
+  BUYER_NO_SHOW: 6,
+  OTHER: 99,
+};
+
+const DISPUTE_REASON_TYPE_LABEL = {
+  [DISPUTE_REASON_TYPE.SHOP_NOT_FOUND]: "Không tìm thấy người bán",
+  [DISPUTE_REASON_TYPE.SHOP_CLOSED]: "Cửa hàng đóng cửa",
+  [DISPUTE_REASON_TYPE.OUT_OF_STOCK]: "Hết hàng",
+  [DISPUTE_REASON_TYPE.WRONG_PRODUCT]: "Sai sản phẩm",
+  [DISPUTE_REASON_TYPE.DAMAGED_PRODUCT]: "Hàng lỗi",
+  [DISPUTE_REASON_TYPE.BUYER_NO_SHOW]: "Người mua không tới",
+  [DISPUTE_REASON_TYPE.OTHER]: "Khác",
+};
+
+const DISPUTE_STATUS = {
+  PENDING: 0,
+  ACCEPT_BUYER: 1,
+  ACCEPT_SELLER: 2,
+  REJECTED: 3,
+  CLOSED: 4,
+};
+
+const DISPUTE_STATUS_LABEL = {
+  [DISPUTE_STATUS.PENDING]: "Chờ admin xử lý",
+  [DISPUTE_STATUS.ACCEPT_BUYER]: "Chấp nhận người mua",
+  [DISPUTE_STATUS.ACCEPT_SELLER]: "Chấp nhận người bán",
+  [DISPUTE_STATUS.REJECTED]: "Từ chối khiếu nại",
+  [DISPUTE_STATUS.CLOSED]: "Đóng khiếu nại",
+};
+
+const PAYMENT_STATUS = {
+  ESCROW: 0,
+  RELEASED: 1,
+  REFUNDED: 2,
+};
+
+const DEFAULT_ESCROW_PROTECTION_DAYS = 7;
+/** Số ngày seller được phản hồi khiếu nại sau giao hàng. */
+const DEFAULT_SELLER_RESPONSE_DAYS = 2;
+const ESCROW_PROTECTION_DAYS_MIN = 1;
+const ESCROW_PROTECTION_DAYS_MAX = 30;
+const ESCROW_PROTECTION_DAYS = DEFAULT_ESCROW_PROTECTION_DAYS;
+const ESCROW_PROTECTION_MS = DEFAULT_ESCROW_PROTECTION_DAYS * 24 * 60 * 60 * 1000;
 
 /** Giờ sau pickupTime được báo cáo trước khi auto-release cọc cho seller. */
 const RESERVATION_DISPUTE_WINDOW_HOURS = 24;
@@ -87,18 +167,18 @@ const RESERVATION_DISPUTE_WINDOW_HOURS = 24;
 const MAX_RESERVATION_REPORT_IMAGES = 5;
 
 const RESERVATION_DISPUTE_REASON = {
-  /** Người bán không có mặt tại điểm nhận. */
   SELLER_ABSENT: "seller_absent",
   SHOP_CLOSED: "shop_closed",
-  /** Người bán không giao / không bán hàng. */
   SELLER_NO_DELIVERY: "seller_no_delivery",
-  /** Legacy alias — map về seller_no_delivery khi đọc. */
   SHOP_NO_DELIVERY: "shop_no_delivery",
-  /** Legacy. */
   SHOP_OUT_OF_STOCK: "shop_out_of_stock",
   OTHER: "other",
-  /** Seller báo buyer không đến. */
   BUYER_NO_SHOW: "buyer_no_show",
+  DAMAGED_ITEM: "damaged_item",
+  MISSING_ITEM: "missing_item",
+  WRONG_ITEM: "wrong_item",
+  NOT_AS_DESCRIBED: "not_as_described",
+  EXPIRED: "expired",
 };
 
 const RESERVATION_DISPUTE_REASON_LABEL = {
@@ -109,9 +189,14 @@ const RESERVATION_DISPUTE_REASON_LABEL = {
   [RESERVATION_DISPUTE_REASON.SHOP_OUT_OF_STOCK]: "Shop hết hàng",
   [RESERVATION_DISPUTE_REASON.OTHER]: "Khác",
   [RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW]: "Người mua không đến nhận hàng",
+  [RESERVATION_DISPUTE_REASON.DAMAGED_ITEM]: "Hàng bị hư hỏng",
+  [RESERVATION_DISPUTE_REASON.MISSING_ITEM]: "Thiếu hàng",
+  [RESERVATION_DISPUTE_REASON.WRONG_ITEM]: "Giao sai hàng",
+  [RESERVATION_DISPUTE_REASON.NOT_AS_DESCRIBED]: "Không đúng mô tả",
+  [RESERVATION_DISPUTE_REASON.EXPIRED]: "Hết hạn",
 };
 
-/** Lý do buyer được chọn trên form báo cáo (không gồm legacy). */
+/** Khiếu nại pickup-time (trước/sau giờ nhận — Report legacy). */
 const BUYER_DISPUTE_REASON_OPTIONS = [
   RESERVATION_DISPUTE_REASON.SELLER_ABSENT,
   RESERVATION_DISPUTE_REASON.SHOP_CLOSED,
@@ -119,12 +204,41 @@ const BUYER_DISPUTE_REASON_OPTIONS = [
   RESERVATION_DISPUTE_REASON.OTHER,
 ];
 
+/** Khiếu nại sau khi seller xác nhận giao (escrow). */
+const BUYER_COMPLAINT_REASON_OPTIONS = [
+  RESERVATION_DISPUTE_REASON.DAMAGED_ITEM,
+  RESERVATION_DISPUTE_REASON.MISSING_ITEM,
+  RESERVATION_DISPUTE_REASON.WRONG_ITEM,
+  RESERVATION_DISPUTE_REASON.NOT_AS_DESCRIBED,
+  RESERVATION_DISPUTE_REASON.EXPIRED,
+  RESERVATION_DISPUTE_REASON.OTHER,
+];
+
+const RESERVATION_DISPUTE_STATUS = {
+  PENDING: DISPUTE_STATUS.PENDING,
+  REVIEWING: DISPUTE_STATUS.PENDING,
+  BUYER_WIN: DISPUTE_STATUS.ACCEPT_BUYER,
+  SELLER_WIN: DISPUTE_STATUS.ACCEPT_SELLER,
+};
+
+/** @deprecated Dùng DISPUTE_STATUS.ACCEPT_BUYER / ACCEPT_SELLER */
+const RESERVATION_DISPUTE_WINNER = {
+  NONE: 0,
+  BUYER: 1,
+  SELLER: 2,
+};
+
+const MAX_RESERVATION_DISPUTE_VIDEOS = 3;
+
 function normalizeBuyerDisputeReason(reason) {
   const raw = String(reason || "").trim();
   if (raw === RESERVATION_DISPUTE_REASON.SHOP_NO_DELIVERY) {
     return RESERVATION_DISPUTE_REASON.SELLER_NO_DELIVERY;
   }
-  if (BUYER_DISPUTE_REASON_OPTIONS.includes(raw)) {
+  if (
+    BUYER_DISPUTE_REASON_OPTIONS.includes(raw) ||
+    BUYER_COMPLAINT_REASON_OPTIONS.includes(raw)
+  ) {
     return raw;
   }
   return "";
@@ -137,61 +251,57 @@ const RESERVATION_AUDIT_ACTION = {
 
 // ── Reports ──────────────────────────────────────────────────────────
 /**
- * Loại báo cáo.
- * 1–4: báo cáo nội dung (giữ nguyên).
- * 5–7: báo cáo giữ hàng / tranh chấp.
- * 8: lỗi hệ thống (tố cáo từ tài khoản).
- * 9: khác (tố cáo chung / giữ hàng “khác”).
- * 10: khiếu nại khóa tài khoản (buyer/seller bị khóa nick).
- * 11: khiếu nại khóa gian hàng (seller bị khóa shop, nick vẫn hoạt động).
+ * Loại báo cáo (Report collection) — mã tuần tự 1–7:
+ * 1 đánh giá | 2 gian hàng | 3 sản phẩm | 4 hệ thống | 5 khác
+ * 6 khiếu nại khóa tài khoản | 7 khiếu nại khóa gian hàng
+ *
+ * Tranh chấp giữ hàng dùng ReservationDispute (không lưu Report).
+ * DISPUTE_VIRTUAL_REPORT_TYPE (5–7) chỉ dùng hiển thị API dispute legacy.
  */
 const REPORT_TYPE = {
   REVIEW: 1,
-  USER: 2,
-  SHOP: 3,
-  PRODUCT: 4,
-  /** Seller báo buyer không đến nhận hàng. */
+  SHOP: 2,
+  PRODUCT: 3,
+  SYSTEM: 4,
+  OTHER: 5,
+  ACCOUNT_LOCK_APPEAL: 6,
+  SHOP_LOCK_APPEAL: 7,
+};
+
+/** Chỉ hiển thị complaint giữ hàng qua API dispute — không ghi Report. */
+const DISPUTE_VIRTUAL_REPORT_TYPE = {
   BUYER_NO_SHOW: 5,
-  /** Buyer báo seller không bán / không mở cửa. */
   SELLER_NO_SHOW: 6,
-  /** Sự cố sản phẩm liên quan đơn giữ hàng. */
   PRODUCT_ISSUE: 7,
-  /** Báo cáo lỗi hệ thống / app. */
-  SYSTEM: 8,
-  /** Khác (tố cáo chung hoặc giữ hàng). */
-  OTHER: 9,
-  /** User bị khóa nick khiếu nại mở lại tài khoản. */
-  ACCOUNT_LOCK_APPEAL: 10,
-  /** Seller bị khóa gian hàng khiếu nại mở lại shop. */
-  SHOP_LOCK_APPEAL: 11,
 };
 
 const REPORT_TYPE_LABELS = {
   [REPORT_TYPE.REVIEW]: "Đánh giá",
-  [REPORT_TYPE.USER]: "Người dùng",
   [REPORT_TYPE.SHOP]: "Gian hàng",
   [REPORT_TYPE.PRODUCT]: "Sản phẩm",
-  [REPORT_TYPE.BUYER_NO_SHOW]: "Buyer không đến nhận",
-  [REPORT_TYPE.SELLER_NO_SHOW]: "Seller không bán / không mở cửa",
-  [REPORT_TYPE.PRODUCT_ISSUE]: "Sự cố sản phẩm (giữ hàng)",
   [REPORT_TYPE.SYSTEM]: "Hệ thống lỗi",
   [REPORT_TYPE.OTHER]: "Khác",
   [REPORT_TYPE.ACCOUNT_LOCK_APPEAL]: "Khiếu nại khóa tài khoản",
   [REPORT_TYPE.SHOP_LOCK_APPEAL]: "Khiếu nại khóa gian hàng",
+  [DISPUTE_VIRTUAL_REPORT_TYPE.BUYER_NO_SHOW]: "Buyer không đến nhận",
+  [DISPUTE_VIRTUAL_REPORT_TYPE.SELLER_NO_SHOW]: "Seller không bán / không mở cửa",
+  [DISPUTE_VIRTUAL_REPORT_TYPE.PRODUCT_ISSUE]: "Sự cố sản phẩm (giữ hàng)",
 };
 
-/** Các loại report gắn Reservation (tranh chấp cọc). */
-const RESERVATION_REPORT_TYPES = [
-  REPORT_TYPE.BUYER_NO_SHOW,
-  REPORT_TYPE.SELLER_NO_SHOW,
-  REPORT_TYPE.PRODUCT_ISSUE,
-  REPORT_TYPE.OTHER,
-];
+/** Nhãn mã cũ trước khi migrate reportType. */
+const LEGACY_REPORT_TYPE_LABELS = {
+  2: "Người dùng",
+  3: "Gian hàng",
+  4: "Sản phẩm",
+  8: "Hệ thống lỗi",
+  9: "Khác",
+  10: "Khiếu nại khóa tài khoản",
+  11: "Khiếu nại khóa gian hàng",
+};
 
-/** Báo cáo nội dung (admin tab Báo cáo) — không gồm tranh chấp đơn. */
+/** Báo cáo nội dung (admin tab Báo cáo). */
 const CONTENT_REPORT_TYPES = [
   REPORT_TYPE.REVIEW,
-  REPORT_TYPE.USER,
   REPORT_TYPE.SHOP,
   REPORT_TYPE.PRODUCT,
   REPORT_TYPE.SYSTEM,
@@ -202,8 +312,6 @@ const CONTENT_REPORT_TYPES = [
 
 /** Loại tố cáo từ màn Tài khoản (combobox). */
 const ACCOUNT_REPORT_TYPES = [
-  REPORT_TYPE.USER,
-  REPORT_TYPE.SHOP,
   REPORT_TYPE.SYSTEM,
   REPORT_TYPE.OTHER,
 ];
@@ -395,10 +503,6 @@ const SELLER_SUBSCRIPTION_STATUS_LABEL = {
   [SELLER_SUBSCRIPTION_STATUS.CANCELLED]: "Đã hủy",
 };
 
-function getShopExpiry(shop) {
-  return null;
-}
-
 /**
  * Shop có gói còn hiệu lực — dựa ShopProfile.isActive (cache từ SellerSubscription).
  */
@@ -406,12 +510,17 @@ function isSubscriptionActive(shop) {
   if (!shop) {
     return false;
   }
-  return shop.isActive === true;
+  const value = shop.isActive;
+  return value === true || value === 1 || value === "1";
 }
 
-/** Mongo filter: shop public khi isActive. */
+/** Mongo filter — DB có cả boolean lẫn number 1. */
 function activeSubscriptionFilter() {
-  return { isActive: true };
+  return {
+    $expr: {
+      $in: ["$isActive", [1, true]],
+    },
+  };
 }
 
 const reservationOrderFlow = require("./reservationOrderFlow");
@@ -420,12 +529,33 @@ module.exports = {
   SELLER_VERIFICATION_STATUS,
   USER_ROLE,
   USER_STATUS,
+  RECORD_STATUS,
+  isRecordActive,
+  activeRecordFilter,
   SHOP_STATUS,
   SHOP_OPEN,
   PRODUCT_STATUS,
+  PRODUCT_REMOVED_BY,
+  REVIEW_REMOVED_BY,
   RESERVATION_STATUS,
   RESERVATION_STATUS_LABEL,
+  DISPUTE_CREATED_BY,
+  DISPUTE_REASON_TYPE,
+  DISPUTE_REASON_TYPE_LABEL,
+  DISPUTE_STATUS,
+  DISPUTE_STATUS_LABEL,
+  PAYMENT_STATUS,
+  DEFAULT_ESCROW_PROTECTION_DAYS,
+  DEFAULT_SELLER_RESPONSE_DAYS,
+  ESCROW_PROTECTION_DAYS_MIN,
+  ESCROW_PROTECTION_DAYS_MAX,
+  ESCROW_PROTECTION_DAYS,
+  ESCROW_PROTECTION_MS,
   RESERVATION_DISPUTE_WINDOW_HOURS,
+  BUYER_COMPLAINT_REASON_OPTIONS,
+  RESERVATION_DISPUTE_STATUS,
+  RESERVATION_DISPUTE_WINNER,
+  MAX_RESERVATION_DISPUTE_VIDEOS,
   MAX_RESERVATION_REPORT_IMAGES,
   RESERVATION_DISPUTE_REASON,
   RESERVATION_DISPUTE_REASON_LABEL,
@@ -433,8 +563,9 @@ module.exports = {
   normalizeBuyerDisputeReason,
   RESERVATION_AUDIT_ACTION,
   REPORT_TYPE,
+  DISPUTE_VIRTUAL_REPORT_TYPE,
   REPORT_TYPE_LABELS,
-  RESERVATION_REPORT_TYPES,
+  LEGACY_REPORT_TYPE_LABELS,
   CONTENT_REPORT_TYPES,
   ACCOUNT_REPORT_TYPES,
   MAX_ACCOUNT_REPORT_IMAGES,
@@ -466,7 +597,6 @@ module.exports = {
   WITHDRAW_STATUS_LABEL,
   SELLER_SUBSCRIPTION_STATUS,
   SELLER_SUBSCRIPTION_STATUS_LABEL,
-  getShopExpiry,
   isSubscriptionActive,
   activeSubscriptionFilter,
   ...reservationOrderFlow,

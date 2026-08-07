@@ -1,130 +1,255 @@
 const mongoose = require("mongoose");
 
+
+
 /**
- * Reservation — đơn giữ hàng giữa buyer và shop.
+
+ * Reservation — đơn giữ hàng giữa buyer và seller.
+
  *
- * Luồng cọc (escrow System Wallet):
- * 1) Buyer đặt giữ → trừ ví buyer → System Wallet (DepositHold)
- *    depositPaidAt set; depositSettleTo = 0
- * 2a) Seller từ chối / hủy → hoàn buyer: depositSettleTo = 1, depositSettledAt
- * 2b) Seller đồng ý → WaitingPickup
- * 3) Hoàn tất (QR / admin release) → seller: depositSettleTo = 2
- *    Forfeit / quá hạn không nhận → hủy (DISPUTE_RESOLVED), cọc seller, không tính sold
- * 4) Admin/dispute refund → buyer: depositSettleTo = 1
- * GD chi tiết xem WalletTransaction theo reservationId.
+
+ * Luồng trạng thái: Pending → Confirmed → WaitingPickup → Completed (+ escrow) / Disputed / Cancelled.
+
+ * Cọc escrow: SystemWallet giữ → release seller hoặc refund buyer (xem WalletTransaction theo reservationId).
+
+ *
+
+ * Tranh chấp giữ hàng: nội dung + ảnh trong ReservationDispute (không lưu GPS).
+
  */
+
 const ReservationSchema = new mongoose.Schema({
-  // Biến thể được giữ (ref ProductVariant).
-  variantId: { type: mongoose.Schema.Types.ObjectId, ref: "ProductVariant" },
-  // Gian hàng (ref ShopProfile).
-  shopId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopProfile", index: true },
-  // Sản phẩm (ref Product).
-  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
-  // Buyer đặt giữ (ref User).
+
+  // Người mua (ref User). Data cũ lưu userId; data mới có thể dùng buyerId.
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+  buyerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+
+  // Chủ shop / seller (ref User) — denormalize từ ShopProfile.userId.
+
+  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+
+  // Gian hàng bán (ref ShopProfile).
+
+  shopId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopProfile", index: true },
+
+  // Sản phẩm giữ (ref Product).
+
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+
+  // Biến thể đã chọn (ref ProductVariant); null nếu sản phẩm không có biến thể.
+
+  variantId: { type: mongoose.Schema.Types.ObjectId, ref: "ProductVariant", default: null },
+
+
 
   // Số lượng giữ.
+
   quantity: Number,
-  // Giá đơn vị lúc đặt giữ (VND).
+
+  // Giá đơn vị lúc đặt (VND).
+
   reservedPrice: Number,
-  // Thời điểm hẹn nhận hàng.
+
+  // Số tiền cọc đã trừ ví buyer (VND).
+
+  depositAmount: { type: Number, default: 0 },
+
+
+
+  // Mã 6 số buyer đưa shop quét QR khi nhận hàng.
+
+  pickupCode: { type: String, default: "", trim: true, index: true },
+
+  // Giờ hẹn buyer đến nhận hàng.
+
   pickupTime: { type: Date, index: true },
-  // Ghi chú của buyer.
-  note: String,
+
+  // Ghi chú buyer gửi khi đặt giữ.
+
+  note: { type: String, default: "" },
+
+
 
   /**
+
    * Trạng thái đơn:
-   * 0 = PendingSellerConfirmation (chờ shop đồng ý)
-   * 1 = Rejected (shop từ chối, đã hoàn cọc)
-   * 2 = WaitingPickup / ACCEPTED|READY (đã đồng ý, chờ nhận hàng)
-   * 3 = Completed (buyer xác nhận nhận hàng)
-   * 4 = Disputed (có Report sau giờ lấy)
-   * 5 = AutoCompleted (hết hạn báo cáo, tự hoàn tất + release cọc)
-   * 6 = Refunded (hoàn cọc — buyer thắng tranh chấp / seller hủy sau xác nhận / admin)
-   * 7 = DisputeResolved (seller thắng tranh chấp, cọc seller, không sold)
+
+   * 0 Pending | 1 Confirmed | 2 WaitingPickup | 3 Received (legacy)
+
+   * 4 Disputed | 5 Completed | 6 Cancelled
+
    */
+
   status: { type: Number, default: 0, index: true },
 
-  // Thời điểm seller đồng ý giữ hàng.
+  // Có tranh chấp / khiếu nại đang mở.
+
+  hasDispute: { type: Boolean, default: false, index: true },
+
+  // Buyer đã đánh giá đơn này chưa.
+
+  hasReview: { type: Boolean, default: false, index: true },
+
+
+
+  // Seller xác nhận đơn lúc nào.
+
   sellerConfirmedAt: { type: Date, default: null },
-  // Đã gửi thông báo nhắc trước giờ nhận 15 phút.
-  pickupReminderSentAt: { type: Date, default: null, index: true },
-  // Hạn báo cáo = pickupTime + 24h (legacy, đồng bộ với autoReleaseAt).
-  reviewDeadlineAt: { type: Date, default: null, index: true },
-  // Thời điểm hệ thống được phép auto-release cọc (= pickupTime + 24h).
-  autoReleaseAt: { type: Date, default: null, index: true },
 
-  // Thời điểm hoàn thành đơn (QR / admin / auto).
+  // Shop quét QR / buyer nhận hàng / đơn hoàn thành lúc nào.
+
   completedAt: { type: Date, default: null },
-  /**
-   * Buyer đã từng gửi đánh giá cho đơn này (kể cả khi đã gỡ đánh giá).
-   * false = chưa đánh giá; true = không cho đánh giá lại.
-   */
-  hasReviewed: { type: Boolean, default: false, index: true },
-  // Thời điểm hủy đơn.
-  cancelledAt: Date,
-  // Mã lý do hủy/kết thúc (RESERVATION_CANCEL_REASON).
-  cancelReason: String,
-  // Ghi chú chi tiết khi seller/admin nhập lý do tự do.
-  cancelNote: { type: String, default: "" },
-  /**
-   * Ai hủy đơn:
-   * "" | buyer | seller_reject | seller_after_accept | admin | system
-   */
-  cancelledBy: { type: String, default: "" },
-  // true = seller hủy sau khi đã đồng ý giữ hàng (có lý do + ảnh).
-  cancelledBySellerAfterAccept: { type: Boolean, default: false, index: true },
-  // Ảnh chứng minh khi seller hủy sau xác nhận (URL, tối đa 5).
-  sellerCancelImages: { type: [String], default: [] },
-  // true nếu đã giữ tồn kho (trừ Quantity biến thể).
-  inventoryHeld: { type: Boolean, default: false },
 
-  // % cọc áp dụng lúc đặt (snapshot từ shop.cocTien). 0 = không cọc.
+  // Đơn bị hủy lúc nào.
+
+  cancelledAt: { type: Date, default: null },
+
+  // Mã lý do hủy / kết thúc (RESERVATION_CANCEL_REASON string).
+
+  cancelReason: { type: String, default: "" },
+
+  // Lý do shop nhập khi hủy đơn đã xác nhận giữ hàng.
+
+  cancelNote: { type: String, default: "" },
+
+  // Ai hủy: buyer | seller_reject | seller_after_accept | system | admin
+
+  cancelledBy: { type: String, default: "" },
+
+  // Shop hủy sau khi đã xác nhận giữ hàng (WaitingPickup).
+
+  cancelledBySellerAfterAccept: { type: Boolean, default: false },
+
+  // Ảnh minh chứng khi shop hủy đơn đã xác nhận.
+
+  sellerCancelImages: { type: [String], default: [] },
+
+
+
+  /** —— Escrow / ví (nội bộ) —— */
+
+  // % cọc áp dụng lúc đặt (0–100).
+
   depositPercent: { type: Number, default: 0 },
-  // Số tiền cọc (VND), giữ tại System Wallet đến khi settle. 0 = không cọc.
-  depositAmount: { type: Number, default: 0 },
-  // Thời điểm buyer đã trừ cọc thành công (vào System).
+
+  // Thời điểm trừ cọc từ ví buyer vào SystemWallet.
+
   depositPaidAt: { type: Date, default: null },
-  // Thời điểm kết thúc cọc (hoàn buyer hoặc giải ngân seller).
+
+  // Thời điểm cọc được release/refund.
+
   depositSettledAt: { type: Date, default: null },
-  /**
-   * Ai nhận cọc khi settle:
-   * 0 = chưa settle (đang escrow)
-   * 1 = hoàn người mua
-   * 2 = giải ngân người bán
-   */
+
+  // Cọc chuyển cho ai: 0 đang giữ (escrow) | 1 hoàn buyer | 2 giải ngân seller.
+
   depositSettleTo: { type: Number, default: 0, enum: [0, 1, 2], index: true },
 
-  // true nếu buyer đã mở tranh chấp sau pickupTime.
-  disputeByBuyer: { type: Boolean, default: false },
-  // true nếu seller đã mở tranh chấp (buyer no-show).
-  disputeBySeller: { type: Boolean, default: false },
-  // Mã lý do tranh chấp: shop_no_delivery | shop_closed | shop_out_of_stock | other | buyer_no_show.
-  disputeReason: { type: String, default: "" },
-  // Mô tả chi tiết tranh chấp.
-  disputeDescription: { type: String, default: "" },
-  // Thời điểm mở tranh chấp lần đầu.
-  disputedAt: { type: Date, default: null },
-  // Bên báo cáo đầu tiên: buyer | seller.
-  disputeFirstBy: { type: String, default: "" },
-  // Thời điểm từng bên gửi báo cáo (để sắp xếp hiển thị).
-  buyerDisputedAt: { type: Date, default: null },
-  sellerDisputedAt: { type: Date, default: null },
+  // Số ngày buyer được khiếu nại sau giao (snapshot từ ProductCategory.disputeDays).
 
-  // Thời điểm tạo đơn.
-  CreatedAt: { type: Date, default: Date.now },
-  // Thời điểm cập nhật gần nhất (auto trong pre-save).
-  UpdatedAt: { type: Date, default: Date.now },
+  escrowProtectionDays: { type: Number, default: null, min: 1, max: 30 },
+
+  // Hết hạn cửa sổ khiếu nại + auto release cọc cho seller nếu không tranh chấp.
+
+  escrowReleaseAt: { type: Date, default: null, index: true },
+
+  // Tồn kho biến thể đã trừ khi giữ (tránh oversell).
+
+  inventoryHeld: { type: Boolean, default: false },
+
+
+
+  createdAt: { type: Date, default: Date.now },
+
+  updatedAt: { type: Date, default: Date.now },
+
 });
+
+
+
+ReservationSchema.index({ status: 1, escrowReleaseAt: 1 });
+
+ReservationSchema.index({ status: 2, pickupTime: 1 });
+
+ReservationSchema.virtual("disputed")
+
+  .get(function getDisputed() {
+
+    return this.hasDispute;
+
+  })
+
+  .set(function setDisputed(value) {
+
+    this.hasDispute = Boolean(value);
+
+  });
+
+
+
+ReservationSchema.virtual("hasReviewed")
+
+  .get(function getHasReviewed() {
+
+    return this.hasReview;
+
+  })
+
+  .set(function setHasReviewed(value) {
+
+    this.hasReview = Boolean(value);
+
+  });
+
+
+
+ReservationSchema.virtual("CreatedAt")
+
+  .get(function getCreatedAt() {
+
+    return this.createdAt;
+
+  })
+
+  .set(function setCreatedAt(value) {
+
+    this.createdAt = value;
+
+  });
+
+
+
+ReservationSchema.virtual("UpdatedAt")
+
+  .get(function getUpdatedAt() {
+
+    return this.updatedAt;
+
+  })
+
+  .set(function setUpdatedAt(value) {
+
+    this.updatedAt = value;
+
+  });
+
+
+
+ReservationSchema.set("toJSON", { virtuals: true });
+
+ReservationSchema.set("toObject", { virtuals: true });
+
+
 
 ReservationSchema.pre("save", function saveHook() {
-  this.UpdatedAt = new Date();
-  // Đồng bộ autoReleaseAt ↔ reviewDeadlineAt khi chỉ set một trong hai.
-  if (this.autoReleaseAt && !this.reviewDeadlineAt) {
-    this.reviewDeadlineAt = this.autoReleaseAt;
-  } else if (this.reviewDeadlineAt && !this.autoReleaseAt) {
-    this.autoReleaseAt = this.reviewDeadlineAt;
+  if (this.buyerId && !this.userId) {
+    this.userId = this.buyerId;
+  } else if (this.userId && !this.buyerId) {
+    this.buyerId = this.userId;
   }
+  this.updatedAt = new Date();
 });
 
+
+
 module.exports = mongoose.model("Reservation", ReservationSchema);
+

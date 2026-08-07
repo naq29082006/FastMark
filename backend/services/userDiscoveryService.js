@@ -2,7 +2,7 @@ const User = require("../models/User");
 const Follow = require("../models/Follow");
 const ShopProfile = require("../models/ShopProfile");
 const { USER_ROLE, USER_STATUS, SHOP_STATUS } = require("../constants");
-const { buildSearchRegex } = require("../utils/searchText");
+const { buildSearchRegex, buildMongoTokenFieldFilter } = require("../utils/searchText");
 const {
   resolveShopDisplayName,
   resolveShopUsername,
@@ -27,7 +27,7 @@ function toUserCard(user, shop = null) {
     fullName: user.FullName || "",
     userName: user.UserName || "",
     avatar: user.Avatar || "",
-    followersCount: Number(user.FollowersCount) || 0,
+    followersCount: Number(shop?.followersCount) || 0,
     followingCount: Number(user.FollowingCount) || 0,
     shopId: shop?._id ? String(shop._id) : "",
     shopName: shop ? resolveShopDisplayName(shop, user) : "",
@@ -45,9 +45,11 @@ function parsePagination(query = {}) {
 async function searchUsers(currentUser, query = {}) {
   const keyword = pickString(query.search || query.q);
   const { page, limit, skip } = parsePagination(query);
-  const regex = buildSearchRegex(keyword);
+  const tokenFilter = buildMongoTokenFieldFilter(keyword, ["FullName", "UserName"], {
+    minTokenLength: 1,
+  });
 
-  if (!regex) {
+  if (!tokenFilter) {
     return {
       items: [],
       pagination: { page, limit, total: 0, totalPages: 1 },
@@ -57,7 +59,7 @@ async function searchUsers(currentUser, query = {}) {
   const filter = {
     Status: USER_STATUS.ACTIVE,
     Role: { $in: [USER_ROLE.BUYER, USER_ROLE.SELLER] },
-    $or: [{ FullName: regex }, { UserName: regex }],
+    ...tokenFilter,
   };
 
   if (currentUser?._id) {
@@ -66,8 +68,8 @@ async function searchUsers(currentUser, query = {}) {
 
   const [rows, total] = await Promise.all([
     User.find(filter)
-      .select("FullName UserName Avatar FollowersCount FollowingCount Role")
-      .sort({ FollowersCount: -1, CreatedAt: -1, _id: -1 })
+      .select("FullName UserName Avatar FollowingCount Role")
+      .sort({ FollowingCount: -1, CreatedAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
@@ -121,13 +123,13 @@ async function getPublicUserProfile(currentUser, userIdInput) {
 
   let followMeta = {
     isFollowing: false,
-    followersCount: Number(user.FollowersCount) || 0,
+    followersCount: Number(shop?.followersCount) || 0,
     followingCount: Number(user.FollowingCount) || 0,
     shopId: shop?._id ? String(shop._id) : "",
   };
 
-  if (currentUser?._id) {
-    const status = await getFollowStatus(currentUser, { followedUserId: userId });
+  if (currentUser?._id && shop?._id) {
+    const status = await getFollowStatus(currentUser, { shopId: String(shop._id) });
     followMeta = {
       ...status,
       followingCount: Number(user.FollowingCount) || 0,
@@ -162,35 +164,40 @@ async function listPublicUserFollowing(userIdInput, query = {}) {
     Follow.countDocuments(filter),
   ]);
 
-  const followedUserIds = rows.map((row) => row.followedUserId).filter(Boolean);
-  const users = followedUserIds.length
-    ? await User.find({
-        _id: { $in: followedUserIds },
-        Status: { $ne: USER_STATUS.BLOCKED },
-        Role: { $ne: USER_ROLE.ADMIN },
-      })
-        .select("FullName UserName Avatar FollowersCount FollowingCount")
-        .lean()
-    : [];
-  const userById = new Map(users.map((row) => [String(row._id), row]));
-
-  const shops = followedUserIds.length
+  const shopIds = rows.map((row) => row.shopId).filter(Boolean);
+  const shops = shopIds.length
     ? await ShopProfile.find({
-        userId: { $in: followedUserIds },
+        _id: { $in: shopIds },
         status: { $ne: SHOP_STATUS.BLOCKED },
       })
         .select("userId shopName shopUsername avatar followersCount")
         .lean()
     : [];
-  const shopByUserId = new Map(shops.map((shop) => [String(shop.userId), shop]));
+  const shopById = new Map(shops.map((shop) => [String(shop._id), shop]));
+
+  const ownerIds = shops.map((shop) => shop.userId).filter(Boolean);
+  const users = ownerIds.length
+    ? await User.find({
+        _id: { $in: ownerIds },
+        Status: { $ne: USER_STATUS.BLOCKED },
+        Role: { $ne: USER_ROLE.ADMIN },
+      })
+        .select("FullName UserName Avatar FollowingCount")
+        .lean()
+    : [];
+  const userById = new Map(users.map((row) => [String(row._id), row]));
 
   const items = rows
     .map((row) => {
-      const followedUser = userById.get(String(row.followedUserId));
-      if (!followedUser) {
+      const shop = shopById.get(String(row.shopId));
+      if (!shop) {
         return null;
       }
-      return toUserCard(followedUser, shopByUserId.get(String(followedUser._id)) || null);
+      const owner = userById.get(String(shop.userId));
+      if (!owner) {
+        return null;
+      }
+      return toUserCard(owner, shop);
     })
     .filter(Boolean);
 

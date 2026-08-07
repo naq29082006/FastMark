@@ -26,6 +26,14 @@ const overlayStyles = StyleSheet.create({
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
   },
+  sheetLayer: {
+    width: '100%',
+    zIndex: 2,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
 });
 
 export function BottomSheetHandle({ compact = false, style }) {
@@ -37,18 +45,21 @@ export function BottomSheetHandle({ compact = false, style }) {
 /** Bấm vùng tối bên ngoài panel để đóng bottom sheet. */
 export function BottomSheetDismissOverlay({ onClose, style, children }) {
   return (
-    <Pressable
-      style={[overlayStyles.root, style]}
-      onPress={onClose}
-      accessibilityRole="button"
-      accessibilityLabel="Đóng"
-    >
-      {children}
-    </Pressable>
+    <View style={[overlayStyles.root, style]} pointerEvents="box-none">
+      <Pressable
+        style={overlayStyles.backdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Đóng"
+      />
+      <View style={overlayStyles.sheetLayer} pointerEvents="box-none">
+        {children}
+      </View>
+    </View>
   );
 }
 
-/** Panel bottom sheet — giữ touch bên trong, không kích hoạt đóng overlay. */
+/** Panel bottom sheet — chặn tap xuyên xuống backdrop / nút mở phía dưới. */
 export function BottomSheetPanel({ style, children }) {
   return (
     <View style={style} onStartShouldSetResponder={() => true}>

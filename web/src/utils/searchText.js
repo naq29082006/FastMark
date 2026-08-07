@@ -6,6 +6,10 @@ export function removeVietnameseDiacritics(value) {
     .replace(/Đ/g, 'D');
 }
 
+export function removeVietnameseTones(value) {
+  return removeVietnameseDiacritics(value);
+}
+
 export function normalizeSearchText(value) {
   return removeVietnameseDiacritics(value).trim().toLowerCase();
 }
@@ -14,12 +18,32 @@ export function normalizeSearchKeyword(value) {
   return normalizeSearchText(value).replace(/^@+/, '').replace(/^#+/, '');
 }
 
-export function matchesSearchText(haystack, needle) {
-  const normalizedNeedle = normalizeSearchKeyword(needle);
-  if (!normalizedNeedle || normalizedNeedle.length < 2) {
+export function tokenizeSearchQuery(keyword) {
+  return normalizeSearchKeyword(keyword).split(/\s+/).filter(Boolean);
+}
+
+export function matchesTokenSearch(haystack, keyword) {
+  const tokens = tokenizeSearchQuery(keyword);
+  if (!tokens.length) {
     return true;
   }
-  return normalizeSearchText(haystack).includes(normalizedNeedle);
+  const normalizedHay = normalizeSearchText(haystack);
+  if (!normalizedHay) {
+    return false;
+  }
+  return tokens.every((token) => normalizedHay.includes(token));
+}
+
+export function matchesTokenSearchAny(fields, keyword) {
+  const combined = (fields || [])
+    .map((field) => String(field || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return matchesTokenSearch(combined, keyword);
+}
+
+export function matchesSearchText(haystack, needle) {
+  return matchesTokenSearch(haystack, needle);
 }
 
 export function resolveStatusesFromLabelSearch(keyword, entries = []) {
@@ -34,7 +58,7 @@ export function resolveStatusesFromLabelSearch(keyword, entries = []) {
     if (!labelNorm) {
       continue;
     }
-    if (labelNorm.includes(normalized) || normalized.includes(labelNorm)) {
+    if (matchesTokenSearch(labelNorm, normalized)) {
       const statuses = Array.isArray(entry.statuses)
         ? entry.statuses
         : entry.status !== undefined

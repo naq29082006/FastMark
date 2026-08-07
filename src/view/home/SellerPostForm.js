@@ -356,6 +356,30 @@ export default function SellerPostForm({ onProductCreated }) {
       }
     }
 
+    if (promotion.enabled) {
+      const percent = Number(promotion.discountPercent);
+      if (!Number.isFinite(percent) || percent < 1 || percent > 99) {
+        setError('Khuyến mãi: nhập phần trăm giảm giá từ 1% đến 99%.');
+        return;
+      }
+      if (promotionBasePrice <= 0) {
+        setError('Khuyến mãi: thêm biến thể có giá hợp lệ trước khi bật khuyến mãi.');
+        return;
+      }
+      if (promotion.startDate && promotion.endDate) {
+        const start = new Date(`${promotion.startDate}T00:00:00`);
+        const end = new Date(`${promotion.endDate}T00:00:00`);
+        if (
+          Number.isFinite(start.getTime()) &&
+          Number.isFinite(end.getTime()) &&
+          end.getTime() < start.getTime()
+        ) {
+          setError('Khuyến mãi: ngày kết thúc phải sau ngày bắt đầu.');
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -527,7 +551,7 @@ export default function SellerPostForm({ onProductCreated }) {
           discountPercent={promotion.discountPercent}
           startDate={promotion.startDate}
           endDate={promotion.endDate}
-          onChange={setPromotion}
+          onChange={(partial) => setPromotion((prev) => ({ ...prev, ...partial }))}
           disabled={isSubmitting}
         />
 
@@ -811,6 +835,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     minHeight: 50,
+    marginTop: 4,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',

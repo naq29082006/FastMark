@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
 const Product = require("../models/Product");
@@ -6,8 +7,10 @@ const WalletTransaction = require("../models/WalletTransaction");
 const WithdrawRequest = require("../models/WithdrawRequest");
 const SystemWallet = require("../models/SystemWallet");
 const Reservation = require("../models/Reservation");
-const ReservationAuditLog = require("../models/ReservationAuditLog");
+const ReservationDispute = require("../models/ReservationDispute");
 const { applyCreatedAtRange } = require("../utils/dateRangeFilter");
+const { buyerIdFilter } = require("../utils/reservationCompat");
+const { buildReportsReceivedFilter, resolveReportTypeLabel } = require("../utils/reportType");
 const Report = require("../models/Report");
 const Review = require("../models/Review");
 const SellerSubscription = require("../models/SellerSubscription");
@@ -39,13 +42,22 @@ const {
 } = require("../utils/shopIdentity");
 const { buildAdminProductPriceFields } = require("./productPromotionService");
 const {
-  isAdminRemovedProduct,
-  isSellerRemovedProduct,
-  isRemovedProduct,
   removedProductConditions,
   notRemovedProductMatch,
   resolveAdminProductStatusLabel,
 } = require("./adminCatalogService");
+const { toAdminProductRemovalFields } = require("../utils/productRemoval");
+const {
+  notDeletedReviewFilter,
+  deletedReviewFilter,
+  publicReviewFilter,
+  adminHiddenReviewFilter,
+  toAdminReviewRemovalFields,
+} = require("../utils/reviewRemoval");
+const {
+  disputeViewFromRecord,
+  loadDisputesByReservationIds,
+} = require("../utils/reservationDisputeView");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -85,8 +97,8 @@ function applyHistoryStatusFilter(baseFilter, tab, statusGroup) {
       return baseFilter;
     }
     const statuses =
-      code === RESERVATION_STATUS.REFUNDED
-        ? [RESERVATION_STATUS.REFUNDED, RESERVATION_STATUS.DISPUTE_RESOLVED]
+      code === RESERVATION_STATUS.CANCELLED
+        ? [RESERVATION_STATUS.CANCELLED, RESERVATION_STATUS.CANCELLED]
         : [code];
     return { ...baseFilter, status: { $in: statuses } };
   }
@@ -138,13 +150,16 @@ function applyHistoryStatusFilter(baseFilter, tab, statusGroup) {
 
   if (tab === "reviews" || tab === "shop-reviews") {
     if (group === "visible") {
-      return { ...baseFilter, isHidden: false, isDeleted: { $ne: true } };
+      return { ...baseFilter, ...publicReviewFilter() };
     }
     if (group === "hidden") {
-      return { ...baseFilter, isHidden: true, isDeleted: { $ne: true } };
+      return {
+        ...baseFilter,
+        $and: [notDeletedReviewFilter(), adminHiddenReviewFilter()],
+      };
     }
     if (group === "deleted") {
-      return { ...baseFilter, isDeleted: true };
+      return { ...baseFilter, ...deletedReviewFilter() };
     }
     return baseFilter;
   }
@@ -203,13 +218,19 @@ function toWithdrawItem(item) {
   };
 }
 
-function toReservationItem(reservation) {
+function populatedReservationBuyer(reservation) {
+  const ref = reservation?.userId || reservation?.buyerId || null;
+  return ref && typeof ref === "object" && ref._id ? ref : null;
+}
+
+function toReservationItem(reservation, disputeRecord = null) {
   const product = reservation.productId || null;
   const shop = reservation.shopId || null;
-  const buyer = reservation.userId || null;
+  const buyer = populatedReservationBuyer(reservation);
   const shopOwner = shop?.userId && typeof shop.userId === "object" ? shop.userId : null;
   const totalPrice =
     (Number(reservation.reservedPrice) || 0) * (Number(reservation.quantity) || 0);
+  const disputeView = disputeViewFromRecord(disputeRecord);
 
   return {
     id: String(reservation._id),
@@ -221,8 +242,8 @@ function toReservationItem(reservation) {
     depositAmount: reservation.depositAmount || 0,
     depositSettleTo: reservation.depositSettleTo,
     pickupTime: reservation.pickupTime || null,
-    disputeByBuyer: Boolean(reservation.disputeByBuyer),
-    disputeBySeller: Boolean(reservation.disputeBySeller),
+    disputeByBuyer: disputeView.disputeByBuyer,
+    disputeBySeller: disputeView.disputeBySeller,
     createdAt: reservation.CreatedAt || null,
     completedAt: reservation.completedAt || null,
     product: product
@@ -249,17 +270,22 @@ function toReservationItem(reservation) {
   };
 }
 
+async function mapReservationHistoryItems(rows) {
+  const disputesMap = await loadDisputesByReservationIds(rows.map((row) => row._id));
+  return rows.map((row) =>
+    toReservationItem(row, disputesMap.get(String(row._id)) || null)
+  );
+}
+
 function toReportItem(report) {
   return {
     id: String(report._id),
     reportType: report.reportType,
-    reportTypeLabel: REPORT_TYPE_LABELS[report.reportType] || "Không rõ",
+    reportTypeLabel: resolveReportTypeLabel(report.reportType),
     status: report.status,
     statusLabel: REPORT_STATUS_LABELS[report.status] || "Không rõ",
-    reporterRole: report.reporterRole || null,
-    reporterRoleLabel: REPORT_REPORTER_ROLE_LABELS[report.reporterRole] || "",
-    title: report.title || report.sellerTitle || "",
-    content: report.content || report.sellerContent || "",
+    title: report.title || "",
+    content: report.content || "",
     reservationId: report.reservationId ? String(report.reservationId) : null,
     createdAt: report.CreatedAt || null,
     processedAt: report.processedAt || null,
@@ -313,8 +339,7 @@ function toReviewItem(review) {
     id: String(review._id),
     rating: review.rating || 0,
     comment: review.comment || "",
-    isHidden: Boolean(review.isHidden),
-    isDeleted: Boolean(review.isDeleted),
+    ...toAdminReviewRemovalFields(review),
     createdAt: review.CreatedAt || null,
     product: product
       ? {
@@ -350,12 +375,7 @@ function toProductHistoryItem(product, shopId, imagesByProduct) {
     categoryName: category?.name || category?.categoryName || "",
     donVi: product.DonVi || "",
     ...buildAdminProductPriceFields(product),
-    isDeleted: isRemovedProduct(product),
-    isAdminRemoved: isAdminRemovedProduct(product),
-    isSellerRemoved: isSellerRemovedProduct(product),
-    sellerRemovedAt: product.SellerRemovedAt || null,
-    adminRemovalReason: product.AdminRemovalReason || "",
-    adminRemovedAt: product.AdminRemovedAt || null,
+    ...toAdminProductRemovalFields(product),
     status: product.Status,
     statusLabel: resolveAdminProductStatusLabel(product),
     viewCount: Number(product.ViewCount) || 0,
@@ -400,7 +420,7 @@ async function getAccountHistory(userId, query = {}) {
   }
 
   if (tab === "reservations") {
-    const filter = applyHistoryStatusFilter({ userId: user._id }, tab, statusGroup);
+    const filter = applyHistoryStatusFilter(buyerIdFilter(user._id), tab, statusGroup);
     const [total, rows] = await Promise.all([
       Reservation.countDocuments(filter),
       Reservation.find(filter)
@@ -408,6 +428,8 @@ async function getAccountHistory(userId, query = {}) {
         .skip(skip)
         .limit(limit)
         .populate("productId", "ProductName")
+        .populate("userId", "FullName UserName Email")
+        .populate("buyerId", "FullName UserName Email")
         .populate({
           path: "shopId",
           select: "userId",
@@ -415,7 +437,11 @@ async function getAccountHistory(userId, query = {}) {
         })
         .lean(),
     ]);
-    return { tab, items: rows.map(toReservationItem), pagination: buildPagination(page, limit, total) };
+    return {
+      tab,
+      items: await mapReservationHistoryItems(rows),
+      pagination: buildPagination(page, limit, total),
+    };
   }
 
   if (tab === "shop-reservations") {
@@ -432,14 +458,21 @@ async function getAccountHistory(userId, query = {}) {
         .limit(limit)
         .populate("productId", "ProductName")
         .populate("userId", "UserName FullName Email")
+        .populate("buyerId", "UserName FullName Email")
         .lean(),
     ]);
-    return { tab, items: rows.map(toReservationItem), pagination: buildPagination(page, limit, total) };
+    return {
+      tab,
+      items: await mapReservationHistoryItems(rows),
+      pagination: buildPagination(page, limit, total),
+    };
   }
 
   if (tab === "reports-filed" || tab === "reports-received") {
     const baseFilter =
-      tab === "reports-filed" ? { userId: user._id } : { targetUserId: user._id };
+      tab === "reports-filed"
+        ? { userId: user._id }
+        : await buildReportsReceivedFilter(user._id);
     const filter = applyHistoryStatusFilter(baseFilter, tab, statusGroup);
     const [total, rows] = await Promise.all([
       Report.countDocuments(filter),
@@ -527,8 +560,7 @@ function toShopReviewItem(review) {
     id: String(review._id),
     rating: review.rating || 0,
     comment: review.comment || "",
-    isHidden: Boolean(review.isHidden),
-    isDeleted: Boolean(review.isDeleted),
+    ...toAdminReviewRemovalFields(review),
     createdAt: review.CreatedAt || null,
     product: product
       ? {
@@ -609,9 +641,14 @@ async function getShopHistory(shopId, query = {}) {
         .limit(limit)
         .populate("productId", "ProductName")
         .populate("userId", "UserName FullName Email")
+        .populate("buyerId", "UserName FullName Email")
         .lean(),
     ]);
-    return { tab, items: rows.map(toReservationItem), pagination: buildPagination(page, limit, total) };
+    return {
+      tab,
+      items: await mapReservationHistoryItems(rows),
+      pagination: buildPagination(page, limit, total),
+    };
   }
 
   if (tab === "reports-filed") {
@@ -628,10 +665,7 @@ async function getShopHistory(shopId, query = {}) {
 
   if (tab === "reports-received") {
     const baseFilter = ownerId
-      ? {
-          userId: { $ne: ownerId },
-          $or: [{ shopId: shop._id }, { targetUserId: ownerId }],
-        }
+      ? await buildReportsReceivedFilter(ownerId)
       : { shopId: shop._id };
     const filter = applyHistoryStatusFilter(baseFilter, tab, statusGroup);
     const [total, rows] = await Promise.all([
@@ -644,10 +678,7 @@ async function getShopHistory(shopId, query = {}) {
   // Alias cũ: gộp báo cáo bị nhận (tương thích client cũ nếu còn gọi tab=reports).
   if (tab === "reports") {
     const baseFilter = ownerId
-      ? {
-          userId: { $ne: ownerId },
-          $or: [{ shopId: shop._id }, { targetUserId: ownerId }],
-        }
+      ? await buildReportsReceivedFilter(ownerId)
       : { shopId: shop._id };
     const filter = applyHistoryStatusFilter(baseFilter, tab, statusGroup);
     const [total, rows] = await Promise.all([
@@ -918,6 +949,7 @@ async function listEscrowReservations() {
     .sort({ depositPaidAt: -1 })
     .limit(DETAIL_LIMIT)
     .populate("userId", "FullName UserName Phone Email")
+    .populate("buyerId", "FullName UserName Phone Email")
     .populate({
       path: "shopId",
       select: "userId shopName shopUsername avatar",
@@ -925,13 +957,14 @@ async function listEscrowReservations() {
     })
     .populate("productId", "ProductName")
     .select(
-      "depositAmount depositPaidAt pickupTime status userId shopId productId quantity reservedPrice"
+      "depositAmount depositPaidAt pickupTime status userId buyerId shopId productId quantity reservedPrice"
     )
     .lean();
 
   return rows.map((row) => {
     const shop = row.shopId || null;
     const shopOwner = shop?.userId && typeof shop.userId === "object" ? shop.userId : null;
+    const buyer = populatedReservationBuyer(row);
     return {
       id: String(row._id),
       productName: row.productId?.ProductName || "Sản phẩm",
@@ -940,8 +973,8 @@ async function listEscrowReservations() {
       pickupTime: row.pickupTime || null,
       status: Number(row.status),
       statusLabel: RESERVATION_STATUS_LABEL[row.status] || String(row.status),
-      buyerName: row.userId?.FullName || row.userId?.UserName || "—",
-      buyerPhone: row.userId?.Phone || "",
+      buyerName: buyer?.FullName || buyer?.UserName || "—",
+      buyerPhone: buyer?.Phone || "",
       shopName: resolveShopDisplayName(shop, shopOwner),
       quantity: Number(row.quantity) || 0,
       reservedPrice: Number(row.reservedPrice) || 0,
@@ -1301,43 +1334,75 @@ async function getFinanceOverview(query = {}) {
  */
 async function listAuditLogs(query = {}) {
   const { page, limit, skip } = parsePagination(query);
-  const filter = {};
+  const match = {};
 
   if (query.action) {
-    filter.action = String(query.action);
+    match["auditLogs.action"] = String(query.action);
   }
   if (query.reservationId) {
-    filter.reservationId = query.reservationId;
+    match.reservationId = new mongoose.Types.ObjectId(String(query.reservationId));
   }
 
-  applyCreatedAtRange(filter, query);
+  const createdAtRange = {};
+  if (query.from) {
+    createdAtRange.$gte = new Date(query.from);
+  }
+  if (query.to) {
+    createdAtRange.$lte = new Date(query.to);
+  }
+  if (Object.keys(createdAtRange).length) {
+    match["auditLogs.createdAt"] = createdAtRange;
+  }
 
-  const [total, rows] = await Promise.all([
-    ReservationAuditLog.countDocuments(filter),
-    ReservationAuditLog.find(filter)
-      .sort({ CreatedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate("adminId", "UserName FullName Email")
-      .lean(),
-  ]);
+  const pipeline = [
+    { $match: { auditLogs: { $exists: true, $ne: [] } } },
+    { $unwind: "$auditLogs" },
+  ];
+  if (Object.keys(match).length) {
+    pipeline.push({ $match: match });
+  }
+  pipeline.push(
+    { $sort: { "auditLogs.createdAt": -1 } },
+    {
+      $facet: {
+        total: [{ $count: "count" }],
+        rows: [{ $skip: skip }, { $limit: limit }],
+      },
+    }
+  );
 
-  const items = rows.map((log) => ({
-    id: String(log._id),
-    action: log.action,
-    decision: log.decision || "",
-    note: log.note || "",
-    reservationId: log.reservationId ? String(log.reservationId) : null,
-    createdAt: log.CreatedAt || null,
-    admin: log.adminId
-      ? {
-          id: String(log.adminId._id),
-          userName: log.adminId.UserName || "",
-          fullName: log.adminId.FullName || "",
-          email: log.adminId.Email || "",
-        }
-      : null,
-  }));
+  const [result] = await ReservationDispute.aggregate(pipeline);
+  const total = result?.total?.[0]?.count || 0;
+  const rows = result?.rows || [];
+
+  const adminIds = [
+    ...new Set(rows.map((row) => String(row.auditLogs?.adminId || "")).filter(Boolean)),
+  ];
+  const admins = adminIds.length
+    ? await User.find({ _id: { $in: adminIds } }).select("UserName FullName Email").lean()
+    : [];
+  const adminById = new Map(admins.map((user) => [String(user._id), user]));
+
+  const items = rows.map((row) => {
+    const log = row.auditLogs;
+    const admin = adminById.get(String(log.adminId || ""));
+    return {
+      id: String(log._id || `${row._id}-${log.createdAt}`),
+      action: log.action,
+      decision: log.decision || "",
+      note: log.note || "",
+      reservationId: row.reservationId ? String(row.reservationId) : null,
+      createdAt: log.createdAt || null,
+      admin: admin
+        ? {
+            id: String(admin._id),
+            userName: admin.UserName || "",
+            fullName: admin.FullName || "",
+            email: admin.Email || "",
+          }
+        : null,
+    };
+  });
 
   return { items, pagination: buildPagination(page, limit, total) };
 }

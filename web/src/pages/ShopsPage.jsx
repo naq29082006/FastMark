@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Eye, Lock, Store, Unlock, UserCheck, UserX } from 'lucide-react';
+import { Eye, Lock, Unlock, UserCheck, UserX } from 'lucide-react';
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 
 import { blockShop, listShops, unblockShop } from '../api/catalogApi';
 import AdminFilterPanel from '../components/admin/AdminFilterPanel';
@@ -152,13 +153,13 @@ export default function ShopsPage() {
 
   return (
     <AdminPageShell
-      icon={Store}
+      icon={FastMarkShopPinIcon}
       title={pageMeta.title}
       description={pageMeta.description}
       stats={[
-        { label: 'Tổng gian hàng', value: loading ? '…' : pagination.total, icon: Store, tone: 'green' },
+        { label: 'Tổng gian hàng', value: loading ? '…' : pagination.total, icon: FastMarkShopPinIcon, tone: 'green' },
         { label: 'Đang hoạt động', value: loading ? '…' : activeCount, icon: UserCheck, tone: 'green' },
-        { label: 'Đang mở cửa', value: loading ? '…' : openCount, icon: Store, tone: 'blue' },
+        { label: 'Đang mở cửa', value: loading ? '…' : openCount, icon: FastMarkShopPinIcon, tone: 'blue' },
         { label: 'Bị khóa', value: loading ? '…' : lockedCount, icon: UserX, tone: 'red' },
       ]}
     >

@@ -3,10 +3,11 @@ import {
   BadgeCheck,
   Check,
   Clock,
-  Store,
   UserCheck,
   X,
 } from 'lucide-react';
+
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 
 import { listCategories } from '../api/categoryApi';
 import {
@@ -215,7 +216,7 @@ function VerificationDetailPanel({
           <div className="seller-verify-detail-section-head">
             <h3>Thông tin gian hàng đăng ký</h3>
             <span className="seller-verify-detail-side-logo">
-              <Store size={22} aria-hidden="true" />
+              <FastMarkShopPinIcon size={24} aria-hidden="true" />
             </span>
           </div>
           <dl className="seller-verify-field-grid">
@@ -223,11 +224,21 @@ function VerificationDetailPanel({
             <div><dt>Username</dt><dd>{item.shopUsername ? `@${item.shopUsername}` : '—'}</dd></div>
             <div><dt>Danh mục</dt><dd>{item.categoryName || '—'}</dd></div>
             <div><dt>Địa chỉ kinh doanh</dt><dd>{address || '—'}</dd></div>
-            <div className="span-2">
-              <dt>Mô tả gian hàng</dt>
-              <dd>{item.shopDescription || '—'}</dd>
-            </div>
-            {Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? (
+            {Number.isFinite(item.latlong?.lat) && Number.isFinite(item.latlong?.long) ? (
+              <div className="span-2">
+                <dt>Tọa độ</dt>
+                <dd>
+                  <a
+                    className="link-btn"
+                    href={`https://www.google.com/maps?q=${item.latlong.lat},${item.latlong.long}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {item.latlong.lat}, {item.latlong.long} — Xem bản đồ
+                  </a>
+                </dd>
+              </div>
+            ) : Number.isFinite(item.latitude) && Number.isFinite(item.longitude) ? (
               <div className="span-2">
                 <dt>Tọa độ</dt>
                 <dd>
@@ -251,6 +262,7 @@ function VerificationDetailPanel({
             <VerifyDocCard label="CCCD mặt trước" url={item.cccdFrontImage} />
             <VerifyDocCard label="CCCD mặt sau" url={item.cccdBackImage} />
             <VerifyDocCard label="Ảnh selfie" url={item.selfieImage} />
+            <VerifyDocCard label="Giấy tờ kinh doanh" url={item.businessImage} />
           </div>
         </section>
 

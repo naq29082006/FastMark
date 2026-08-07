@@ -179,7 +179,6 @@ exports.createReport = async (req, res) => {
     productName: pickBodyValue(req.body, ["productName", "product_name"]),
     reviewId: pickBodyValue(req.body, ["reviewId", "review_id"]),
     reviewerName: pickBodyValue(req.body, ["reviewerName", "userName", "user_name"]),
-    targetUserId: pickBodyValue(req.body, ["targetUserId", "target_user_id"]),
     title,
     content,
     images: req.body.images || req.body.imageUrls || [],

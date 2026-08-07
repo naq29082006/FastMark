@@ -9,7 +9,7 @@ async function getShopStatsForUser(userId, userDoc = null) {
 
   const owner =
     userDoc ||
-    (await User.findById(userId).select("FullName UserName Phone Avatar FollowersCount").lean());
+    (await User.findById(userId).select("FullName UserName Phone Avatar FollowingCount").lean());
 
   if (!shop) {
     return {
@@ -75,18 +75,7 @@ async function buildPublicUserProfile(user) {
 
   const publicUser = user.toPublicJSON();
   const { legacyShopFollowersCount, ...storefrontStats } = shopStats;
-  const followersCount =
-    Number(publicUser.followersCount) || Number(legacyShopFollowersCount) || 0;
-
-  // Backfill User.FollowersCount once from legacy shop counter.
-  if (
-    Number(publicUser.followersCount) === 0 &&
-    Number(legacyShopFollowersCount) > 0 &&
-    user?.FollowersCount !== legacyShopFollowersCount
-  ) {
-    user.FollowersCount = legacyShopFollowersCount;
-    await user.save().catch(() => null);
-  }
+  const followersCount = Number(legacyShopFollowersCount) || 0;
 
   return {
     ...publicUser,

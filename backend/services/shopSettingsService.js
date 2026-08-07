@@ -1,7 +1,7 @@
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
 const { SHOP_OPEN } = require("../constants");
-const { isSubscriptionActive } = require("../constants");
+const { isSubscriptionActive, isRecordActive } = require("../constants");
 const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService");
 const {
   pickString,
@@ -12,11 +12,19 @@ const {
   assertShopUsernameAvailable,
   normalizeShopUsername,
 } = require("../utils/shopIdentity");
+const {
+  resolveShopLatlong,
+  applyShopLatlongFromPayload,
+} = require("../utils/shopCoordinates");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function resolveShopQrId(shop) {
+  return String(shop?._id || shop?.id || "").trim();
 }
 
 function toPublicShopSettings(shop, user) {
@@ -35,6 +43,8 @@ function toPublicShopSettings(shop, user) {
     0,
     Math.min(100, Number(shop.cocTien ?? shop.depositPercent) || 0)
   );
+  const coords = resolveShopLatlong(shop);
+  const shopQrId = resolveShopQrId(shop);
 
   return {
     id: shop._id,
@@ -53,24 +63,22 @@ function toPublicShopSettings(shop, user) {
     systemAddress,
     addressHeThong: systemAddress,
     address: systemAddress,
-    latitude: shop.latitude ?? null,
-    longitude: shop.longitude ?? null,
+    latlong: coords,
+    latitude: coords.lat,
+    longitude: coords.long,
     shopPhone: user?.Phone || "",
     userPhone: user?.Phone || "",
     openTime: shop.openTime || "",
     closeTime: shop.closeTime || "",
     isOpen: Number(shop.isOpen) === SHOP_OPEN.OPEN ? 1 : 0,
     status: shop.status ?? 1,
-    followersCount: Number(user?.FollowersCount) || 0,
+    followersCount: Number(shop.followersCount) || 0,
     depositPercent,
     cocTien: depositPercent,
-    qrCodeValue: pickString(shop.qrCodeValue) || String(shop._id),
-    qrPayload: JSON.stringify({
-      shopId: pickString(shop.qrCodeValue) || String(shop._id),
-    }),
-    pinHours: Boolean(shop.pinHours),
+    qrCodeValue: shopQrId,
+    qrPayload: JSON.stringify({ shopId: shopQrId }),
     subscriptionActive: isSubscriptionActive(shop),
-    isActive: Boolean(shop.isActive),
+    isActive: isRecordActive(shop.isActive),
   };
 }
 
@@ -80,11 +88,6 @@ async function getShopForSeller(user) {
     .sort({ CreatedAt: -1 });
   if (!shop) {
     throw createServiceError("Chưa có gian hàng.", 404);
-  }
-  if (!pickString(shop.qrCodeValue)) {
-    shop.qrCodeValue = String(shop._id);
-    shop.UpdatedAt = new Date();
-    await shop.save();
   }
   return shop;
 }
@@ -184,19 +187,19 @@ async function updateShopSettings(user, payload) {
         payload.address
     );
   }
-  if (payload.latitude !== undefined || payload.lat !== undefined) {
-    const latitude = Number(payload.latitude ?? payload.lat);
-    if (!Number.isFinite(latitude)) {
-      throw createServiceError("Tọa độ vĩ độ không hợp lệ.");
+  if (
+    payload.latlong !== undefined ||
+    payload.latitude !== undefined ||
+    payload.lat !== undefined ||
+    payload.longitude !== undefined ||
+    payload.lng !== undefined ||
+    payload.long !== undefined
+  ) {
+    try {
+      applyShopLatlongFromPayload(shop, payload);
+    } catch (coordError) {
+      throw createServiceError(coordError.message, coordError.statusCode || 400);
     }
-    shop.latitude = latitude;
-  }
-  if (payload.longitude !== undefined || payload.lng !== undefined) {
-    const longitude = Number(payload.longitude ?? payload.lng);
-    if (!Number.isFinite(longitude)) {
-      throw createServiceError("Tọa độ kinh độ không hợp lệ.");
-    }
-    shop.longitude = longitude;
   }
   if (payload.openTime !== undefined) {
     shop.openTime = normalizeTime(payload.openTime);
@@ -216,19 +219,6 @@ async function updateShopSettings(user, payload) {
       throw createServiceError("Phần trăm đặt cọc phải từ 0 đến 100.");
     }
     shop.cocTien = percent;
-  }
-
-  if (payload.pinHours !== undefined) {
-    shop.pinHours = Boolean(payload.pinHours);
-    shop.markModified("pinHours");
-  } else if (
-    (payload.openTime !== undefined || payload.closeTime !== undefined) &&
-    shop.openTime &&
-    shop.closeTime &&
-    shop.pinHours == null
-  ) {
-    shop.pinHours = true;
-    shop.markModified("pinHours");
   }
 
   shop.UpdatedAt = new Date();

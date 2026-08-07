@@ -19,6 +19,12 @@ import { isSameData } from '../../core/utils/realtimeList';
 import ProfileSubScreen from '../profile/ProfileSubScreen';
 import { useResourceSocket } from '../../hooks/useResourceSocket';
 import WalletBalanceTopUpBar from '../shared/components/WalletBalanceTopUpBar';
+import PlanTabPanel from '../shared/components/PlanTabPanel';
+
+const PLAN_SCREEN_TABS = [
+  { key: 'owned', label: 'Gói đang có' },
+  { key: 'buy', label: 'Mua gói' },
+];
 
 function formatExpiry(value) {
   if (!value) return '';
@@ -66,6 +72,7 @@ export default function SellerSubscriptionScreen({ onBack, onOpenWallet, onOpenB
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [buyingPlan, setBuyingPlan] = useState(null);
+  const [screenTab, setScreenTab] = useState('owned');
 
   const plans = useMemo(() => {
     const rows = Array.isArray(data?.plans) ? [...data.plans] : [];
@@ -133,6 +140,7 @@ export default function SellerSubscriptionScreen({ onBack, onOpenWallet, onOpenB
               const result = await purchaseSellerSubscriptionViewModel(plan.id);
               const wasActive = Boolean(data?.subscriptionActive);
               setData(result);
+              setScreenTab('owned');
               Alert.alert(
                 'Đã kích hoạt',
                 wasActive
@@ -170,140 +178,169 @@ export default function SellerSubscriptionScreen({ onBack, onOpenWallet, onOpenB
         </View>
       ) : (
         <>
-          <WalletBalanceTopUpBar
-            balance={data?.walletBalance ?? 0}
-            onTopUp={() => onOpenWallet?.()}
-          />
-
-          {purchases.length > 0 ? (
+          <PlanTabPanel
+            tabs={PLAN_SCREEN_TABS}
+            activeTab={screenTab}
+            onChangeTab={setScreenTab}
+          >
+          {screenTab === 'owned' ? (
             <>
-              <Text style={styles.sectionLabel}>Chi tiết gói đang có</Text>
-              <View style={styles.purchaseList}>
-                {purchases.map((item, index) => (
-                  <View key={String(item.id || index)} style={styles.purchaseCard}>
-                    <Text style={styles.purchaseMeta}>
-                      Ngày mua: {formatExpiry(item.ngayMua || item.purchasedAt || item.createdAt)}
-                    </Text>
-                    <Text style={styles.purchaseMeta}>
-                      Ngày có hiệu lực: {formatExpiry(item.effectiveFrom || item.startDate)}
-                    </Text>
-                    <Text style={styles.purchaseMeta}>
-                      Ngày hết hạn: {formatExpiry(item.expiresAt || item.endDate)}
-                    </Text>
-                    {item.amount ? (
-                      <Text style={styles.purchaseAmount}>{formatPrice(item.amount)}</Text>
-                    ) : null}
+              {isActive ? (
+                <View style={styles.statusBanner}>
+                  <Ionicons name="checkmark-circle" size={18} color={t.primary} />
+                  <Text style={styles.statusBannerText}>Gói bán hàng đang có hiệu lực</Text>
+                </View>
+              ) : (
+                <View style={styles.statusBannerMuted}>
+                  <Text style={styles.statusBannerTextMuted}>
+                    Chưa có gói đang hiệu lực. Chuyển sang tab Mua gói để đăng ký.
+                  </Text>
+                </View>
+              )}
+
+              {purchases.length > 0 ? (
+                <View style={styles.purchaseList}>
+                  {purchases.map((item, index) => (
+                    <View key={String(item.id || index)} style={styles.purchaseCard}>
+                      <Text style={styles.purchaseMeta}>
+                        Ngày mua: {formatExpiry(item.ngayMua || item.purchasedAt || item.createdAt)}
+                      </Text>
+                      <Text style={styles.purchaseMeta}>
+                        Ngày có hiệu lực: {formatExpiry(item.effectiveFrom || item.startDate)}
+                      </Text>
+                      <Text style={styles.purchaseMeta}>
+                        Ngày hết hạn: {formatExpiry(item.expiresAt || item.endDate)}
+                      </Text>
+                      {item.amount ? (
+                        <Text style={styles.purchaseAmount}>{formatPrice(item.amount)}</Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="file-tray-outline" size={28} color="#94a3b8" />
+                  <Text style={styles.emptyTitle}>Chưa có gói nào</Text>
+                  <Text style={styles.emptyBody}>
+                    Lịch sử mua gói sẽ hiển thị tại đây. Bấm tab Mua gói để chọn gói phù hợp.
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              <WalletBalanceTopUpBar
+                balance={data?.walletBalance ?? 0}
+                onTopUp={() => onOpenWallet?.()}
+              />
+              <Text style={styles.sectionLabel}>Quyền lợi gói</Text>
+              <View style={styles.benefitCard}>
+                {BENEFITS.map((item) => (
+                  <View key={item} style={styles.benefitRow}>
+                    <View style={styles.benefitIcon}>
+                      <Ionicons name="checkmark" size={14} color={t.primary} />
+                    </View>
+                    <Text style={styles.benefitText}>{item}</Text>
                   </View>
                 ))}
               </View>
-            </>
-          ) : null}
 
-          <Text style={styles.sectionLabel}>Quyền lợi gói</Text>
-          <View style={styles.benefitCard}>
-            {BENEFITS.map((item) => (
-              <View key={item} style={styles.benefitRow}>
-                <View style={styles.benefitIcon}>
-                  <Ionicons name="checkmark" size={14} color={t.primary} />
+              <Text style={styles.sectionLabel}>Chọn gói phù hợp</Text>
+              {plans.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="diamond-outline" size={28} color="#94a3b8" />
+                  <Text style={styles.emptyTitle}>Chưa có gói nào</Text>
+                  <Text style={styles.emptyBody}>Vui lòng quay lại sau khi admin cấu hình gói.</Text>
                 </View>
-                <Text style={styles.benefitText}>{item}</Text>
-              </View>
-            ))}
-          </View>
+              ) : (
+                plans.map((plan, index) => {
+                  const accent = getPlanAccent(index, plans.length);
+                  const featured = accent === 'featured';
+                  const daily = getDailyPrice(plan);
+                  const savePercent =
+                    baseDaily > 0 && daily < baseDaily
+                      ? Math.round(((baseDaily - daily) / baseDaily) * 100)
+                      : 0;
+                  const isBuying = buyingPlan === plan.id;
+                  const planName = plan.name || plan.label || 'Gói';
 
-          <Text style={styles.sectionLabel}>Chọn gói phù hợp</Text>
-          {plans.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Ionicons name="diamond-outline" size={28} color="#94a3b8" />
-              <Text style={styles.emptyTitle}>Chưa có gói nào</Text>
-              <Text style={styles.emptyBody}>Vui lòng quay lại sau khi admin cấu hình gói.</Text>
-            </View>
-          ) : (
-            plans.map((plan, index) => {
-              const accent = getPlanAccent(index, plans.length);
-              const featured = accent === 'featured';
-              const daily = getDailyPrice(plan);
-              const savePercent =
-                baseDaily > 0 && daily < baseDaily
-                  ? Math.round(((baseDaily - daily) / baseDaily) * 100)
-                  : 0;
-              const isBuying = buyingPlan === plan.id;
-              const planName = plan.name || plan.label || 'Gói';
+                  return (
+                    <View
+                      key={String(plan.id || planName)}
+                      style={[styles.planCard, featured && styles.planCardFeatured]}
+                    >
+                      {featured ? (
+                        <View style={styles.popularBadge}>
+                          <Ionicons name="sparkles" size={12} color="#ffffff" />
+                          <Text style={styles.popularBadgeText}>Khuyến nghị</Text>
+                        </View>
+                      ) : null}
 
-              return (
-                <View
-                  key={String(plan.id || planName)}
-                  style={[styles.planCard, featured && styles.planCardFeatured]}
-                >
-                  {featured ? (
-                    <View style={styles.popularBadge}>
-                      <Ionicons name="sparkles" size={12} color="#ffffff" />
-                      <Text style={styles.popularBadgeText}>Khuyến nghị</Text>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.planHeader}>
-                    <View style={[styles.planIconWrap, featured && styles.planIconWrapFeatured]}>
-                      <Ionicons
-                        name="diamond"
-                        size={20}
-                        color={featured ? '#ffffff' : t.primary}
-                      />
-                    </View>
-                    <View style={styles.planHeaderCopy}>
-                      <Text style={[styles.planLabel, featured && styles.planLabelFeatured]}>
-                        {planName}
-                      </Text>
-                      <Text style={styles.planMonths}>{formatPlanDuration(plan)}</Text>
-                    </View>
-                    {savePercent > 0 ? (
-                      <View style={styles.savePill}>
-                        <Text style={styles.savePillText}>-{savePercent}%</Text>
+                      <View style={styles.planHeader}>
+                        <View style={[styles.planIconWrap, featured && styles.planIconWrapFeatured]}>
+                          <Ionicons
+                            name="diamond"
+                            size={20}
+                            color={featured ? '#ffffff' : t.primary}
+                          />
+                        </View>
+                        <View style={styles.planHeaderCopy}>
+                          <Text style={[styles.planLabel, featured && styles.planLabelFeatured]}>
+                            {planName}
+                          </Text>
+                          <Text style={styles.planMonths}>{formatPlanDuration(plan)}</Text>
+                        </View>
+                        {savePercent > 0 ? (
+                          <View style={styles.savePill}>
+                            <Text style={styles.savePillText}>-{savePercent}%</Text>
+                          </View>
+                        ) : null}
                       </View>
-                    ) : null}
-                  </View>
 
-                  <View style={styles.priceRow}>
-                    <Text style={[styles.planPrice, featured && styles.planPriceFeatured]}>
-                      {formatPrice(plan.price)}
-                    </Text>
-                    <Text style={styles.planMonthly}>≈ {formatPrice(daily)}/ngày</Text>
-                  </View>
-
-                  {plan.description ? (
-                    <Text style={styles.planDesc}>{plan.description}</Text>
-                  ) : null}
-
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.buyBtn,
-                      featured ? styles.buyBtnFeatured : styles.buyBtnDefault,
-                      Boolean(buyingPlan) && styles.buyBtnDisabled,
-                      pressed && !buyingPlan && styles.pressed,
-                    ]}
-                    disabled={Boolean(buyingPlan)}
-                    onPress={() => handlePurchase(plan)}
-                  >
-                    {isBuying ? (
-                      <ActivityIndicator color="#ffffff" />
-                    ) : (
-                      <>
-                        <Text style={styles.buyBtnText}>
-                          {isActive ? 'Gia hạn gói này' : 'Mua ngay'}
+                      <View style={styles.priceRow}>
+                        <Text style={[styles.planPrice, featured && styles.planPriceFeatured]}>
+                          {formatPrice(plan.price)}
                         </Text>
-                        <Ionicons name="arrow-forward" size={16} color="#ffffff" />
-                      </>
-                    )}
-                  </Pressable>
-                </View>
-              );
-            })
-          )}
+                        <Text style={styles.planMonthly}>≈ {formatPrice(daily)}/ngày</Text>
+                      </View>
 
-          <Text style={styles.footnote}>
-            Thanh toán trừ trực tiếp từ ví FastMark. Nếu số dư không đủ, hãy nạp ví rồi quay lại mua
-            gói.
-          </Text>
+                      {plan.description ? (
+                        <Text style={styles.planDesc}>{plan.description}</Text>
+                      ) : null}
+
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.buyBtn,
+                          featured ? styles.buyBtnFeatured : styles.buyBtnDefault,
+                          Boolean(buyingPlan) && styles.buyBtnDisabled,
+                          pressed && !buyingPlan && styles.pressed,
+                        ]}
+                        disabled={Boolean(buyingPlan)}
+                        onPress={() => handlePurchase(plan)}
+                      >
+                        {isBuying ? (
+                          <ActivityIndicator color="#ffffff" />
+                        ) : (
+                          <>
+                            <Text style={styles.buyBtnText}>
+                              {isActive ? 'Gia hạn gói này' : 'Mua ngay'}
+                            </Text>
+                            <Ionicons name="arrow-forward" size={16} color="#ffffff" />
+                          </>
+                        )}
+                      </Pressable>
+                    </View>
+                  );
+                })
+              )}
+
+              <Text style={styles.footnote}>
+                Thanh toán trừ trực tiếp từ ví FastMark. Nếu số dư không đủ, hãy nạp ví rồi quay lại
+                mua gói.
+              </Text>
+            </>
+          )}
+          </PlanTabPanel>
         </>
       )}
     </ProfileSubScreen>
@@ -332,10 +369,44 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginBottom: 10,
+    marginTop: 14,
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 0,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: t.primarySoft,
+    borderWidth: 1,
+    borderColor: '#A7D9B8',
+  },
+  statusBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: t.primaryDark,
+  },
+  statusBannerMuted: {
+    marginTop: 0,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  statusBannerTextMuted: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+    lineHeight: 18,
   },
   purchaseList: {
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 8,
   },
   purchaseCard: {
     backgroundColor: '#ffffff',

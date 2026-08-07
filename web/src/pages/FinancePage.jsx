@@ -9,10 +9,11 @@ import {
   Lock,
   RotateCcw,
   Send,
-  Store,
   Users,
   Wallet,
 } from 'lucide-react';
+
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 
 import { getFinanceOverview } from '../api/accountApi';
 import DashboardDateRange, { presetDates } from '../components/DashboardDateRange';
@@ -81,7 +82,7 @@ const BALANCE_METRICS = [
   {
     key: 'sellerWallets',
     label: 'Tổng ví người bán',
-    icon: Store,
+    icon: FastMarkShopPinIcon,
     tone: 'purple',
     value: (balances) => balances.sellerWalletTotal,
     detail: (balances) => `${formatNumber(balances.sellerWalletCount)} ví`,

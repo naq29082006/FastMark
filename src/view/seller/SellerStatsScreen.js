@@ -45,11 +45,6 @@ const ORDER_STATUS_ITEMS = [
   { key: 'cancelled', label: 'Đã hủy', color: '#f1f5f9', text: '#475569' },
 ];
 
-const INTERACTION_ITEMS = [
-  { key: 'followersCount', label: 'Người theo dõi', icon: 'people-outline', color: '#0e7490' },
-  { key: 'periodNewFollowers', label: 'Người theo dõi mới', icon: 'person-add-outline', color: '#7c3aed' },
-];
-
 function toApiDate(dateInput) {
   const parts = String(dateInput || '').trim().split('/');
   if (parts.length !== 3) {
@@ -242,22 +237,6 @@ function ProductSection({ stats }) {
           ))}
         </View>
       ) : null}
-    </View>
-  );
-}
-
-function InteractionGrid({ stats }) {
-  return (
-    <View style={styles.interactionGrid}>
-      {INTERACTION_ITEMS.map((item) => (
-        <View key={item.key} style={styles.interactionTile}>
-          <View style={[styles.interactionIconWrap, { backgroundColor: `${item.color}18` }]}>
-            <Ionicons name={item.icon} size={20} color={item.color} />
-          </View>
-          <Text style={styles.interactionValue}>{String(stats?.[item.key] || 0)}</Text>
-          <Text style={styles.interactionLabel}>{item.label}</Text>
-        </View>
-      ))}
     </View>
   );
 }
@@ -470,10 +449,6 @@ export default function SellerStatsScreen({ onBack, embedded = false }) {
 
       <SectionCard title="Sản phẩm">
         <ProductSection stats={stats} />
-      </SectionCard>
-
-      <SectionCard title="Tương tác khách hàng">
-        <InteractionGrid stats={stats} />
       </SectionCard>
 
       <SectionCard title="Đánh giá gian hàng">
@@ -805,42 +780,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#1d4ed8',
-  },
-  interactionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  interactionTile: {
-    width: '47%',
-    minWidth: '46%',
-    flexGrow: 1,
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 12,
-    alignItems: 'center',
-    gap: 6,
-  },
-  interactionIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  interactionValue: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  interactionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 15,
   },
   ratingSection: {
     flexDirection: 'row',

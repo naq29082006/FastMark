@@ -4,10 +4,21 @@ const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
 const Product = require("../models/Product");
 const { NOTIFICATION_AUDIENCE, NOTIFICATION_INDEX } = require("../constants");
+const {
+  isReviewSoftDeleted,
+  isReviewHidden,
+  notDeletedReviewFilter,
+  notAdminHiddenReviewFilter,
+  adminHiddenReviewFilter,
+  markReviewAdminHidden,
+  markReviewAdminDeleted,
+  clearReviewRemoval,
+  toAdminReviewRemovalFields,
+} = require("../utils/reviewRemoval");
 const { refreshShopReviewStats, loadReviewImagesMap } = require("./buyerReviewService");
 const { createNotification } = require("./notificationService");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
-const { resolveShopDisplayName } = require("../utils/shopIdentity");
+const { resolveShopDisplayName, resolveShopUsername, resolveShopAvatar } = require("../utils/shopIdentity");
 const { buildSearchRegex } = require("../utils/searchText");
 const {
   findUsersBySearchRegex,
@@ -54,7 +65,7 @@ function toReviewerSummary(user, fallbackName = "") {
 
 async function buildReviewFilter({ search, rating, status, productId, from, to }) {
   const filter = {
-    isDeleted: { $ne: true },
+    ...notDeletedReviewFilter(),
   };
   const normalizedRating = pickString(rating);
   const normalizedStatus = pickString(status);
@@ -72,9 +83,9 @@ async function buildReviewFilter({ search, rating, status, productId, from, to }
   }
 
   if (normalizedStatus === "visible") {
-    filter.isHidden = { $ne: true };
+    filter.$and = [...(filter.$and || []), notAdminHiddenReviewFilter()];
   } else if (normalizedStatus === "hidden") {
-    filter.isHidden = true;
+    filter.$and = [...(filter.$and || []), adminHiddenReviewFilter()];
   }
 
   if (!keyword) {
@@ -115,10 +126,10 @@ async function buildReviewFilter({ search, rating, status, productId, from, to }
     { label: "Đã ẩn", statuses: [1] },
   ]);
   if (matchedVisibility.includes(0)) {
-    orConditions.push({ isHidden: { $ne: true } });
+    orConditions.push(notAdminHiddenReviewFilter());
   }
   if (matchedVisibility.includes(1)) {
-    orConditions.push({ isHidden: true });
+    orConditions.push(adminHiddenReviewFilter());
   }
 
   orConditions.push(...buildObjectIdSearchConditions(keyword));
@@ -167,11 +178,15 @@ async function enrichReviews(reviews) {
     const product = review.productId ? productById.get(String(review.productId)) : null;
     const images = imagesByReview.get(String(review._id)) || [];
 
+    const removal = toAdminReviewRemovalFields(review);
+
     return {
       id: String(review._id),
       reviewer: toReviewerSummary(user),
       shopId: review.shopId ? String(review.shopId) : "",
       shopName: resolveShopDisplayName(shop, shopOwner),
+      shopUsername: resolveShopUsername(shop, shopOwner),
+      shopAvatar: resolveShopAvatar(shop, shopOwner),
       productId: review.productId ? String(review.productId) : "",
       productName: product?.ProductName || "—",
       reservationId: review.reservationId ? String(review.reservationId) : "",
@@ -180,8 +195,7 @@ async function enrichReviews(reviews) {
       images,
       imageUrl: images[0]?.imageUrl || "",
       createdAt: review.CreatedAt || null,
-      isHidden: Boolean(review.isHidden),
-      deletedAt: review.deletedAt || null,
+      ...removal,
     };
   });
 }
@@ -285,25 +299,26 @@ function assertModerationReason(reason) {
 
 async function setReviewVisibility(publicId, isHidden, { reason } = {}) {
   const review = await findReviewByPublicId(publicId);
-  if (review.isDeleted) {
+  if (isReviewSoftDeleted(review)) {
     throw createServiceError("Đánh giá đã bị xóa mềm.", 400);
   }
 
-  const wasHidden = Boolean(review.isHidden);
-  let moderationReason = "";
+  const wasHidden = isReviewHidden(review);
+  let adminRemovalReason = "";
 
   if (Boolean(isHidden) && !wasHidden) {
-    moderationReason = assertModerationReason(reason);
-    review.moderationReason = moderationReason;
+    adminRemovalReason = assertModerationReason(reason);
+    markReviewAdminHidden(review, adminRemovalReason);
+  } else if (!Boolean(isHidden) && wasHidden) {
+    clearReviewRemoval(review);
   }
 
-  review.isHidden = Boolean(isHidden);
   review.UpdatedAt = new Date();
   await review.save();
   const shop = await refreshShopReviewStats(review.shopId);
 
   if (Boolean(isHidden) && !wasHidden) {
-    await notifyReviewerReviewModerated(review, "hidden", moderationReason);
+    await notifyReviewerReviewModerated(review, "hidden", adminRemovalReason);
   }
 
   const [item] = await enrichReviews([review.toObject()]);
@@ -326,20 +341,17 @@ async function setReviewVisibility(publicId, isHidden, { reason } = {}) {
 
 async function softDeleteReview(publicId, { reason } = {}) {
   const review = await findReviewByPublicId(publicId);
-  if (review.isDeleted) {
+  if (isReviewSoftDeleted(review)) {
     throw createServiceError("Đánh giá đã bị xóa mềm.", 400);
   }
 
-  const moderationReason = assertModerationReason(reason);
+  const adminRemovalReason = assertModerationReason(reason);
   const now = new Date();
-  review.isDeleted = true;
-  review.isHidden = true;
-  review.deletedAt = now;
-  review.moderationReason = moderationReason;
+  markReviewAdminDeleted(review, adminRemovalReason, now);
   review.UpdatedAt = now;
   await review.save();
   const shop = await refreshShopReviewStats(review.shopId);
-  await notifyReviewerReviewModerated(review, "deleted", moderationReason);
+  await notifyReviewerReviewModerated(review, "deleted", adminRemovalReason);
 
   const payload = {
     reviewId: String(review._id),
@@ -356,11 +368,27 @@ async function softDeleteReview(publicId, { reason } = {}) {
     emitUserResourceUpdated(review.userId, "review", payload);
   }
 
-  return { id: String(review._id), deletedAt: now };
+  return { id: String(review._id), removedAt: now };
+}
+
+async function getReviewDetail(publicId) {
+  const review = await findReviewByPublicId(publicId);
+  const [item] = await enrichReviews([review.toObject()]);
+  if (!item) {
+    throw createServiceError("Không tìm thấy đánh giá.", 404);
+  }
+  return {
+    ...item,
+    meta: {
+      dataSource: "mongodb",
+      collection: "reviews",
+    },
+  };
 }
 
 module.exports = {
   listReviews,
+  getReviewDetail,
   setReviewVisibility,
   softDeleteReview,
   findReviewByPublicId,

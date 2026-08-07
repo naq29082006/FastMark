@@ -172,12 +172,14 @@ export default function AddressSearchBar({ onSelectResult, onFocusChange, placeh
 
 const styles = StyleSheet.create({
   wrapper: {
+    position: 'relative',
     zIndex: 40,
     elevation: 12,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: 44,
     backgroundColor: '#ffffff',
     borderRadius: 14,
     borderWidth: 1,
@@ -198,6 +200,10 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   dropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
     marginTop: 8,
     maxHeight: 220,
     borderRadius: 14,

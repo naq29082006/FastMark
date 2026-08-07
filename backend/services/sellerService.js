@@ -32,6 +32,17 @@ const {
 } = require("./pusherService");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
 
+function resolveBusinessImage(source) {
+  if (!source) {
+    return "";
+  }
+  return pickString(
+    source.businessImage ??
+      source.businessDocImage ??
+      source.businessDoc?.imageUrl
+  );
+}
+
 function pickPayloadValue(body, keys) {
   for (const key of keys) {
     const value = body?.[key];
@@ -46,13 +57,6 @@ function pickPayloadValue(body, keys) {
 function normalizeSellerRegistrationPayload(body = {}) {
   const shopName = pickPayloadValue(body, ["shopName", "storeName", "tenGianHang", "TenGianHang"]);
   const shopUsername = pickPayloadValue(body, ["shopUsername", "storeUsername"]);
-  const shopDescription = pickPayloadValue(body, [
-    "shopDescription",
-    "description",
-    "bio",
-    "shopBio",
-    "gioiThieuShop",
-  ]);
   const categoryId = pickPayloadValue(body, ["categoryId"]);
   const address = pickPayloadValue(body, ["address", "Address"]);
   const systemAddress = pickPayloadValue(body, [
@@ -66,13 +70,30 @@ function normalizeSellerRegistrationPayload(body = {}) {
     ...body,
     shopName: shopName ?? body.shopName,
     shopUsername: shopUsername ?? body.shopUsername,
-    shopDescription: shopDescription ?? body.shopDescription,
     categoryId: normalizeCategoryId(categoryId ?? body.categoryId),
     systemAddress:
       systemAddress ?? body.systemAddress ?? body.addressHeThong ?? body.DiaChiHeThong ?? address ?? body.address,
-    latitude: body.latitude ?? body.lat,
-    longitude: body.longitude ?? body.lng,
+    latlong: resolveVerificationLatlong(body),
   };
+}
+
+function resolveVerificationLatlong(source = {}) {
+  const nested = source?.latlong;
+  if (nested && typeof nested === "object") {
+    const lat = Number(nested.lat);
+    const long = Number(nested.long ?? nested.lng);
+    if (Number.isFinite(lat) && Number.isFinite(long)) {
+      return { lat, long };
+    }
+  }
+
+  const lat = Number(source.latitude ?? source.lat);
+  const long = Number(source.longitude ?? source.lng ?? source.long);
+  if (Number.isFinite(lat) && Number.isFinite(long)) {
+    return { lat, long };
+  }
+
+  return { lat: null, long: null };
 }
 
 function resolveCategoryFields(verification) {
@@ -374,6 +395,7 @@ async function promoteUserToSeller(user, verification, approvedById = null) {
   await user.save();
 
   const categoryId = verification.categoryId?._id || verification.categoryId || null;
+  const coords = resolveVerificationLatlong(verification);
 
   const existingShop = await ShopProfile.findOne({ userId: user._id });
   let shop = existingShop;
@@ -383,18 +405,14 @@ async function promoteUserToSeller(user, verification, approvedById = null) {
       shopName: verification.shopName || "",
       shopUsername: verification.shopUsername || "",
       categoryId,
-      description: verification.shopDescription || verification.description || "",
+      description: "",
       addressHeThong:
         verification.addressHeThong ||
         verification.DiaChiHeThong ||
         verification.address ||
         "",
-      latitude: verification.latitude,
-      longitude: verification.longitude,
+      latlong: { lat: coords.lat, long: coords.long },
     });
-    // QR cố định = shopId (gán sau create vì cần _id).
-    shop.qrCodeValue = String(shop._id);
-    await shop.save();
   } else {
     if (categoryId) {
       existingShop.categoryId = categoryId;
@@ -405,19 +423,13 @@ async function promoteUserToSeller(user, verification, approvedById = null) {
     if (verification.shopUsername) {
       existingShop.shopUsername = verification.shopUsername;
     }
-    if (verification.shopDescription || verification.description) {
-      existingShop.description = verification.shopDescription || verification.description;
-    }
     existingShop.addressHeThong =
       verification.addressHeThong ||
       verification.DiaChiHeThong ||
       verification.address ||
       "";
-    existingShop.latitude = verification.latitude;
-    existingShop.longitude = verification.longitude;
-    if (!existingShop.qrCodeValue) {
-      existingShop.qrCodeValue = String(existingShop._id);
-    }
+    existingShop.latlong = { lat: coords.lat, long: coords.long };
+    existingShop.markModified("latlong");
     existingShop.UpdatedAt = new Date();
     await existingShop.save();
     shop = existingShop;
@@ -489,14 +501,13 @@ async function submitSellerVerification(user, payload) {
   }
 
   const systemAddress = String(normalizedPayload.systemAddress || "").trim();
-  const latitude = Number(normalizedPayload.latitude);
-  const longitude = Number(normalizedPayload.longitude);
+  const { lat, long } = normalizedPayload.latlong || resolveVerificationLatlong(normalizedPayload);
 
   if (!systemAddress) {
     throw createServiceError("Vui lòng nhập địa chỉ.");
   }
 
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+  if (!Number.isFinite(lat) || !Number.isFinite(long)) {
     throw createServiceError("Vui lòng chọn vị trí trên bản đồ.");
   }
 
@@ -510,9 +521,8 @@ async function submitSellerVerification(user, payload) {
   }
 
   const category = await assertCategoryExists(normalizedPayload.categoryId);
-  const shopDescription = String(normalizedPayload.shopDescription || "").trim();
 
-  const [cccdFrontImage, cccdBackImage, selfieImage] = await Promise.all([
+  const [cccdFrontImage, cccdBackImage, selfieImage, businessImage] = await Promise.all([
     resolveVerificationImage({
       user,
       imageBase64: normalizedPayload.cccdFrontImageBase64,
@@ -538,19 +548,37 @@ async function submitSellerVerification(user, payload) {
       folder: "seller-verification",
       label: "selfie",
     }),
+    resolveVerificationImage({
+      user,
+      imageBase64:
+        normalizedPayload.businessImageBase64 ?? normalizedPayload.businessDocImageBase64,
+      mimeType: normalizedPayload.businessImageMimeType ?? normalizedPayload.businessDocMimeType,
+      existingUrl:
+        resolveBusinessImage(existing) ||
+        normalizedPayload.businessImageUrl ||
+        normalizedPayload.businessDocImageUrl ||
+        null,
+      folder: "seller-verification",
+      label: "business-doc",
+    }),
   ]);
+
+  if (!businessImage) {
+    throw createServiceError(
+      "Vui lòng tải ảnh giấy phép kinh doanh hoặc giấy chứng nhận ATTP."
+    );
+  }
 
   const sharedFields = {
     cccdFrontImage,
     cccdBackImage,
     selfieImage,
+    businessImage,
     shopName,
     shopUsername,
-    shopDescription,
     categoryId: category._id,
     addressHeThong: systemAddress,
-    latitude,
-    longitude,
+    latlong: { lat, long },
     status: SELLER_VERIFICATION_STATUS.PENDING,
     LyDoTuChoi: "",
     approvedBy: null,
@@ -747,6 +775,7 @@ function toPublicVerification(verification) {
   }
 
   const category = resolveCategoryFields(verification);
+  const coords = resolveVerificationLatlong(verification);
 
   return {
     id: verification._id,
@@ -754,6 +783,7 @@ function toPublicVerification(verification) {
     cccdFrontImage: verification.cccdFrontImage || "",
     cccdBackImage: verification.cccdBackImage || "",
     selfieImage: verification.selfieImage || "",
+    businessImage: resolveBusinessImage(verification),
     address:
       verification.addressHeThong ||
       verification.DiaChiHeThong ||
@@ -769,14 +799,14 @@ function toPublicVerification(verification) {
       verification.DiaChiHeThong ||
       verification.address ||
       "",
-    latitude: verification.latitude,
-    longitude: verification.longitude,
+    latlong: coords,
+    latitude: coords.lat,
+    longitude: coords.long,
     // Tên/handle gian hàng lưu trên hồ sơ đăng ký.
     shopUsername: verification.shopUsername || "",
     shopName: verification.shopName || "",
     categoryId: category.categoryId,
     categoryName: category.categoryName,
-    shopDescription: verification.shopDescription || verification.description || "",
     status: verification.status,
     statusLabel: ADMIN_VERIFICATION_STATUS_LABELS[verification.status] || "Không rõ",
     lyDoTuChoi: verification.LyDoTuChoi || "",

@@ -33,6 +33,7 @@ export default function LeafletMap({
   navigationMode = false,
   followUser = false,
   interactive = true,
+  shouldAutoRecenter = true,
 }) {
   const webViewRef = useRef(null);
   const onEventRef = useRef(onEvent);
@@ -127,13 +128,24 @@ export default function LeafletMap({
     sendCommand({
       type: 'location',
       location: currentLocation,
-      recenter: !hasCenteredRef.current,
+      recenter: false,
     });
-
-    if (!hasCenteredRef.current) {
-      hasCenteredRef.current = true;
-    }
   }, [currentLocation, followUser, navigationMode, ready, sendNavLocationUpdate]);
+
+  useEffect(() => {
+    if (!shouldAutoRecenter || navigationMode || !ready || !hasValidLocation(currentLocation)) {
+      return;
+    }
+    if (hasCenteredRef.current) {
+      return;
+    }
+
+    hasCenteredRef.current = true;
+    sendCommand({
+      type: 'recenter',
+      location: currentLocation,
+    });
+  }, [shouldAutoRecenter, currentLocation, navigationMode, ready]);
 
   useEffect(() => {
     if (!navigationMode) {
@@ -168,6 +180,7 @@ export default function LeafletMap({
       return;
     }
 
+    hasCenteredRef.current = true;
     sendCommand({
       type: 'recenter',
       location,

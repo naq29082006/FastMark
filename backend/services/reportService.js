@@ -1,5 +1,4 @@
 const Report = require("../models/Report");
-const ReportImage = require("../models/ReportImage");
 const Product = require("../models/Product");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
@@ -13,6 +12,8 @@ const {
   USER_STATUS,
   SHOP_STATUS,
 } = require("../constants");
+const { normalizeEmbeddedImages, toPublicImageList } = require("../utils/embeddedImages");
+const { notDeletedReviewFilter } = require("../utils/reviewVisibility");
 const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService");
 const { resolveShopDisplayName } = require("../utils/shopIdentity");
 const {
@@ -22,6 +23,7 @@ const {
   ensureShopLockedAt,
   isLegacyShopLockAppealReport,
 } = require("./lockAppealService");
+const { normalizeReportType } = require("../utils/reportType");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -79,14 +81,13 @@ async function resolveProductById(productId) {
 function inferReportType(payload = {}) {
   const CONTENT_TYPES = [
     REPORT_TYPE.REVIEW,
-    REPORT_TYPE.USER,
     REPORT_TYPE.SHOP,
     REPORT_TYPE.PRODUCT,
     REPORT_TYPE.SYSTEM,
     REPORT_TYPE.OTHER,
   ];
-  const explicitType = Number(payload.reportType);
-  if (CONTENT_TYPES.includes(explicitType)) {
+  const explicitType = normalizeReportType(payload.reportType);
+  if (explicitType != null && CONTENT_TYPES.includes(explicitType)) {
     return explicitType;
   }
 
@@ -102,7 +103,7 @@ function inferReportType(payload = {}) {
     return REPORT_TYPE.SHOP;
   }
 
-  return REPORT_TYPE.USER;
+  return REPORT_TYPE.OTHER;
 }
 
 async function resolveReviewById(reviewId) {
@@ -114,7 +115,7 @@ async function resolveReviewById(reviewId) {
   const Review = require("../models/Review");
   const review = await Review.findOne({
     _id: rawId,
-    isDeleted: { $ne: true },
+    ...notDeletedReviewFilter(),
   }).lean();
   if (!review) {
     throw createServiceError("Không tìm thấy đánh giá để báo cáo.", 404);
@@ -231,21 +232,8 @@ async function normalizeImageUrls(images = []) {
   return urls;
 }
 
-async function saveReportImages(reportId, imageUrls = []) {
-  if (!imageUrls.length) {
-    return [];
-  }
-  const docs = await ReportImage.insertMany(
-    imageUrls.map((imageUrl) => ({
-      reportId,
-      imageUrl,
-      CreatedAt: new Date(),
-    }))
-  );
-  return docs.map((doc) => ({
-    id: String(doc._id),
-    imageUrl: doc.imageUrl,
-  }));
+function normalizeReportImages(imageUrls = []) {
+  return toPublicImageList(normalizeEmbeddedImages(imageUrls));
 }
 
 async function createReport(user, payload = {}) {
@@ -284,10 +272,9 @@ async function createReport(user, payload = {}) {
     const reviewerName = pickString(payload.reviewerName || payload.userName) || "khách hàng";
     const snippet = pickString(review.comment).slice(0, 120);
 
-    reportData.reviewId = String(review._id);
+    reportData.reviewId = review._id;
     reportData.shopId = review.shopId || null;
     reportData.productId = review.productId || null;
-    reportData.targetUserId = review.userId || null;
     reportData.content =
       note ||
       `Báo cáo đánh giá của ${reviewerName}${snippet ? `: "${snippet}"` : ""} — ${resolvedTitle}`;
@@ -308,7 +295,6 @@ async function createReport(user, payload = {}) {
 
     reportData.productId = product._id;
     reportData.shopId = shop?._id || product.ShopId || null;
-    reportData.targetUserId = shop?.userId || null;
     reportData.content =
       note ||
       `Báo cáo sản phẩm "${productName}"${shopDisplayName ? ` thuộc gian hàng "${shopDisplayName}"` : ""}: ${resolvedTitle}`;
@@ -333,34 +319,26 @@ async function createReport(user, payload = {}) {
       : null;
     const shopName = storeName || pickShopDisplayName(shop, shopOwner);
     reportData.shopId = shop._id;
-    reportData.targetUserId = shop.userId || null;
     reportData.content = note || `Báo cáo gian hàng "${shopName}": ${resolvedTitle}`;
   } else if (reportType === REPORT_TYPE.SYSTEM) {
     reportData.content = note || `Báo cáo lỗi hệ thống: ${resolvedTitle}`;
   } else if (reportType === REPORT_TYPE.OTHER) {
     reportData.content = note || `Tố cáo khác: ${resolvedTitle}`;
-  } else if (reportType === REPORT_TYPE.USER) {
-    const targetUserId = pickString(payload.targetUserId || payload.target_user_id);
-    if (!isStrictMongoObjectId(targetUserId)) {
-      throw createServiceError(
-        "Thiếu người dùng bị tố cáo. Hãy báo cáo từ hồ sơ / cuộc trò chuyện tương ứng.",
-        400
-      );
-    }
-    reportData.targetUserId = targetUserId;
-    reportData.content = note || `Tố cáo người dùng: ${resolvedTitle}`;
   } else {
     reportData.content = note || resolvedTitle;
   }
 
   const imageUrls = await normalizeImageUrls(payload.images || payload.imageUrls || []);
-  const report = await Report.create(reportData);
-  const images = await saveReportImages(report._id, imageUrls);
+  const report = await Report.create({
+    ...reportData,
+    images: normalizeEmbeddedImages(imageUrls),
+  });
+  const images = normalizeReportImages(report.images);
 
   return {
     id: String(report._id),
     reportType: report.reportType,
-    reportTypeLabel: REPORT_TYPE_LABELS[report.reportType] || "Không rõ",
+    reportTypeLabel: REPORT_TYPE_LABELS[normalizeReportType(report.reportType)] || "Không rõ",
     title: report.title,
     content: report.content,
     status: report.status,
@@ -370,12 +348,11 @@ async function createReport(user, payload = {}) {
 }
 
 async function loadAppealImages(reportId) {
-  if (!reportId) return [];
-  const rows = await ReportImage.find({ reportId }).sort({ CreatedAt: 1 }).lean();
-  return rows.map((row) => ({
-    id: String(row._id),
-    imageUrl: row.imageUrl,
-  }));
+  if (!reportId) {
+    return [];
+  }
+  const report = await Report.findById(reportId).select("images").lean();
+  return normalizeReportImages(report?.images || []);
 }
 
 async function findShopByUserId(userId) {
@@ -498,10 +475,11 @@ async function createAccountLockAppeal(user, payload = {}) {
     content: note,
     status: REPORT_STATUS.PENDING,
     lockSessionAt: lockedAt || now,
+    images: normalizeEmbeddedImages(imageUrls),
     CreatedAt: now,
     UpdatedAt: now,
   });
-  const images = await saveReportImages(report._id, imageUrls);
+  const images = normalizeReportImages(report.images);
 
   return {
     id: String(report._id),
@@ -645,10 +623,11 @@ async function createShopLockAppeal(user, payload = {}) {
     content: note,
     status: REPORT_STATUS.PENDING,
     lockSessionAt: lockedAt || now,
+    images: normalizeEmbeddedImages(imageUrls),
     CreatedAt: now,
     UpdatedAt: now,
   });
-  const images = await saveReportImages(report._id, imageUrls);
+  const images = normalizeReportImages(report.images);
 
   return {
     id: String(report._id),

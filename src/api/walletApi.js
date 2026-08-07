@@ -39,12 +39,15 @@ export async function getWalletOnBackend(idToken) {
 
 export async function getWalletTransactionsOnBackend(
   idToken,
-  { page = 1, limit = DEFAULT_PAGE_SIZE } = {}
+  { page = 1, limit = DEFAULT_PAGE_SIZE, type } = {}
 ) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
+  if (type != null && String(type).trim() !== '') {
+    params.set('type', String(type));
+  }
   const response = await apiRequest(
     `${API_ENDPOINTS.walletTransactions}?${params.toString()}`,
     { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },

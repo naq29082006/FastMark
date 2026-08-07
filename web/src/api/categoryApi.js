@@ -1,4 +1,5 @@
 import { apiRequest } from './client';
+import { apiUrl } from '../config/env';
 
 function categoryBase(type) {
   return type === 'shops' ? '/api/categories/shops' : '/api/categories/products';
@@ -30,15 +31,6 @@ export function deleteCategory(token, type, categoryId) {
     token,
   });
 }
-
-export function restoreCategory(token, type, categoryId) {
-  return apiRequest(`${categoryBase(type)}/${categoryId}/restore`, {
-    method: 'POST',
-    token,
-  });
-}
-
-import { apiUrl } from '../config/env';
 
 export async function uploadCategoryIcon(token, type, categoryId, file) {
   const formData = new FormData();

@@ -1,32 +1,38 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-import { getMyNotificationsOnBackend } from '../../api/notificationApi';
+import {
+  getMyNotificationsOnBackend,
+  markAllNotificationsReadOnBackend,
+} from '../../api/notificationApi';
 import {
   notificationMatchesAudience,
   prependUniqueNotification,
 } from '../../core/utils/notificationRealtime';
 import { showErrorAlert } from '../../core/utils/appAlert';
 import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
-import { mergeListById } from '../../core/utils/realtimeList';
 import { useNotificationSocket } from '../../hooks/useNotificationSocket';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import {
   NOTIFICATION_TAB,
   NOTIFICATION_TABS,
-  filterNotificationsByTab,
+  notificationMatchesTab,
   resolveNotificationIndex,
 } from '../../constants/notifications';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
 import OrderStatusTabBar from '../shared/components/OrderStatusTabBar';
-import SubScreenHeader from '../shared/components/SubScreenHeader';
+import SubScreenHeader, {
+  APP_HEADER_ICON_BUTTON_STYLE,
+} from '../shared/components/SubScreenHeader';
 import NotificationDetailScreen from './NotificationDetailScreen';
 
 function formatNotificationTime(value) {
@@ -107,54 +113,79 @@ export default function NotificationsScreen({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const loadingGuardRef = useRef(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [activeTab, setActiveTab] = useState(NOTIFICATION_TAB.ALL);
+  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
+  const fetchSeqRef = useRef(0);
 
-  const filteredNotifications = useMemo(
-    () => filterNotificationsByTab(notifications, activeTab),
-    [notifications, activeTab]
-  );
-
-  const loadNotifications = useCallback(async ({ nextPage = 1, refresh = false } = {}) => {
-    if (loadingGuardRef.current) {
-      return;
+  const hasUnread = useMemo(() => {
+    if (unreadCount > 0) {
+      return true;
     }
-    loadingGuardRef.current = true;
-    if (nextPage === 1) {
-      setIsLoading(true);
-    } else {
-      setIsLoadingMore(true);
-    }
+    return notifications.some((item) => !item.isRead);
+  }, [notifications, unreadCount]);
 
-    try {
-      const result = await getMyNotificationsOnBackend(audience, {
-        page: nextPage,
-        limit: DEFAULT_PAGE_SIZE,
-      });
-      const items = (result.items || []).map((item) => ({
-        ...item,
-        index: resolveNotificationIndex(item),
-      }));
-      setNotifications((current) =>
-        nextPage === 1 ? mergeListById(current, items) : appendUniqueById(current, items)
-      );
-      setPage(Number(result.page) || nextPage);
-      setHasMore(Boolean(result.hasMore));
-      setTotalCount(Math.max(0, Number(result.total) || 0));
-    } catch (error) {
-      if (nextPage === 1) {
-        setNotifications([]);
-        setHasMore(false);
-        setTotalCount(0);
+  const loadNotifications = useCallback(
+    async ({ nextPage = 1, refresh = false, tab = activeTab } = {}) => {
+      if (loadingGuardRef.current && nextPage > 1) {
+        return;
       }
-      showErrorAlert(error.message || 'Không tải được thông báo.');
-    } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
-      loadingGuardRef.current = false;
-    }
-  }, [audience]);
+      const fetchSeq = ++fetchSeqRef.current;
+
+      if (nextPage === 1) {
+        loadingGuardRef.current = true;
+        setIsLoading(true);
+      } else {
+        if (loadingGuardRef.current) {
+          return;
+        }
+        loadingGuardRef.current = true;
+        setIsLoadingMore(true);
+      }
+
+      try {
+        const result = await getMyNotificationsOnBackend(audience, {
+          page: nextPage,
+          limit: DEFAULT_PAGE_SIZE,
+          tab,
+        });
+        if (fetchSeq !== fetchSeqRef.current) {
+          return;
+        }
+        const items = (result.items || []).map((item) => ({
+          ...item,
+          index: resolveNotificationIndex(item),
+        }));
+        setNotifications((current) =>
+          nextPage === 1 ? items : appendUniqueById(current, items)
+        );
+        setPage(Number(result.page) || nextPage);
+        setHasMore(Boolean(result.hasMore));
+        setTotalCount(Math.max(0, Number(result.total) || 0));
+        setUnreadCount(Math.max(0, Number(result.unreadCount) || 0));
+      } catch (error) {
+        if (fetchSeq !== fetchSeqRef.current) {
+          return;
+        }
+        if (nextPage === 1) {
+          setNotifications([]);
+          setHasMore(false);
+          setTotalCount(0);
+        }
+        showErrorAlert(error.message || 'Không tải được thông báo.');
+      } finally {
+        if (fetchSeq !== fetchSeqRef.current) {
+          return;
+        }
+        setIsLoading(false);
+        setIsLoadingMore(false);
+        loadingGuardRef.current = false;
+      }
+    },
+    [activeTab, audience]
+  );
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || isLoading || isLoadingMore || loadingGuardRef.current) {
@@ -173,16 +204,67 @@ export default function NotificationsScreen({
       if (!isScreenActive || !notificationMatchesAudience(notification, audience)) {
         return;
       }
+      if (!notificationMatchesTab(notification, activeTab)) {
+        return;
+      }
 
       setNotifications((current) => prependUniqueNotification(current, notification));
     },
-    [audience, isScreenActive]
+    [activeTab, audience, isScreenActive]
+  );
+
+  const handleNotificationReadAll = useCallback(
+    (payload) => {
+      if (!payload?.all) {
+        return;
+      }
+      const eventAudience = String(payload?.audience || 'buyer').trim().toLowerCase();
+      const screenAudience = String(audience || 'buyer').trim().toLowerCase();
+      if (eventAudience !== screenAudience) {
+        return;
+      }
+      setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+      setUnreadCount(0);
+    },
+    [audience]
   );
 
   useNotificationSocket({
     enabled: isScreenActive,
     onNotificationNew: handleRealtimeNotification,
+    onNotificationRead: handleNotificationReadAll,
   });
+
+  const markAllReadMessage =
+    audience === 'seller'
+      ? 'Bạn có muốn đánh dấu tất cả thông báo gian hàng là đã đọc không?'
+      : 'Bạn có muốn đánh dấu tất cả thông báo người mua là đã đọc không?';
+
+  const confirmMarkAllRead = useCallback(async () => {
+    if (isMarkingAllRead) {
+      return;
+    }
+    setIsMarkingAllRead(true);
+    try {
+      await markAllNotificationsReadOnBackend(audience);
+      setNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+      setUnreadCount(0);
+    } catch (error) {
+      showErrorAlert(error.message || 'Không đánh dấu được tất cả thông báo.');
+    } finally {
+      setIsMarkingAllRead(false);
+    }
+  }, [audience, isMarkingAllRead]);
+
+  const handleMarkAllReadPress = useCallback(() => {
+    if (!hasUnread || isMarkingAllRead) {
+      return;
+    }
+    Alert.alert('Đánh dấu đã đọc', markAllReadMessage, [
+      { text: 'Không', style: 'cancel' },
+      { text: 'Có', onPress: () => confirmMarkAllRead() },
+    ]);
+  }, [confirmMarkAllRead, hasUnread, isMarkingAllRead, markAllReadMessage]);
 
   useEffect(() => {
     if (!isScreenActive) {
@@ -190,8 +272,8 @@ export default function NotificationsScreen({
       setActiveTab(NOTIFICATION_TAB.ALL);
       return;
     }
-    loadNotifications({ nextPage: 1 });
-  }, [isScreenActive, loadNotifications]);
+    loadNotifications({ nextPage: 1, tab: activeTab });
+  }, [isScreenActive, activeTab, loadNotifications]);
 
   useEffect(() => {
     onNavigationStateChange?.(Boolean(isScreenActive && selectedNotification));
@@ -222,19 +304,50 @@ export default function NotificationsScreen({
     );
   }
 
+  const markAllReadButton = (
+    <Pressable
+      onPress={handleMarkAllReadPress}
+      disabled={isMarkingAllRead || !hasUnread}
+      style={({ pressed }) => [
+        styles.markAllBtn,
+        !hasUnread && styles.markAllBtnMuted,
+        pressed && hasUnread && !isMarkingAllRead && styles.markAllBtnPressed,
+        isMarkingAllRead && styles.markAllBtnDisabled,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="Đánh dấu tất cả đã đọc"
+      hitSlop={8}
+    >
+      {isMarkingAllRead ? (
+        <ActivityIndicator size="small" color="#076F32" />
+      ) : (
+        <Ionicons
+          name="checkmark-done-outline"
+          size={20}
+          color={hasUnread ? '#076F32' : '#cbd5e1'}
+        />
+      )}
+    </Pressable>
+  );
+
   return (
     <View style={styles.screen}>
-      <SubScreenHeader title="Thông báo" onBack={onBack} />
+      <SubScreenHeader title="Thông báo" onBack={onBack} rightSlot={markAllReadButton} />
 
-      <OrderStatusTabBar tabs={NOTIFICATION_TABS} activeTab={activeTab} onChangeTab={setActiveTab} />
+      <OrderStatusTabBar
+        tabs={NOTIFICATION_TABS}
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        equalWidth
+      />
 
-      {isLoading && filteredNotifications.length === 0 ? (
+      {isLoading && notifications.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator color="#076F32" />
         </View>
       ) : (
         <FlatList
-          data={filteredNotifications}
+          data={notifications}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={[
             styles.listContent,
@@ -247,15 +360,13 @@ export default function NotificationsScreen({
           refreshing={isLoading}
           onRefresh={() => loadNotifications({ nextPage: 1, refresh: true })}
           ListFooterComponent={
-            filteredNotifications.length > 0 ? (
+            notifications.length > 0 ? (
               <LoadMoreButton
-                currentCount={filteredNotifications.length}
+                currentCount={notifications.length}
                 totalCount={
-                  activeTab === NOTIFICATION_TAB.ALL
-                    ? Math.max(totalCount, filteredNotifications.length)
-                    : hasMore
-                      ? filteredNotifications.length + DEFAULT_PAGE_SIZE
-                      : filteredNotifications.length
+                  hasMore
+                    ? Math.max(totalCount, notifications.length + DEFAULT_PAGE_SIZE)
+                    : Math.max(totalCount, notifications.length)
                 }
                 loading={isLoadingMore}
                 onPress={handleLoadMore}
@@ -283,6 +394,18 @@ export default function NotificationsScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f1f5f9' },
+  markAllBtn: {
+    ...APP_HEADER_ICON_BUTTON_STYLE,
+  },
+  markAllBtnPressed: {
+    opacity: 0.82,
+  },
+  markAllBtnDisabled: {
+    opacity: 0.65,
+  },
+  markAllBtnMuted: {
+    opacity: 0.55,
+  },
   errorText: {
     color: '#dc2626',
     marginHorizontal: 16,

@@ -7,7 +7,6 @@ module.exports = {
   updateProductCategory: productCategoryService.updateCategory,
   deleteProductCategory: productCategoryService.deleteCategory,
   restoreProductCategory: productCategoryService.restoreCategory,
-  uploadProductCategoryIcon: productCategoryService.uploadCategoryIcon,
   assertProductCategoryExists: productCategoryService.assertProductCategoryExists,
   getProductCategoryNameMap: productCategoryService.getProductCategoryNameMap,
 
@@ -16,6 +15,7 @@ module.exports = {
   updateShopCategory: shopCategoryService.updateCategory,
   deleteShopCategory: shopCategoryService.deleteCategory,
   restoreShopCategory: shopCategoryService.restoreCategory,
+  uploadShopCategoryIcon: shopCategoryService.uploadCategoryIcon,
   assertShopCategoryExists: shopCategoryService.assertShopCategoryExists,
   getShopCategoryNameMap: shopCategoryService.getShopCategoryNameMap,
 
@@ -25,5 +25,4 @@ module.exports = {
   updateCategory: productCategoryService.updateCategory,
   deleteCategory: productCategoryService.deleteCategory,
   assertCategoryExists: shopCategoryService.assertShopCategoryExists,
-  getCategoryNameMap: shopCategoryService.getShopCategoryNameMap,
 };

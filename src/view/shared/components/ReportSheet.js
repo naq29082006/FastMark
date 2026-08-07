@@ -1,7 +1,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BOTTOM_SHEET_BORDER, BottomSheetDismissOverlay, BottomSheetHandle, BottomSheetPanel } from './bottomSheetChrome';
+import { BottomSheetDismissOverlay, BottomSheetHandle } from './bottomSheetChrome';
+import { FormSheetHeader, FormSheetShell, FORM_SHEET_SCROLL_STYLE } from './formSheetLayout';
 
 const DEFAULT_REPORT_REASONS = [
   'Hàng giả / hàng kém chất lượng',
@@ -13,20 +13,18 @@ const DEFAULT_REPORT_REASONS = [
 ];
 
 export default function ReportSheet({ visible, title, reasons, onClose, onSubmit }) {
-  const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, 12);
   const reasonList = Array.isArray(reasons) && reasons.length > 0 ? reasons : DEFAULT_REPORT_REASONS;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <BottomSheetDismissOverlay onClose={onClose}>
-        <BottomSheetPanel style={[styles.sheet, { paddingBottom: bottomInset }]}>
+        <FormSheetShell panelStyle={styles.sheet}>
           <BottomSheetHandle />
-          <Text style={styles.title}>{title || 'Báo cáo vi phạm'}</Text>
+          <FormSheetHeader title={title || 'Báo cáo vi phạm'} onClose={onClose} />
           <Text style={styles.subtitle}>Chọn lý do báo cáo</Text>
 
           <ScrollView
-            style={styles.reasonList}
+            style={FORM_SHEET_SCROLL_STYLE}
             contentContainerStyle={styles.reasonListContent}
             bounces={false}
             showsVerticalScrollIndicator={false}
@@ -41,11 +39,7 @@ export default function ReportSheet({ visible, title, reasons, onClose, onSubmit
               </Pressable>
             ))}
           </ScrollView>
-
-          <Pressable style={styles.cancelButton} onPress={onClose}>
-            <Text style={styles.cancelText}>Hủy</Text>
-          </Pressable>
-        </BottomSheetPanel>
+        </FormSheetShell>
       </BottomSheetDismissOverlay>
     </Modal>
   );
@@ -53,18 +47,8 @@ export default function ReportSheet({ visible, title, reasons, onClose, onSubmit
 
 const styles = StyleSheet.create({
   sheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    ...BOTTOM_SHEET_BORDER,
     paddingHorizontal: 16,
     paddingTop: 10,
-    maxHeight: '72%',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
   },
   subtitle: {
     marginTop: 4,
@@ -72,9 +56,6 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontSize: 13,
     fontWeight: '600',
-  },
-  reasonList: {
-    flexGrow: 0,
   },
   reasonListContent: {
     paddingBottom: 4,
@@ -96,18 +77,5 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontSize: 14,
     fontWeight: '600',
-  },
-  cancelButton: {
-    marginTop: 4,
-    minHeight: 46,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#e2e8f0',
-  },
-  cancelText: {
-    color: '#334155',
-    fontSize: 14,
-    fontWeight: '800',
   },
 });

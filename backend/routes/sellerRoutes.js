@@ -80,6 +80,13 @@ router.post(
 );
 
 router.get("/orders", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.listOrders));
+router.get("/reviews", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.listReviews));
+router.get(
+  "/reviews/:id",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerOpsController.getReviewDetail)
+);
 router.get(
   "/reservations/:id",
   verifyFirebaseToken,
@@ -121,6 +128,31 @@ router.post(
     req.body = { ...req.body, reservationId: req.params.id };
     return reservationReportController.sellerReportBuyer(req, res);
   })
+);
+
+router.post(
+  "/reservations/validate-pickup-qr",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerOpsController.validatePickupQr)
+);
+router.post(
+  "/reservations/:id/confirm-delivered",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerOpsController.confirmDelivered)
+);
+router.post(
+  "/reservations/:id/adjust-at-pickup",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerOpsController.adjustReservationAtPickup)
+);
+router.post(
+  "/reservations/:id/dispute-response",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerOpsController.respondToPostDeliveryComplaint)
 );
 
 router.get("/stats", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.getStats));

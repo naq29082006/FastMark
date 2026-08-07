@@ -486,7 +486,7 @@ export default function ProductDetailScreen({
 
       await submitReportOnBackend({
         idToken,
-        reportType: 4,
+        reportType: 3,
         productId: product.id,
         productName: product.name,
         shopId: store?.id || product.store_id,
@@ -560,7 +560,7 @@ export default function ProductDetailScreen({
               accessibilityLabel="Báo cáo sản phẩm"
               hitSlop={8}
             >
-              <Ionicons name="ellipsis-vertical" size={18} color="#0f172a" />
+              <Ionicons name="ellipsis-horizontal" size={20} color="#0f172a" />
             </Pressable>
           )
         }

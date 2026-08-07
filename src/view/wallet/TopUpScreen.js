@@ -18,13 +18,23 @@ import {
   cancelTopupViewModel,
   resolveTopupReturnViewModel,
   syncTopupViewModel,
+  loadWalletTransactionsViewModel,
 } from '../../viewmodel/wallet/walletViewModel';
 import SubScreenHeader from '../shared/components/SubScreenHeader';
 import KeyboardAwareScrollView from '../shared/components/KeyboardAwareScrollView';
-import KeyboardStickyFooter from '../shared/components/KeyboardStickyFooter';
 import KeyboardAwareTextInput from '../shared/components/KeyboardAwareTextInput';
+import PlanTabPanel from '../shared/components/PlanTabPanel';
+import LoadMoreButton from '../shared/components/LoadMoreButton';
+import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
+import { WALLET_TX_TYPE } from '../../model/walletModel';
+import { useResourceSocket } from '../../hooks/useResourceSocket';
+import WalletTransactionRow from './WalletTransactionRow';
+import WalletTransactionDetailScreen from './WalletTransactionDetailScreen';
 
-const ACTIONS_BAR_ESTIMATE = 72;
+const TOPUP_SCREEN_TABS = [
+  { key: 'topup', label: 'Nạp tiền' },
+  { key: 'history', label: 'Lịch sử nạp' },
+];
 
 const PRESETS = [50000, 100000, 200000, 500000];
 const POLL_MS = 2000;
@@ -89,8 +99,17 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
   const [submitting, setSubmitting] = useState(false);
   const [checkout, setCheckout] = useState(null);
   const [polling, setPolling] = useState(false);
+  const [screenTab, setScreenTab] = useState('topup');
+  const [topupHistory, setTopupHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
   const finishedRef = useRef(false);
   const handlingReturnRef = useRef(false);
+  const historyGuardRef = useRef(false);
 
   const selectedAmount = useMemo(() => {
     const custom = Math.round(Number(String(customText).replace(/\D/g, '')));
@@ -112,6 +131,7 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
       finishedRef.current = true;
       setPolling(false);
       setCheckout(null);
+      setScreenTab('history');
       onSuccess?.({
         amount: synced.transaction.amount,
         orderCode: synced.transaction.orderCode,
@@ -176,6 +196,71 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
     };
   }, [checkout?.orderCode, finishSuccess]);
 
+  const loadTopupHistory = useCallback(async ({ nextPage = 1, silent = false } = {}) => {
+    if (historyGuardRef.current) {
+      return;
+    }
+    historyGuardRef.current = true;
+    if (nextPage === 1) {
+      if (!silent) {
+        setHistoryLoading(true);
+      }
+    } else {
+      setHistoryLoadingMore(true);
+    }
+    try {
+      const data = await loadWalletTransactionsViewModel({
+        page: nextPage,
+        limit: DEFAULT_PAGE_SIZE,
+        type: WALLET_TX_TYPE.TOPUP,
+      });
+      const rows = data.transactions || [];
+      setTopupHistory((current) =>
+        nextPage === 1 ? rows : appendUniqueById(current, rows)
+      );
+      setHistoryPage(Number(data.page) || nextPage);
+      setHistoryHasMore(Boolean(data.hasMore));
+      setHistoryTotal(Math.max(0, Number(data.total) || 0));
+    } catch (error) {
+      if (!silent && nextPage === 1) {
+        Alert.alert('Lỗi', error.message || 'Không tải được lịch sử nạp.');
+        setTopupHistory([]);
+        setHistoryHasMore(false);
+        setHistoryTotal(0);
+      }
+    } finally {
+      if (!silent) {
+        setHistoryLoading(false);
+      }
+      setHistoryLoadingMore(false);
+      historyGuardRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (screenTab !== 'history') {
+      return;
+    }
+    loadTopupHistory({ nextPage: 1 });
+  }, [screenTab, loadTopupHistory]);
+
+  const handleWalletRealtime = useCallback(
+    (payload) => {
+      if (String(payload?.type || '').trim() !== 'wallet') {
+        return;
+      }
+      if (screenTab === 'history') {
+        loadTopupHistory({ nextPage: 1, silent: true });
+      }
+    },
+    [loadTopupHistory, screenTab]
+  );
+
+  useResourceSocket({
+    enabled: screenTab === 'history',
+    onResourceUpdated: handleWalletRealtime,
+  });
+
   async function handleConfirm() {
     if (submitting || checkout) return;
     if (!selectedAmount || selectedAmount < 10000) {
@@ -226,6 +311,16 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
           },
         },
       ]
+    );
+  }
+
+  if (selectedTransaction) {
+    return (
+      <WalletTransactionDetailScreen
+        transactionId={selectedTransaction.id}
+        initialTransaction={selectedTransaction}
+        onBack={() => setSelectedTransaction(null)}
+      />
     );
   }
 
@@ -286,83 +381,128 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
     <View style={styles.screen}>
       <SubScreenHeader title="Nạp tiền" onBack={onBack} />
 
-      <KeyboardAwareScrollView
-        contentContainerStyle={styles.content}
-        extraBottomInset={ACTIONS_BAR_ESTIMATE}
-      >
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Số dư hiện tại</Text>
-          <Text style={styles.balanceValue}>{formatPrice(balance)}</Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>Chọn mệnh giá nạp</Text>
-        <View style={styles.presetGrid}>
-          {PRESETS.map((value) => {
-            const active = !customText && amount === value;
-            return (
-              <Pressable
-                key={value}
-                onPress={() => selectPreset(value)}
-                style={[styles.presetChip, active && styles.presetChipActive]}
-              >
-                <Text style={[styles.presetText, active && styles.presetTextActive]}>
-                  {formatPrice(value)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.inputWrap}>
-          <Ionicons name="wallet-outline" size={18} color={t.textMuted} />
-          <KeyboardAwareTextInput
-            style={styles.input}
-            value={customText}
-            onChangeText={setCustomText}
-            placeholder="Nhập số tiền khác..."
-            placeholderTextColor="#94a3b8"
-            keyboardType="number-pad"
-          />
-          <Text style={styles.inputSuffix}>VNĐ</Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>Phương thức nạp</Text>
-        <View style={[styles.methodCard, styles.methodCardActive]}>
-          <View style={styles.methodIcon}>
-            <Ionicons name="card-outline" size={20} color={t.primaryDark} />
-          </View>
-          <View style={styles.methodBody}>
-            <Text style={styles.methodTitle}>Thanh toán PayOS</Text>
-            <Text style={styles.methodSub}>Nhúng trong app · nội dung CK = userId</Text>
-          </View>
-          <Ionicons name="checkmark-circle" size={22} color={t.primary} />
-        </View>
-      </KeyboardAwareScrollView>
-
-      <KeyboardStickyFooter style={styles.footer}>
-        <Pressable
-          style={[styles.confirmBtn, submitting && styles.confirmBtnDisabled]}
-          onPress={handleConfirm}
-          disabled={submitting}
+      <View style={styles.tabShell}>
+        <PlanTabPanel
+          tabs={TOPUP_SCREEN_TABS}
+          activeTab={screenTab}
+          onChangeTab={setScreenTab}
         >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <View style={styles.confirmRow}>
-              <Text style={styles.confirmText}>
-                {`Xác nhận nạp ${formatPrice(selectedAmount || 0)}`}
-              </Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
+          {screenTab === 'topup' ? (
+            <KeyboardAwareScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.tabContent}
+              nestedScrollPadding={false}
+            >
+              <View style={styles.balanceCard}>
+                <Text style={styles.balanceLabel}>Số dư hiện tại</Text>
+                <Text style={styles.balanceValue}>{formatPrice(balance)}</Text>
+              </View>
+
+              <Text style={styles.sectionTitle}>Chọn mệnh giá nạp</Text>
+              <View style={styles.presetGrid}>
+                {PRESETS.map((value) => {
+                  const active = !customText && amount === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => selectPreset(value)}
+                      style={[styles.presetChip, active && styles.presetChipActive]}
+                    >
+                      <Text style={[styles.presetText, active && styles.presetTextActive]}>
+                        {formatPrice(value)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.inputWrap}>
+                <Ionicons name="wallet-outline" size={18} color={t.textMuted} />
+                <KeyboardAwareTextInput
+                  style={styles.input}
+                  value={customText}
+                  onChangeText={setCustomText}
+                  placeholder="Nhập số tiền khác..."
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="number-pad"
+                />
+                <Text style={styles.inputSuffix}>VNĐ</Text>
+              </View>
+
+              <Text style={styles.sectionTitle}>Phương thức nạp</Text>
+              <View style={[styles.methodCard, styles.methodCardActive]}>
+                <View style={styles.methodIcon}>
+                  <Ionicons name="card-outline" size={20} color={t.primaryDark} />
+                </View>
+                <View style={styles.methodBody}>
+                  <Text style={styles.methodTitle}>Thanh toán PayOS</Text>
+                  <Text style={styles.methodSub}>Nhúng trong app · nội dung CK = userId</Text>
+                </View>
+                <Ionicons name="checkmark-circle" size={22} color={t.primary} />
+              </View>
+
+              <Pressable
+                style={[styles.confirmBtn, submitting && styles.confirmBtnDisabled]}
+                onPress={handleConfirm}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <View style={styles.confirmRow}>
+                    <Text style={styles.confirmText}>
+                      {`Xác nhận nạp ${formatPrice(selectedAmount || 0)}`}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={18} color="#fff" />
+                  </View>
+                )}
+              </Pressable>
+            </KeyboardAwareScrollView>
+          ) : historyLoading ? (
+            <View style={styles.historyLoading}>
+              <ActivityIndicator color={t.primary} size="large" />
             </View>
+          ) : (
+            <KeyboardAwareScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.historyContent}
+            >
+              {topupHistory.length === 0 ? (
+                <Text style={styles.historyEmpty}>Chưa có lần nạp tiền nào.</Text>
+              ) : (
+                <>
+                  <View style={styles.txCard}>
+                    {topupHistory.map((item) => (
+                      <WalletTransactionRow
+                        key={item.id}
+                        item={item}
+                        onPress={setSelectedTransaction}
+                      />
+                    ))}
+                  </View>
+                  <LoadMoreButton
+                    currentCount={topupHistory.length}
+                    totalCount={
+                      historyHasMore
+                        ? Math.max(historyTotal, topupHistory.length + DEFAULT_PAGE_SIZE)
+                        : topupHistory.length
+                    }
+                    loading={historyLoadingMore}
+                    onPress={() => loadTopupHistory({ nextPage: historyPage + 1 })}
+                  />
+                </>
+              )}
+            </KeyboardAwareScrollView>
           )}
-        </Pressable>
-      </KeyboardStickyFooter>
+        </PlanTabPanel>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f8fafc' },
+  scroll: { flex: 1 },
   checkoutMeta: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -394,6 +534,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: { padding: 20, gap: 14 },
+  tabShell: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  tabContent: { gap: 14, paddingBottom: 24 },
+  historyContent: { gap: 12, paddingBottom: 24 },
+  historyLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  historyEmpty: {
+    color: t.textMuted,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingVertical: 32,
+  },
+  txCard: {
+    borderWidth: 1,
+    borderColor: t.border,
+    borderRadius: t.radius,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
   balanceCard: {
     backgroundColor: t.primaryDark,
     borderRadius: t.radiusLg,
@@ -457,12 +619,8 @@ const styles = StyleSheet.create({
   methodBody: { flex: 1, gap: 2 },
   methodTitle: { fontSize: 15, fontWeight: '800', color: t.text },
   methodSub: { fontSize: 12, fontWeight: '600', color: t.textMuted },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    backgroundColor: '#f8fafc',
-  },
   confirmBtn: {
+    marginTop: 8,
     minHeight: 56,
     borderRadius: 999,
     backgroundColor: t.primaryDark,

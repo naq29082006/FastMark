@@ -20,21 +20,28 @@ import {
   refundSellerDisputeDepositOnBackend,
   rejectSellerReservationOnBackend,
   reportBuyerNoShowOnBackend,
+  respondSellerPostDeliveryComplaintOnBackend,
 } from '../../api/sellerOpsApi';
 import { showErrorAlert } from '../../core/utils/appAlert';
 import {
   RESERVATION_STATUS,
-  RESERVATION_STATUS_LABELS,
   getCancelledReservationReason,
   getSellerCancelNote,
+  getSellerCompletedOrderStatusLabel,
   hasAdminDisputeResolution,
   hasDisputeReportHistory,
   isActiveDisputeOrder,
   isCancelledReservationStatus,
+  isSellerCancelAfterAcceptOrder,
   VIEWER_ROLE,
 } from '../../constants/sellerOrders';
 import { formatPrice } from '../../core/utils/productFormat';
 import { getOrderCodeValue } from '../../core/utils/orderCode';
+import {
+  getSellerDepositReleaseCountdownLabel,
+  getSellerResponseCountdownLabel,
+} from '../../core/utils/escrowHold';
+import { useMinuteNow } from '../../hooks/useMinuteNow';
 import {
   getReservationBuyerId,
   getReservationProductId,
@@ -42,6 +49,7 @@ import {
 import AvatarBadge from '../shared/components/AvatarBadge';
 import ReservationDisputeModal from '../shared/components/ReservationDisputeModal';
 import ReservationDisputeSection from '../shared/components/ReservationDisputeSection';
+import ReservationAdjustmentSection from '../shared/components/ReservationAdjustmentSection';
 import ReservationAdminResolutionSection from '../shared/components/ReservationAdminResolutionSection';
 import SellerCancelAcceptedModal from '../shared/components/SellerCancelAcceptedModal';
 import SellerOrderReviewSection from '../shared/components/SellerOrderReviewSection';
@@ -165,9 +173,10 @@ export default function SellerOrderDetailScreen({
   const [isLoading, setIsLoading] = useState(!initialItem);
   const [isActing, setIsActing] = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [showResponseModal, setShowResponseModal] = useState(false);
   const [showCancelAcceptedModal, setShowCancelAcceptedModal] = useState(false);
   const [disputeReports, setDisputeReports] = useState([]);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+  const currentTime = useMinuteNow(true);
 
   const loadDisputeReports = useCallback(async () => {
     if (!resolvedId) {
@@ -232,18 +241,6 @@ export default function SellerOrderDetailScreen({
     onOrderUpdated: handleOrderUpdated,
   });
 
-  useEffect(() => {
-    const pickupAt = new Date(reservation?.pickupTime).getTime();
-    if (!Number.isFinite(pickupAt) || pickupAt <= currentTime) {
-      return undefined;
-    }
-    const timer = setTimeout(
-      () => setCurrentTime(Date.now()),
-      Math.min(pickupAt - currentTime + 50, 2_147_483_647)
-    );
-    return () => clearTimeout(timer);
-  }, [reservation?.pickupTime, currentTime]);
-
   async function runAction(action) {
     setIsActing(true);
     try {
@@ -306,7 +303,6 @@ export default function SellerOrderDetailScreen({
       setReservation((prev) => mergeLoadedItem(prev, updated));
       setShowCancelAcceptedModal(false);
       onChanged?.();
-      Alert.alert('Đã hủy đơn', 'Đã thông báo người mua và hoàn tiền cọc.');
     } catch (actionError) {
       Alert.alert('Lỗi', actionError.message || 'Không hủy được đơn.');
       throw actionError;
@@ -361,9 +357,6 @@ export default function SellerOrderDetailScreen({
         title: payload.title,
         description: payload.description,
         note: payload.note,
-        latitude: payload.latitude,
-        longitude: payload.longitude,
-        address: payload.address,
         images: payload.images,
       });
       setReservation(result?.reservation || result);
@@ -373,6 +366,28 @@ export default function SellerOrderDetailScreen({
       Alert.alert('Đã gửi', 'Đã báo cáo người mua không đến. Cọc đang giữ chờ admin.');
     } catch (actionError) {
       Alert.alert('Lỗi', actionError.message || 'Không gửi được báo cáo.');
+      throw actionError;
+    } finally {
+      setIsActing(false);
+    }
+  }
+
+  async function handleSubmitDisputeResponse(payload) {
+    setIsActing(true);
+    try {
+      const idToken = await getCurrentUserIdToken();
+      const updated = await respondSellerPostDeliveryComplaintOnBackend(idToken, {
+        reservationId: resolvedId,
+        description: payload.description,
+        images: payload.images,
+      });
+      setReservation((prev) => mergeLoadedItem(prev, updated));
+      setShowResponseModal(false);
+      await loadDisputeReports();
+      onChanged?.();
+      Alert.alert('Đã gửi', 'Phản hồi khiếu nại đã gửi. Admin sẽ xử lý tranh chấp.');
+    } catch (actionError) {
+      Alert.alert('Lỗi', actionError.message || 'Không gửi được phản hồi.');
       throw actionError;
     } finally {
       setIsActing(false);
@@ -432,6 +447,10 @@ export default function SellerOrderDetailScreen({
   const showPastPickupActions =
     showPastPickupNotice && (canCancelAccepted || canReportBuyer);
   const showCancelBeforePickup = canCancelAccepted && !pastPickup;
+  const canSellerRespondToComplaint = reservation?.canSellerRespondToComplaint === true;
+  const sellerResponseCountdownText = canSellerRespondToComplaint
+    ? getSellerResponseCountdownLabel(reservation, currentTime)
+    : '';
   const buyerName = reservation.buyer?.fullName || 'Khách';
   const buyerId = getReservationBuyerId(reservation);
   const productId = getReservationProductId(reservation);
@@ -452,7 +471,7 @@ export default function SellerOrderDetailScreen({
     onOpenProduct?.({ productId, productName: reservation.product?.productName || '' });
   }
 
-  const statusLabel = RESERVATION_STATUS_LABELS[reservation.status] || 'Không rõ';
+  const statusLabel = getSellerCompletedOrderStatusLabel(reservation.status);
   const statusChipStyle =
     isCancelledReservationStatus(reservation.status) ||
     reservation.status === RESERVATION_STATUS.DISPUTED
@@ -469,15 +488,16 @@ export default function SellerOrderDetailScreen({
   const sellerCancelImages = Array.isArray(reservation.sellerCancelImages)
     ? reservation.sellerCancelImages.filter(Boolean)
     : [];
-  const hideSellerCancelDetails =
-    hasDisputeReportHistory(reservation) && !isActiveDisputeOrder(reservation);
+  const showSellerCancelEvidence =
+    isSellerCancelAfterAcceptOrder(reservation) &&
+    !(hasDisputeReportHistory(reservation) && !isActiveDisputeOrder(reservation));
   const showAdminResolutionSection = hasAdminDisputeResolution(reservation, disputeReports);
   const showCancelReasonSection =
     !isActiveDisputeOrder(reservation) &&
     !showAdminResolutionSection &&
     (Boolean(cancelReasonText) ||
-      (!hideSellerCancelDetails && Boolean(sellerCancelNote)) ||
-      (!hideSellerCancelDetails && sellerCancelImages.length > 0));
+      (showSellerCancelEvidence && Boolean(sellerCancelNote)) ||
+      (showSellerCancelEvidence && sellerCancelImages.length > 0));
   const totalAmount = Number(reservation.totalAmount) || 0;
   const depositAmount = Number(reservation.depositAmount) || 0;
   const depositPercent = Math.max(0, Math.min(100, Number(reservation.depositPercent) || 0));
@@ -498,6 +518,10 @@ export default function SellerOrderDetailScreen({
     reservation.status === RESERVATION_STATUS.AUTO_COMPLETED;
   const buyerReview =
     isCompletedOrder && reservation.buyerReview?.id ? reservation.buyerReview : null;
+  const escrowDepositCountdown = getSellerDepositReleaseCountdownLabel(
+    reservation,
+    currentTime
+  );
 
   return (
     <OrderDetailLayout onBack={onBack}>
@@ -510,6 +534,10 @@ export default function SellerOrderDetailScreen({
             {statusLabel}
           </Text>
         </View>
+
+        {escrowDepositCountdown ? (
+          <Text style={styles.escrowDepositCountdown}>{escrowDepositCountdown}</Text>
+        ) : null}
 
         <View style={styles.divider} />
 
@@ -526,7 +554,6 @@ export default function SellerOrderDetailScreen({
               <Text style={styles.buyerName} numberOfLines={1}>
                 {buyerName}
               </Text>
-              <Text style={styles.linkHint}>Xem hồ sơ khách</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
           </Pressable>
@@ -573,7 +600,6 @@ export default function SellerOrderDetailScreen({
               <Text style={styles.productMeta}>Giá: {formatPrice(unitPrice)}</Text>
               <Text style={styles.productQtyMark}>x{qty || 1}</Text>
             </View>
-            <Text style={styles.linkHint}>Xem sản phẩm</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
         </Pressable>
@@ -643,6 +669,9 @@ export default function SellerOrderDetailScreen({
           />
         ) : null}
 
+        <View style={styles.divider} />
+        <ReservationAdjustmentSection reservation={reservation} />
+
         <ReservationDisputeSection
           reservation={reservation}
           buyerReport={buyerReport}
@@ -663,22 +692,21 @@ export default function SellerOrderDetailScreen({
             {cancelReasonText ? (
               <Text style={styles.cancelReasonBody}>{cancelReasonText}</Text>
             ) : null}
-            {!hideSellerCancelDetails && sellerCancelNote ? (
+            {!showSellerCancelEvidence || !sellerCancelNote ? null : (
               <View style={styles.cancelDetailBlock}>
-                <Text style={styles.cancelDetailLabel}>Lý do hủy hàng:</Text>
                 <Text style={styles.cancelDetailBody}>{sellerCancelNote}</Text>
               </View>
-            ) : null}
-            {!hideSellerCancelDetails && sellerCancelImages.length ? (
+            )}
+            {!showSellerCancelEvidence || !sellerCancelImages.length ? null : (
               <View style={styles.cancelEvidenceBlock}>
-                <Text style={styles.cancelDetailLabel}>Ảnh chứng minh khi hủy:</Text>
+                <Text style={styles.cancelDetailLabel}>Ảnh minh chứng</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {sellerCancelImages.map((uri) => (
                     <Image key={uri} source={{ uri }} style={styles.evidencePhoto} />
                   ))}
                 </ScrollView>
               </View>
-            ) : null}
+            )}
           </>
         ) : null}
       </View>
@@ -755,6 +783,18 @@ export default function SellerOrderDetailScreen({
             <Text style={styles.dangerBtnText}>Hủy đơn (hoàn cọc)</Text>
           </Pressable>
         ) : null}
+        {canSellerRespondToComplaint ? (
+          <Pressable
+            disabled={isActing}
+            onPress={() => setShowResponseModal(true)}
+            style={[styles.primaryBtn, sellerResponseCountdownText ? styles.actionBtnStacked : null]}
+          >
+            <Text style={styles.primaryBtnText}>Phản hồi khiếu nại</Text>
+            {sellerResponseCountdownText ? (
+              <Text style={styles.responseCountdownText}>{sellerResponseCountdownText}</Text>
+            ) : null}
+          </Pressable>
+        ) : null}
         {!showPastPickupActions && !showDisputeActions && canReportBuyer ? (
           <Pressable
             disabled={isActing}
@@ -771,6 +811,12 @@ export default function SellerOrderDetailScreen({
         mode="seller"
         onClose={() => setShowDisputeModal(false)}
         onSubmit={handleSubmitBuyerNoShow}
+      />
+      <ReservationDisputeModal
+        visible={showResponseModal}
+        mode="seller_response"
+        onClose={() => setShowResponseModal(false)}
+        onSubmit={handleSubmitDisputeResponse}
       />
       <SellerCancelAcceptedModal
         visible={showCancelAcceptedModal}
@@ -856,6 +902,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#dc2626',
+  },
+  escrowDepositCountdown: {
+    marginTop: 8,
+    color: '#ea580c',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  escrowHoldCard: {
+    marginTop: 10,
+    borderRadius: 12,
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  escrowHoldText: {
+    color: '#b45309',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
   },
   buyerRow: {
     flexDirection: 'row',
@@ -1037,18 +1103,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     letterSpacing: 0.4,
   },
+  actionBtnStacked: {
+    paddingVertical: 10,
+    gap: 2,
+  },
+  responseCountdownText: {
+    color: '#dcfce7',
+    fontWeight: '700',
+    fontSize: 11,
+  },
   outlineDangerBtn: {
     flex: 1,
     minHeight: 50,
     borderRadius: 12,
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#fca5a5',
+    backgroundColor: '#DC2626',
     alignItems: 'center',
     justifyContent: 'center',
   },
   outlineDangerBtnText: {
-    color: '#b91c1c',
+    color: '#ffffff',
     fontWeight: '800',
     fontSize: 14,
   },
@@ -1057,11 +1130,11 @@ const styles = StyleSheet.create({
     minWidth: '40%',
     minHeight: 48,
     borderRadius: 12,
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#DC2626',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dangerBtnText: { color: '#b91c1c', fontWeight: '800' },
+  dangerBtnText: { color: '#ffffff', fontWeight: '800' },
   refundBtn: {
     width: '100%',
     minHeight: 48,

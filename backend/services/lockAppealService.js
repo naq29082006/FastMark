@@ -11,8 +11,9 @@ function pickString(value) {
 }
 
 function isLegacyShopLockAppealReport(report) {
+  const type = Number(report?.reportType);
   return (
-    Number(report?.reportType) === REPORT_TYPE.OTHER &&
+    (type === REPORT_TYPE.OTHER || type === 9) &&
     Boolean(report?.shopId) &&
     SHOP_LOCK_APPEAL_TITLE_PATTERN.test(pickString(report?.title))
   );
@@ -38,8 +39,13 @@ function shopLockAppealBaseFilter(userId, shopId) {
     shopId,
     $or: [
       { reportType: REPORT_TYPE.SHOP_LOCK_APPEAL },
+      { reportType: 11 },
       {
         reportType: REPORT_TYPE.OTHER,
+        title: { $regex: SHOP_LOCK_APPEAL_TITLE_PATTERN },
+      },
+      {
+        reportType: 9,
         title: { $regex: SHOP_LOCK_APPEAL_TITLE_PATTERN },
       },
     ],
@@ -151,8 +157,13 @@ async function closePendingShopLockAppeals(
       status: REPORT_STATUS.PENDING,
       $or: [
         { reportType: REPORT_TYPE.SHOP_LOCK_APPEAL },
+        { reportType: 11 },
         {
           reportType: REPORT_TYPE.OTHER,
+          title: { $regex: SHOP_LOCK_APPEAL_TITLE_PATTERN },
+        },
+        {
+          reportType: 9,
           title: { $regex: SHOP_LOCK_APPEAL_TITLE_PATTERN },
         },
       ],

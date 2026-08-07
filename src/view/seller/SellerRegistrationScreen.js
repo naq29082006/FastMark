@@ -181,6 +181,7 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
   const [cccdFront, setCccdFront] = useState(null);
   const [cccdBack, setCccdBack] = useState(null);
   const [selfie, setSelfie] = useState(null);
+  const [businessImage, setBusinessImage] = useState(null);
   const [systemAddress, setSystemAddress] = useState('');
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
@@ -247,14 +248,18 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
         ''
     );
     setLatitude(
-      Number.isFinite(Number(initialVerification.latitude))
-        ? Number(initialVerification.latitude)
-        : null
+      Number.isFinite(Number(initialVerification.latlong?.lat))
+        ? Number(initialVerification.latlong.lat)
+        : Number.isFinite(Number(initialVerification.latitude))
+          ? Number(initialVerification.latitude)
+          : null
     );
     setLongitude(
-      Number.isFinite(Number(initialVerification.longitude))
-        ? Number(initialVerification.longitude)
-        : null
+      Number.isFinite(Number(initialVerification.latlong?.long))
+        ? Number(initialVerification.latlong.long)
+        : Number.isFinite(Number(initialVerification.longitude))
+          ? Number(initialVerification.longitude)
+          : null
     );
     setCategoryId((current) =>
       current || normalizeCategoryId(initialVerification.categoryId)
@@ -270,6 +275,11 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
     }
     if (initialVerification.selfieImage) {
       setSelfie({ uri: initialVerification.selfieImage });
+    }
+    const existingBusinessImage =
+      initialVerification.businessImage || initialVerification.businessDocImage || '';
+    if (existingBusinessImage) {
+      setBusinessImage({ uri: existingBusinessImage });
     }
   }, [initialVerification?.id]);
 
@@ -413,6 +423,16 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
       return;
     }
 
+    if (
+      !hasUsableVerificationImage(
+        businessImage,
+        initialVerification?.businessImage || initialVerification?.businessDocImage
+      )
+    ) {
+      setError('Vui lòng tải ảnh giấy phép kinh doanh hoặc giấy chứng nhận ATTP.');
+      return;
+    }
+
     setError('');
     setSuccessMessage('');
     setIsSubmitting(true);
@@ -437,6 +457,10 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
         selfie,
         initialVerification?.selfieImage
       );
+      const businessImagePayload = buildVerificationImagePayload(
+        businessImage,
+        initialVerification?.businessImage || initialVerification?.businessDocImage
+      );
 
       let verification = null;
 
@@ -453,13 +477,15 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
             selfieImageBase64: selfieImage.base64,
             selfieMimeType: selfieImage.mimeType,
             selfieImageUrl: selfieImage.existingUrl,
+            businessImageBase64: businessImagePayload.base64,
+            businessImageMimeType: businessImagePayload.mimeType,
+            businessImageUrl: businessImagePayload.existingUrl,
             systemAddress: systemAddress.trim(),
             addressHeThong: systemAddress.trim(),
             categoryId: normalizedCategoryId,
             shopName: String(shopName).trim(),
             shopUsername: normalizeShopUsername(shopUsername),
-            latitude,
-            longitude,
+            latlong: { lat: latitude, long: longitude },
           },
         });
 
@@ -547,6 +573,12 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
           label="Ảnh chân dung"
           value={selfie}
           onPick={() => handlePickImage(setSelfie)}
+        />
+
+        <ImagePickerField
+          label="Ảnh giấy phép kinh doanh / ATTP"
+          value={businessImage}
+          onPick={() => handlePickImage(setBusinessImage)}
         />
 
         <View style={styles.field}>

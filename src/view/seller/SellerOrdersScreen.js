@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import {
   confirmSellerReservationOnBackend,
@@ -18,12 +19,8 @@ import {
 } from '../../api/sellerOpsApi';
 import { showErrorAlert } from '../../core/utils/appAlert';
 import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
-import {
-  hasItemId,
-  mergeListById,
-  removeById,
-  upsertById,
-} from '../../core/utils/realtimeList';
+import { orderMatchesSearch, isOrderSearchActive } from '../../core/utils/reservationOrderSearch';
+import { applyReservationRealtimeRow, syncOrderListAfterMutation } from '../../core/utils/orderRealtimeSync';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
 import {
   RESERVATION_TAB,
@@ -31,13 +28,17 @@ import {
   RESERVATION_STATUS_LABELS,
   ORDER_STATUS_TABS,
   getCancelledReservationReason,
-  getReservationTabForStatus,
+  getSellerCompletedOrderStatusLabel,
   isActiveDisputeOrder,
+  isCancelledReservationStatus,
   VIEWER_ROLE,
 } from '../../constants/sellerOrders';
 import ClearableSearchField from '../shared/components/ClearableSearchField';
-import { matchesSearchAny, normalizeSearchText } from '../../core/utils/searchText';
 import OrderItemHeader from '../shared/components/OrderItemHeader';
+import {
+  getSellerDepositReleaseCountdownLabel,
+} from '../../core/utils/escrowHold';
+import { useMinuteNow } from '../../hooks/useMinuteNow';
 import OrderStatusTabBar from '../shared/components/OrderStatusTabBar';
 import OrderTabEmptyState, {
   ORDER_TAB_EMPTY_MESSAGE,
@@ -45,14 +46,23 @@ import OrderTabEmptyState, {
 } from '../shared/components/OrderTabEmptyState';
 import OrderDisputeListHints from '../shared/components/OrderDisputeListHints';
 import ReservationDisputeModal from '../shared/components/ReservationDisputeModal';
-import SubScreenHeader from '../shared/components/SubScreenHeader';
+import SubScreenHeader, { APP_HEADER_ICON_BUTTON_STYLE } from '../shared/components/SubScreenHeader';
 import { formatPrice } from '../../core/utils/productFormat';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useOrderSocket } from '../../hooks/useOrderSocket';
 
-function getReservationStatusStyle(status) {
+function getReservationStatusStyle(status, { treatReceivedAsCompleted = false } = {}) {
+  if (
+    treatReceivedAsCompleted &&
+    status === RESERVATION_STATUS.RECEIVED
+  ) {
+    return { badge: styles.statusBadgeSuccess, text: styles.statusBadgeTextSuccess };
+  }
   if (status === RESERVATION_STATUS.WAITING_PICKUP) {
     return { badge: styles.statusBadgePending, text: styles.statusBadgeTextPending };
+  }
+  if (status === RESERVATION_STATUS.RECEIVED) {
+    return { badge: styles.statusBadgeInfo, text: styles.statusBadgeTextInfo };
   }
   if (
     status === RESERVATION_STATUS.COMPLETED ||
@@ -120,6 +130,7 @@ function formatOrderTime(iso) {
 export default function SellerOrdersScreen({
   onBack,
   onOpenReservation,
+  onScanPickupQr,
   onRefreshKey = 0,
   embedded = false,
   activeTab: controlledActiveTab,
@@ -143,22 +154,38 @@ export default function SellerOrdersScreen({
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-  const loadingGuardRef = useRef(false);
+  const ordersFetchSeqRef = useRef(0);
+  const loadingMoreGuardRef = useRef(false);
   const [disputeTarget, setDisputeTarget] = useState(null);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+  const currentTime = useMinuteNow(true);
 
-  const loadOrders = useCallback(async ({ nextPage = 1 } = {}) => {
-    if (loadingGuardRef.current) {
-      return;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const loadOrders = useCallback(async ({ nextPage = 1, silent = false } = {}) => {
+    const fetchSeq = ++ordersFetchSeqRef.current;
+
+    if (nextPage > 1) {
+      if (loadingMoreGuardRef.current) {
+        return;
+      }
+      loadingMoreGuardRef.current = true;
     }
-    loadingGuardRef.current = true;
+
     if (nextPage === 1) {
-      setIsLoading(true);
+      if (!silent) {
+        setIsLoading(true);
+      }
     } else {
       setIsLoadingMore(true);
     }
@@ -167,13 +194,20 @@ export default function SellerOrdersScreen({
       const data = await getSellerOrdersOnBackend({
         idToken,
         tab: activeTab,
+        search: debouncedSearch || undefined,
         page: nextPage,
         limit: DEFAULT_PAGE_SIZE,
       });
+      if (fetchSeq !== ordersFetchSeqRef.current) {
+        return;
+      }
       const rows = data?.reservations || data?.items || [];
-      setItems((current) =>
-        nextPage === 1 ? mergeListById(current, rows) : appendUniqueById(current, rows)
-      );
+      setItems((current) => {
+        if (nextPage === 1) {
+          return rows;
+        }
+        return appendUniqueById(current, rows);
+      });
       setPage(Number(data?.page) || nextPage);
       setHasMore(
         typeof data?.hasMore === 'boolean'
@@ -188,6 +222,9 @@ export default function SellerOrdersScreen({
             (data?.hasMore ? DEFAULT_PAGE_SIZE : 0)
       );
     } catch (loadError) {
+      if (fetchSeq !== ordersFetchSeqRef.current) {
+        return;
+      }
       showErrorAlert(loadError.message || 'Không tải được đơn hàng.');
       if (nextPage === 1) {
         setItems([]);
@@ -195,16 +232,55 @@ export default function SellerOrdersScreen({
         setTotalCount(0);
       }
     } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
-      loadingGuardRef.current = false;
+      if (nextPage > 1) {
+        loadingMoreGuardRef.current = false;
+      }
+      if (fetchSeq !== ordersFetchSeqRef.current) {
+        return;
+      }
+      if (nextPage === 1) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
-  }, [activeTab]);
+  }, [activeTab, debouncedSearch]);
 
   useEffect(() => {
     setSearch('');
+    setDebouncedSearch('');
+  }, [activeTab]);
+
+  useEffect(() => {
     loadOrders({ nextPage: 1 });
-  }, [loadOrders, onRefreshKey]);
+  }, [loadOrders]);
+
+  const prevRefreshKeyRef = useRef(onRefreshKey);
+  useEffect(() => {
+    if (prevRefreshKeyRef.current === onRefreshKey) {
+      return;
+    }
+    prevRefreshKeyRef.current = onRefreshKey;
+    if (onRefreshKey > 0) {
+      loadOrders({ nextPage: 1, silent: true });
+    }
+  }, [onRefreshKey, loadOrders]);
+
+  const syncListAfterMutation = useCallback(
+    (reservation, reservationId) => {
+      syncOrderListAfterMutation({
+        reservation,
+        reservationId,
+        activeTab,
+        search: debouncedSearch,
+        itemsRef,
+        setItems,
+        setTotalCount,
+        loadOrders,
+      });
+    },
+    [activeTab, debouncedSearch, loadOrders]
+  );
 
   /**
    * Realtime: chỉ đồng bộ đúng đơn vừa thay đổi (không tải lại cả danh sách).
@@ -213,18 +289,6 @@ export default function SellerOrdersScreen({
     async (payload) => {
       const reservationId = String(payload?.reservationId || payload?.id || '').trim();
       if (!reservationId) {
-        return;
-      }
-
-      const eventTab = getReservationTabForStatus(payload?.status);
-      const belongsToTab = activeTab === RESERVATION_TAB.ALL || eventTab === activeTab;
-      const isInList = hasItemId(itemsRef.current, reservationId);
-
-      if (!belongsToTab) {
-        if (isInList) {
-          setItems((current) => removeById(current, reservationId));
-          setTotalCount((current) => Math.max(0, current - 1));
-        }
         return;
       }
 
@@ -237,19 +301,24 @@ export default function SellerOrdersScreen({
         if (!reservation?.id) {
           return;
         }
-        setItems((current) => upsertById(current, reservation, { position: 'start' }));
-        if (!isInList) {
-          setTotalCount((current) => current + 1);
-        }
+        applyReservationRealtimeRow({
+          reservation,
+          reservationId,
+          activeTab,
+          search: debouncedSearch,
+          currentItems: itemsRef.current,
+          setItems,
+          setTotalCount,
+        });
       } catch {
-        // Bỏ qua lỗi tạm thời: giữ nguyên danh sách đang hiển thị.
+        // Giữ danh sách hiện tại nếu tải lỗi.
       }
     },
-    [activeTab]
+    [activeTab, debouncedSearch]
   );
 
   const handleLoadMore = useCallback(() => {
-    if (!hasMore || isLoading || isLoadingMore || loadingGuardRef.current) {
+    if (!hasMore || isLoading || isLoadingMore || loadingMoreGuardRef.current) {
       return;
     }
     loadOrders({ nextPage: page + 1 });
@@ -260,42 +329,16 @@ export default function SellerOrdersScreen({
     onOrderUpdated: handleOrderUpdated,
   });
 
-  useEffect(() => {
-    const nextPickupAt = items.reduce((nearest, item) => {
-      const pickupAt = new Date(item.pickupTime).getTime();
-      if (!Number.isFinite(pickupAt) || pickupAt <= currentTime) {
-        return nearest;
-      }
-      return nearest == null || pickupAt < nearest ? pickupAt : nearest;
-    }, null);
-    if (nextPickupAt == null) {
-      return undefined;
-    }
-    const timer = setTimeout(
-      () => setCurrentTime(Date.now()),
-      Math.min(nextPickupAt - currentTime + 50, 2_147_483_647)
-    );
-    return () => clearTimeout(timer);
-  }, [items, currentTime]);
-
   const filteredItems = useMemo(() => {
-    if (!normalizeSearchText(search)) {
-      return items;
+    let list = items;
+    if (activeTab === RESERVATION_TAB.HOLDING) {
+      list = list.filter((item) => !isCancelledReservationStatus(item.status));
     }
-    return items.filter((item) =>
-      matchesSearchAny(
-        [
-          item.product?.productName || item.productName,
-          item.variant?.variantName || item.variantName,
-          item.buyer?.fullName || item.buyer?.name || item.buyerName,
-          item.id,
-          item.orderCode,
-          item.note,
-        ],
-        search
-      )
-    );
-  }, [items, search]);
+    if (isOrderSearchActive(search)) {
+      list = list.filter((item) => orderMatchesSearch(item, search, 'seller'));
+    }
+    return list;
+  }, [items, activeTab, search]);
 
   function handleConfirmReservation(reservation) {
     const depositNote =
@@ -309,12 +352,8 @@ export default function SellerOrdersScreen({
         onPress: async () => {
           try {
             const idToken = await getCurrentUserIdToken();
-            await confirmSellerReservationOnBackend(idToken, reservation.id);
-            Alert.alert(
-              'Thành công',
-              'Đã xác nhận giữ hàng. Đưa QR gian hàng cho khách quét khi nhận.'
-            );
-            loadOrders({ nextPage: 1 });
+            const updated = await confirmSellerReservationOnBackend(idToken, reservation.id);
+            syncListAfterMutation(updated, reservation.id);
           } catch (actionError) {
             Alert.alert('Lỗi', actionError.message || 'Không xác nhận được đơn.');
           }
@@ -332,12 +371,12 @@ export default function SellerOrdersScreen({
         onPress: async () => {
           try {
             const idToken = await getCurrentUserIdToken();
-            await rejectSellerReservationOnBackend({
+            const updated = await rejectSellerReservationOnBackend({
               idToken,
               reservationId: reservation.id,
               reason: 'Shop hủy',
             });
-            loadOrders({ nextPage: 1 });
+            syncListAfterMutation(updated, reservation.id);
           } catch (actionError) {
             Alert.alert('Lỗi', actionError.message || 'Không từ chối được đơn.');
           }
@@ -352,20 +391,18 @@ export default function SellerOrdersScreen({
     }
     try {
       const idToken = await getCurrentUserIdToken();
-      await reportBuyerNoShowOnBackend({
+      const reservationId = disputeTarget.id;
+      const updated = await reportBuyerNoShowOnBackend({
         idToken,
-        reservationId: disputeTarget.id,
+        reservationId,
         title: payload.title,
         description: payload.description,
         note: payload.note,
-        latitude: payload.latitude,
-        longitude: payload.longitude,
-        address: payload.address,
         images: payload.images,
       });
       setDisputeTarget(null);
       Alert.alert('Đã gửi', 'Đã báo cáo người mua không đến. Cọc đang giữ chờ admin.');
-      loadOrders({ nextPage: 1 });
+      syncListAfterMutation(updated, reservationId);
     } catch (actionError) {
       Alert.alert('Lỗi', actionError.message || 'Không gửi được báo cáo.');
       throw actionError;
@@ -373,8 +410,12 @@ export default function SellerOrdersScreen({
   }
 
   function renderReservationItem({ item }) {
-    const statusLabel = RESERVATION_STATUS_LABELS[item.status] || 'Không rõ';
-    const statusStyle = getReservationStatusStyle(item.status);
+    const statusLabel = isCompletedTab
+      ? getSellerCompletedOrderStatusLabel(item.status)
+      : RESERVATION_STATUS_LABELS[item.status] || 'Không rõ';
+    const statusStyle = getReservationStatusStyle(item.status, {
+      treatReceivedAsCompleted: isCompletedTab,
+    });
     const productName = item.product?.productName || 'Sản phẩm';
     const thumb = item.product?.thumbnail || '';
     const qty = Number(item.quantity) || 0;
@@ -390,6 +431,10 @@ export default function SellerOrdersScreen({
     const canReportBuyer = canReportBuyerNoShow(item, currentTime);
     const cancelReasonText = getCancelledReservationReason(item, VIEWER_ROLE.SELLER);
     const showActiveDisputeHint = isActiveDisputeOrder(item);
+    const isCompletedTab = activeTab === RESERVATION_TAB.COMPLETED;
+    const escrowHoldLabel = isCompletedTab
+      ? getSellerDepositReleaseCountdownLabel(item, currentTime)
+      : '';
     const unitPrice =
       item.agreedPrice != null
         ? Number(item.agreedPrice)
@@ -427,11 +472,14 @@ export default function SellerOrdersScreen({
           >
             {item.pickupTime ? (
               <Text style={styles.infoLinePickup}>
-                Giờ nhận hàng: {formatOrderTime(item.pickupTime)}
+                Thời gian nhận: {formatOrderTime(item.pickupTime)}
               </Text>
             ) : (
               <Text style={styles.infoLinePickup}>Giữ: {formatOrderTime(item.createdAt)}</Text>
             )}
+            {escrowHoldLabel ? (
+              <Text style={styles.infoLineEscrowCountdown}>{escrowHoldLabel}</Text>
+            ) : null}
             {item.status === RESERVATION_STATUS.WAITING_PICKUP &&
             pastPickup &&
             !showActiveDisputeHint ? (
@@ -479,21 +527,37 @@ export default function SellerOrdersScreen({
 
   return (
     <View style={styles.screen}>
-      <SubScreenHeader title="Đơn hàng" onBack={onBack} />
-
-      <OrderStatusTabBar
-        tabs={ORDER_STATUS_TABS}
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
+      <SubScreenHeader
+        title="Đơn hàng"
+        onBack={onBack}
+        rightSlot={
+          onScanPickupQr ? (
+            <Pressable
+              style={APP_HEADER_ICON_BUTTON_STYLE}
+              onPress={onScanPickupQr}
+              accessibilityRole="button"
+              accessibilityLabel="Quét QR giao hàng"
+              hitSlop={8}
+            >
+              <Ionicons name="scan-outline" size={18} color="#076F32" />
+            </Pressable>
+          ) : null
+        }
       />
 
       <View style={styles.searchBar}>
         <ClearableSearchField
           value={search}
           onChangeText={setSearch}
-          placeholder="Tìm theo sản phẩm, khách, mã đơn..."
+          placeholder="Tìm mã đơn hoặc tên sản phẩm..."
         />
       </View>
+
+      <OrderStatusTabBar
+        tabs={ORDER_STATUS_TABS}
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+      />
 
       {isLoading ? (
         <View style={styles.centered}>
@@ -515,7 +579,7 @@ export default function SellerOrdersScreen({
               <LoadMoreButton
                 currentCount={filteredItems.length}
                 totalCount={
-                  search.trim()
+                  isOrderSearchActive(search)
                     ? filteredItems.length
                     : hasMore
                       ? Math.max(totalCount, items.length + DEFAULT_PAGE_SIZE)
@@ -529,7 +593,9 @@ export default function SellerOrdersScreen({
           ListEmptyComponent={
             <OrderTabEmptyState
               message={
-                search.trim() ? ORDER_TAB_SEARCH_EMPTY_MESSAGE : ORDER_TAB_EMPTY_MESSAGE
+                isOrderSearchActive(search)
+                  ? ORDER_TAB_SEARCH_EMPTY_MESSAGE
+                  : ORDER_TAB_EMPTY_MESSAGE
               }
             />
           }
@@ -567,9 +633,9 @@ const styles = StyleSheet.create({
   listContent: { padding: 16, flexGrow: 1 },
   searchBar: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-    backgroundColor: '#f1f5f9',
+    paddingTop: 12,
+    paddingBottom: 4,
+    backgroundColor: '#ffffff',
   },
   card: {
     backgroundColor: '#ffffff',
@@ -621,6 +687,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 4,
   },
+  infoLineEscrowCountdown: {
+    color: '#ea580c',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
+  },
   infoLinePickup: {
     color: '#0f172a',
     fontSize: 14,
@@ -665,7 +737,7 @@ const styles = StyleSheet.create({
     flexBasis: '30%',
   },
   actionButtonDanger: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#DC2626',
   },
   actionButtonText: {
     color: '#ffffff',
@@ -673,7 +745,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   actionButtonTextDanger: {
-    color: '#b91c1c',
+    color: '#ffffff',
     fontWeight: '800',
     fontSize: 13,
   },
