@@ -73,33 +73,40 @@ const REVIEW_REMOVED_BY = {
 
 // ── Reservations ─────────────────────────────────────────────────────
 /**
- * Reservation status:
- * 0 Pending | 1 Confirmed | 2 WaitingPickup | 3 Received
- * 4 Disputed | 5 Completed | 6 Cancelled
+ * Reservation status (v2):
+ * 0 Pending | 1 WaitingPickup | 2 PickupConfirmed (escrow)
+ * 3 Disputed | 4 Completed | 5 Cancelled
  */
 const RESERVATION_STATUS = {
   PENDING: 0,
+  WAITING_PICKUP: 1,
+  PICKUP_CONFIRMED: 2,
+  DISPUTED: 3,
+  COMPLETED: 4,
+  CANCELLED: 5,
+  /** @deprecated alias */
   CONFIRMED: 1,
-  WAITING_PICKUP: 2,
-  RECEIVED: 3,
-  DISPUTED: 4,
-  COMPLETED: 5,
-  CANCELLED: 6,
-  /** @deprecated */ PENDING_SELLER_CONFIRMATION: 0,
-  /** @deprecated */ REJECTED: 6,
-  /** @deprecated */ DELIVERED_PENDING_DISPUTE: 3,
-  /** @deprecated */ AUTO_COMPLETED: 5,
-  /** @deprecated */ REFUNDED: 6,
-  /** @deprecated */ DISPUTE_RESOLVED: 6,
-  /** @deprecated */ ACCEPTED: 2,
-  /** @deprecated */ READY: 2,
+  /** @deprecated alias — đã quét QR / xác nhận nhận, escrow */
+  RECEIVED: 2,
+  /** @deprecated */
+  PENDING_SELLER_CONFIRMATION: 0,
+  /** @deprecated */
+  REJECTED: 5,
+  /** @deprecated — dùng COMPLETED (4) */
+  AUTO_COMPLETED: 4,
+  /** @deprecated */
+  REFUNDED: 5,
+  /** @deprecated — dùng DISPUTED (3) + cocChuyenDen */
+  DISPUTE_RESOLVED: 3,
+  DELIVERED_PENDING_DISPUTE: 2,
+  ACCEPTED: 1,
+  READY: 1,
 };
 
 const RESERVATION_STATUS_LABEL = {
   [RESERVATION_STATUS.PENDING]: "Chờ xác nhận",
-  [RESERVATION_STATUS.CONFIRMED]: "Giữ hàng",
   [RESERVATION_STATUS.WAITING_PICKUP]: "Giữ hàng",
-  [RESERVATION_STATUS.RECEIVED]: "Hoàn thành",
+  [RESERVATION_STATUS.PICKUP_CONFIRMED]: "Đã nhận hàng",
   [RESERVATION_STATUS.DISPUTED]: "Tranh chấp",
   [RESERVATION_STATUS.COMPLETED]: "Hoàn thành",
   [RESERVATION_STATUS.CANCELLED]: "Đã hủy",
@@ -160,8 +167,11 @@ const ESCROW_PROTECTION_DAYS_MAX = 30;
 const ESCROW_PROTECTION_DAYS = DEFAULT_ESCROW_PROTECTION_DAYS;
 const ESCROW_PROTECTION_MS = DEFAULT_ESCROW_PROTECTION_DAYS * 24 * 60 * 60 * 1000;
 
-/** Giờ sau pickupTime được báo cáo trước khi auto-release cọc cho seller. */
-const RESERVATION_DISPUTE_WINDOW_HOURS = 24;
+/** Giờ sau pickupTime được báo cáo / phản hồi tranh chấp pickup. */
+const RESERVATION_DISPUTE_WINDOW_HOURS = 48;
+
+/** Thời gian giữ lịch sử tranh chấp đã xử lý trên app. */
+const DISPUTE_HISTORY_RETENTION_HOURS = 48;
 
 /** Số ảnh chứng cứ tối đa mỗi báo cáo giữ hàng. */
 const MAX_RESERVATION_REPORT_IMAGES = 5;
@@ -283,6 +293,10 @@ const REPORT_TYPE_LABELS = {
   [REPORT_TYPE.OTHER]: "Khác",
   [REPORT_TYPE.ACCOUNT_LOCK_APPEAL]: "Khiếu nại khóa tài khoản",
   [REPORT_TYPE.SHOP_LOCK_APPEAL]: "Khiếu nại khóa gian hàng",
+};
+
+/** Nhãn riêng cho API tranh chấp giữ hàng — không trùng mã Report (5–7). */
+const DISPUTE_VIRTUAL_REPORT_TYPE_LABELS = {
   [DISPUTE_VIRTUAL_REPORT_TYPE.BUYER_NO_SHOW]: "Buyer không đến nhận",
   [DISPUTE_VIRTUAL_REPORT_TYPE.SELLER_NO_SHOW]: "Seller không bán / không mở cửa",
   [DISPUTE_VIRTUAL_REPORT_TYPE.PRODUCT_ISSUE]: "Sự cố sản phẩm (giữ hàng)",
@@ -518,12 +532,10 @@ function isSubscriptionActive(shop) {
 function activeSubscriptionFilter() {
   return {
     $expr: {
-      $in: ["$isActive", [1, true]],
+      $in: ["$isActive", [1, true, "1"]],
     },
   };
 }
-
-const reservationOrderFlow = require("./reservationOrderFlow");
 
 module.exports = {
   SELLER_VERIFICATION_STATUS,
@@ -552,6 +564,7 @@ module.exports = {
   ESCROW_PROTECTION_DAYS,
   ESCROW_PROTECTION_MS,
   RESERVATION_DISPUTE_WINDOW_HOURS,
+  DISPUTE_HISTORY_RETENTION_HOURS,
   BUYER_COMPLAINT_REASON_OPTIONS,
   RESERVATION_DISPUTE_STATUS,
   RESERVATION_DISPUTE_WINNER,
@@ -564,6 +577,7 @@ module.exports = {
   RESERVATION_AUDIT_ACTION,
   REPORT_TYPE,
   DISPUTE_VIRTUAL_REPORT_TYPE,
+  DISPUTE_VIRTUAL_REPORT_TYPE_LABELS,
   REPORT_TYPE_LABELS,
   LEGACY_REPORT_TYPE_LABELS,
   CONTENT_REPORT_TYPES,
@@ -599,5 +613,6 @@ module.exports = {
   SELLER_SUBSCRIPTION_STATUS_LABEL,
   isSubscriptionActive,
   activeSubscriptionFilter,
-  ...reservationOrderFlow,
 };
+
+Object.assign(module.exports, require("./reservationOrderFlow"));

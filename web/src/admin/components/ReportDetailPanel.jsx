@@ -1,9 +1,9 @@
-import { Image, Tag } from 'antd';
-import { Link } from 'react-router-dom';
+import { Descriptions, Tag } from 'antd';
 
 import { formatDateTime } from '../utils/format';
-import { AdminDetailDl, AdminDetailSection, AdminDetailTimeline } from './AdminDetailModal';
-import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import ShopCell from './ShopCell';
+import ProductCell from './ProductCell';
+import { PreviewableImageGrid } from '../../components/PreviewableImage';
 
 function statusTag(status) {
   if (status === 0) return <Tag color="orange">Chờ xử lý</Tag>;
@@ -11,146 +11,128 @@ function statusTag(status) {
   return <Tag color="red">Đã bác bỏ</Tag>;
 }
 
-function personBlock(person, fallback = '—') {
-  if (!person) return fallback;
-  const name = person.fullName || person.userName || fallback;
-  const lines = [name];
-  if (person.userName && person.fullName) lines.push(`@${person.userName}`);
-  if (person.email) lines.push(person.email);
-  return (
-    <div className="admin-detail-person">
-      {lines.map((line) => (
-        <div key={line}>{line}</div>
-      ))}
-    </div>
-  );
-}
-
-function buildTimeline(report) {
-  const entries = [];
-  if (report?.createdAt) {
-    entries.push({
-      key: 'created',
-      title: 'Tạo báo cáo',
-      detail: report.reporter?.fullName || report.reporter?.userName || 'Người gửi',
-      at: formatDateTime(report.createdAt),
-    });
-  }
-  if (report?.processedAt) {
-    entries.push({
-      key: 'processed',
-      title: report.status === 1 ? 'Đã xử lý' : report.status === 2 ? 'Đã bác bỏ' : 'Cập nhật trạng thái',
-      detail: [
-        report.processedBy?.fullName || report.processedBy?.userName || 'Admin',
-        report.adminNote || report.adminDecision || '',
-      ]
-        .filter(Boolean)
-        .join(' — '),
-      at: formatDateTime(report.processedAt),
-    });
-  }
-  return entries;
-}
-
-export default function ReportDetailPanel({ report }) {
-  if (!report) return null;
-
-  const images = (report.evidenceImages || report.images || [])
+function collectReportImages(report) {
+  return (report?.evidenceImages || report?.images || [])
     .map((item) => (typeof item === 'string' ? item : item?.url || item?.imageUrl))
     .filter(Boolean);
+}
+
+function resolveTargetLink(report) {
+  const product = report?.product;
+  const shop = report?.shop;
+  const targetUser = report?.targetUser;
+
+  if (product?.id) {
+    return {
+      path: `/products/${product.id}`,
+      product,
+    };
+  }
+  if (shop?.id) {
+    return {
+      path: `/sellers/shops/${shop.id}`,
+      shop,
+    };
+  }
+  if (targetUser?.id) {
+    return {
+      path: `/users/${targetUser.id}`,
+      user: targetUser,
+    };
+  }
+  return null;
+}
+
+export default function ReportDetailPanel({ report, onNavigate }) {
+  if (!report) return null;
+
+  const images = collectReportImages(report);
+  const content = String(report.content || report.description || '').trim();
+  const reporter = report.reporter;
+  const target = resolveTargetLink(report);
+  const shop = report.shop;
+  const product = report.product;
+  const targetUser = report.targetUser;
+
+  function go(path) {
+    if (path && onNavigate) {
+      onNavigate(path);
+    }
+  }
+
+  const targetName =
+    product?.name ||
+    shop?.name ||
+    report.targetSubjectLabel ||
+    targetUser?.fullName ||
+    targetUser?.userName ||
+    '—';
 
   return (
-    <div className="admin-detail-modal-grid">
-      <AdminDetailSection title="Thông tin báo cáo">
-        <AdminDetailDl
-          items={[
-            { label: 'Mã', value: report.id || report._id },
-            { label: 'Loại', value: report.reportTypeLabel || report.reportType },
-            { label: 'Tiêu đề', value: report.title || report.reasonLabel },
-            { label: 'Trạng thái', value: statusTag(report.status) },
-            { label: 'Ngày tạo', value: formatDateTime(report.createdAt || report.CreatedAt) },
-            {
-              label: 'Đơn liên quan',
-              value: report.reservationId ? (
-                <Link to={`/reservations/${report.reservationId}`}>#{report.reservationId}</Link>
-              ) : (
-                '—'
-              ),
-            },
-          ]}
-        />
-      </AdminDetailSection>
-
-      <AdminDetailSection title="Người báo cáo">
-        {personBlock(report.reporter)}
-      </AdminDetailSection>
-
-      <AdminDetailSection title="Đối tượng bị báo cáo">
-        <AdminDetailDl
-          items={[
-            { label: 'Mô tả', value: report.targetSubjectLabel || '—' },
-            { label: 'Người dùng', value: personBlock(report.targetUser, '—') },
-            {
-              label: 'Gian hàng',
-              value: report.shop?.name || report.targetShopName || report.target_shop_name || '—',
-            },
-            {
-              label: 'Sản phẩm',
-              value: report.product?.name || report.targetProductName || report.target_product_name || '—',
-            },
-          ]}
-        />
-        {report.shop?.id ? (
-          <p style={{ marginTop: 8 }}>
-            <Link to={`/sellers/shops/${report.shop.id}`}>Xem gian hàng</Link>
-          </p>
-        ) : null}
-        {report.product?.id ? (
-          <p>
-            <Link to={`/products/${report.product.id}`}>Xem sản phẩm</Link>
-          </p>
-        ) : null}
-      </AdminDetailSection>
-
-      <AdminDetailSection title="Nội dung báo cáo">
-        <div className="admin-detail-prose">{report.content || report.description || '—'}</div>
-      </AdminDetailSection>
-
-      {report.review?.id || report.review?.comment ? (
-        <AdminDetailSection title="Đánh giá liên quan">
-          <AdminDetailDl
-            items={[
-              { label: 'Sao', value: report.review.rating ?? '—' },
-              { label: 'Nội dung', value: report.review.comment || '—' },
-            ]}
+    <div className="admin-report-detail-panel">
+      <Descriptions bordered column={1} size="small" className="admin-report-detail-descriptions">
+        <Descriptions.Item label="Người gửi">
+          <ShopCell
+            shopName={reporter?.fullName || reporter?.userName || '—'}
+            shopUsername={reporter?.fullName ? reporter?.userName : ''}
+            avatar={reporter?.avatar}
+            onClick={reporter?.id ? () => go(`/users/${reporter.id}`) : undefined}
           />
-        </AdminDetailSection>
-      ) : null}
+        </Descriptions.Item>
 
-      <AdminDetailSection title="Ảnh đính kèm" description={images.length ? `${images.length} ảnh` : undefined}>
+        <Descriptions.Item label="Đối tượng">
+          {product?.id ? (
+            <ProductCell
+              productName={product.name}
+              productImage={product.image}
+              onClick={() => go(`/products/${product.id}`)}
+            />
+          ) : shop?.id || targetUser?.id ? (
+            <ShopCell
+              shopName={shop?.name || targetUser?.fullName || targetUser?.userName || targetName}
+              shopUsername={
+                shop?.shopUsername ||
+                (targetUser?.fullName ? targetUser?.userName : targetUser?.userName || '')
+              }
+              avatar={shop?.avatar || targetUser?.avatar}
+              onClick={target?.path ? () => go(target.path) : undefined}
+            />
+          ) : (
+            targetName
+          )}
+        </Descriptions.Item>
+
+        <Descriptions.Item label="Nội dung">
+          <div className="admin-report-detail-content">{content || '—'}</div>
+        </Descriptions.Item>
+
         {images.length ? (
-          <div className="admin-detail-image-grid">
-            <Image.PreviewGroup>
-              {images.map((src, index) => (
-                <Image
-                  key={`${src}-${index}`}
-                  src={resolveMediaUrl(src)}
-                  alt=""
-                  width={120}
-                  height={120}
-                  style={{ objectFit: 'cover', borderRadius: 12 }}
-                />
-              ))}
-            </Image.PreviewGroup>
-          </div>
-        ) : (
-          <p className="admin-detail-empty">Không có ảnh đính kèm.</p>
-        )}
-      </AdminDetailSection>
+          <Descriptions.Item label="Ảnh đính kèm">
+            <PreviewableImageGrid
+              items={images}
+              className="admin-report-detail-images previewable-image-grid"
+            />
+          </Descriptions.Item>
+        ) : null}
 
-      <AdminDetailSection title="Lịch sử xử lý">
-        <AdminDetailTimeline entries={buildTimeline(report)} />
-      </AdminDetailSection>
+        <Descriptions.Item label="Ngày gửi">
+          {formatDateTime(report.createdAt || report.CreatedAt) || '—'}
+        </Descriptions.Item>
+
+        <Descriptions.Item label="Trạng thái">{statusTag(report.status)}</Descriptions.Item>
+
+        {report.adminNote || report.qdAdmin ? (
+          <Descriptions.Item label="Ghi chú admin">
+            {report.adminNote || report.qdAdmin}
+          </Descriptions.Item>
+        ) : null}
+
+        {report.tgXuLy ? (
+          <Descriptions.Item label="Ngày xử lý">
+            {formatDateTime(report.tgXuLy)}
+          </Descriptions.Item>
+        ) : null}
+      </Descriptions>
     </div>
   );
 }

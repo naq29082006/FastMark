@@ -44,14 +44,12 @@ const SellerSubscriptionSchema = new mongoose.Schema({
     index: true,
   },
   // Giao dịch ví đã trừ khi mua gói (ref WalletTransaction).
-  walletTransactionId: {
+  gdViId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "WalletTransaction",
     default: null,
     index: true,
   },
-  // Mã giao dịch ví (orderCode) lúc trừ tiền.
-  orderCode: { type: Number, default: null, index: true },
   // Thời điểm tạo lần mua.
   CreatedAt: { type: Date, default: Date.now },
   // Thời điểm cập nhật gần nhất (auto trong pre-save).

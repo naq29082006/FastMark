@@ -83,7 +83,7 @@ export default function ReportsPage() {
         pagination={{ current: page, pageSize: limit, total: pagination.total, onChange: setPage }}
         columns={withSttColumn(
           [
-          { title: 'Tiêu đề', dataIndex: 'title' },
+          { title: 'Báo cáo', dataIndex: 'title' },
           {
             title: 'Loại',
             dataIndex: 'reportType',

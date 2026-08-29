@@ -25,22 +25,24 @@ const {
   hasSellerResponse,
   canAdminResolvePostDeliveryDispute,
   sellerResponsePublicView,
+  resolveSellerResponseDeadline,
+  readSellerRespondedAt,
 } = require("./postDeliveryDispute");
 
 const BUYER_FIELDS = {
   userId: "buyerUserId",
-  reasonType: "buyerReasonType",
+  reasonType: "maLyDoBuyer",
   content: "buyerContent",
   images: "buyerImages",
-  createdAt: "buyerComplaintAt",
+  createdAt: "tgKnBuyer",
 };
 
 const SELLER_FIELDS = {
   shopId: "sellerShopId",
-  reasonType: "sellerReasonType",
+  reasonType: "maLyDoShop",
   content: "sellerContent",
   images: "sellerImages",
-  createdAt: "sellerComplaintAt",
+  createdAt: "tgKnShop",
 };
 
 function pickString(value) {
@@ -61,12 +63,16 @@ function disputeViewFromRecord(dispute) {
       disputeKind: DISPUTE_KIND.PICKUP,
       isPostDeliveryDispute: false,
       sellerResponse: null,
-      sellerRespondedAt: null,
-      sellerResponseDeadlineAt: null,
+      tgPhShop: null,
+      hanPhShop: null,
       canSellerRespondToComplaint: false,
       awaitingAdminReview: false,
       disputeReason: "",
       disputeReasonLabel: "",
+      buyerDisputeReason: "",
+      buyerDisputeReasonLabel: "",
+      sellerDisputeReason: "",
+      sellerDisputeReasonLabel: "",
       disputeDescription: "",
       disputedAt: null,
       disputeFirstBy: "",
@@ -104,6 +110,12 @@ function disputeViewFromRecord(dispute) {
   const primaryComplaint = buyerComplaint || sellerComplaint;
   const reasonType = normalizeDisputeReasonType(primaryComplaint?.reasonType);
   const legacyReason = disputeReasonLegacyString(reasonType);
+  const maLyDoBuyer = buyerComplaint
+    ? normalizeDisputeReasonType(buyerComplaint.reasonType)
+    : null;
+  const maLyDoShop = sellerComplaint
+    ? normalizeDisputeReasonType(sellerComplaint.reasonType)
+    : null;
   const sellerResponse = sellerResponsePublicView(dispute);
   const postDelivery = isPostDeliveryDispute(dispute);
 
@@ -114,8 +126,8 @@ function disputeViewFromRecord(dispute) {
     disputeKind: dispute?.disputeKind || (postDelivery ? DISPUTE_KIND.POST_DELIVERY : DISPUTE_KIND.PICKUP),
     isPostDeliveryDispute: postDelivery,
     sellerResponse,
-    sellerRespondedAt: dispute?.sellerRespondedAt || null,
-    sellerResponseDeadlineAt: dispute?.sellerResponseDeadlineAt || null,
+    tgPhShop: readSellerRespondedAt(dispute),
+    hanPhShop: resolveSellerResponseDeadline(dispute),
     canSellerRespondToComplaint:
       postDelivery &&
       disputeByBuyer &&
@@ -127,6 +139,10 @@ function disputeViewFromRecord(dispute) {
       canAdminResolvePostDeliveryDispute(dispute),
     disputeReason: legacyReason,
     disputeReasonLabel: disputeReasonTypeLabel(reasonType),
+    buyerDisputeReason: maLyDoBuyer ? disputeReasonLegacyString(maLyDoBuyer) : "",
+    buyerDisputeReasonLabel: maLyDoBuyer ? disputeReasonTypeLabel(maLyDoBuyer) : "",
+    sellerDisputeReason: maLyDoShop ? disputeReasonLegacyString(maLyDoShop) : "",
+    sellerDisputeReasonLabel: maLyDoShop ? disputeReasonTypeLabel(maLyDoShop) : "",
     disputeDescription: primaryComplaint?.content || "",
     disputedAt,
     disputeFirstBy,
@@ -153,9 +169,6 @@ async function loadDisputesByReservationIds(reservationIds = []) {
 }
 
 async function resolveSellerIdForReservation(reservation) {
-  if (reservation?.sellerId) {
-    return reservation.sellerId;
-  }
   if (!reservation?.shopId) {
     return null;
   }
@@ -269,7 +282,6 @@ const { RESERVATION_STATUS } = require("../constants");
 
 async function markReservationDisputed(reservation, { now = new Date() } = {}) {
   reservation.status = RESERVATION_STATUS.DISPUTED;
-  reservation.hasDispute = true;
   reservation.updatedAt = now;
   await reservation.save();
 }

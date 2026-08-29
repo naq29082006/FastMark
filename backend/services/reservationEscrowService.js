@@ -36,17 +36,14 @@ function reservationHelpers() {
 }
 
 async function finalizeReceivedBySeller(reservation, shop, { now = new Date() } = {}) {
-  const escrowDays =
-    reservation.escrowProtectionDays != null
-      ? normalizeEscrowProtectionDays(reservation.escrowProtectionDays)
-      : await resolveEscrowProtectionDaysForProduct(reservation.productId);
+  const escrowDays = await resolveEscrowProtectionDaysForProduct(reservation.productId);
 
-  reservation.status = RESERVATION_STATUS.COMPLETED;
-  reservation.completedAt = now;
-  reservation.depositSettleTo = DEPOSIT_SETTLE_TO.NONE;
-  reservation.escrowProtectionDays = escrowDays;
-  reservation.escrowReleaseAt = computeEscrowReleaseAt(now, escrowDays);
-  reservation.cancelReason = RESERVATION_CANCEL_REASON.BUYER_RECEIVED;
+  reservation.status = RESERVATION_STATUS.PICKUP_CONFIRMED;
+  reservation.tgNhanHang = now;
+  reservation.cocChuyenDen = DEPOSIT_SETTLE_TO.NONE;
+  reservation.soNgayKN = escrowDays;
+  reservation.hanGiaiCoc = computeEscrowReleaseAt(now, escrowDays);
+  reservation.cancelType = RESERVATION_CANCEL_REASON.BUYER_RECEIVED;
   reservation.updatedAt = now;
 
   const soldQuantity = Number(reservation.quantity) || 1;
@@ -66,8 +63,8 @@ async function releaseEscrowToSeller(
 ) {
   const releaseResult = await reservationHelpers().releaseDepositIfHeld(reservation, shop);
   reservation.status = RESERVATION_STATUS.COMPLETED;
-  reservation.depositSettleTo = DEPOSIT_SETTLE_TO.SELLER;
-  reservation.depositSettledAt = reservation.depositSettledAt || now;
+  reservation.cocChuyenDen = DEPOSIT_SETTLE_TO.SELLER;
+  reservation.tgGiaiCoc = reservation.tgGiaiCoc || now;
   reservation.updatedAt = now;
   await reservation.save();
   await emitOrderUpdated(reservation, { action: "escrow_released" });
@@ -79,13 +76,14 @@ async function releaseEscrowToSeller(
   return reservation;
 }
 
-async function refundEscrowToBuyer(reservation, { now = new Date() } = {}) {
+async function refundEscrowToBuyer(reservation, { now = new Date(), cancelNote, cancelType } = {}) {
   await reservationHelpers().refundDepositIfHeld(reservation);
-  reservation.status = RESERVATION_STATUS.CANCELLED;
-  reservation.depositSettleTo = DEPOSIT_SETTLE_TO.BUYER;
-  reservation.depositSettledAt = reservation.depositSettledAt || now;
-  reservation.cancelledAt = reservation.cancelledAt || now;
-  reservation.updatedAt = now;
+  reservationHelpers().applyDisputeResolution(reservation, {
+    cocChuyenDen: DEPOSIT_SETTLE_TO.BUYER,
+    cancelType: cancelType || RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN,
+    cancelNote: cancelNote || undefined,
+    at: now,
+  });
   await reservation.save();
   await emitOrderUpdated(reservation, { action: "escrow_refunded" });
   return reservation;
@@ -96,12 +94,11 @@ async function processEscrowAutoReleases() {
   let releasedCount = 0;
 
   const due = await Reservation.find({
-    status: { $in: [RESERVATION_STATUS.RECEIVED, RESERVATION_STATUS.COMPLETED] },
-    depositSettleTo: DEPOSIT_SETTLE_TO.NONE,
-    depositPaidAt: { $ne: null },
+    status: RESERVATION_STATUS.PICKUP_CONFIRMED,
+    cocChuyenDen: DEPOSIT_SETTLE_TO.NONE,
     depositAmount: { $gt: 0 },
     ...noDisputeFilter(),
-    escrowReleaseAt: { $ne: null, $lte: now },
+    hanGiaiCoc: { $ne: null, $lte: now },
   }).limit(200);
 
   for (const reservation of due) {
@@ -140,11 +137,11 @@ async function processEscrowAutoReleases() {
 }
 
 async function resolveDisputeBuyerWin(reservation, dispute, { note, now = new Date() } = {}) {
-  await refundEscrowToBuyer(reservation, { now });
-  if (!reservation.cancelReason) {
-    reservation.cancelReason = RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
-  }
-  await reservation.save();
+  await refundEscrowToBuyer(reservation, {
+    now,
+    cancelType: RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN,
+    cancelNote: note || undefined,
+  });
 
   dispute.status = DISPUTE_STATUS.ACCEPT_BUYER;
   dispute.adminNote = note || dispute.adminNote || "";
@@ -165,8 +162,14 @@ async function resolveDisputeBuyerWin(reservation, dispute, { note, now = new Da
 }
 
 async function resolveDisputeSellerWin(reservation, shop, dispute, { note, now = new Date() } = {}) {
-  await releaseEscrowToSeller(reservation, shop, { now, notifySellerOnRelease: false });
-  reservation.cancelReason = RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN;
+  await reservationHelpers().releaseDepositIfHeld(reservation, shop);
+  await reservationHelpers().releaseVariantInventory(reservation);
+  reservationHelpers().applyDisputeResolution(reservation, {
+    cocChuyenDen: DEPOSIT_SETTLE_TO.SELLER,
+    cancelType: RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN,
+    cancelNote: note || undefined,
+    at: now,
+  });
   await reservation.save();
 
   dispute.status = DISPUTE_STATUS.ACCEPT_SELLER;

@@ -20,6 +20,7 @@ import AdminDateFilter from '../components/admin/AdminDateFilter';
 import AdminPageShell from '../components/admin/AdminPageShell';
 import AdminPagination from '../components/admin/AdminPagination';
 import AdminTimeline from '../components/admin/AdminTimeline';
+import PreviewableImage, { VerifyDocCard } from '../components/PreviewableImage';
 import { EmptyState } from '../components/ui/Feedback';
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch';
 import { useAdminDateFilter } from '../hooks/useAdminDateFilter';
@@ -50,15 +51,18 @@ function verificationStatusBadge(status) {
 
 function ApplicantCell({ item }) {
   const user = item.user;
-  const initial = user?.fullName?.charAt(0) || user?.userName?.charAt(0) || 'U';
 
   return (
     <div className="seller-verify-applicant">
-      {user?.avatar ? (
-        <img src={user.avatar} alt="" className="seller-verify-applicant-avatar" />
-      ) : (
-        <span className="seller-verify-applicant-avatar placeholder">{initial}</span>
-      )}
+      <PreviewableImage
+        src={user?.avatar}
+        alt={user?.fullName || item.shopName || 'Ứng viên'}
+        width={40}
+        height={40}
+        shape="circle"
+        fallbackLetter={user?.fullName || user?.userName || item.shopName || 'U'}
+        className="seller-verify-applicant-avatar"
+      />
       <div className="seller-verify-applicant-meta">
         <strong>{user?.fullName || item.shopName || 'Ứng viên'}</strong>
         <span>{user?.phone || user?.email || ''}</span>
@@ -79,26 +83,6 @@ function SubmittedCell({ value }) {
         <em>{formatted.day}</em>
       </span>
     </div>
-  );
-}
-
-function VerifyDocCard({ label, url }) {
-  if (!url) {
-    return (
-      <article className="seller-verify-doc-card empty">
-        <div className="seller-verify-doc-preview placeholder">{label}</div>
-        <span>{label}</span>
-      </article>
-    );
-  }
-
-  return (
-    <article className="seller-verify-doc-card">
-      <a href={url} target="_blank" rel="noreferrer" className="seller-verify-doc-preview">
-        <img src={url} alt={label} />
-      </a>
-      <span>{label}</span>
-    </article>
   );
 }
 
@@ -196,13 +180,15 @@ function VerificationDetailPanel({
         <section className="seller-verify-detail-section">
           <div className="seller-verify-detail-section-head">
             <h3>Thông tin cá nhân</h3>
-            {user?.avatar ? (
-              <img src={user.avatar} alt="" className="seller-verify-detail-side-avatar" />
-            ) : (
-              <span className="seller-verify-detail-side-avatar placeholder">
-                {user?.fullName?.charAt(0) || 'U'}
-              </span>
-            )}
+            <PreviewableImage
+              src={user?.avatar}
+              alt={user?.fullName || 'Người đăng ký'}
+              width={48}
+              height={48}
+              shape="circle"
+              fallbackLetter={user?.fullName || user?.userName || 'U'}
+              className="seller-verify-detail-side-avatar"
+            />
           </div>
           <dl className="seller-verify-field-grid">
             <div><dt>Họ tên</dt><dd>{user?.fullName || '—'}</dd></div>
@@ -259,10 +245,10 @@ function VerificationDetailPanel({
         <section className="seller-verify-detail-section">
           <h3>Giấy tờ xác minh</h3>
           <div className="seller-verify-doc-grid">
-            <VerifyDocCard label="CCCD mặt trước" url={item.cccdFrontImage} />
-            <VerifyDocCard label="CCCD mặt sau" url={item.cccdBackImage} />
+            <VerifyDocCard label="CCCD mặt trước" url={item.anhCccdTruoc} />
+            <VerifyDocCard label="CCCD mặt sau" url={item.anhCccdSau} />
             <VerifyDocCard label="Ảnh selfie" url={item.selfieImage} />
-            <VerifyDocCard label="Giấy tờ kinh doanh" url={item.businessImage} />
+            <VerifyDocCard label="Giấy tờ kinh doanh" url={item.anhKD} />
           </div>
         </section>
 

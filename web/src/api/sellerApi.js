@@ -23,6 +23,14 @@ export function approveVerification(token, verificationId) {
   });
 }
 
+export function updateAdminVerification(token, verificationId, body) {
+  return apiRequest(`/api/seller/verification/${verificationId}`, {
+    method: 'PATCH',
+    token,
+    body,
+  });
+}
+
 export function rejectVerification(token, verificationId, lyDoTuChoi) {
   return apiRequest(`/api/seller/verification/${verificationId}/reject`, {
     method: 'POST',

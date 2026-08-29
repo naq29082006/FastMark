@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const { MF } = require("../constants/modelFields");
 const ShopProfile = require("../models/ShopProfile");
 const { mapPresenceFields } = require("../utils/activityLabel");
 
@@ -22,7 +23,7 @@ async function findShopByUser(user) {
 }
 
 async function touchUserActivity(user) {
-  user.LanHoatDongCuoi = new Date();
+  user[MF.HoatDongCuoi] = new Date();
   await user.save();
   return mapPresenceFields(user);
 }

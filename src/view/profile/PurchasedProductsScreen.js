@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import { getBuyerOrdersOnBackend } from '../../api/buyerOpsApi';
+import { getPickupConfirmedAt } from '../../core/utils/reservationEntity';
 import { RESERVATION_TAB } from '../../constants/sellerOrders';
 import {
   canShowReviewButton,
@@ -177,7 +177,7 @@ export default function PurchasedProductsScreen({
         storeName: reservation.storeName || 'Gian hàng',
         price: Number(reservation.variant?.price || reservation.product?.minPrice || 0),
         quantity: Number(reservation.quantity || 1),
-        purchasedAt: reservation.completedAt || reservation.updatedAt || reservation.createdAt,
+        purchasedAt: getPickupConfirmedAt(reservation) || reservation.updatedAt || reservation.createdAt,
         imageEmoji: '📦',
         status: reservation.status,
         type: 'purchase',

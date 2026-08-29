@@ -9,21 +9,34 @@ import {
   submitLockAppealOnBackend,
 } from '../../api/reportApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
-import { selectAuthProfile } from '../../viewmodel/auth/authSelectors';
+import { RESERVATION_TAB } from '../../constants/sellerOrders';
+import { selectAuthProfile, selectHasShop } from '../../viewmodel/auth/authSelectors';
 import { loadUserProfile, logoutUser } from '../../viewmodel/auth/authSlice';
 import { showErrorAlert, confirmLogout } from '../../core/utils/appAlert';
 import WithdrawScreen from '../wallet/WithdrawScreen';
+import WalletScreen from '../wallet/WalletScreen';
+import WalletTransactionsScreen from '../wallet/WalletTransactionsScreen';
+import SellerOrdersScreen from '../seller/SellerOrdersScreen';
+import SellerOrderDetailScreen from '../seller/SellerOrderDetailScreen';
+import SellerBuyerQrScanScreen from '../seller/SellerBuyerQrScanScreen';
+import SellerPickupConfirmScreen from '../seller/SellerPickupConfirmScreen';
+import SellerShopQrScreen from '../seller/SellerShopQrScreen';
 import AdminAppealCompose from '../shared/components/AdminAppealCompose';
 import KeyboardAwareScrollView from '../shared/components/KeyboardAwareScrollView';
 
 export default function AccountLockedScreen() {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
+  const hasShop = useSelector(selectHasShop);
 
   const [loading, setLoading] = useState(true);
   const [appealState, setAppealState] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [screen, setScreen] = useState('main');
+  const [ordersTab, setOrdersTab] = useState(RESERVATION_TAB.DISPUTE);
+  const [orderDetailTarget, setOrderDetailTarget] = useState(null);
+  const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
+  const [pickupScanReservation, setPickupScanReservation] = useState(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -69,11 +82,97 @@ export default function AccountLockedScreen() {
   const phase = appealState?.phase || 'can_appeal';
   const displayName = profile?.fullName || profile?.userName || 'Tài khoản';
 
+  if (screen === 'wallet') {
+    return (
+      <WalletScreen
+        onBack={() => setScreen('main')}
+        canTopUp={false}
+        canWithdraw
+        onWithdraw={() => setScreen('withdraw')}
+        onSeeAllTransactions={() => setScreen('wallet-transactions')}
+      />
+    );
+  }
+
+  if (screen === 'wallet-transactions') {
+    return <WalletTransactionsScreen onBack={() => setScreen('wallet')} />;
+  }
+
   if (screen === 'withdraw') {
     return (
       <WithdrawScreen
         balance={profile?.walletBalance ?? 0}
+        onBack={() => setScreen('wallet')}
+        onSuccess={() => {
+          dispatch(loadUserProfile()).catch(() => {});
+        }}
+      />
+    );
+  }
+
+  if (screen === 'scan-buyer-qr' && hasShop) {
+    return (
+      <SellerBuyerQrScanScreen
+        onBack={() => setScreen('orders')}
+        onValidated={(reservation) => {
+          setPickupScanReservation(reservation);
+          setScreen('pickup-confirm');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'pickup-confirm' && pickupScanReservation && hasShop) {
+    return (
+      <SellerPickupConfirmScreen
+        reservation={pickupScanReservation}
+        onBack={() => setScreen('scan-buyer-qr')}
+        onCompleted={() => {
+          setPickupScanReservation(null);
+          setOrdersRefreshKey((value) => value + 1);
+          setScreen('orders');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'shop-qr' && hasShop) {
+    return <SellerShopQrScreen onBack={() => setScreen('orders')} />;
+  }
+
+  if (screen === 'orders' && hasShop) {
+    return (
+      <SellerOrdersScreen
+        activeTab={ordersTab}
+        onActiveTabChange={setOrdersTab}
+        onRefreshKey={ordersRefreshKey}
+        isScreenActive
+        accountLockedOrderMode
         onBack={() => setScreen('main')}
+        onOpenReservation={(target) => {
+          setOrderDetailTarget(target);
+          setScreen('order-detail');
+        }}
+        onScanPickupQr={() => setScreen('scan-buyer-qr')}
+        onShowShopQr={() => setScreen('shop-qr')}
+      />
+    );
+  }
+
+  if (screen === 'order-detail' && orderDetailTarget && hasShop) {
+    return (
+      <SellerOrderDetailScreen
+        reservationId={String(orderDetailTarget.item?.id || '')}
+        initialItem={orderDetailTarget.item || null}
+        listCancelReasonText={orderDetailTarget.listCancelReasonText || ''}
+        accountLockedOrderMode
+        onBack={() => {
+          if (orderDetailTarget.fromTab) {
+            setOrdersTab(orderDetailTarget.fromTab);
+          }
+          setScreen('orders');
+        }}
+        onChanged={() => setOrdersRefreshKey((value) => value + 1)}
       />
     );
   }
@@ -89,13 +188,30 @@ export default function AccountLockedScreen() {
         </View>
         <Text style={styles.title}>Tài khoản đã bị khóa</Text>
         <Text style={styles.subtitle}>
-          {displayName} hiện không thể sử dụng FastMark cho đến khi admin mở khóa. Bạn vẫn có thể
-          gửi yêu cầu xem xét lại, rút tiền trong ví hoặc đăng xuất.
+          {displayName} hiện không thể sử dụng FastMark cho đến khi admin mở khóa. Các đơn
+          bạn đặt với vai trò người mua đã được hủy và cọc hoàn về ví (nếu có).
+          {hasShop
+            ? ' Đơn gian hàng (giữ hàng, tranh chấp…) vẫn giữ nguyên — bạn có thể quản lý đơn gian hàng, quản lý ví (chỉ rút tiền), gửi yêu cầu xem xét lại hoặc đăng xuất.'
+            : ' Bạn vẫn có thể quản lý ví (chỉ rút tiền), gửi yêu cầu xem xét lại hoặc đăng xuất.'}
         </Text>
 
-        <Pressable style={styles.secondaryBtn} onPress={() => setScreen('withdraw')}>
-          <Text style={styles.secondaryBtnText}>Rút tiền</Text>
+        <Pressable style={styles.actionBtn} onPress={() => setScreen('wallet')}>
+          <Ionicons name="wallet-outline" size={18} color="#076F32" />
+          <Text style={styles.actionBtnText}>Quản lý ví</Text>
         </Pressable>
+
+        {hasShop ? (
+          <Pressable
+            style={styles.actionBtn}
+            onPress={() => {
+              setOrdersTab(RESERVATION_TAB.DISPUTE);
+              setScreen('orders');
+            }}
+          >
+            <Ionicons name="receipt-outline" size={18} color="#076F32" />
+            <Text style={styles.actionBtnText}>Quản lý đơn gian hàng</Text>
+          </Pressable>
+        ) : null}
 
         {loading ? <Text style={styles.muted}>Đang tải trạng thái...</Text> : null}
 
@@ -183,16 +299,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
-    paddingVertical: 12,
+  actionBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    marginBottom: 16,
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: '#076F32',
+    backgroundColor: '#ffffff',
   },
-  secondaryBtnText: { color: '#076F32', fontWeight: '800', fontSize: 14 },
+  actionBtnText: { color: '#076F32', fontWeight: '800', fontSize: 15 },
   muted: { textAlign: 'center', color: '#94a3b8', marginBottom: 12 },
   card: {
     backgroundColor: '#fff',

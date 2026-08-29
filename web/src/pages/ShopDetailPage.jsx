@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
   CalendarDays,
@@ -8,14 +8,13 @@ import {
   Crown,
   Eye,
   Heart,
-  Layers,
   Lock,
+  LockOpen,
   MapPin,
   Package,
   Scale,
   ShoppingBag,
   Star,
-  Unlock,
   UserPlus,
   Users,
   Wallet,
@@ -38,18 +37,13 @@ import {
 import { getAccountFinance } from '../api/accountApi';
 import AdminDetailTabs from '../components/admin/AdminDetailTabs';
 import FollowListDialog, { FollowStatButton } from '../components/admin/FollowListDialog';
+import { useAdminTopbar } from '../admin/context/AdminTopbarContext';
 import { useAuth } from '../context/AuthContext';
-import { formatDate, formatPrice } from '../utils/format';
-import { goBackOr } from '../utils/navigation';
-import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import { formatDate, formatDateTimeDetail, formatPrice } from '../utils/format';
+import PreviewableImage, { VerifyDocCard } from '../components/PreviewableImage';
 
 function statusBadgeClass(status) {
   return status === 1 ? 'badge badge-success' : 'badge badge-danger';
-}
-
-function formatJoinDate(value) {
-  if (!value) return '';
-  return new Date(value).toLocaleDateString('vi-VN');
 }
 
 function subscriptionDaysLeft(end) {
@@ -82,59 +76,17 @@ function DetailSkeleton() {
   );
 }
 
-function VerifyDocCard({ label, url, onPreview }) {
-  const src = resolveMediaUrl(url);
-  if (!src) {
-    return (
-      <article className="seller-verify-doc-card empty">
-        <div className="seller-verify-doc-preview placeholder">{label}</div>
-        <span>{label}</span>
-      </article>
-    );
-  }
-
-  return (
-    <article className="seller-verify-doc-card">
-      <button
-        type="button"
-        className="seller-verify-doc-preview shop-detail-doc-preview-btn"
-        onClick={() => onPreview?.({ url: src, label })}
-      >
-        <img src={src} alt={label} />
-      </button>
-      <span>{label}</span>
-    </article>
-  );
-}
-
-function ImagePreviewModal({ imageUrl, label, onClose }) {
-  if (!imageUrl) {
-    return null;
-  }
-
-  return (
-    <div className="image-preview-overlay" role="presentation" onClick={onClose}>
-      <div className="image-preview-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-        <button type="button" className="ghost-btn image-preview-close" onClick={onClose}>
-          Đóng
-        </button>
-        <img src={imageUrl} alt={label || 'Ảnh xác minh phóng to'} className="image-preview-full" />
-      </div>
-    </div>
-  );
-}
-
 export default function ShopDetailPage() {
   const { shopId } = useParams();
-  const navigate = useNavigate();
   const { getIdToken } = useAuth();
+  const { setTrail, clearTrail } = useAdminTopbar();
 
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [confirmUnlock, setConfirmUnlock] = useState(false);
   const [followDialog, setFollowDialog] = useState('');
   const [finance, setFinance] = useState(null);
   const [mainTab, setMainTab] = useState('overview');
@@ -169,10 +121,6 @@ export default function ShopDetailPage() {
 
   async function toggleLock() {
     if (!shop) return;
-    if (shop.status === 1 && !confirmLock) {
-      setConfirmLock(true);
-      return;
-    }
     setBusy(true);
     setError('');
     try {
@@ -183,6 +131,7 @@ export default function ShopDetailPage() {
         await unblockShop(token, shop.id);
       }
       setConfirmLock(false);
+      setConfirmUnlock(false);
       await loadDetail();
     } catch (actionError) {
       setError(actionError.message || 'Thao tác thất bại.');
@@ -236,37 +185,32 @@ export default function ShopDetailPage() {
   );
   const subscriptionDaysRemaining = subscriptionDaysLeft(shop?.subscriptionExpiresAt);
 
-  if (loading) {
-    return (
-      <div className="page shop-detail-page shop-detail-page-v2">
-        <DetailSkeleton />
-      </div>
-    );
-  }
+  const shopDisplayName =
+    shop?.shopName || shop?.shopUsername || (loading ? '…' : 'Chi tiết');
 
-  if (!shop) {
-    return (
-      <div className="page shop-detail-page shop-detail-page-v2">
-        <p className="error-banner">{error || 'Không tìm thấy gian hàng.'}</p>
-        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/sellers')}>
-          ← Quay lại
-        </button>
-      </div>
-    );
-  }
+  useEffect(() => {
+    setTrail([
+      { label: 'Người bán', to: '/sellers' },
+      { label: shopDisplayName },
+    ]);
+    return () => clearTrail();
+  }, [shopDisplayName, setTrail, clearTrail]);
 
-  const owner = shop.owner;
+  const owner = shop?.owner;
   const hoursLabel =
-    shop.openTime || shop.closeTime
+    shop?.openTime || shop?.closeTime
       ? `${shop.openTime || '—'} – ${shop.closeTime || '—'}`
       : 'Chưa cấu hình';
+  const isShopActive = shop?.status === 1;
 
   function openWalletHistory() {
     setMainTab('history');
     setHistoryTab('wallet');
   }
 
-  const statCards = [
+  const statCards = useMemo(() => {
+    if (!shop) return [];
+    return [
     {
       label: 'Tổng doanh thu',
       value: formatPrice(shop.totalRevenue || 0),
@@ -276,7 +220,7 @@ export default function ShopDetailPage() {
     },
     {
       label: 'Tổng sản phẩm',
-      value: shop.totalProducts ?? 0,
+      value: shop.tongSP ?? 0,
       icon: Package,
       tone: 'blue',
     },
@@ -318,8 +262,8 @@ export default function ShopDetailPage() {
     },
     {
       label: 'Đánh giá',
-      value: `${Number(shop.averageRating || 0).toFixed(1)} ★`,
-      hint: `${shop.totalReviews || 0} lượt đánh giá`,
+      value: `${Number(shop.diemTB || 0).toFixed(1)} ★`,
+      hint: `${shop.tongDG || 0} lượt đánh giá`,
       icon: Star,
       tone: 'green',
     },
@@ -330,113 +274,118 @@ export default function ShopDetailPage() {
       icon: AlertTriangle,
       tone: 'red',
     },
-  ];
+    ];
+  }, [shop]);
 
   return (
-    <div className="admin-detail-page shop-detail-page shop-detail-page-v2">
-      <header className="admin-detail-toolbar">
-        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/sellers')}>
-          ← Quay lại
-        </button>
-        <div className="header-actions">
-          <button type="button" className="ghost-btn" onClick={loadDetail} disabled={busy}>
-            Làm mới
-          </button>
-          <button
-            type="button"
-            className={shop.status === 1 ? 'danger-btn' : 'approve-btn'}
-            onClick={toggleLock}
-            disabled={busy}
-          >
-            {shop.status === 1 ? (
-              <>
-                <Lock size={16} aria-hidden="true" /> Khóa gian hàng
-              </>
-            ) : (
-              <>
-                <Unlock size={16} aria-hidden="true" /> Mở khóa
-              </>
-            )}
-          </button>
-        </div>
-      </header>
-
+    <div className="admin-detail-page account-detail-page account-detail-page-v2 shop-detail-page shop-detail-page-v2">
       {error ? <p className="error-banner">{error}</p> : null}
 
-      <section className="shop-detail-hero">
-        <span className={`shop-detail-hero-status ${statusBadgeClass(shop.status)}`}>
-          {shop.statusLabel || (shop.status === 1 ? 'Hoạt động' : 'Đã khóa')}
-        </span>
-        <div className="shop-detail-hero-content">
-          {shop.avatar ? (
-            <img src={shop.avatar} alt="" className="shop-detail-hero-avatar" />
-          ) : (
-            <div className="shop-detail-hero-avatar placeholder">
-              {(shop.shopName || shop.shopUsername || 'S').charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="shop-detail-hero-main">
-            <h1>{shop.shopName || 'Gian hàng'}</h1>
-            <p className="shop-detail-hero-handle">@{shop.shopUsername || ''}</p>
-            <p className="shop-detail-hero-meta">
-              <MapPin size={14} aria-hidden="true" />
-              {shop.addressHeThong || shop.address || 'Chưa có địa chỉ'}
-              <span className="shop-detail-hero-meta-sep">|</span>
-              <CalendarDays size={14} aria-hidden="true" />
-              Tham gia từ {formatJoinDate(shop.createdAt)}
-            </p>
-            <div className="shop-detail-hero-extra">
-              {shop.categoryName ? (
-                <span className="shop-detail-hero-extra-item">
-                  <Layers size={14} aria-hidden="true" />
-                  <span>Danh mục:</span>
-                  <span className="shop-detail-tag">{shop.categoryName}</span>
-                </span>
-              ) : null}
-              <span className="shop-detail-hero-extra-item">
-                <Clock size={14} aria-hidden="true" />
-                <span>Giờ mở cửa:</span>
-                <strong>{hoursLabel}</strong>
-                <span className="badge badge-neutral shop-detail-open-badge">{shop.isOpenLabel}</span>
-              </span>
-            </div>
-            <div className="shop-detail-hero-extra shop-detail-hero-follow-row">
-              <FollowStatButton
-                icon={UserPlus}
-                label="Đang theo dõi"
-                count={shop.followingCount || 0}
-                onClick={() => setFollowDialog('following')}
-              />
-              <FollowStatButton
-                icon={Users}
-                label="Đã theo dõi"
-                count={shop.followersCount || 0}
-                onClick={() => setFollowDialog('followers')}
-              />
-            </div>
-            {shop.subscriptionActive && shop.subscriptionPlan ? (
-              <div className="shop-detail-hero-subscription">
-                <div className="shop-detail-hero-subscription-head">
-                  <span className="shop-detail-hero-subscription-label">
-                    <Crown size={14} aria-hidden="true" />
-                    {shop.subscriptionPlan}
-                  </span>
-                  <span className="shop-detail-hero-subscription-meta">
-                    Còn <strong>{subscriptionDaysRemaining}</strong> ngày · Hết hạn{' '}
-                    {formatJoinDate(shop.subscriptionExpiresAt)}
+      {loading ? <DetailSkeleton /> : null}
+
+      {!loading && shop ? (
+        <>
+          <section className="shop-detail-hero">
+            <button
+              type="button"
+              className={
+                isShopActive
+                  ? 'account-hero-lock-btn account-hero-lock-btn--corner account-hero-lock-btn--lock'
+                  : 'account-hero-lock-btn account-hero-lock-btn--corner account-hero-lock-btn--unlock'
+              }
+              title={isShopActive ? 'Khóa gian hàng' : 'Mở khóa gian hàng'}
+              aria-label={isShopActive ? 'Khóa gian hàng' : 'Mở khóa gian hàng'}
+              disabled={busy}
+              onClick={() => {
+                if (isShopActive) {
+                  setConfirmLock(true);
+                } else {
+                  setConfirmUnlock(true);
+                }
+              }}
+            >
+              {isShopActive ? (
+                <Lock size={18} aria-hidden="true" />
+              ) : (
+                <LockOpen size={18} aria-hidden="true" />
+              )}
+            </button>
+            <div className="shop-detail-hero-content account-detail-hero-content">
+              <div className="account-detail-hero-aside">
+                <PreviewableImage
+                  src={shop.avatar}
+                  alt={shop.shopName || 'Gian hàng'}
+                  width={160}
+                  height={160}
+                  shape="circle"
+                  fallbackLetter={shop.shopName || shop.shopUsername || 'S'}
+                  wrapperClassName="shop-detail-hero-avatar-wrap"
+                  className="shop-detail-hero-avatar"
+                />
+              </div>
+              <div className="shop-detail-hero-main">
+                <div className="shop-detail-hero-title-row">
+                  <h1>{shop.shopName || 'Gian hàng'}</h1>
+                  <span className={statusBadgeClass(shop.status)}>
+                    {shop.statusLabel || (isShopActive ? 'Hoạt động' : 'Đã khóa')}
                   </span>
                 </div>
-                <div className="shop-detail-hero-subscription-track" aria-hidden="true">
-                  <div
-                    className="shop-detail-hero-subscription-bar"
-                    style={{ width: `${subscriptionRemaining}%` }}
+                <p className="shop-detail-hero-handle">@{shop.shopUsername || '—'}</p>
+                <div className="shop-detail-hero-extra shop-detail-hero-follow-row">
+                  <FollowStatButton
+                    icon={UserPlus}
+                    label="Đang theo dõi"
+                    count={shop.followingCount || 0}
+                    onClick={() => setFollowDialog('following')}
+                  />
+                  <FollowStatButton
+                    icon={Users}
+                    label="Đã theo dõi"
+                    count={shop.soNguoiTheo || 0}
+                    onClick={() => setFollowDialog('followers')}
                   />
                 </div>
+                <div className="account-detail-hero-meta-lines">
+                  <p className="account-detail-hero-meta-line">
+                    <CalendarDays size={14} aria-hidden="true" />
+                    <span>
+                      Tham gia từ:{' '}
+                      <strong>{formatDateTimeDetail(shop.createdAt) || '—'}</strong>
+                    </span>
+                  </p>
+                  {owner?.lastActiveAt ? (
+                    <p className="account-detail-hero-meta-line">
+                      <Clock size={14} aria-hidden="true" />
+                      <span>
+                        Lần hoạt động cuối (chủ shop):{' '}
+                        <strong>{formatDateTimeDetail(owner.lastActiveAt) || '—'}</strong>
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
+                {shop.subscriptionActive && shop.subscriptionPlan ? (
+                  <div className="shop-detail-hero-subscription">
+                    <div className="shop-detail-hero-subscription-head">
+                      <span className="shop-detail-hero-subscription-label">
+                        <Crown size={14} aria-hidden="true" />
+                        {shop.subscriptionPlan}
+                      </span>
+                      <span className="shop-detail-hero-subscription-meta">
+                        Còn <strong>{subscriptionDaysRemaining}</strong> ngày · Hết hạn{' '}
+                        {formatDate(shop.subscriptionExpiresAt) || '—'}
+                      </span>
+                    </div>
+                    <div className="shop-detail-hero-subscription-track" aria-hidden="true">
+                      <div
+                        className="shop-detail-hero-subscription-bar"
+                        style={{ width: `${subscriptionRemaining}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        </div>
-      </section>
+            </div>
+          </section>
 
       <section className="account-detail-main-section">
         <AdminDetailTabs
@@ -449,7 +398,7 @@ export default function ShopDetailPage() {
         <div className="account-detail-main-tab-body">
           {mainTab === 'overview' ? (
             <div className="account-detail-overview-tab">
-              <section className="shop-detail-stat-grid shop-detail-overview-stats">
+              <section className="shop-detail-stat-grid account-detail-overview-stats">
                 {statCards.map((card) => {
                   const Icon = card.icon;
                   return (
@@ -467,141 +416,56 @@ export default function ShopDetailPage() {
                 })}
               </section>
 
-              <div className="shop-detail-overview-layout">
-                <div className="shop-detail-overview-main">
-                  <article className="shop-detail-panel shop-detail-info-panel shop-detail-info-panel-compact">
-                    <div className="shop-detail-panel-head">
-                      <h3>Thông tin gian hàng</h3>
-                    </div>
-                    <div className="shop-detail-info-split">
-                      <dl className="shop-detail-dl">
-                        <div><dt>Tên gian hàng</dt><dd>{shop.shopName || '—'}</dd></div>
-                        <div><dt>Username</dt><dd>@{shop.shopUsername || '—'}</dd></div>
-                        <div className="shop-detail-address-row">
-                          <dt>Địa chỉ</dt>
-                          <dd title={shop.addressHeThong || shop.address || ''}>
-                            {shop.addressHeThong || shop.address || '—'}
-                          </dd>
-                        </div>
-                        <div><dt>Số điện thoại</dt><dd>{shop.phone || '—'}</dd></div>
-                        <div>
-                          <dt>Giờ mở cửa</dt>
-                          <dd className="shop-detail-hours-dd">
-                            <span>{hoursLabel}</span>
-                            {shop.isOpenLabel ? (
-                              <span className="badge badge-neutral shop-detail-open-badge">{shop.isOpenLabel}</span>
-                            ) : null}
-                          </dd>
-                        </div>
-                        <div><dt>Mô tả</dt><dd>{shop.description || 'Chưa có mô tả.'}</dd></div>
-                        <div><dt>Ngày tạo</dt><dd>{formatDate(shop.createdAt)}</dd></div>
-                      </dl>
-
-                      <div className="shop-detail-info-verify shop-detail-info-verify-compact">
-                        <div className="shop-detail-verify-head">
-                          <h4>Xác minh người bán hàng</h4>
-                          <span className={shop.isVerified ? 'badge badge-success' : 'badge badge-warning'}>
-                            {shop.verification?.statusLabel || (shop.isVerified ? 'Đã xác minh' : 'Chưa xác minh')}
-                          </span>
-                        </div>
-                        <div className="seller-verify-doc-grid shop-detail-verify-doc-grid">
-                          <VerifyDocCard
-                            label="Mặt trước"
-                            url={shop.verification?.cccdFrontImage}
-                            onPreview={setPreviewImage}
-                          />
-                          <VerifyDocCard
-                            label="Mặt sau"
-                            url={shop.verification?.cccdBackImage}
-                            onPreview={setPreviewImage}
-                          />
-                          <VerifyDocCard
-                            label="Selfie"
-                            url={shop.verification?.selfieImage}
-                            onPreview={setPreviewImage}
-                          />
-                          <VerifyDocCard
-                            label="Giấy tờ kinh doanh"
-                            url={shop.verification?.businessImage}
-                            onPreview={setPreviewImage}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-
-                  <article className="shop-detail-panel shop-detail-overview-map-panel">
-                    <div className="shop-detail-panel-head shop-detail-map-panel-head">
-                      <h3>Vị trí gian hàng</h3>
-                      {mapLinkUrl ? (
-                        <a
-                          className="detail-btn shop-detail-map-link shop-detail-map-link-head"
-                          href={mapLinkUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Xem trên Google Maps
-                        </a>
-                      ) : null}
-                    </div>
-                    {(shop.addressHeThong || shop.address) ? (
-                      <p className="shop-detail-map-address">
-                        <MapPin size={14} aria-hidden="true" />
-                        {shop.addressHeThong || shop.address}
-                      </p>
-                    ) : null}
-                    <div className="shop-detail-map-wrap">
-                      {mapEmbedUrl ? (
-                        <iframe
-                          title="Bản đồ gian hàng"
-                          className="shop-detail-map"
-                          src={mapEmbedUrl}
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                        />
-                      ) : (
-                        <div className="shop-detail-map-fallback">
-                          <MapPin size={32} aria-hidden="true" />
-                          <p>Chưa có tọa độ GPS.</p>
-                        </div>
-                      )}
-                    </div>
-                  </article>
-                </div>
-
-                <div className="account-detail-overview-cards shop-detail-overview-cards">
-                <article className="shop-detail-panel account-detail-overview-card">
+              <div className="account-detail-overview-cards">
+                <article className="shop-detail-panel shop-detail-info-panel shop-detail-info-panel-compact account-detail-overview-card">
                   <div className="shop-detail-panel-head">
-                    <h3>Chủ gian hàng</h3>
+                    <h3>Thông tin gian hàng</h3>
                   </div>
-                  {owner ? (
-                    <>
-                      <div className="shop-detail-owner">
-                        {owner.avatar ? (
-                          <img src={owner.avatar} alt="" className="shop-detail-owner-avatar" />
-                        ) : (
-                          <div className="shop-detail-owner-avatar placeholder">
-                            {(owner.fullName || owner.userName || 'U').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div>
-                          <strong>{owner.fullName || owner.userName || ''}</strong>
-                          <span className="shop-detail-owner-handle">
-                            {owner.userName ? `@${owner.userName}` : '—'}
-                          </span>
-                        </div>
-                      </div>
-                      <dl className="shop-detail-dl compact account-detail-overview-card-body">
-                        <div><dt>Email</dt><dd>{owner.email || '—'}</dd></div>
-                        <div><dt>Số điện thoại</dt><dd>{owner.phone || '—'}</dd></div>
-                      </dl>
-                      <Link className="detail-btn shop-detail-side-actions" to={`/accounts/${owner.id}`}>
-                        Xem chi tiết người dùng
-                      </Link>
-                    </>
-                  ) : (
-                    <p className="muted account-detail-overview-card-body">Không có thông tin chủ shop.</p>
-                  )}
+                  <dl className="shop-detail-dl account-detail-user-dl">
+                    <div>
+                      <dt>ID gian hàng</dt>
+                      <dd>{shop.id || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Tên gian hàng</dt>
+                      <dd>{shop.shopName || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Username</dt>
+                      <dd>@{shop.shopUsername || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Địa chỉ</dt>
+                      <dd title={shop.addressHeThong || shop.address || ''}>
+                        {shop.addressHeThong || shop.address || '—'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Số điện thoại</dt>
+                      <dd>{shop.phone || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Danh mục</dt>
+                      <dd>{shop.categoryName || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Giờ mở cửa</dt>
+                      <dd className="shop-detail-hours-dd">
+                        <span>{hoursLabel}</span>
+                        {shop.isOpenLabel ? (
+                          <span className="badge badge-neutral shop-detail-open-badge">{shop.isOpenLabel}</span>
+                        ) : null}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Tạo lúc</dt>
+                      <dd>{formatDate(shop.createdAt)}</dd>
+                    </div>
+                    <div>
+                      <dt>Cập nhật</dt>
+                      <dd>{formatDate(shop.updatedAt)}</dd>
+                    </div>
+                  </dl>
                 </article>
 
                 <article className="shop-detail-panel account-wallet-panel account-detail-overview-card">
@@ -638,8 +502,106 @@ export default function ShopDetailPage() {
                     Xem chi tiết ví
                   </button>
                 </article>
-                </div>
+
+                <article className="shop-detail-panel account-detail-overview-card">
+                  <div className="shop-detail-panel-head">
+                    <h3>Chủ gian hàng</h3>
+                  </div>
+                  {owner ? (
+                    <>
+                      <div className="shop-detail-owner">
+                        <PreviewableImage
+                          src={owner.avatar}
+                          alt={owner.fullName || owner.userName || 'Chủ shop'}
+                          width={56}
+                          height={56}
+                          shape="circle"
+                          fallbackLetter={owner.fullName || owner.userName || 'U'}
+                          className="shop-detail-owner-avatar"
+                        />
+                        <div>
+                          <strong>{owner.fullName || owner.userName || ''}</strong>
+                          <span className="shop-detail-owner-handle">
+                            {owner.userName ? `@${owner.userName}` : '—'}
+                          </span>
+                        </div>
+                      </div>
+                      <dl className="shop-detail-dl compact account-detail-overview-card-body">
+                        <div>
+                          <dt>Email</dt>
+                          <dd>{owner.email || '—'}</dd>
+                        </div>
+                        <div>
+                          <dt>Số điện thoại</dt>
+                          <dd>{owner.phone || '—'}</dd>
+                        </div>
+                        <div>
+                          <dt>Vai trò</dt>
+                          <dd>{owner.roleLabel || 'Người bán'}</dd>
+                        </div>
+                      </dl>
+                      <Link className="detail-btn shop-detail-side-actions" to={`/users/${owner.id}`}>
+                        Xem chi tiết người dùng
+                      </Link>
+                    </>
+                  ) : (
+                    <p className="muted account-detail-overview-card-body">Không có thông tin chủ shop.</p>
+                  )}
+                </article>
               </div>
+
+              <article className="shop-detail-panel shop-detail-verify-panel">
+                <div className="shop-detail-panel-head shop-detail-verify-panel-head">
+                  <h3>Ảnh xác minh người bán</h3>
+                  <span className={shop.isVerified ? 'badge badge-success' : 'badge badge-warning'}>
+                    {shop.verification?.statusLabel || (shop.isVerified ? 'Đã xác minh' : 'Chưa xác minh')}
+                  </span>
+                </div>
+                <div className="seller-verify-doc-grid shop-detail-verify-doc-grid shop-detail-verify-doc-grid-active">
+                  <VerifyDocCard label="Mặt trước" url={shop.verification?.anhCccdTruoc} />
+                  <VerifyDocCard label="Mặt sau" url={shop.verification?.anhCccdSau} />
+                  <VerifyDocCard label="Selfie" url={shop.verification?.selfieImage} />
+                  <VerifyDocCard label="Giấy tờ kinh doanh" url={shop.verification?.anhKD} />
+                </div>
+              </article>
+
+              <article className="shop-detail-panel shop-detail-overview-map-panel">
+                    <div className="shop-detail-panel-head shop-detail-map-panel-head">
+                      <h3>Vị trí gian hàng</h3>
+                      {mapLinkUrl ? (
+                        <a
+                          className="detail-btn shop-detail-map-link shop-detail-map-link-head"
+                          href={mapLinkUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Xem trên Google Maps
+                        </a>
+                      ) : null}
+                    </div>
+                    {(shop.addressHeThong || shop.address) ? (
+                      <p className="shop-detail-map-address">
+                        <MapPin size={14} aria-hidden="true" />
+                        {shop.addressHeThong || shop.address}
+                      </p>
+                    ) : null}
+                    <div className="shop-detail-map-wrap">
+                      {mapEmbedUrl ? (
+                        <iframe
+                          title="Bản đồ gian hàng"
+                          className="shop-detail-map"
+                          src={mapEmbedUrl}
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                      ) : (
+                        <div className="shop-detail-map-fallback">
+                          <MapPin size={32} aria-hidden="true" />
+                          <p>Chưa có tọa độ GPS.</p>
+                        </div>
+                      )}
+                    </div>
+                  </article>
             </div>
           ) : (
             <ActivityHistorySection
@@ -656,13 +618,11 @@ export default function ShopDetailPage() {
           )}
         </div>
       </section>
+        </>
+      ) : null}
 
-      {previewImage ? (
-        <ImagePreviewModal
-          imageUrl={previewImage.url}
-          label={previewImage.label}
-          onClose={() => setPreviewImage(null)}
-        />
+      {!loading && !shop ? (
+        <p className="error-banner">{error || 'Không tìm thấy gian hàng.'}</p>
       ) : null}
 
       <FollowListDialog
@@ -678,8 +638,9 @@ export default function ShopDetailPage() {
           <div className="dialog-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h3>Khóa gian hàng</h3>
             <p>
-              Gian hàng sẽ bị khóa: không hiển thị bài đăng, mọi đơn đang treo sẽ hủy và hoàn cọc
-              cho người mua. Tài khoản chủ shop vẫn dùng được các tính năng khác.
+              Gian hàng sẽ bị khóa: không hiển thị bài đăng; đơn chờ xác nhận và đang giữ hàng sẽ hủy
+              và hoàn cọc. Đơn tranh chấp và đơn đang giam tiền giữ nguyên. Tài khoản chủ shop vẫn
+              dùng được các tính năng khác.
             </p>
             <div className="dialog-actions">
               <button type="button" className="ghost-btn" disabled={busy} onClick={() => setConfirmLock(false)}>
@@ -687,6 +648,26 @@ export default function ShopDetailPage() {
               </button>
               <button type="button" className="danger-btn" disabled={busy} onClick={toggleLock}>
                 {busy ? 'Đang xử lý...' : 'Khóa gian hàng'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmUnlock ? (
+        <div className="dialog-overlay" role="presentation" onClick={() => !busy && setConfirmUnlock(false)}>
+          <div className="dialog-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <h3>Mở khóa gian hàng</h3>
+            <p>
+              Gian hàng sẽ hoạt động lại, hiển thị sản phẩm đã ẩn và có thể nhận đơn mới. Bạn có chắc
+              muốn mở khóa?
+            </p>
+            <div className="dialog-actions">
+              <button type="button" className="ghost-btn" disabled={busy} onClick={() => setConfirmUnlock(false)}>
+                Huỷ
+              </button>
+              <button type="button" className="unlock-confirm-btn" disabled={busy} onClick={toggleLock}>
+                {busy ? 'Đang xử lý...' : 'Xác nhận mở khóa'}
               </button>
             </div>
           </div>

@@ -1,6 +1,4 @@
-import { Avatar } from 'antd';
-
-import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import PreviewableImage from '../../components/PreviewableImage';
 
 export default function ShopCell({
   shopName,
@@ -13,25 +11,30 @@ export default function ShopCell({
   const rawHandle = shopUsername ? String(shopUsername).replace(/^@+/, '') : '';
   const handle = rawHandle ? `@${rawHandle}` : '';
 
-  const content = (
-    <div className="admin-shop-cell">
-      <Avatar src={resolveMediaUrl(shopAvatar || avatar) || undefined} size={36}>
-        {name.charAt(0).toUpperCase()}
-      </Avatar>
-      <div className="admin-shop-cell-text">
-        <div className="admin-shop-cell-name">{shopName || shopUsername || '—'}</div>
-        {handle ? <div className="admin-shop-cell-handle">{handle}</div> : null}
-      </div>
+  const textBlock = (
+    <div className="admin-shop-cell-text">
+      <div className="admin-shop-cell-name">{shopName || shopUsername || '—'}</div>
+      {handle ? <div className="admin-shop-cell-handle">{handle}</div> : null}
     </div>
   );
 
-  if (onClick) {
-    return (
-      <button type="button" className="admin-shop-cell-button" onClick={onClick}>
-        {content}
-      </button>
-    );
-  }
-
-  return content;
+  return (
+    <div className="admin-shop-cell">
+      <PreviewableImage
+        src={shopAvatar || avatar}
+        alt={name}
+        width={36}
+        height={36}
+        shape="circle"
+        fallbackLetter={name}
+      />
+      {onClick ? (
+        <button type="button" className="admin-shop-cell-text-button" onClick={onClick}>
+          {textBlock}
+        </button>
+      ) : (
+        textBlock
+      )}
+    </div>
+  );
 }

@@ -19,7 +19,7 @@ function resolveReviewRemovedBy(review) {
   }
 
   if (Number(review?.isDeleted) === RECORD_STATUS.HIDDEN || isLegacyBooleanDeleted(review?.isDeleted)) {
-    return pickString(review?.adminRemovalReason || review?.moderationReason)
+    return pickString(review?.lyDoGo || review?.adminRemovalReason || review?.moderationReason)
       ? REVIEW_REMOVED_BY.ADMIN
       : REVIEW_REMOVED_BY.BUYER;
   }
@@ -69,8 +69,8 @@ function resolveReviewRemovedAt(review) {
   return review?.removedAt || review?.deletedAt || null;
 }
 
-function resolveReviewAdminRemovalReason(review) {
-  return pickString(review?.adminRemovalReason || review?.moderationReason);
+function resolveReviewLyDoGo(review) {
+  return pickString(review?.lyDoGo || review?.adminRemovalReason || review?.moderationReason);
 }
 
 function toAdminReviewRemovalFields(review) {
@@ -83,7 +83,7 @@ function toAdminReviewRemovalFields(review) {
     isBuyerRemoved: isBuyerRemovedReview(review),
     removedBy,
     removedAt,
-    adminRemovalReason: resolveReviewAdminRemovalReason(review),
+    lyDoGo: resolveReviewLyDoGo(review),
   };
 }
 
@@ -124,6 +124,56 @@ function publicReviewFilter() {
   };
 }
 
+function visibleReviewMatch() {
+  return publicReviewFilter();
+}
+
+function emptyRemovedByMatch(field = "removedBy") {
+  return {
+    $or: [{ [field]: "" }, { [field]: null }, { [field]: { $exists: false } }],
+  };
+}
+
+function adminDeletedReviewFilter() {
+  return {
+    $and: [
+      deletedReviewFilter(),
+      {
+        $or: [
+          { removedBy: REVIEW_REMOVED_BY.ADMIN },
+          {
+            $and: [
+              emptyRemovedByMatch(),
+              { lyDoGo: { $exists: true, $nin: ["", null] } },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function buyerDeletedReviewFilter() {
+  return {
+    $and: [
+      deletedReviewFilter(),
+      {
+        $or: [
+          { removedBy: REVIEW_REMOVED_BY.BUYER },
+          {
+            $and: [
+              emptyRemovedByMatch(),
+              {
+                $or: [{ lyDoGo: { $exists: false } }, { lyDoGo: "" }, { lyDoGo: null }],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function activeReviewPartialFilter(field = "isDeleted") {
   return notDeletedReviewFilter(field);
 }
@@ -131,35 +181,35 @@ function activeReviewPartialFilter(field = "isDeleted") {
 function clearReviewRemoval(review) {
   review.isDeleted = RECORD_STATUS.ACTIVE;
   review.removedBy = "";
-  review.adminRemovalReason = "";
+  review.lyDoGo = "";
   review.removedAt = null;
 }
 
 function markReviewAdminHidden(review, reason, removedAt = new Date()) {
   review.isDeleted = RECORD_STATUS.ACTIVE;
   review.removedBy = REVIEW_REMOVED_BY.ADMIN;
-  review.adminRemovalReason = pickString(reason);
+  review.lyDoGo = pickString(reason);
   review.removedAt = removedAt;
 }
 
 function markReviewAdminDeleted(review, reason, removedAt = new Date()) {
   review.isDeleted = RECORD_STATUS.HIDDEN;
   review.removedBy = REVIEW_REMOVED_BY.ADMIN;
-  review.adminRemovalReason = pickString(reason);
+  review.lyDoGo = pickString(reason);
   review.removedAt = removedAt;
 }
 
 function markReviewBuyerDeleted(review, removedAt = new Date()) {
   review.isDeleted = RECORD_STATUS.HIDDEN;
   review.removedBy = REVIEW_REMOVED_BY.BUYER;
-  review.adminRemovalReason = "";
+  review.lyDoGo = "";
   review.removedAt = removedAt;
 }
 
 /** @deprecated Dùng markReviewAdminDeleted / markReviewBuyerDeleted */
 function markReviewDeleted(review, removedAt = new Date(), removedBy = REVIEW_REMOVED_BY.BUYER) {
   if (removedBy === REVIEW_REMOVED_BY.ADMIN) {
-    markReviewAdminDeleted(review, review?.adminRemovalReason || review?.moderationReason || "", removedAt);
+    markReviewAdminDeleted(review, review?.lyDoGo || review?.adminRemovalReason || review?.moderationReason || "", removedAt);
     return;
   }
   markReviewBuyerDeleted(review, removedAt);
@@ -172,7 +222,7 @@ function setReviewHiddenFlag(review, hidden) {
     }
     return;
   }
-  markReviewAdminHidden(review, review?.adminRemovalReason || review?.moderationReason || "Ẩn bởi quản trị viên");
+  markReviewAdminHidden(review, review?.lyDoGo || review?.adminRemovalReason || review?.moderationReason || "Ẩn bởi quản trị viên");
 }
 
 module.exports = {
@@ -186,13 +236,16 @@ module.exports = {
   isBuyerRemovedReview,
   resolveReviewRemovedBy,
   resolveReviewRemovedAt,
-  resolveReviewAdminRemovalReason,
+  resolveReviewLyDoGo,
   toAdminReviewRemovalFields,
   notDeletedReviewFilter,
   deletedReviewFilter,
   notAdminHiddenReviewFilter,
   adminHiddenReviewFilter,
   publicReviewFilter,
+  visibleReviewMatch,
+  adminDeletedReviewFilter,
+  buyerDeletedReviewFilter,
   activeReviewPartialFilter,
   clearReviewRemoval,
   markReviewAdminHidden,

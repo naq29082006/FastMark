@@ -176,12 +176,40 @@ async function recoverSubmittedVerification(idToken) {
   return null;
 }
 
+function normalizeCccdDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function getCccdNumberError(value) {
+  const digits = normalizeCccdDigits(value);
+  if (!digits) {
+    return 'Vui lòng nhập số CCCD/CMND.';
+  }
+  if (digits.length !== 9 && digits.length !== 12) {
+    return 'Số CCCD/CMND phải gồm 9 hoặc 12 chữ số.';
+  }
+  return '';
+}
+
+function getCccdFullNameError(value) {
+  const name = String(value || '').trim().replace(/\s+/g, ' ');
+  if (name.length < 2) {
+    return 'Vui lòng nhập họ tên trên CCCD.';
+  }
+  if (name.length > 100) {
+    return 'Họ tên không được quá 100 ký tự.';
+  }
+  return '';
+}
+
 export default function SellerRegistrationScreen({ onBack, onSubmitted, initialVerification = null }) {
   const profile = useSelector(selectAuthProfile);
+  const [cccdFullName, setCccdFullName] = useState('');
+  const [cccdNumber, setCccdNumber] = useState('');
   const [cccdFront, setCccdFront] = useState(null);
   const [cccdBack, setCccdBack] = useState(null);
   const [selfie, setSelfie] = useState(null);
-  const [businessImage, setBusinessImage] = useState(null);
+  const [anhKD, setBusinessImage] = useState(null);
   const [systemAddress, setSystemAddress] = useState('');
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
@@ -266,18 +294,20 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
     );
     setShopName((current) => current || initialVerification.shopName || '');
     setShopUsername((current) => current || initialVerification.shopUsername || '');
+    setCccdFullName((current) => current || initialVerification.fullName || '');
+    setCccdNumber((current) => current || initialVerification.cccdNumber || '');
 
-    if (initialVerification.cccdFrontImage) {
-      setCccdFront({ uri: initialVerification.cccdFrontImage });
+    if (initialVerification.anhCccdTruoc) {
+      setCccdFront({ uri: initialVerification.anhCccdTruoc });
     }
-    if (initialVerification.cccdBackImage) {
-      setCccdBack({ uri: initialVerification.cccdBackImage });
+    if (initialVerification.anhCccdSau) {
+      setCccdBack({ uri: initialVerification.anhCccdSau });
     }
     if (initialVerification.selfieImage) {
       setSelfie({ uri: initialVerification.selfieImage });
     }
     const existingBusinessImage =
-      initialVerification.businessImage || initialVerification.businessDocImage || '';
+      initialVerification.anhKD || initialVerification.businessDocImage || '';
     if (existingBusinessImage) {
       setBusinessImage({ uri: existingBusinessImage });
     }
@@ -376,14 +406,26 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
   }
 
   async function handleSubmit() {
+    const fullNameError = getCccdFullNameError(cccdFullName);
+    const cccdError = getCccdNumberError(cccdNumber);
+    if (fullNameError || cccdError) {
+      setFieldErrors((current) => ({
+        ...current,
+        cccdFullName: fullNameError,
+        cccdNumber: cccdError,
+      }));
+      setError(fullNameError || cccdError);
+      return;
+    }
+
     if (!cccdFront || !cccdBack || !selfie) {
       setError('Vui lòng chọn đủ ảnh CCCD mặt trước, mặt sau và ảnh chân dung.');
       return;
     }
 
     if (
-      !hasUsableVerificationImage(cccdFront, initialVerification?.cccdFrontImage) ||
-      !hasUsableVerificationImage(cccdBack, initialVerification?.cccdBackImage) ||
+      !hasUsableVerificationImage(cccdFront, initialVerification?.anhCccdTruoc) ||
+      !hasUsableVerificationImage(cccdBack, initialVerification?.anhCccdSau) ||
       !hasUsableVerificationImage(selfie, initialVerification?.selfieImage)
     ) {
       setError('Không đọc được ảnh. Vui lòng chọn lại ảnh trước khi gửi.');
@@ -425,8 +467,8 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
 
     if (
       !hasUsableVerificationImage(
-        businessImage,
-        initialVerification?.businessImage || initialVerification?.businessDocImage
+        anhKD,
+        initialVerification?.anhKD || initialVerification?.businessDocImage
       )
     ) {
       setError('Vui lòng tải ảnh giấy phép kinh doanh hoặc giấy chứng nhận ATTP.');
@@ -447,19 +489,19 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
 
       const frontImage = buildVerificationImagePayload(
         cccdFront,
-        initialVerification?.cccdFrontImage
+        initialVerification?.anhCccdTruoc
       );
       const backImage = buildVerificationImagePayload(
         cccdBack,
-        initialVerification?.cccdBackImage
+        initialVerification?.anhCccdSau
       );
       const selfieImage = buildVerificationImagePayload(
         selfie,
         initialVerification?.selfieImage
       );
-      const businessImagePayload = buildVerificationImagePayload(
-        businessImage,
-        initialVerification?.businessImage || initialVerification?.businessDocImage
+      const anhKDPayload = buildVerificationImagePayload(
+        anhKD,
+        initialVerification?.anhKD || initialVerification?.businessDocImage
       );
 
       let verification = null;
@@ -468,18 +510,20 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
         const response = await submitSellerVerificationOnBackend({
           idToken,
           payload: {
-            cccdFrontImageBase64: frontImage.base64,
+            anhCccdTruocBase64: frontImage.base64,
             cccdFrontMimeType: frontImage.mimeType,
-            cccdFrontImageUrl: frontImage.existingUrl,
-            cccdBackImageBase64: backImage.base64,
+            anhCccdTruocUrl: frontImage.existingUrl,
+            anhCccdSauBase64: backImage.base64,
             cccdBackMimeType: backImage.mimeType,
-            cccdBackImageUrl: backImage.existingUrl,
+            anhCccdSauUrl: backImage.existingUrl,
             selfieImageBase64: selfieImage.base64,
             selfieMimeType: selfieImage.mimeType,
             selfieImageUrl: selfieImage.existingUrl,
-            businessImageBase64: businessImagePayload.base64,
-            businessImageMimeType: businessImagePayload.mimeType,
-            businessImageUrl: businessImagePayload.existingUrl,
+            anhKDBase64: anhKDPayload.base64,
+            anhKDMimeType: anhKDPayload.mimeType,
+            anhKDUrl: anhKDPayload.existingUrl,
+            fullName: String(cccdFullName).trim().replace(/\s+/g, ' '),
+            cccdNumber: normalizeCccdDigits(cccdNumber),
             systemAddress: systemAddress.trim(),
             addressHeThong: systemAddress.trim(),
             categoryId: normalizedCategoryId,
@@ -577,9 +621,46 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
 
         <ImagePickerField
           label="Ảnh giấy phép kinh doanh / ATTP"
-          value={businessImage}
+          value={anhKD}
           onPick={() => handlePickImage(setBusinessImage)}
         />
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Họ tên (trên CCCD)</Text>
+          <KeyboardAwareTextInput
+            value={cccdFullName}
+            onChangeText={(value) => {
+              setCccdFullName(value);
+              setFieldErrors((current) => ({ ...current, cccdFullName: '' }));
+              setError('');
+            }}
+            placeholder="Nhập đúng họ tên trên giấy tờ"
+            placeholderTextColor="#94a3b8"
+            style={[styles.textInput, fieldErrors.cccdFullName ? styles.textInputError : null]}
+          />
+          {fieldErrors.cccdFullName ? (
+            <Text style={styles.fieldError}>{fieldErrors.cccdFullName}</Text>
+          ) : null}
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Số CCCD/CMND</Text>
+          <KeyboardAwareTextInput
+            value={cccdNumber}
+            onChangeText={(value) => {
+              setCccdNumber(normalizeCccdDigits(value).slice(0, 12));
+              setFieldErrors((current) => ({ ...current, cccdNumber: '' }));
+              setError('');
+            }}
+            keyboardType="number-pad"
+            placeholder="9 hoặc 12 chữ số"
+            placeholderTextColor="#94a3b8"
+            style={[styles.textInput, fieldErrors.cccdNumber ? styles.textInputError : null]}
+          />
+          {fieldErrors.cccdNumber ? (
+            <Text style={styles.fieldError}>{fieldErrors.cccdNumber}</Text>
+          ) : null}
+        </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>Tên gian hàng</Text>

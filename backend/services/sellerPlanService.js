@@ -44,8 +44,8 @@ function toPlanDto(doc) {
 }
 
 async function listAdminPlans() {
-  const rows = await SellerPlan.find({})
-    .sort({ isActive: -1, price: 1, CreatedAt: 1 })
+  const rows = await SellerPlan.find(activeRecordFilter())
+    .sort({ price: 1, CreatedAt: 1 })
     .limit(100);
   return rows.map(toPlanDto);
 }

@@ -1,5 +1,5 @@
 /**
- * Gộp businessDocType + businessDocImage → businessImage.
+ * Gộp businessDocType + businessDocImage → anhKD.
  * Usage: node backend/scripts/migrateSellerVerificationBusinessImage.js
  */
 require("../config/env");
@@ -17,15 +17,15 @@ async function migrate() {
 
   for await (const doc of cursor) {
     const imageUrl = pickString(
-      doc.businessImage ?? doc.businessDocImage ?? doc.businessDoc?.imageUrl
+      doc.anhKD ?? doc.businessDocImage ?? doc.businessDoc?.imageUrl
     );
     const $set = {};
     const $unset = {};
 
-    if (imageUrl && doc.businessImage !== imageUrl) {
-      $set.businessImage = imageUrl;
-    } else if (!doc.businessImage && imageUrl) {
-      $set.businessImage = imageUrl;
+    if (imageUrl && doc.anhKD !== imageUrl) {
+      $set.anhKD = imageUrl;
+    } else if (!doc.anhKD && imageUrl) {
+      $set.anhKD = imageUrl;
     }
 
     if (doc.businessDocType !== undefined) {

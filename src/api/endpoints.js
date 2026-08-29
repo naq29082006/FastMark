@@ -110,6 +110,7 @@ export const API_ENDPOINTS = {
   authForgotPasswordVerify: '/api/auth/forgot-password/verify',
   authForgotPasswordReset: '/api/auth/forgot-password/reset',
   shopsNearby: '/api/shops/nearby',
+  shopsNearbyMap: '/api/shops/nearby/map',
   shopsSearch: '/api/shops/search',
   shopCategories: '/api/shops/categories',
   shopById: (id) => `/api/shops/${id}`,

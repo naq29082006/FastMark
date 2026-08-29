@@ -23,3 +23,20 @@ export function formatTimeString(date) {
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;
 }
+
+export function snapTimeToMinuteInterval(date, minuteInterval = 1) {
+  const step = Math.max(1, Math.min(30, Number(minuteInterval) || 1));
+  if (step <= 1) {
+    return new Date(date);
+  }
+  const minuteOptions = [];
+  for (let minute = 0; minute < 60; minute += step) {
+    minuteOptions.push(minute);
+  }
+  const snappedMinute = minuteOptions.reduce((best, candidate) =>
+    Math.abs(candidate - date.getMinutes()) < Math.abs(best - date.getMinutes())
+      ? candidate
+      : best
+  );
+  return new Date(2000, 0, 1, date.getHours(), snappedMinute);
+}

@@ -18,7 +18,6 @@ import BannerPlansPage from './admin/pages/BannerPlansPage';
 import WalletsPage from './admin/pages/WalletsPage';
 import WalletTransactionsPage from './admin/pages/WalletTransactionsPage';
 import WithdrawalsPage from './admin/pages/WithdrawalsPage';
-import SystemWalletPage from './admin/pages/SystemWalletPage';
 import FinancePage from './admin/pages/FinancePage';
 import NotificationsPage from './admin/pages/NotificationsPage';
 import CategoriesPage from './admin/pages/CategoriesPage';
@@ -92,7 +91,7 @@ function ProtectedRoutes() {
         <Route path="wallets" element={<WalletsPage />} />
         <Route path="wallet-transactions" element={<WalletTransactionsPage />} />
         <Route path="withdrawals" element={<WithdrawalsPage />} />
-        <Route path="system-wallet" element={<SystemWalletPage />} />
+        <Route path="system-wallet" element={<Navigate to="/finance" replace />} />
         <Route path="finance" element={<FinancePage />} />
 
         <Route path="notifications" element={<NotificationsPage />} />

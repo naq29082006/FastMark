@@ -17,7 +17,7 @@ export function normalizeSocketNotification(payload) {
     body: String(payload.content || payload.body || '').trim(),
     audience: String(payload.audience || 'system').trim().toLowerCase() || 'system',
     index: resolveNotificationIndex(payload),
-    isAdminBroadcast: Boolean(payload.isAdminBroadcast),
+    tbAdmin: Boolean(payload.tbAdmin),
     isRead: Number(payload.isRead) === 1 || payload.isRead === true,
     createdAt: payload.createdAt || new Date().toISOString(),
   };

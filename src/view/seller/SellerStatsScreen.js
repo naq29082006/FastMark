@@ -32,14 +32,16 @@ const RANGE_PRESETS = [
 const OVERVIEW_TILES = [
   { key: 'revenue', label: 'Tổng doanh thu', bg: '#ecfdf3', border: '#bbf7d0', accent: '#076F32', trendKey: 'periodRevenue', valueKey: 'periodRevenue', format: 'price' },
   { key: 'orders', label: 'Đơn hoàn thành', bg: '#eff6ff', border: '#bfdbfe', accent: '#1d4ed8', trendKey: 'periodCompleted', valueKey: 'periodCompletedOrders', format: 'count', suffix: ' đơn' },
-  { key: 'products', label: 'Tổng sản phẩm', bg: '#fff7ed', border: '#fed7aa', accent: '#c2410c', trendKey: 'totalProducts', valueKey: 'totalProducts', format: 'count', suffix: ' sản phẩm' },
-  { key: 'followers', label: 'Người theo dõi', bg: '#f5f3ff', border: '#ddd6fe', accent: '#6d28d9', trendKey: 'followers', valueKey: 'followersCount', format: 'count' },
+  { key: 'products', label: 'Tổng sản phẩm', bg: '#fff7ed', border: '#fed7aa', accent: '#c2410c', trendKey: 'tongSP', valueKey: 'tongSP', format: 'count', suffix: ' sản phẩm' },
+  { key: 'followers', label: 'Người theo dõi', bg: '#f5f3ff', border: '#ddd6fe', accent: '#6d28d9', trendKey: 'followers', valueKey: 'soNguoiTheo', format: 'count' },
 ];
 
 const ORDER_STATUS_ITEMS = [
+  { key: 'total', label: 'Tổng đơn', color: '#f8fafc', text: '#0f172a' },
   { key: 'pending', label: 'Chờ xác nhận', color: '#fef3c7', text: '#92400e' },
   { key: 'holding', label: 'Đang giữ', color: '#dbeafe', text: '#1e40af' },
   { key: 'waitingPickup', label: 'Chờ nhận hàng', color: '#e0e7ff', text: '#3730a3' },
+  { key: 'pickupConfirmed', label: 'Đã nhận hàng', color: '#ccfbf1', text: '#0f766e' },
   { key: 'disputed', label: 'Tranh chấp', color: '#fee2e2', text: '#b91c1c' },
   { key: 'completed', label: 'Hoàn thành', color: '#dcfce7', text: '#166534' },
   { key: 'cancelled', label: 'Đã hủy', color: '#f1f5f9', text: '#475569' },
@@ -173,7 +175,7 @@ function ProductSection({ stats }) {
   const topProducts = Array.isArray(stats?.topSellingProducts) ? stats.topSellingProducts : [];
   const topBuyers = Array.isArray(stats?.topBuyers) ? stats.topBuyers : [];
   const statItems = [
-    { value: stats.totalProducts || 0, label: 'Tổng sản phẩm' },
+    { value: stats.tongSP || 0, label: 'Tổng sản phẩm' },
     { value: stats.activeProducts || 0, label: 'Đang bán' },
     { value: stats.outOfStockProducts || 0, label: 'Hết hàng' },
     { value: stats.periodSoldCount || 0, label: 'Đã bán trong kỳ' },
@@ -241,10 +243,10 @@ function ProductSection({ stats }) {
   );
 }
 
-function RatingSection({ averageRating, totalReviews, breakdown = {} }) {
+function RatingSection({ diemTB, tongDG, breakdown = {} }) {
   const rows = [5, 4, 3, 2, 1];
   const maxCount = Math.max(...rows.map((star) => Number(breakdown[star]) || 0), 1);
-  const ratingText = Number(averageRating) > 0 ? `${Number(averageRating).toFixed(1)}/5` : '—';
+  const ratingText = Number(diemTB) > 0 ? `${Number(diemTB).toFixed(1)}/5` : '—';
 
   return (
     <View style={styles.ratingSection}>
@@ -254,13 +256,13 @@ function RatingSection({ averageRating, totalReviews, breakdown = {} }) {
           {rows.map((star) => (
             <Ionicons
               key={star}
-              name={Number(averageRating) >= star ? 'star' : 'star-outline'}
+              name={Number(diemTB) >= star ? 'star' : 'star-outline'}
               size={14}
               color="#f59e0b"
             />
           ))}
         </View>
-        <Text style={styles.ratingCountLine}>Từ {totalReviews || 0} lượt đánh giá</Text>
+        <Text style={styles.ratingCountLine}>Từ {tongDG || 0} lượt đánh giá</Text>
       </View>
       <View style={styles.ratingBars}>
         {rows.map((star) => {
@@ -453,8 +455,8 @@ export default function SellerStatsScreen({ onBack, embedded = false }) {
 
       <SectionCard title="Đánh giá gian hàng">
         <RatingSection
-          averageRating={stats.averageRating}
-          totalReviews={stats.totalReviews}
+          diemTB={stats.diemTB}
+          tongDG={stats.tongDG}
           breakdown={stats.ratingBreakdown}
         />
       </SectionCard>
@@ -612,8 +614,8 @@ const styles = StyleSheet.create({
   },
   orderStatusTile: {
     width: '31%',
-    flexGrow: 1,
-    minWidth: '30%',
+    flexGrow: 0,
+    flexShrink: 0,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 8,

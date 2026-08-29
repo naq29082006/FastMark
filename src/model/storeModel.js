@@ -9,7 +9,7 @@ function pickText(...values) {
 }
 
 export function normalizeStore(row) {
-  const ratingAvg = Number(row.rating_avg ?? row.averageRating ?? 0);
+  const ratingAvg = Number(row.rating_avg ?? row.diemTB ?? 0);
   const isRegisteredShop = Boolean(row.is_registered_shop);
   const systemAddress = pickText(
     row.addressHeThong,
@@ -48,10 +48,10 @@ export function normalizeStore(row) {
     close_time: pickText(row.close_time, row.closeTime),
     is_open: row.is_open !== false && row.is_open !== 0 && row.isOpen !== 0,
     rating_avg: Number.isFinite(ratingAvg) ? ratingAvg : 0,
-    review_count: Number(row.review_count ?? row.totalReviews ?? 0),
-    follow_count: Number(row.follow_count ?? row.followersCount ?? row.FollowersCount ?? 0),
-    product_count: Number(row.total_products ?? row.product_count ?? row.totalProducts ?? 0),
-    total_products: Number(row.total_products ?? row.product_count ?? row.totalProducts ?? 0),
+    review_count: Number(row.review_count ?? row.tongDG ?? 0),
+    follow_count: Number(row.follow_count ?? row.soNguoiTheo ?? row.FollowersCount ?? 0),
+    product_count: Number(row.total_products ?? row.product_count ?? row.tongSP ?? 0),
+    total_products: Number(row.total_products ?? row.product_count ?? row.tongSP ?? 0),
     sold_count: Number(row.sold_count ?? row.soldCount ?? 0),
     total_likes: Number(row.total_likes ?? row.totalLikes ?? row.likesCount ?? 0),
     owner_user_id: pickText(row.owner_user_id, row.ownerUserId),

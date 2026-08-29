@@ -50,6 +50,41 @@ export async function fetchNearbyShopsFromNode({
   return normalizePageResult(payload.data || {}, 'shops');
 }
 
+export async function fetchMapShopsFromNode({
+  latitude,
+  longitude,
+  radiusMeters = 2000,
+  shopCategoryId = '',
+  limit = 500,
+}) {
+  if (!hasStoreNodeApi()) {
+    return { items: [], shops: [], total: 0, count: 0, truncated: false };
+  }
+
+  const params = new URLSearchParams({
+    lat: String(latitude),
+    lng: String(longitude),
+    radius: String(radiusMeters),
+    limit: String(limit),
+  });
+  const normalizedCategoryId = String(shopCategoryId || '').trim();
+  if (normalizedCategoryId) {
+    params.set('shopCategoryId', normalizedCategoryId);
+  }
+
+  const response = await apiRequest(`${API_ENDPOINTS.shopsNearbyMap}?${params.toString()}`);
+  const payload = await parseJson(response, 'fetchMapShopsFromNode');
+  const data = payload.data || {};
+  const items = data.items || data.shops || [];
+  return {
+    items,
+    shops: items,
+    total: Number(data.total) || items.length,
+    count: Number(data.count) || items.length,
+    truncated: Boolean(data.truncated),
+  };
+}
+
 export async function fetchSearchShopsFromNode({
   latitude,
   longitude,

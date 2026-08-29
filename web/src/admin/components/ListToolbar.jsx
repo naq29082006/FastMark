@@ -1,4 +1,10 @@
-import { Button, Col, Input, Row, Select, Space } from 'antd';
+import { Button, Input, Select, Tooltip } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
+
+function resolveFilterLabel(filter) {
+  const raw = String(filter.label || filter.placeholder || '').trim();
+  return raw.replace(/:$/, '');
+}
 
 export default function ListToolbar({
   searchPlaceholder = 'Tìm kiếm...',
@@ -10,38 +16,51 @@ export default function ListToolbar({
   onReset,
 }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <Row gutter={[12, 12]} align="middle">
-        <Col xs={24} md={10} lg={8}>
-          <Input.Search
-            allowClear
-            placeholder={searchPlaceholder}
-            value={searchValue}
-            onChange={(e) => onSearchChange?.(e.target.value)}
-            onSearch={onSearch}
-          />
-        </Col>
-        {filters.map((filter) => (
-          <Col key={filter.key} xs={24} sm={12} md={8} lg={6}>
-            <Select
-              allowClear
-              placeholder={filter.placeholder}
-              style={{ width: '100%' }}
-              options={filter.options}
-              value={filter.value}
-              onChange={filter.onChange}
-            />
-          </Col>
-        ))}
-        <Col flex="auto">
-          <Space wrap style={{ float: 'right' }}>
+    <div className="admin-list-toolbar">
+      <div className="admin-list-toolbar-row">
+        <Input.Search
+          allowClear
+          className="admin-list-toolbar-search"
+          placeholder={searchPlaceholder}
+          value={searchValue}
+          onChange={(e) => onSearchChange?.(e.target.value)}
+          onSearch={onSearch}
+        />
+
+        {filters.map((filter) => {
+          const label = resolveFilterLabel(filter);
+          return (
+            <div key={filter.key} className="admin-list-toolbar-filter">
+              {label ? <span className="admin-list-toolbar-filter-label">{label}:</span> : null}
+              <Select
+                className="admin-list-toolbar-filter-select"
+                style={{ width: filter.width || 168 }}
+                placeholder={filter.placeholder}
+                options={filter.options}
+                value={filter.value}
+                loading={filter.loading}
+                onChange={filter.onChange}
+              />
+            </div>
+          );
+        })}
+
+        {(onReset || extra) && (
+          <div className="admin-list-toolbar-actions">
             {onReset ? (
-              <Button onClick={onReset}>Reset</Button>
+              <Tooltip title="Đặt lại bộ lọc">
+                <Button
+                  type="default"
+                  icon={<ReloadOutlined />}
+                  aria-label="Đặt lại bộ lọc"
+                  onClick={onReset}
+                />
+              </Tooltip>
             ) : null}
             {extra}
-          </Space>
-        </Col>
-      </Row>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

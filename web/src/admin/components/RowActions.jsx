@@ -15,7 +15,11 @@ export default function RowActions({
   viewLabel = 'Xem',
   editLabel = 'Sửa',
   deleteLabel = 'Xóa',
+  editIcon,
+  deleteIcon,
 }) {
+  const EditIcon = editIcon ?? EditOutlined;
+  const DeleteIcon = deleteIcon ?? DeleteOutlined;
   return (
     <div className="admin-row-actions">
       {onView ? (
@@ -24,7 +28,7 @@ export default function RowActions({
         </Button>
       ) : null}
       {onEdit ? (
-        <Button type="link" size="small" icon={<EditOutlined />} loading={editLoading} onClick={onEdit}>
+        <Button type="link" size="small" icon={<EditIcon />} loading={editLoading} onClick={onEdit}>
           {editLabel}
         </Button>
       ) : null}
@@ -33,7 +37,7 @@ export default function RowActions({
           type="link"
           size="small"
           danger
-          icon={<DeleteOutlined />}
+          icon={<DeleteIcon />}
           loading={deleteLoading}
           onClick={onDelete}
         >

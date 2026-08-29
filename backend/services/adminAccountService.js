@@ -21,24 +21,16 @@ const {
 } = require("../utils/adminSearchHelpers");
 const { applyCreatedAtRange } = require("../utils/dateRangeFilter");
 const { buildReportsReceivedFilter } = require("../utils/reportType");
-const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
+const { readUserHoatDongCuoi } = require("../utils/fieldCompat");
+const { MF } = require("../constants/modelFields");
 
-const CANCELLED_RESERVATION_STATUSES = [
-  RESERVATION_STATUS.REJECTED,
-  RESERVATION_STATUS.REFUNDED,
-  RESERVATION_STATUS.CANCELLED,
-];
+const CANCELLED_RESERVATION_STATUSES = [RESERVATION_STATUS.CANCELLED];
 
-const COMPLETED_RESERVATION_STATUSES = [
-  RESERVATION_STATUS.COMPLETED,
-  RESERVATION_STATUS.AUTO_COMPLETED,
-];
+const COMPLETED_RESERVATION_STATUSES = [RESERVATION_STATUS.COMPLETED];
 
-const DISPUTE_RESERVATION_STATUSES = [
-  RESERVATION_STATUS.DISPUTED,
-  RESERVATION_STATUS.CANCELLED,
-];
+const DISPUTE_RESERVATION_STATUSES = [RESERVATION_STATUS.DISPUTED];
 const { cancelActiveReservationsForAccountLock } = require("./reservationService");
+const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
 const {
   resolveShopDisplayName,
   resolveShopUsername,
@@ -109,8 +101,8 @@ function toAdminUserBase(user, shop = null) {
     bio: "",
     createdAt: user.CreatedAt || null,
     updatedAt: user.UpdatedAt || null,
-    lastActiveAt: user.LanHoatDongCuoi || null,
-    followingCount: user.FollowingCount || 0,
+    lastActiveAt: readUserHoatDongCuoi(user),
+    followingCount: user.SoTheoDoi || 0,
     verifyAccount: Boolean(user.VerifyAccount),
     sellerPhoneVerified: require("../models/User").isPhoneVerified(user),
   };
@@ -128,10 +120,10 @@ function toAdminShopSummary(shop, owner = null) {
     avatar: resolveShopAvatar(shop, owner),
     status: shop.status,
     statusLabel: shop.status === SHOP_STATUS.ACTIVE ? "Hoạt động" : "Đã khóa",
-    averageRating: Number(shop.averageRating) || 0,
-    totalProducts: Number(shop.totalProducts) || 0,
-    totalReviews: Number(shop.totalReviews) || 0,
-    followersCount: Number(shop.followersCount) || 0,
+    diemTB: Number(shop.diemTB) || 0,
+    tongSP: Number(shop.tongSP) || 0,
+    tongDG: Number(shop.tongDG) || 0,
+    soNguoiTheo: Number(shop.soNguoiTheo) || 0,
     soldCount: Number(shop.soldCount) || 0,
     address: shop.addressHeThong || shop.address || "",
     phone: owner?.Phone || shop.phone || "",
@@ -152,11 +144,11 @@ function toAdminVerificationSummary(verification) {
     statusLabel: VERIFICATION_LABELS[verification.status] || "Không rõ",
     shopName: verification.shopName || "",
     shopUsername: verification.shopUsername || "",
-    cccdFrontImage: verification.cccdFrontImage || "",
-    cccdBackImage: verification.cccdBackImage || "",
+    anhCccdTruoc: verification.anhCccdTruoc || "",
+    anhCccdSau: verification.anhCccdSau || "",
     selfieImage: verification.selfieImage || "",
-    businessImage:
-      verification.businessImage ||
+    anhKD:
+      verification.anhKD ||
       verification.businessDocImage ||
       verification.businessDoc?.imageUrl ||
       "",
@@ -192,45 +184,105 @@ function toAdminAccountListItem(user, shop, verification) {
     ...base,
     shop: shopSummary,
     verification: verificationSummary,
-    productCount: shopSummary?.totalProducts || 0,
-    averageRating: shopSummary?.averageRating || 0,
+    productCount: shopSummary?.tongSP || 0,
+    diemTB: shopSummary?.diemTB || 0,
   };
 }
 
-function sortAccountItems(items, sortKey) {
-  const sorted = [...items];
-
+function resolveAccountDbSort(sortKey) {
   switch (sortKey) {
     case "oldest":
-      sorted.sort(
-        (left, right) => new Date(left.createdAt || 0) - new Date(right.createdAt || 0)
-      );
-      break;
+      return { CreatedAt: 1 };
     case "last_active":
-      sorted.sort((left, right) => {
-        const rightTime = new Date(right.lastActiveAt || 0).getTime();
-        const leftTime = new Date(left.lastActiveAt || 0).getTime();
-        return rightTime - leftTime;
-      });
-      break;
+      return { [MF.HoatDongCuoi]: -1, CreatedAt: -1 };
     case "most_products":
-      sorted.sort((left, right) => {
-        const diff = (right.productCount || 0) - (left.productCount || 0);
-        if (diff !== 0) {
-          return diff;
-        }
-        return (left.fullName || "").localeCompare(right.fullName || "", "vi");
-      });
-      break;
+      return null;
     case "newest":
     default:
-      sorted.sort(
-        (left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0)
-      );
-      break;
+      return { CreatedAt: -1 };
+  }
+}
+
+async function loadLatestVerificationsByUserIds(userIds) {
+  if (!userIds.length) {
+    return new Map();
   }
 
-  return sorted;
+  const rows = await SellerVerification.aggregate([
+    { $match: { userId: { $in: userIds } } },
+    { $sort: { submittedAt: -1, CreatedAt: -1 } },
+    { $group: { _id: "$userId", doc: { $first: "$$ROOT" } } },
+  ]);
+
+  return new Map(rows.map((row) => [String(row._id), row.doc]));
+}
+
+function buildAccountListResponse({ users, shops, verificationByUserId, currentPage, pageSize, total }) {
+  const shopByUserId = new Map(shops.map((shop) => [String(shop.userId), shop]));
+  const items = users.map((user) =>
+    toAdminAccountListItem(
+      user,
+      shopByUserId.get(String(user._id)),
+      verificationByUserId.get(String(user._id))
+    )
+  );
+
+  return {
+    items,
+    pagination: {
+      page: currentPage,
+      limit: pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    },
+  };
+}
+
+async function listAccountsByProductCount({ match, skip, pageSize, currentPage }) {
+  const shopCollection = ShopProfile.collection.name;
+  const [facetResult] = await User.aggregate([
+    { $match: match },
+    {
+      $lookup: {
+        from: shopCollection,
+        localField: "_id",
+        foreignField: "userId",
+        as: "shop",
+      },
+    },
+    {
+      $addFields: {
+        productCount: {
+          $ifNull: [{ $arrayElemAt: ["$shop.tongSP", 0] }, 0],
+        },
+      },
+    },
+    { $sort: { productCount: -1, FullName: 1 } },
+    {
+      $facet: {
+        total: [{ $count: "count" }],
+        users: [{ $skip: skip }, { $limit: pageSize }],
+      },
+    },
+  ]);
+
+  const total = facetResult?.total?.[0]?.count || 0;
+  const users = facetResult?.users || [];
+  const userIds = users.map((user) => user._id);
+
+  const [shops, verificationByUserId] = await Promise.all([
+    ShopProfile.find({ userId: { $in: userIds } }).lean(),
+    loadLatestVerificationsByUserIds(userIds),
+  ]);
+
+  return buildAccountListResponse({
+    users,
+    shops,
+    verificationByUserId,
+    currentPage,
+    pageSize,
+    total,
+  });
 }
 
 async function buildUserMatchFilter({ search, role, status, verificationStatus, hasShop }) {
@@ -241,9 +293,19 @@ async function buildUserMatchFilter({ search, role, status, verificationStatus, 
   const normalizedVerificationStatus = pickString(verificationStatus);
   const keyword = pickString(search);
 
-  andConditions.push({ Role: { $in: [USER_ROLE.BUYER, USER_ROLE.SELLER] } });
+  if (normalizedRole === "3") {
+    andConditions.push({ Role: USER_ROLE.ADMIN });
+  } else if (normalizedRole === "2") {
+    andConditions.push({ Role: USER_ROLE.SELLER });
+  } else if (normalizedRole === "1") {
+    andConditions.push({ Role: USER_ROLE.BUYER });
+  } else {
+    andConditions.push({
+      Role: { $in: [USER_ROLE.BUYER, USER_ROLE.SELLER, USER_ROLE.ADMIN] },
+    });
+  }
 
-  if (normalizedHasShop === "1" || normalizedRole === "2") {
+  if (normalizedHasShop === "1") {
     const shopUserIds = await ShopProfile.distinct("userId");
     andConditions.push({ _id: { $in: shopUserIds.filter(Boolean) } });
   } else if (normalizedHasShop === "0") {
@@ -352,49 +414,31 @@ async function listAccounts({
   });
   applyCreatedAtRange(match, { from, to });
 
-  const users = await User.find(match).lean();
-  const userIds = users.map((user) => user._id);
+  if (sort === "most_products") {
+    return listAccountsByProductCount({ match, skip, pageSize, currentPage });
+  }
 
-  const [shops, verifications] = await Promise.all([
-    ShopProfile.find({ userId: { $in: userIds } }).lean(),
-    SellerVerification.find({ userId: { $in: userIds } })
-      .sort({ submittedAt: -1, CreatedAt: -1 })
-      .lean(),
+  const sortSpec = resolveAccountDbSort(sort);
+
+  const [total, users] = await Promise.all([
+    User.countDocuments(match),
+    User.find(match).sort(sortSpec).skip(skip).limit(pageSize).lean(),
   ]);
 
-  const shopByUserId = new Map(shops.map((shop) => [String(shop.userId), shop]));
-  const verificationByUserId = new Map();
+  const userIds = users.map((user) => user._id);
+  const [shops, verificationByUserId] = await Promise.all([
+    ShopProfile.find({ userId: { $in: userIds } }).lean(),
+    loadLatestVerificationsByUserIds(userIds),
+  ]);
 
-  verifications.forEach((verification) => {
-    const key = String(verification.userId);
-    if (!verificationByUserId.has(key)) {
-      verificationByUserId.set(key, verification);
-    }
+  return buildAccountListResponse({
+    users,
+    shops,
+    verificationByUserId,
+    currentPage,
+    pageSize,
+    total,
   });
-
-  const items = sortAccountItems(
-    users.map((user) =>
-      toAdminAccountListItem(
-        user,
-        shopByUserId.get(String(user._id)),
-        verificationByUserId.get(String(user._id))
-      )
-    ),
-    sort
-  );
-
-  const total = items.length;
-  const pagedItems = items.slice(skip, skip + pageSize);
-
-  return {
-    items: pagedItems,
-    pagination: {
-      page: currentPage,
-      limit: pageSize,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    },
-  };
 }
 
 async function getAccountStats(user) {
@@ -406,7 +450,7 @@ async function getAccountStats(user) {
     totalCompletedOrders,
     totalCancelledOrders,
     totalDisputes,
-    totalReviewsWritten,
+    tongDGWritten,
     totalReportsReceived,
   ] = await Promise.all([
     Reservation.countDocuments(buyerFilter),
@@ -431,7 +475,7 @@ async function getAccountStats(user) {
     totalCompletedOrders,
     totalCancelledOrders,
     totalDisputes,
-    totalReviewsWritten,
+    tongDGWritten,
     totalReportsReceived,
   };
 }
@@ -450,7 +494,7 @@ async function getRecentReports(userId, limit = 5) {
     reportType: report.reportType,
     status: report.status,
     createdAt: report.CreatedAt || null,
-    processedAt: report.processedAt || null,
+    tgXuLy: report.tgXuLy || null,
   }));
 }
 
@@ -624,78 +668,58 @@ function assertUserIsActive(user) {
     );
   }
 }
-async function getAccountStatistics(query = {}) {
-
-  const [
-    totalUsers,
-    buyers,
-    sellers,
-    admins,
-    activeUsers,
-    blockedUsers,
-    totalShops,
-    totalProducts,
-    totalOrders
-  ] = await Promise.all([
-
-    User.countDocuments({}), // total tất cả tài khoản
-
-    // Buyer = USER + SELLER (seller vẫn mua hàng)
-    User.countDocuments({
-      Role: { 
-        $in: [1, 2]
-      }
-    }),
-    
-    // Seller
-    User.countDocuments({
-      Role: 2
-    }),
-    
-    // Admin
-    User.countDocuments({
-      Role: 3
-    }),
-    
-    // Active
-    User.countDocuments({
-      Status: 1
-    }),
-    
-    // Blocked
-    User.countDocuments({
-      Status: 0
-    }),
+async function getAccountStatistics() {
+  const [userStatsRows, totalShops, tongSP, totalOrders] = await Promise.all([
+    User.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          buyers: {
+            $sum: {
+              $cond: [{ $in: ["$Role", [USER_ROLE.BUYER, USER_ROLE.SELLER]] }, 1, 0],
+            },
+          },
+          sellers: {
+            $sum: { $cond: [{ $eq: ["$Role", USER_ROLE.SELLER] }, 1, 0] },
+          },
+          admins: {
+            $sum: { $cond: [{ $eq: ["$Role", USER_ROLE.ADMIN] }, 1, 0] },
+          },
+          active: {
+            $sum: { $cond: [{ $eq: ["$Status", USER_STATUS.ACTIVE] }, 1, 0] },
+          },
+          blocked: {
+            $sum: { $cond: [{ $eq: ["$Status", USER_STATUS.BLOCKED] }, 1, 0] },
+          },
+        },
+      },
+    ]),
     ShopProfile.countDocuments({}),
-
     Product.countDocuments(notRemovedProductMatch()),
-
-    Reservation.countDocuments({})
-
+    Reservation.countDocuments({}),
   ]);
 
+  const userStats = userStatsRows[0] || {};
 
   return {
     users: {
-      total: totalUsers,
-      buyers,
-      sellers,
-      admins,
-      active: activeUsers,
-      blocked: blockedUsers
+      total: userStats.total || 0,
+      buyers: userStats.buyers || 0,
+      sellers: userStats.sellers || 0,
+      admins: userStats.admins || 0,
+      active: userStats.active || 0,
+      blocked: userStats.blocked || 0,
     },
-
     shops: {
-      total: totalShops
+      total: totalShops,
     },
-
     products: {
-      total: totalProducts
+      total: tongSP,
     },
-
     orders: {
-      total: totalOrders
-    }
+      total: totalOrders,
+    },
   };
 }
 

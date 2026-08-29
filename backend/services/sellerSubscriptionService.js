@@ -21,7 +21,6 @@ const {
   findUsersBySearchRegex,
   buildObjectIdSearchConditions,
   appendStatusLabelSearchConditions,
-  appendNumericFieldSearchConditions,
   appendUniqueOrConditions,
 } = require("../utils/adminSearchHelpers");
 const { applyCreatedAtRange } = require("../utils/dateRangeFilter");
@@ -36,15 +35,10 @@ function toSubscriptionRow(doc, extras = {}) {
   const ngayMua = doc.ngayMua || doc.CreatedAt || null;
   const startDate = doc.startDate || null;
   const endDate = doc.endDate || null;
-  const orderCode =
-    extras.orderCode != null
-      ? extras.orderCode
-      : doc.orderCode != null
-        ? doc.orderCode
-        : null;
+  const orderCode = extras.orderCode != null ? extras.orderCode : null;
   const transactionId =
     extras.transactionId ||
-    (doc.walletTransactionId ? String(doc.walletTransactionId) : "");
+    (doc.gdViId ? String(doc.gdViId) : "");
   return {
     id: String(doc._id),
     sellerId: doc.sellerId ? String(doc.sellerId) : "",
@@ -201,8 +195,7 @@ async function purchaseSubscription(user, payload = {}) {
           startDate: base,
           endDate,
           status: SELLER_SUBSCRIPTION_STATUS.ACTIVE,
-          walletTransactionId: walletTx?._id || null,
-          orderCode: walletTx?.orderCode != null ? Number(walletTx.orderCode) : null,
+          gdViId: walletTx?._id || null,
           CreatedAt: now,
           UpdatedAt: now,
         },
@@ -283,7 +276,6 @@ async function listAdminSubscriptions({
     }
 
     appendStatusLabelSearchConditions(orConditions, search, SELLER_SUBSCRIPTION_STATUS_LABEL);
-    appendNumericFieldSearchConditions(orConditions, "orderCode", search);
     orConditions.push(...buildObjectIdSearchConditions(search));
 
     if (orConditions.length) {
@@ -321,7 +313,10 @@ async function listAdminSubscriptions({
 
   const sellerIds = rows.map((r) => r.sellerId).filter(Boolean);
   const shopIds = rows.map((r) => r.shopId).filter(Boolean);
-  const [sellers, shops, walletTxs] = await Promise.all([
+  const walletTxIds = [
+    ...new Set(rows.map((r) => r.gdViId).filter(Boolean).map(String)),
+  ];
+  const [sellers, shops, walletTxs, linkedWalletTxs] = await Promise.all([
     sellerIds.length
       ? User.find({ _id: { $in: sellerIds } })
           .select("FullName UserName Email Phone")
@@ -343,13 +338,20 @@ async function listAdminSubscriptions({
           .limit(500)
           .lean()
       : [],
+    walletTxIds.length
+      ? WalletTransaction.find({ _id: { $in: walletTxIds } })
+          .select("_id userId amount orderCode description CreatedAt referenceId")
+          .lean()
+      : [],
   ]);
   const sellerById = new Map(sellers.map((s) => [String(s._id), s]));
   const shopById = new Map(shops.map((s) => [String(s._id), s]));
 
   const txBySubscriptionId = new Map();
+  const txById = new Map();
   const txCandidatesBySeller = new Map();
-  for (const tx of walletTxs) {
+  for (const tx of [...walletTxs, ...linkedWalletTxs]) {
+    txById.set(String(tx._id), tx);
     if (tx.referenceId) {
       txBySubscriptionId.set(String(tx.referenceId), tx);
     }
@@ -359,10 +361,13 @@ async function listAdminSubscriptions({
   }
 
   function resolvePaymentTx(row) {
-    if (row.walletTransactionId || row.orderCode != null) {
+    if (row.gdViId) {
+      const linked =
+        txById.get(String(row.gdViId)) ||
+        txBySubscriptionId.get(String(row._id));
       return {
-        transactionId: row.walletTransactionId ? String(row.walletTransactionId) : "",
-        orderCode: row.orderCode != null ? Number(row.orderCode) : null,
+        transactionId: String(row.gdViId),
+        orderCode: linked?.orderCode != null ? Number(linked.orderCode) : null,
       };
     }
     const byRef = txBySubscriptionId.get(String(row._id));

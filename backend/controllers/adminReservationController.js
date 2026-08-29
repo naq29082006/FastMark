@@ -81,8 +81,21 @@ exports.releaseToSeller = async (req, res) => {
   });
 };
 
+exports.rejectDispute = async (req, res) => {
+  const note = pickBodyValue(req.body, ["note", "reason"]);
+  const reservation = await adminReservationService.rejectDispute(
+    req.currentUser,
+    req.params.id,
+    { note }
+  );
+  return success(res, {
+    message: "Đã bác bỏ tranh chấp. Cọc vẫn giữ ở ví hệ thống cho đến khi admin quyết định.",
+    data: { reservation },
+  });
+};
+
 exports.cancelReservation = async (req, res) => {
-  const reason = pickBodyValue(req.body, ["reason", "cancelReason", "note"]);
+  const reason = pickBodyValue(req.body, ["reason", "cancelNote", "cancelReason", "note"]);
   const reservation = await adminReservationService.cancelReservation(
     req.currentUser,
     req.params.id,

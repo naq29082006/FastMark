@@ -57,7 +57,7 @@ async function listReservationsWithSearch({
 }) {
   const keyword = normalizeSearchKeyword(search);
   const { page: safePage, limit: safeLimit, skip } = parsePagination({ page, limit });
-  const { reservationListSortForTab } = require("./reservationListSort");
+  const { reservationListSortForTab, compareReservationsNewestFirst } = require("./reservationListSort");
   const sort = reservationListSortForTab(tab);
 
   const searchActive = Boolean(keyword && keyword.length >= MIN_SEARCH_LENGTH);
@@ -80,11 +80,15 @@ async function listReservationsWithSearch({
 
   const filtered = mapped
     .filter((item) => reservationMatchesSearch(item, keyword, searchRole))
-    .sort(
-      (left, right) =>
+    .sort((left, right) => {
+      const rankDiff =
         reservationSearchRank(right, keyword, searchRole) -
-        reservationSearchRank(left, keyword, searchRole)
-    );
+        reservationSearchRank(left, keyword, searchRole);
+      if (rankDiff !== 0) {
+        return rankDiff;
+      }
+      return compareReservationsNewestFirst(left, right, tab);
+    });
 
   const total = filtered.length;
   const pageItems = filtered.slice(skip, skip + safeLimit);

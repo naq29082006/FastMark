@@ -67,8 +67,10 @@ async function runBroadcastBulk(recipientIds, payload) {
     console.log(
       `[admin-broadcast] inserted=${inAppCount} audience=${payload.audience} recipients=${recipientIds.length}`
     );
+    return inAppCount;
   } catch (error) {
     console.error("[admin-broadcast] bulk insert failed:", error?.message || error);
+    throw error;
   }
 }
 
@@ -104,13 +106,10 @@ async function sendSystemNotification(adminUser, { title, content, audience = AU
     content: normalizedContent,
     audience: notificationAudience,
     index: NOTIFICATION_INDEX.SYSTEM,
-    isAdminBroadcast: true,
+    tbAdmin: true,
   };
 
-  // Trả response ngay — ghi DB hàng loạt nền (không socket/FCM từng user).
-  setImmediate(() => {
-    runBroadcastBulk(recipientIds, bulkPayload);
-  });
+  const inAppCount = await runBroadcastBulk(recipientIds, bulkPayload);
 
   return {
     audience: normalizedAudience,
@@ -118,8 +117,8 @@ async function sendSystemNotification(adminUser, { title, content, audience = AU
     title: normalizedTitle,
     content: normalizedContent,
     recipientCount: recipientIds.length,
-    inAppCount: recipientIds.length,
-    status: "queued",
+    inAppCount,
+    status: "sent",
     sentBy: {
       id: String(adminUser._id),
       fullName: adminUser.FullName || "",
@@ -137,7 +136,7 @@ async function listBroadcastHistory({ page = 1, limit = 20, from = "", to = "" }
   const pageSize = Math.min(50, Math.max(1, Number(limit) || 20));
 
   const pipeline = [];
-  pipeline.push({ $match: { isAdminBroadcast: true } });
+  pipeline.push({ $match: { tbAdmin: true } });
   const dateMatch = {};
   applyCreatedAtRange(dateMatch, { from, to });
   if (Object.keys(dateMatch).length) {
@@ -169,14 +168,21 @@ async function listBroadcastHistory({ page = 1, limit = 20, from = "", to = "" }
 
   const rows = await Notification.aggregate(pipeline);
 
-  const items = (rows[0]?.items || []).map((row) => ({
-    title: row._id.title || "",
-    content: row._id.content || "",
-    audience: row._id.audience || "",
-    recipientCount: row.recipientCount,
-    readCount: row.readCount,
-    sentAt: row.sentAt || null,
-  }));
+  const items = (rows[0]?.items || []).map((row) => {
+    const title = row._id.title || "";
+    const content = row._id.content || "";
+    const audience = row._id.audience || "";
+    const minute = row._id.minute || "";
+    return {
+      id: `${title}|${content}|${audience}|${minute}`,
+      title,
+      content,
+      audience,
+      recipientCount: row.recipientCount,
+      readCount: row.readCount,
+      sentAt: row.sentAt || null,
+    };
+  });
   const total = rows[0]?.total?.[0]?.count || 0;
 
   return {

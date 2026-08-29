@@ -15,7 +15,7 @@ function pickString(value) {
 }
 
 function resolveCategoryName(category) {
-  return pickString(category?.name || category?.categoryName);
+  return pickString(category?.name);
 }
 
 function resolveDisputeDays(category) {
@@ -72,7 +72,7 @@ async function getProductCategoryNameMap(categoryIds = []) {
   }
 
   const categories = await ProductCategory.find({ _id: { $in: uniqueIds } })
-    .select("name categoryName")
+    .select("name")
     .lean();
 
   return new Map(
@@ -86,13 +86,10 @@ async function createCategory({ name, description, disputeDays }) {
     throw createServiceError("Vui lòng nhập tên danh mục.");
   }
 
-  const existing = await ProductCategory.findOne({
-    $or: [{ name: categoryName }, { categoryName }],
-  });
+  const existing = await ProductCategory.findOne({ name: categoryName });
   if (existing) {
     if (Number(existing.IsDeleted) === 0) {
       existing.name = categoryName;
-      existing.categoryName = categoryName;
       existing.description = pickString(description);
       if (disputeDays !== undefined) {
         existing.disputeDays = normalizeEscrowProtectionDays(disputeDays);
@@ -107,7 +104,6 @@ async function createCategory({ name, description, disputeDays }) {
 
   const category = await ProductCategory.create({
     name: categoryName,
-    categoryName,
     description: pickString(description),
     disputeDays: normalizeEscrowProtectionDays(disputeDays),
     IsDeleted: 1,
@@ -128,7 +124,7 @@ async function updateCategory(categoryId, { name, description, disputeDays }) {
   }
 
   const duplicate = await ProductCategory.findOne({
-    $or: [{ name: categoryName }, { categoryName }],
+    name: categoryName,
     _id: { $ne: category._id },
   });
   if (duplicate) {
@@ -136,7 +132,6 @@ async function updateCategory(categoryId, { name, description, disputeDays }) {
   }
 
   category.name = categoryName;
-  category.categoryName = categoryName;
   category.description = pickString(description);
   if (disputeDays !== undefined) {
     category.disputeDays = normalizeEscrowProtectionDays(disputeDays);

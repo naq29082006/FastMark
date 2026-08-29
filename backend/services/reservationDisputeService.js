@@ -26,6 +26,7 @@ const {
   DISPUTE_CREATED_BY,
   DISPUTE_STATUS,
   DISPUTE_STATUS_LABEL,
+  DEPOSIT_SETTLE_TO,
 } = require("../constants");
 const {
   upsertPartyComplaint,
@@ -43,13 +44,14 @@ const {
 const { toPublicReservationDispute } = require("./reservationEscrowService");
 const {
   DISPUTE_KIND,
-  computeSellerResponseDeadline,
   DEFAULT_SELLER_RESPONSE_DAYS,
   isPostDeliveryDispute,
   hasSellerResponse,
   isSellerResponseWindowOpen,
   canAdminResolvePostDeliveryDispute,
   sellerResponsePublicView,
+  resolveSellerResponseDeadline,
+  readSellerRespondedAt,
 } = require("../utils/postDeliveryDispute");
 const { createNotification, NOTIFICATION_INDEX } = require("./notificationService");
 const { emitOrderUpdated } = require("./orderRealtimeService");
@@ -62,6 +64,7 @@ const {
   refundDepositIfHeld,
   releaseDepositIfHeld,
   releaseVariantInventory,
+  isDepositSettled,
 } = require("./reservationService");
 const { getShopForSeller } = require("./shopSettingsService");
 
@@ -257,8 +260,8 @@ function toPublicDispute(dispute) {
     sellerComplaint: getPartyComplaint(dispute, "seller"),
     sellerResponse: sellerResponsePublicView(dispute),
     disputeKind: dispute.disputeKind || DISPUTE_KIND.PICKUP,
-    sellerRespondedAt: dispute.sellerRespondedAt || null,
-    sellerResponseDeadlineAt: dispute.sellerResponseDeadlineAt || null,
+    tgPhShop: readSellerRespondedAt(dispute),
+    hanPhShop: resolveSellerResponseDeadline(dispute),
     reports: disputeToPublicReports(dispute),
     auditLogs: (dispute.auditLogs || []).map((log, index) => ({
       id: String(log._id || index),
@@ -393,7 +396,7 @@ async function buyerReportSeller(user, payload = {}) {
     throw createServiceError("Chỉ báo cáo sau giờ nhận hàng đã chọn.", 403);
   }
   if (!isWithinDepositDecisionWindow(reservation) && status !== RESERVATION_STATUS.DISPUTED) {
-    throw createServiceError("Đã hết thời gian báo cáo tranh chấp (24 giờ sau giờ nhận).", 403);
+    throw createServiceError("Đã hết thời gian báo cáo tranh chấp (48 giờ sau giờ nhận).", 403);
   }
 
   const existingDispute = await ReservationDispute.findOne({
@@ -425,11 +428,11 @@ async function buyerReportSeller(user, payload = {}) {
     await markReservationDisputed(reservation, { now });
   }
   if (existingDispute && partyHasComplaint(existingDispute, "seller")) {
-    reservation.cancelReason = RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED;
+    reservation.cancelType = RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED;
   } else {
-    reservation.cancelReason = RESERVATION_CANCEL_REASON.BUYER_REPORT_SELLER_ABSENT;
+    reservation.cancelType = RESERVATION_CANCEL_REASON.BUYER_REPORT_SELLER_ABSENT;
   }
-  reservation.UpdatedAt = now;
+  reservation.updatedAt = now;
   await reservation.save();
 
   const shop = await ShopProfile.findById(reservation.shopId);
@@ -473,10 +476,25 @@ async function sellerReportBuyer(user, payload = {}) {
     throw createServiceError("Thiếu reservationId.");
   }
 
+  const allowedSellerReasons = new Set([
+    RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW,
+    RESERVATION_DISPUTE_REASON.OTHER,
+  ]);
+  const reason = pickString(payload.reason);
+  if (!allowedSellerReasons.has(reason)) {
+    throw createServiceError(
+      "Vui lòng chọn lý do báo cáo (người mua không đến / khác)."
+    );
+  }
+
   const content = pickString(payload.description || payload.content || payload.note);
+  if (reason === RESERVATION_DISPUTE_REASON.OTHER && !content) {
+    throw createServiceError("Vui lòng nhập giải thích khi chọn lý do Khác.");
+  }
   if (!content) {
     throw createServiceError("Vui lòng nhập nội dung mô tả.");
   }
+  const reasonLabel = RESERVATION_DISPUTE_REASON_LABEL[reason] || reason;
 
   const imageUrls = await normalizeImageUrls(payload.images || payload.imageUrls || []);
 
@@ -502,7 +520,7 @@ async function sellerReportBuyer(user, payload = {}) {
     throw createServiceError("Chỉ báo cáo sau giờ nhận hàng đã chọn.", 403);
   }
   if (!isWithinDepositDecisionWindow(reservation) && status !== RESERVATION_STATUS.DISPUTED) {
-    throw createServiceError("Đã hết thời gian báo cáo tranh chấp (24 giờ sau giờ nhận).", 403);
+    throw createServiceError("Đã hết thời gian báo cáo tranh chấp (48 giờ sau giờ nhận).", 403);
   }
 
   const existingDispute = await ReservationDispute.findOne({
@@ -519,7 +537,7 @@ async function sellerReportBuyer(user, payload = {}) {
     reservation,
     party: "seller",
     shopId: shop._id,
-    reason: RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW,
+    reason,
     content,
     images: imageUrls,
   });
@@ -534,17 +552,23 @@ async function sellerReportBuyer(user, payload = {}) {
     await markReservationDisputed(reservation, { now });
   }
   if (existingDispute && partyHasComplaint(existingDispute, "buyer")) {
-    reservation.cancelReason = RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED;
+    reservation.cancelType = RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED;
   } else {
-    reservation.cancelReason = RESERVATION_CANCEL_REASON.SELLER_REPORT_BUYER_NO_SHOW;
+    reservation.cancelType = RESERVATION_CANCEL_REASON.SELLER_REPORT_BUYER_NO_SHOW;
   }
-  reservation.UpdatedAt = now;
+  reservation.updatedAt = now;
   await reservation.save();
 
   if (reservation.userId) {
     await createNotification(reservation.userId, {
-      title: "Shop báo cáo bạn không đến nhận hàng",
-      content: "Người bán đã tố cáo bạn không đến lấy hàng. Cọc đang giữ chờ admin xử lý.",
+      title:
+        reason === RESERVATION_DISPUTE_REASON.OTHER
+          ? "Shop báo cáo về đơn giữ hàng"
+          : "Shop báo cáo bạn không đến nhận hàng",
+      content:
+        reason === RESERVATION_DISPUTE_REASON.OTHER
+          ? "Người bán đã gửi báo cáo về đơn giữ hàng. Cọc đang giữ chờ admin xử lý."
+          : "Người bán đã tố cáo bạn không đến lấy hàng. Cọc đang giữ chờ admin xử lý.",
       audience: NOTIFICATION_AUDIENCE.BUYER,
     index: NOTIFICATION_INDEX.ORDER,
     });
@@ -558,8 +582,6 @@ async function sellerReportBuyer(user, payload = {}) {
   });
 
   await emitOrderUpdated(reservation, { action: "seller_dispute" });
-  const reason = RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW;
-  const reasonLabel = RESERVATION_DISPUTE_REASON_LABEL[reason];
   const report = complaintToPublicReport(dispute, "seller", getPartyComplaint(dispute, "seller"), {
     reason,
     reasonLabel,
@@ -634,17 +656,21 @@ async function adminApproveBuyer(adminUser, disputeId, { note } = {}) {
   ) {
     throw createServiceError("Đơn giữ hàng đã kết thúc, không thể hoàn cọc lại.", 400);
   }
+  if (isDepositSettled(reservation)) {
+    throw createServiceError("Tranh chấp đã được xử lý trước đó.", 400);
+  }
 
   await refundDepositIfHeld(reservation);
   await releaseVariantInventory(reservation);
 
   const now = new Date();
-  reservation.status = RESERVATION_STATUS.CANCELLED;
-  reservation.cancelledAt = reservation.cancelledAt || now;
-  reservation.cancelledBy = "admin";
-  reservation.cancelReason = RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
-  reservation.cancelNote = pickString(note);
-  reservation.UpdatedAt = now;
+  const { applyDisputeResolution } = require("./reservationService");
+  applyDisputeResolution(reservation, {
+    cocChuyenDen: DEPOSIT_SETTLE_TO.BUYER,
+    cancelType: RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN,
+    cancelNote: pickString(note) || undefined,
+    at: now,
+  });
   await reservation.save();
 
   dispute.status = RESERVATION_DISPUTE_STATUS.BUYER_WIN;
@@ -689,8 +715,17 @@ async function adminApproveSeller(adminUser, disputeId, { note } = {}) {
   }
   assertAdminCanResolveDispute(dispute, reservation);
 
-  if (Number(reservation.status) !== RESERVATION_STATUS.DISPUTED) {
-    throw createServiceError("Chỉ giải phóng cọc cho đơn đang tranh chấp.", 400);
+  const status = Number(reservation.status);
+  if (
+    status === RESERVATION_STATUS.COMPLETED ||
+    status === RESERVATION_STATUS.AUTO_COMPLETED ||
+    status === RESERVATION_STATUS.CANCELLED ||
+    status === RESERVATION_STATUS.REJECTED
+  ) {
+    throw createServiceError("Đơn giữ hàng đã kết thúc, không thể giải ngân cọc lại.", 400);
+  }
+  if (isDepositSettled(reservation)) {
+    throw createServiceError("Tranh chấp đã được xử lý trước đó.", 400);
   }
 
   const shop = reservation.shopId ? await ShopProfile.findById(reservation.shopId) : null;
@@ -702,12 +737,13 @@ async function adminApproveSeller(adminUser, disputeId, { note } = {}) {
   await releaseDepositIfHeld(reservation, shop);
   await releaseVariantInventory(reservation);
 
-  reservation.status = RESERVATION_STATUS.CANCELLED;
-  reservation.cancelledAt = now;
-  reservation.cancelledBy = "admin";
-  reservation.cancelReason = RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN;
-  reservation.cancelNote = pickString(note);
-  reservation.UpdatedAt = now;
+  const { applyDisputeResolution } = require("./reservationService");
+  applyDisputeResolution(reservation, {
+    cocChuyenDen: DEPOSIT_SETTLE_TO.SELLER,
+    cancelType: RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN,
+    cancelNote: pickString(note) || undefined,
+    at: now,
+  });
   await reservation.save();
 
   dispute.status = RESERVATION_DISPUTE_STATUS.SELLER_WIN;
@@ -815,7 +851,7 @@ async function buyerPostDeliveryComplaint(user, payload = {}) {
     throw createServiceError("Đơn đang trong tranh chấp.", 409);
   }
   if (
-    status !== RESERVATION_STATUS.RECEIVED &&
+    status !== RESERVATION_STATUS.PICKUP_CONFIRMED &&
     status !== RESERVATION_STATUS.COMPLETED
   ) {
     throw createServiceError("Chỉ khiếu nại được sau khi shop đã xác nhận giao hàng.", 403);
@@ -840,15 +876,13 @@ async function buyerPostDeliveryComplaint(user, payload = {}) {
     images: imageUrls,
   });
 
-  const responseDeadline = computeSellerResponseDeadline(now);
   dispute.disputeKind = DISPUTE_KIND.POST_DELIVERY;
-  dispute.sellerResponseDeadlineAt = responseDeadline;
   dispute.updatedAt = now;
   await dispute.save();
 
   await markReservationDisputed(reservation, { now });
-  reservation.cancelReason = RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT;
-  reservation.UpdatedAt = now;
+  reservation.cancelType = RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT;
+  reservation.updatedAt = now;
   await reservation.save();
   await emitOrderUpdated(reservation, { action: "buyer_complaint" });
 
@@ -915,9 +949,10 @@ async function sellerRespondToPostDeliveryComplaint(user, payload = {}) {
   }
 
   const now = new Date();
-  dispute.sellerResponseContent = content;
-  dispute.sellerResponseImages = normalizeEmbeddedImages(imageUrls);
-  dispute.sellerRespondedAt = now;
+  dispute.sellerShopId = shop._id;
+  dispute.sellerContent = content;
+  dispute.sellerImages = normalizeEmbeddedImages(imageUrls);
+  dispute.tgKnShop = now;
   dispute.updatedAt = now;
   await dispute.save();
 
@@ -955,6 +990,7 @@ module.exports = {
   adminApproveBuyer,
   adminApproveSeller,
   adminRejectReport,
+  assertAdminCanResolveDispute,
   hasReservationDisputeReport,
   toPublicDispute,
   toPublicDisputeReport,

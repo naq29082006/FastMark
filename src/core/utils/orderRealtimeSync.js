@@ -1,4 +1,9 @@
-import { RESERVATION_TAB, getReservationTabForStatus } from '../../constants/sellerOrders';
+import {
+  RESERVATION_TAB,
+  getReservationTabForStatus,
+  matchesDisputeSubTab,
+  matchesCompletedSubTab,
+} from '../../constants/sellerOrders';
 import { hasItemId, removeById, upsertById } from './realtimeList';
 
 /**
@@ -8,6 +13,8 @@ export function applyReservationRealtimeRow({
   reservation,
   reservationId,
   activeTab,
+  disputeSubTab = null,
+  completedSubTab = null,
   search = '',
   currentItems,
   setItems,
@@ -19,7 +26,13 @@ export function applyReservationRealtimeRow({
   }
 
   const eventTab = getReservationTabForStatus(reservation.status);
-  const belongsToTab = activeTab === RESERVATION_TAB.ALL || eventTab === activeTab;
+  let belongsToTab = activeTab === RESERVATION_TAB.ALL || eventTab === activeTab;
+  if (belongsToTab && activeTab === RESERVATION_TAB.DISPUTE && disputeSubTab) {
+    belongsToTab = matchesDisputeSubTab(reservation, disputeSubTab);
+  }
+  if (belongsToTab && activeTab === RESERVATION_TAB.COMPLETED && completedSubTab) {
+    belongsToTab = matchesCompletedSubTab(reservation, completedSubTab);
+  }
   const isInList = hasItemId(currentItems, id);
   const hasSearch = String(search || '').trim().length > 0;
 
@@ -77,6 +90,8 @@ export function syncOrderListAfterMutation({
   reservation,
   reservationId,
   activeTab,
+  disputeSubTab = null,
+  completedSubTab = null,
   search = '',
   itemsRef,
   setItems,
@@ -90,6 +105,8 @@ export function syncOrderListAfterMutation({
       reservation,
       reservationId: id,
       activeTab,
+      disputeSubTab,
+      completedSubTab,
       search,
       currentItems: itemsRef.current,
       setItems,

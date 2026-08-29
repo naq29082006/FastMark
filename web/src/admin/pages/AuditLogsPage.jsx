@@ -9,13 +9,18 @@ import ListToolbar from '../components/ListToolbar';
 import { usePaginatedQuery } from '../hooks/usePaginatedQuery';
 import { formatDateTime } from '../utils/format';
 import { buildSttColumn } from '../utils/tableColumns';
+import {
+  ALL_FILTER_VALUE,
+  apiFilterParam,
+  withAllFilterOption,
+} from '../utils/filterOptions';
 import { useAuth } from '../../context/AuthContext';
 
-const ACTION_OPTIONS = [
+const ACTION_OPTIONS = withAllFilterOption([
   { value: 'ADMIN_REFUND_BUYER', label: 'Hoàn cọc cho người mua' },
   { value: 'ADMIN_RELEASE_SELLER', label: 'Giải ngân cọc cho người bán' },
   { value: 'ADMIN_REJECT_REPORT', label: 'Bác bỏ báo cáo' },
-];
+]);
 
 const ACTION_LABELS = Object.fromEntries(ACTION_OPTIONS.map((o) => [o.value, o.label]));
 
@@ -27,13 +32,13 @@ const DECISION_LABELS = {
 export default function AuditLogsPage() {
   const navigate = useNavigate();
   const { getIdToken } = useAuth();
-  const [action, setAction] = useState(undefined);
+  const [action, setAction] = useState(ALL_FILTER_VALUE);
 
   const fetcher = useCallback(
     async ({ page, limit }) => {
       const token = await getIdToken();
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-      if (action) params.set('action', action);
+      if (apiFilterParam(action)) params.set('action', apiFilterParam(action));
       const payload = await apiRequest(`/api/admin/audit-logs?${params}`, { token });
       return {
         data: {
@@ -134,7 +139,7 @@ export default function AuditLogsPage() {
           },
         ]}
         onReset={() => {
-          setAction(undefined);
+          setAction(ALL_FILTER_VALUE);
           setPage(1);
         }}
       />

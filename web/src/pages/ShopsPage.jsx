@@ -16,6 +16,7 @@ import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch';
 import { useAdminDateFilter } from '../hooks/useAdminDateFilter';
 import { formatDate } from '../utils/format';
+import PreviewableImage from '../components/PreviewableImage';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -256,13 +257,16 @@ export default function ShopsPage() {
                   <TableSttCell page={pagination.page} limit={limit} index={index} />
                   <td>
                     <div className="user-cell">
-                      {shop.avatar ? (
-                        <img src={shop.avatar} alt="" className="avatar-sm" />
-                      ) : (
-                        <div className="avatar-sm avatar-fallback">
-                          {(shop.shopName || 'S').charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                      <PreviewableImage
+                        src={shop.avatar}
+                        alt={shop.shopName || ''}
+                        width={48}
+                        height={48}
+                        shape="rounded"
+                        className="avatar-sm"
+                        fallbackLetter={shop.shopName || 'S'}
+                        fallbackClassName="avatar-sm avatar-fallback"
+                      />
                       <div>
                         <strong>{shop.shopName || ''}</strong>
                         <div className="muted">@{shop.shopUsername || ''}</div>
@@ -281,8 +285,8 @@ export default function ShopsPage() {
                   </td>
                   <td>{shop.categoryName || ''}</td>
                   <td>
-                    {Number(shop.averageRating) ? `${shop.averageRating} ★` : ''}
-                    <div className="muted">{Number(shop.followersCount) || 0} theo dõi</div>
+                    {Number(shop.diemTB) ? `${shop.diemTB} ★` : ''}
+                    <div className="muted">{Number(shop.soNguoiTheo) || 0} theo dõi</div>
                   </td>
                   <td className="col-open">
                     <span className={shop.isOpen === 1 ? 'badge badge-success' : 'badge'}>

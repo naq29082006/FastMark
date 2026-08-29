@@ -2,6 +2,7 @@ const shopSettingsService = require("../services/shopSettingsService");
 const reservationService = require("../services/reservationService");
 const sellerReviewService = require("../services/sellerReviewService");
 const sellerStatsService = require("../services/sellerStatsService");
+const { isCancelledBySellerAfterAccept } = require("../utils/reservationCompat");
 const { success, fail } = require("../utils/apiResponse");
 
 function pickBodyValue(body, keys) {
@@ -168,7 +169,7 @@ exports.cancelReservation = async (req, res) => {
     req.params.id,
     { reason, images }
   );
-  const afterAccept = Boolean(reservation?.cancelledBySellerAfterAccept);
+  const afterAccept = isCancelledBySellerAfterAccept(reservation);
   return success(res, {
     message: afterAccept
       ? "Đã hủy đơn sau xác nhận. Tiền cọc đã hoàn cho người mua."
@@ -183,7 +184,7 @@ exports.refundDisputeDeposit = async (req, res) => {
     req.params.id
   );
   return success(res, {
-    message: "Đã hoàn cọc cho người mua. Đơn đã kết thúc tranh chấp.",
+    message: "Đã hoàn cọc cho người mua.",
     data: { reservation },
   });
 };

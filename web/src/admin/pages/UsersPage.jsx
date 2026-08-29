@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Avatar, Table, Tag, message } from 'antd';
+import { Alert, Modal, Table, Tag, message } from 'antd';
 
 import {
   blockAccount,
@@ -10,24 +10,31 @@ import {
 } from '../../api/accountApi';
 import PageContainer from '../components/PageContainer';
 import RowActions from '../components/RowActions';
+import ShopCell from '../components/ShopCell';
 import StatCards from '../components/StatCards';
 import ListToolbar from '../components/ListToolbar';
 import { usePaginatedQuery } from '../hooks/usePaginatedQuery';
 import { useUrlQueryString } from '../hooks/useUrlQuery';
 import { formatDateTime, statusTagColor } from '../utils/format';
 import { buildSttColumn } from '../utils/tableColumns';
+import {
+  ALL_FILTER_VALUE,
+  apiFilterParam,
+  initialFilterValue,
+  withAllFilterOption,
+} from '../utils/filterOptions';
 import { useAuth } from '../../context/AuthContext';
 
-const STATUS_OPTIONS = [
+const STATUS_OPTIONS = withAllFilterOption([
   { value: '1', label: 'Hoạt động' },
   { value: '0', label: 'Đã khóa' },
-];
+]);
 
-const ROLE_OPTIONS = [
+const ROLE_OPTIONS = withAllFilterOption([
   { value: '1', label: 'Người mua' },
   { value: '2', label: 'Người bán' },
   { value: '3', label: 'Admin' },
-];
+]);
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -35,8 +42,8 @@ export default function UsersPage() {
   const urlStatus = useUrlQueryString('status');
   const urlSearch = useUrlQueryString('search');
   const [search, setSearch] = useState(urlSearch || '');
-  const [status, setStatus] = useState(urlStatus);
-  const [role, setRole] = useState(undefined);
+  const [status, setStatus] = useState(() => initialFilterValue(urlStatus));
+  const [role, setRole] = useState(ALL_FILTER_VALUE);
   const [statistics, setStatistics] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [busyId, setBusyId] = useState('');
@@ -44,7 +51,13 @@ export default function UsersPage() {
   const fetcher = useCallback(
     async ({ page, limit }) => {
       const token = await getIdToken();
-      return listAccounts(token, { page, limit, search, status, role });
+      return listAccounts(token, {
+        page,
+        limit,
+        search,
+        status: apiFilterParam(status),
+        role: apiFilterParam(role),
+      });
     },
     [getIdToken, search, status, role]
   );
@@ -80,7 +93,7 @@ export default function UsersPage() {
     ];
   }, [statistics]);
 
-  async function handleBlockToggle(record) {
+  async function executeBlockToggle(record) {
     const accountId = record.id || record._id;
     const isBlocked = record.status === 0;
     setBusyId(accountId);
@@ -102,34 +115,43 @@ export default function UsersPage() {
     }
   }
 
+  function handleBlockToggle(record) {
+    const isBlocked = record.status === 0;
+    if (isBlocked) {
+      Modal.confirm({
+        title: 'Mở khóa tài khoản',
+        content:
+          'Người dùng sẽ đăng nhập và dùng FastMark bình thường. Gian hàng liên kết (nếu có) cũng được mở khóa.',
+        okText: 'Xác nhận mở khóa',
+        cancelText: 'Huỷ',
+        okButtonProps: { className: 'unlock-confirm-btn' },
+        onOk: () => executeBlockToggle(record),
+      });
+      return;
+    }
+    Modal.confirm({
+      title: 'Khóa tài khoản',
+      content:
+        'Người dùng chỉ còn màn bị khóa trên app (rút tiền, khiếu nại, đăng xuất). Gian hàng cũng bị khóa và mọi đơn treo sẽ hủy hoàn cọc.',
+      okText: 'Xác nhận khóa',
+      cancelText: 'Huỷ',
+      okType: 'danger',
+      onOk: () => executeBlockToggle(record),
+    });
+  }
+
   const columns = [
     buildSttColumn({ page, pageSize: limit }),
     {
-      title: 'Avatar',
-      dataIndex: 'avatar',
-      key: 'avatar',
-      width: 72,
-      render: (avatar, row) => (
-        <Avatar src={avatar || undefined}>
-          {(row.fullName || row.userName || '?').charAt(0).toUpperCase()}
-        </Avatar>
+      title: 'Người dùng',
+      key: 'user',
+      render: (_, row) => (
+        <ShopCell
+          shopName={row.fullName || row.userName}
+          shopUsername={row.fullName ? row.userName : ''}
+          shopAvatar={row.avatar}
+        />
       ),
-    },
-    {
-      title: 'Họ tên',
-      key: 'fullName',
-      render: (_, row) => {
-        const name = row.fullName || row.userName || '—';
-        const username = row.userName ? String(row.userName) : '';
-        return (
-          <div>
-            <div>{name}</div>
-            {username && row.fullName ? (
-              <div style={{ color: '#6b7280', fontSize: 12, marginTop: 2 }}>{username}</div>
-            ) : null}
-          </div>
-        );
-      },
     },
     {
       title: 'Liên hệ',
@@ -157,7 +179,15 @@ export default function UsersPage() {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      width: 168,
       render: formatDateTime,
+    },
+    {
+      title: 'Lần hoạt động cuối',
+      dataIndex: 'lastActiveAt',
+      key: 'lastActiveAt',
+      width: 168,
+      render: (value) => formatDateTime(value) || '—',
     },
     {
       title: 'Thao tác',
@@ -213,8 +243,8 @@ export default function UsersPage() {
         ]}
         onReset={() => {
           setSearch('');
-          setStatus(undefined);
-          setRole(undefined);
+          setStatus(ALL_FILTER_VALUE);
+          setRole(ALL_FILTER_VALUE);
           setPage(1);
         }}
       />

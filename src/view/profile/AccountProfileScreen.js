@@ -357,11 +357,11 @@ export default function AccountProfileScreen({
 
   const stats = useMemo(
     () => ({
-      products: showAsSeller ? catalogStats.products : profile?.totalProducts ?? 0,
+      products: showAsSeller ? catalogStats.products : profile?.tongSP ?? 0,
       sold: profile?.soldCount ?? 0,
       likes: showAsSeller ? catalogStats.likes : profile?.likesCount ?? 0,
-      reviews: profile?.totalReviews ?? 0,
-      rating: profile?.averageRating ?? 0,
+      reviews: profile?.tongDG ?? 0,
+      rating: profile?.diemTB ?? 0,
       following: profile?.followingCount ?? 0,
     }),
     [catalogStats, showAsSeller, profile]

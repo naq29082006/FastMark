@@ -34,9 +34,10 @@ import {
 } from '../../core/utils/geo';
 import useLocationWatcher from '../../hooks/useLocationWatcher';
 import { loadAllNearbyShopsForMap, loadNearbyRegisteredShops, reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
-import { loadStoreById } from '../../viewmodel/store/storeViewModel';
+import { loadProductById, loadStoreById } from '../../viewmodel/store/storeViewModel';
 import { mapLogger as log } from '../../core/utils/logger';
 import { RESERVATION_TAB } from '../../constants/sellerOrders';
+import { toReservationFormResume } from '../../viewmodel/buyer/reservationResumeSession';
 import AvatarBadge from '../shared/components/AvatarBadge';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
 import { resolveShopAvatarUri } from '../../core/utils/avatarInitial';
@@ -87,6 +88,7 @@ export default function MapScreen({
   children,
   focusStoreRequest,
   onClearFocus,
+  onDirectionsStopped,
   onPickupCompleted,
   onOpenBuyerOrders,
   onOpenWalletTopUp,
@@ -233,6 +235,72 @@ export default function MapScreen({
     if (!resumeReserveRequest?.productId || !resumeReserveRequest?.at) {
       return;
     }
+
+    if (resumeReserveRequest.fromTopUp) {
+      let cancelled = false;
+      const productId = String(resumeReserveRequest.productId);
+      const formResume = toReservationFormResume(resumeReserveRequest);
+
+      setActiveReservation({
+        product: null,
+        store: null,
+        preselectedVariantId: resumeReserveRequest.variantId || null,
+        initialQuantity: Math.max(1, Number(resumeReserveRequest.quantity) || 1),
+        initialFormResume: formResume,
+      });
+
+      (async () => {
+        try {
+          const loadedProduct = await loadProductById(productId);
+          let loadedStore = null;
+          const storeId = resumeReserveRequest.storeId || loadedProduct?.store_id;
+          if (storeId) {
+            loadedStore = await loadStoreById(String(storeId));
+          }
+          if (cancelled) {
+            return;
+          }
+          if (!loadedProduct) {
+            setActiveReservation((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    product: null,
+                    store: null,
+                    loadError: 'Không tải được thông tin sản phẩm.',
+                  }
+                : prev
+            );
+            onResumeReserveHandled?.();
+            return;
+          }
+          setActiveReservation({
+            product: { ...loadedProduct, id: loadedProduct?.id || productId },
+            store: loadedStore,
+            preselectedVariantId: resumeReserveRequest.variantId || null,
+            initialQuantity: Math.max(1, Number(resumeReserveRequest.quantity) || 1),
+            initialFormResume: formResume,
+          });
+          onResumeReserveHandled?.();
+        } catch (error) {
+          log.fail('MapScreen:resume-topup-failed', error);
+          if (!cancelled) {
+            setStoreNav({
+              screen: 'product',
+              productId,
+              storeId: resumeReserveRequest.storeId
+                ? String(resumeReserveRequest.storeId)
+                : undefined,
+            });
+          }
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setStoreNav({
       screen: 'product',
       productId: String(resumeReserveRequest.productId),
@@ -240,7 +308,13 @@ export default function MapScreen({
         ? String(resumeReserveRequest.storeId)
         : undefined,
     });
-  }, [resumeReserveRequest?.at, resumeReserveRequest?.productId, resumeReserveRequest?.storeId]);
+  }, [
+    resumeReserveRequest?.at,
+    resumeReserveRequest?.productId,
+    resumeReserveRequest?.storeId,
+    resumeReserveRequest?.fromTopUp,
+    onResumeReserveHandled,
+  ]);
 
   const openStore = useCallback((storeId) => {
     setMenuVisible(false);
@@ -410,8 +484,8 @@ export default function MapScreen({
         });
     };
 
-    // Tab đang mở: debounce 3s trước khi quét lại. Tab ẩn: debounce nhẹ để preload.
-    const delayMs = isScreenActive ? 3000 : 400;
+    // Tab đang mở: debounce ngắn trước khi quét lại. Tab ẩn: debounce nhẹ để preload.
+    const delayMs = isScreenActive ? 800 : 400;
     scanFetchTimerRef.current = setTimeout(runFetch, delayMs);
 
     return () => {
@@ -543,6 +617,7 @@ export default function MapScreen({
           image_url: String(storeAvatar || '').trim(),
           type: 'shop',
         },
+        returnTo: { type: 'mapStore', storeId: String(shopId) },
       });
       onClearFocus?.();
     },
@@ -600,6 +675,7 @@ export default function MapScreen({
             image_url: String(enrichedStore.image_url || enrichedStore.cover_image_url || '').trim(),
             type: 'shop',
           },
+          returnTo: focusStoreRequest?.returnTo || null,
         });
       }
 
@@ -736,6 +812,8 @@ export default function MapScreen({
 
     const cached = currentLocation;
     if (hasValidLocation(cached)) {
+      setScanLocation({ ...cached });
+      resolveScanAddress(cached);
       requestRecenter(cached);
       log.info('recenter:instant', { lat: cached.latitude, lng: cached.longitude });
     }
@@ -819,8 +897,16 @@ export default function MapScreen({
   }, [openStore, applyScanLocation, closeFilterMenu]);
 
   function handleStopDirections() {
+    const returnTo = directionsSession?.returnTo ?? null;
     setDirectionsSession(null);
     onClearFocus?.();
+
+    if (returnTo?.type === 'mapStore' && returnTo.storeId) {
+      setStoreNav({ screen: 'store', storeId: String(returnTo.storeId) });
+      return;
+    }
+
+    onDirectionsStopped?.(returnTo);
   }
 
   function handleSearchSelect(result) {
@@ -917,9 +1003,13 @@ export default function MapScreen({
   if (activeReservation) {
     screenContent = (
       <ReservationScreen
+        loading={!activeReservation.product}
+        loadError={activeReservation.loadError || null}
         product={activeReservation.product}
         store={activeReservation.store}
         preselectedVariantId={activeReservation.preselectedVariantId}
+        initialQuantity={activeReservation.initialQuantity || 1}
+        initialFormResume={activeReservation.initialFormResume || null}
         onBack={() => setActiveReservation(null)}
         onSuccess={() => {
           setActiveReservation(null);
@@ -946,6 +1036,13 @@ export default function MapScreen({
         onBack={closeStoreNav}
         onProductPress={openProduct}
         onNavigateDirections={startDirectionsToStore}
+        onOrderSuccess={(tab) => {
+          setStoreNav(null);
+          setActiveReservation(null);
+          onOpenBuyerOrders?.(tab);
+        }}
+        onOpenTopUp={onOpenWalletTopUp}
+        reservationSource="map"
       />
     );
   } else if (storeNav?.screen === 'product') {
@@ -955,6 +1052,11 @@ export default function MapScreen({
         onBack={goBackStoreNav}
         onStorePress={openStore}
         onOpenTopUp={onOpenWalletTopUp}
+        onOrderSuccess={(tab) => {
+          setStoreNav(null);
+          setActiveReservation(null);
+          onOpenBuyerOrders?.(tab);
+        }}
         reservationSource="map"
         reservationStoreId={storeNav.storeId || null}
         resumeReserveRequest={
@@ -964,13 +1066,22 @@ export default function MapScreen({
             : null
         }
         onResumeReserveConsumed={onResumeReserveHandled}
-        onReserve={(product, store, selectedVariant) =>
+        onReserve={(product, store, selectedVariant) => {
+          const pendingResume =
+            resumeReserveRequest &&
+            String(resumeReserveRequest.productId) === String(storeNav.productId)
+              ? resumeReserveRequest
+              : null;
+          const formResume = toReservationFormResume(pendingResume);
           setActiveReservation({
             product: { ...product, id: product.id || storeNav.productId },
             store,
-            preselectedVariantId: selectedVariant?.id || null,
-          })
-        }
+            preselectedVariantId:
+              pendingResume?.variantId || selectedVariant?.id || null,
+            initialQuantity: pendingResume?.quantity || 1,
+            initialFormResume: formResume,
+          });
+        }}
       />
     );
   } else {
@@ -1199,7 +1310,7 @@ export default function MapScreen({
                   TYPE_LABEL[restaurant.type] ||
                   'Gian hàng';
                 const productCount = Number(restaurant.total_products ?? restaurant.product_count ?? 0);
-                const rating = Number(restaurant.rating_avg ?? restaurant.averageRating ?? 0);
+                const rating = Number(restaurant.rating_avg ?? restaurant.diemTB ?? 0);
                 const distanceLabel = formatNearbyDistance(restaurant.distance_meters);
                 const isOpen = restaurant.is_open !== false && restaurant.is_open !== 0;
                 const avatarUrl = resolveShopAvatarUri(restaurant);

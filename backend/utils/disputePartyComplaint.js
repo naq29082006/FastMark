@@ -1,4 +1,4 @@
-const { DISPUTE_CREATED_BY } = require("../constants");
+const { DISPUTE_CREATED_BY, DISPUTE_STATUS } = require("../constants");
 const { normalizeDisputeCreatedBy } = require("./reservationCompat");
 const {
   normalizeDisputeReasonType,
@@ -7,18 +7,18 @@ const {
 
 const BUYER_FIELDS = {
   userId: "buyerUserId",
-  reasonType: "buyerReasonType",
+  reasonType: "maLyDoBuyer",
   content: "buyerContent",
   images: "buyerImages",
-  createdAt: "buyerComplaintAt",
+  createdAt: "tgKnBuyer",
 };
 
 const SELLER_FIELDS = {
   shopId: "sellerShopId",
-  reasonType: "sellerReasonType",
+  reasonType: "maLyDoShop",
   content: "sellerContent",
   images: "sellerImages",
-  createdAt: "sellerComplaintAt",
+  createdAt: "tgKnShop",
 };
 
 function pickString(value) {
@@ -47,6 +47,12 @@ function hasComplaintPayload(complaint) {
 
 function readFlatComplaint(dispute, party) {
   const map = fieldMap(party);
+  if (party === "seller") {
+    const reasonType = Number(dispute[map.reasonType]);
+    if (!Number.isFinite(reasonType) || reasonType <= 0) {
+      return null;
+    }
+  }
   const reasonType = dispute[map.reasonType];
   return party === "seller"
     ? {
@@ -126,8 +132,34 @@ function partyHasComplaint(dispute, party) {
   return hasComplaintPayload(getPartyComplaint(dispute, party));
 }
 
+/** Điều kiện chung: cả buyer và seller đều đã báo cáo (pickup). */
+function buildBothPartiesComplaintFilter(extra = {}) {
+  return {
+    maLyDoShop: { $gt: 0 },
+    $or: [
+      { maLyDoBuyer: { $gt: 0 } },
+      { buyerContent: { $nin: [null, ""] } },
+      { buyerImages: { $exists: true, $not: { $size: 0 } } },
+    ],
+    ...extra,
+  };
+}
+
+/** Khiếu nại pickup: cả buyer và seller đã báo cáo, dispute còn PENDING — chờ admin xử lý. */
+function buildBothPartiesPendingDisputeFilter() {
+  return buildBothPartiesComplaintFilter({ status: DISPUTE_STATUS.PENDING });
+}
+
+/** Tranh chấp pickup đã được admin xử lý (dispute không còn PENDING). */
+function buildBothPartiesResolvedDisputeFilter() {
+  return buildBothPartiesComplaintFilter({ status: { $ne: DISPUTE_STATUS.PENDING } });
+}
+
 module.exports = {
   getPartyComplaint,
   partyHasComplaint,
   resolveComplaintTitle,
+  buildBothPartiesComplaintFilter,
+  buildBothPartiesPendingDisputeFilter,
+  buildBothPartiesResolvedDisputeFilter,
 };

@@ -1,8 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Image, Input, Modal, Table, Tag, message } from 'antd';
+import { Alert, Button, Input, Modal, Table, Tag, message } from 'antd';
 
 import { deleteProduct, listProducts } from '../../api/catalogApi';
+import { listCategories } from '../../api/categoryApi';
+import PreviewableImage from '../../components/PreviewableImage';
 import PageContainer from '../components/PageContainer';
 import RowActions from '../components/RowActions';
 import ShopCell from '../components/ShopCell';
@@ -13,16 +15,32 @@ import { useUrlQueryString } from '../hooks/useUrlQuery';
 import { formatCurrency, formatDateTime } from '../utils/format';
 import { buildSttColumn } from '../utils/tableColumns';
 import { useAuth } from '../../context/AuthContext';
-import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import {
+  ALL_FILTER_VALUE,
+  apiFilterParam,
+  initialFilterValue,
+  withAllFilterOption,
+} from '../utils/filterOptions';
 
-const STATUS_OPTIONS = [
+const STATUS_OPTIONS = withAllFilterOption([
   { value: '1', label: 'Đang hiện' },
   { value: '0', label: 'Đã ẩn' },
   { value: 'removed', label: 'Đã xóa' },
-];
+]);
+
+const REMOVED_BY_OPTIONS = withAllFilterOption([
+  { value: 'admin', label: 'Admin xóa' },
+  { value: 'seller', label: 'Người bán xóa' },
+]);
 
 function productStatusTag(record) {
   if (record.isDeleted || record.isRemoved) {
+    if (record.isAdminRemoved || record.removedBy === 'admin') {
+      return <Tag color="error">Admin xóa</Tag>;
+    }
+    if (record.isSellerRemoved || record.removedBy === 'seller') {
+      return <Tag color="error">Người bán xóa</Tag>;
+    }
     return <Tag color="error">{record.statusLabel || 'Đã xóa'}</Tag>;
   }
   if (record.status === 0) {
@@ -42,7 +60,6 @@ function formatProductPrice(row) {
       (row.maxPrice !== row.minPrice
         ? `${formatCurrency(row.minPrice)} - ${formatCurrency(row.maxPrice)}`
         : formatCurrency(row.minPrice));
-
     return (
       <div>
         <div style={{ color: '#dc2626', fontWeight: 600 }}>
@@ -69,20 +86,87 @@ function formatProductPrice(row) {
   return formatCurrency(row.minPrice ?? row.maxPrice ?? 0);
 }
 
+function productListCell(name, thumbnail) {
+  const label = name || '—';
+  return (
+    <div className="admin-dashboard-product-cell">
+      <PreviewableImage
+        src={thumbnail}
+        alt={label}
+        width={40}
+        height={40}
+        shape="rounded"
+        fallbackLetter={label}
+        className="admin-dashboard-product-cell-thumb"
+      />
+      <span className="admin-dashboard-product-cell-name" title={label}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
 export default function ProductsPage() {
   const navigate = useNavigate();
   const { getIdToken } = useAuth();
   const urlStatus = useUrlQueryString('status');
+  const urlCategoryId = useUrlQueryString('categoryId');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(urlStatus);
+  const [status, setStatus] = useState(() => initialFilterValue(urlStatus));
+  const [removedBy, setRemovedBy] = useState(ALL_FILTER_VALUE);
+  const [categoryId, setCategoryId] = useState(() => initialFilterValue(urlCategoryId));
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteReason, setDeleteReason] = useState('');
   const [actionLoading, setActionLoading] = useState('');
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCategories() {
+      setCategoriesLoading(true);
+      try {
+        const token = await getIdToken();
+        const payload = await listCategories(token, 'products');
+        if (cancelled) return;
+        const rows = payload.data?.categories || payload.data?.items || [];
+        setCategoryOptions(
+          withAllFilterOption(
+            rows.map((item) => ({
+              value: String(item.id || item._id),
+              label: item.name || item.categoryName || '—',
+            }))
+          )
+        );
+      } catch {
+        if (!cancelled) {
+          setCategoryOptions(withAllFilterOption([]));
+        }
+      } finally {
+        if (!cancelled) {
+          setCategoriesLoading(false);
+        }
+      }
+    }
+
+    loadCategories();
+    return () => {
+      cancelled = true;
+    };
+  }, [getIdToken]);
+
   const fetcher = useCallback(
     async ({ page, limit }) => {
       const token = await getIdToken();
-      const payload = await listProducts(token, { page, limit, search, status });
+      const payload = await listProducts(token, {
+        page,
+        limit,
+        search,
+        status: apiFilterParam(status),
+        removedBy: status === 'removed' ? apiFilterParam(removedBy) : undefined,
+        categoryId: apiFilterParam(categoryId),
+      });
       return {
         data: {
           items: payload.data?.items || [],
@@ -91,17 +175,42 @@ export default function ProductsPage() {
         },
       };
     },
-    [getIdToken, search, status]
+    [getIdToken, search, status, removedBy, categoryId]
   );
 
   const { items, loading, error, pagination, page, setPage, limit, setLimit, stats, reload } =
-    usePaginatedQuery({ fetcher, deps: [search, status] });
+    usePaginatedQuery({ fetcher, deps: [search, status, removedBy, categoryId] });
 
   const statItems = useMemo(
     () => [
       { key: 'total', title: 'Tổng sản phẩm', value: stats?.total ?? 0 },
-      { key: 'visible', title: 'Đang hiện', value: stats?.visible ?? 0 },
-      { key: 'removed', title: 'Đã xóa', value: stats?.removed ?? 0 },
+      {
+        key: 'visible',
+        title: 'Đang hiện',
+        value: stats?.visible ?? 0,
+        onClick: () => {
+          setStatus('1');
+          setPage(1);
+        },
+      },
+      {
+        key: 'hidden',
+        title: 'Đã ẩn',
+        value: stats?.hidden ?? 0,
+        onClick: () => {
+          setStatus('0');
+          setPage(1);
+        },
+      },
+      {
+        key: 'removed',
+        title: 'Đã xóa',
+        value: stats?.removed ?? 0,
+        onClick: () => {
+          setStatus('removed');
+          setPage(1);
+        },
+      },
     ],
     [stats]
   );
@@ -127,28 +236,10 @@ export default function ProductsPage() {
   const columns = [
     buildSttColumn({ page, pageSize: limit }),
     {
-      title: 'Ảnh',
-      dataIndex: 'thumbnail',
-      key: 'thumbnail',
-      width: 72,
-      render: (thumb) =>
-        thumb ? (
-          <Image
-            src={resolveMediaUrl(thumb)}
-            alt=""
-            width={48}
-            height={48}
-            style={{ objectFit: 'cover', borderRadius: 6 }}
-          />
-        ) : (
-          '—'
-        ),
-    },
-    {
-      title: 'Tên sản phẩm',
-      dataIndex: 'productName',
-      key: 'productName',
-      render: (v) => v || '—',
+      title: 'Sản phẩm',
+      key: 'product',
+      width: 200,
+      render: (_, row) => productListCell(row.productName, row.thumbnail),
     },
     {
       title: 'Gian hàng',
@@ -172,16 +263,21 @@ export default function ProductsPage() {
     {
       title: 'Giá',
       key: 'price',
+      width: 168,
       render: (_, row) => formatProductPrice(row),
     },
     {
       title: 'Tồn kho',
       key: 'stock',
+      width: 92,
+      align: 'center',
       render: (_, row) => row.stock ?? row.totalStock ?? 0,
     },
     {
       title: 'Trạng thái',
       key: 'status',
+      width: 118,
+      align: 'center',
       render: (_, record) => productStatusTag(record),
     },
     {
@@ -220,7 +316,7 @@ export default function ProductsPage() {
     <PageContainer
       title="Sản phẩm"
       subtitle="Quản lý sản phẩm trên toàn hệ thống"
-      stats={<StatCards items={statItems} loading={loading && !stats} columns={3} />}
+      stats={<StatCards items={statItems} loading={loading && !stats} columns={4} />}
     >
       <ListToolbar
         searchPlaceholder="Tìm theo tên sản phẩm, shop..."
@@ -229,19 +325,49 @@ export default function ProductsPage() {
         onSearch={setSearch}
         filters={[
           {
+            key: 'category',
+            placeholder: 'Danh mục',
+            options: categoryOptions,
+            value: categoryId,
+            loading: categoriesLoading,
+            onChange: (v) => {
+              setCategoryId(v);
+              setPage(1);
+            },
+          },
+          {
             key: 'status',
             placeholder: 'Trạng thái',
             options: STATUS_OPTIONS,
             value: status,
             onChange: (v) => {
               setStatus(v);
+              if (v !== 'removed') {
+                setRemovedBy(ALL_FILTER_VALUE);
+              }
               setPage(1);
             },
           },
+          ...(status === 'removed'
+            ? [
+                {
+                  key: 'removedBy',
+                  placeholder: 'Người xóa',
+                  options: REMOVED_BY_OPTIONS,
+                  value: removedBy,
+                  onChange: (v) => {
+                    setRemovedBy(v);
+                    setPage(1);
+                  },
+                },
+              ]
+            : []),
         ]}
         onReset={() => {
           setSearch('');
-          setStatus(undefined);
+          setCategoryId(ALL_FILTER_VALUE);
+          setStatus(ALL_FILTER_VALUE);
+          setRemovedBy(ALL_FILTER_VALUE);
           setPage(1);
         }}
       />

@@ -10,12 +10,14 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSelector } from 'react-redux';
 
 import { formatPrice } from '../../core/utils/productFormat';
 import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
 import { mergeListById } from '../../core/utils/realtimeList';
 import { buyerTheme as t } from '../../core/theme/buyerTheme';
 import { useResourceSocket } from '../../hooks/useResourceSocket';
+import { selectIsSeller } from '../../viewmodel/auth/authSelectors';
 import SubScreenHeader from '../shared/components/SubScreenHeader';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
 import KeyboardAwareScrollView from '../shared/components/KeyboardAwareScrollView';
@@ -66,6 +68,7 @@ function WithdrawDetailRow({ label, value }) {
 }
 
 export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
+  const isSeller = useSelector(selectIsSeller);
   const [banks, setBanks] = useState([]);
   const [withdraws, setWithdraws] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +83,7 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
   const [amountText, setAmountText] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState('');
+  const [accountNameNotice, setAccountNameNotice] = useState('');
   const [screenTab, setScreenTab] = useState('withdraw');
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -105,8 +109,14 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
     }
     try {
       if (banksOnly) {
-        const bankRows = await loadWithdrawBanksViewModel();
+        const bankPayload = await loadWithdrawBanksViewModel();
+        const bankRows = bankPayload?.banks || [];
         setBanks(Array.isArray(bankRows) ? bankRows : []);
+        const profile = bankPayload?.withdrawProfile;
+        if (profile) {
+          setAccountName(String(profile.accountName || '').trim());
+          setAccountNameNotice(String(profile.accountNameNotice || '').trim());
+        }
         setSelectedBankId((current) => {
           if (current) return current;
           return bankRows?.[0]?.id ? String(bankRows[0].id) : '';
@@ -154,6 +164,17 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
   }, [load]);
 
   useEffect(() => {
+    if (isSeller) {
+      return;
+    }
+    Alert.alert(
+      'Thông báo',
+      'Chỉ tài khoản người bán mới được rút tiền. Người mua chỉ có thể nạp tiền vào ví.',
+      [{ text: 'OK', onPress: () => onBack?.() }]
+    );
+  }, [isSeller, onBack]);
+
+  useEffect(() => {
     if (screenTab !== 'history') {
       return;
     }
@@ -196,8 +217,11 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
       Alert.alert('STK không hợp lệ', 'Số tài khoản gồm 6–20 chữ số.');
       return;
     }
-    if (!String(accountName).trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập tên chủ tài khoản.');
+    if (!accountName || !String(accountName).trim()) {
+      Alert.alert(
+        'Thiếu thông tin',
+        'Không tải được họ tên CCCD đã duyệt. Vui lòng thử tải lại hoặc liên hệ hỗ trợ.'
+      );
       return;
     }
 
@@ -221,7 +245,6 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
               onSuccess?.(result);
               setAmountText('');
               setAccountNumber('');
-              setAccountName('');
               setScreenTab('history');
               await load({ nextPage: 1 });
             } catch (error) {
@@ -290,6 +313,10 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
     );
   }
 
+  if (!isSeller) {
+    return null;
+  }
+
   return (
     <View style={styles.screen}>
       {selectedWithdraw ? (
@@ -334,7 +361,7 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
               />
               <WithdrawDetailRow
                 label="ID giao dịch ví"
-                value={selectedWithdraw.walletTransactionId}
+                value={selectedWithdraw.gdViId}
               />
               <WithdrawDetailRow
                 label="Ghi chú admin"
@@ -350,7 +377,7 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
               />
               <WithdrawDetailRow
                 label="Thời gian xử lý"
-                value={formatWithdrawTime(selectedWithdraw.processedAt)}
+                value={formatWithdrawTime(selectedWithdraw.tgXuLy)}
               />
             </View>
           </KeyboardAwareScrollView>
@@ -431,23 +458,26 @@ export default function WithdrawScreen({ balance = 0, onBack, onSuccess }) {
                       placeholderTextColor="#94a3b8"
                     />
 
-                    <Text style={styles.label}>Tên chủ tài khoản</Text>
-                    <KeyboardAwareTextInput
-                      style={styles.input}
-                      autoCapitalize="characters"
-                      value={accountName}
-                      onChangeText={setAccountName}
-                      placeholder="NGUYEN VAN A"
-                      placeholderTextColor="#94a3b8"
-                    />
+                    <Text style={styles.label}>Tên chủ tài khoản (theo CCCD)</Text>
+                    {accountNameNotice ? (
+                      <Text style={styles.nameNotice}>{accountNameNotice}</Text>
+                    ) : null}
+                    <View style={[styles.input, styles.inputReadonly]}>
+                      <Text style={styles.readonlyName} selectable>
+                        {accountName || '—'}
+                      </Text>
+                    </View>
 
                     <Pressable
                       style={[
                         styles.submitBtn,
-                        (submitting || banks.length === 0) && styles.submitDisabled,
+                        (submitting || banks.length === 0 || !String(accountName).trim()) &&
+                          styles.submitDisabled,
                       ]}
                       onPress={handleSubmit}
-                      disabled={submitting || banks.length === 0}
+                      disabled={
+                        submitting || banks.length === 0 || !String(accountName).trim()
+                      }
                     >
                       {submitting ? (
                         <ActivityIndicator color="#fff" />
@@ -652,6 +682,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: t.text,
+  },
+  inputReadonly: {
+    backgroundColor: '#f8fafc',
+    justifyContent: 'center',
+  },
+  readonlyName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: t.text,
+    letterSpacing: 0.3,
+  },
+  nameNotice: {
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    color: t.textMuted,
+    lineHeight: 18,
   },
   submitBtn: {
     marginTop: 12,

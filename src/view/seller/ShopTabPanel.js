@@ -436,8 +436,17 @@ export default function ShopTabPanel({
     );
   }
 
-  if (isSeller && shopLocked) {
-    return <ShopLockedScreen />;
+  const shopLockedOrderFlow = shopNav === 'orders' || shopNav === 'order-detail';
+
+  if (isSeller && shopLocked && !shopLockedOrderFlow) {
+    return (
+      <ShopLockedScreen
+        onManageOrders={() => {
+          setSellerOrdersTab(RESERVATION_TAB.DISPUTE);
+          setShopNav('orders');
+        }}
+      />
+    );
   }
 
   if (shopNav === 'post') {
@@ -580,6 +589,7 @@ export default function ShopTabPanel({
         activeTab={sellerOrdersTab}
         onActiveTabChange={setSellerOrdersTab}
         onRefreshKey={ordersRefreshKey}
+        isScreenActive={isVisible}
         onBack={() => {
           setSellerOrdersTab(RESERVATION_TAB.PENDING);
           setShopNav(null);
@@ -593,6 +603,7 @@ export default function ShopTabPanel({
           setPickupScanReservation(null);
           setShopNav('scan-buyer-qr');
         }}
+        onShowShopQr={() => setShopNav('pickup-qr')}
       />
     );
   }
@@ -670,6 +681,7 @@ export default function ShopTabPanel({
         onBack={() => setShopNav(null)}
         onTopUp={() => openTopUp('wallet')}
         onWithdraw={() => setShopNav('wallet-withdraw')}
+        canTopUp
         onSeeAllTransactions={() => setShopNav('wallet-transactions')}
       />
     );

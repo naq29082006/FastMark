@@ -30,10 +30,7 @@ function resolveEscrowDaysFromCategory(category) {
   if (category.disputeDays != null) {
     return normalizeEscrowProtectionDays(category.disputeDays);
   }
-  if (category.escrowProtectionDays != null) {
-    return normalizeEscrowProtectionDays(category.escrowProtectionDays);
-  }
-  const name = String(category.name || category.categoryName || "").trim();
+  const name = String(category.name || "").trim();
   if (name && Object.prototype.hasOwnProperty.call(CATEGORY_ESCROW_PRESETS, name)) {
     return CATEGORY_ESCROW_PRESETS[name];
   }
@@ -49,7 +46,7 @@ async function resolveEscrowProtectionDaysForProduct(productId) {
     return DEFAULT_ESCROW_PROTECTION_DAYS;
   }
   const category = await ProductCategory.findById(product.CategoryId)
-    .select("name categoryName disputeDays escrowProtectionDays")
+    .select("name disputeDays")
     .lean();
   return resolveEscrowDaysFromCategory(category);
 }

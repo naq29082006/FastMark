@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
+const { MF } = require("../constants/modelFields");
 
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -69,7 +70,7 @@ async function createUserRecord(payload) {
 }
 
 async function updateUserActivity(user) {
-  user.LanHoatDongCuoi = new Date();
+  user[MF.HoatDongCuoi] = new Date();
   await user.save();
   return user;
 }

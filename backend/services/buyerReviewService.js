@@ -219,14 +219,14 @@ async function refreshShopReviewStats(shopId) {
   }).lean();
 
   const total = reviews.length;
-  const averageRating =
+  const diemTB =
     total > 0
       ? Math.round((reviews.reduce((sum, row) => sum + Number(row.rating || 0), 0) / total) * 10) /
         10
       : 0;
 
-  shop.totalReviews = total;
-  shop.averageRating = averageRating;
+  shop.tongDG = total;
+  shop.diemTB = diemTB;
   shop.UpdatedAt = new Date();
   await shop.save();
   return shop;
@@ -241,8 +241,8 @@ function buildReviewRealtimePayload(review, shop = null, extras = {}) {
       ? String(review.reservationId)
       : String(extras.reservationId || ""),
     rating: Number(review?.rating || extras.rating || 0),
-    totalReviews: Number(shop?.totalReviews || 0),
-    averageRating: Number(shop?.averageRating || 0),
+    tongDG: Number(shop?.tongDG || 0),
+    diemTB: Number(shop?.diemTB || 0),
     action: extras.action || "updated",
   };
 }
@@ -303,7 +303,7 @@ async function assertPurchasedProduct(user, { productId, reservationId, shopId }
     filter._id = pickString(reservationId);
   }
 
-  const reservation = await Reservation.findOne(filter).sort({ completedAt: -1, UpdatedAt: -1 });
+  const reservation = await Reservation.findOne(filter).sort({ tgNhanHang: -1, updatedAt: -1 });
   if (!reservation) {
     throw createServiceError("Chỉ đánh giá được sản phẩm bạn đã mua / nhận hàng.", 403);
   }
@@ -416,7 +416,7 @@ async function createBuyerReview(user, payload = {}) {
   const images = await replaceReviewImages(review._id, collectImageInputs(payload));
   let shop = await refreshShopReviewStats(shopId);
   if (!shop?.userId && shopId) {
-    shop = await ShopProfile.findById(shopId).select("userId totalReviews averageRating shopName");
+    shop = await ShopProfile.findById(shopId).select("userId tongDG diemTB shopName");
   }
   await Reservation.updateOne(
     { _id: reservation._id },

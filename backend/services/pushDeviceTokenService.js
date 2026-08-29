@@ -1,4 +1,5 @@
 const PushDeviceToken = require("../models/PushDeviceToken");
+const mongoose = require("mongoose");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -18,9 +19,24 @@ function normalizePlatform(platform) {
   return "unknown";
 }
 
-async function registerDeviceToken(userId, { token, platform } = {}) {
-  const normalizedToken = pickString(token);
+function normalizeUserId(userId) {
   if (!userId) {
+    return null;
+  }
+  if (userId instanceof mongoose.Types.ObjectId) {
+    return userId;
+  }
+  const text = String(userId).trim();
+  if (!text || !mongoose.Types.ObjectId.isValid(text)) {
+    return null;
+  }
+  return new mongoose.Types.ObjectId(text);
+}
+
+async function registerDeviceToken(userId, { token, platform } = {}) {
+  const normalizedUserId = normalizeUserId(userId);
+  const normalizedToken = pickString(token);
+  if (!normalizedUserId) {
     throw createServiceError("Thiếu người dùng.", 400);
   }
   if (!normalizedToken) {
@@ -30,7 +46,7 @@ async function registerDeviceToken(userId, { token, platform } = {}) {
   const doc = await PushDeviceToken.findOneAndUpdate(
     { token: normalizedToken },
     {
-      userId,
+      userId: normalizedUserId,
       token: normalizedToken,
       platform: normalizePlatform(platform),
       UpdatedAt: new Date(),
@@ -47,13 +63,14 @@ async function registerDeviceToken(userId, { token, platform } = {}) {
 }
 
 async function removeDeviceToken(userId, token) {
+  const normalizedUserId = normalizeUserId(userId);
   const normalizedToken = pickString(token);
-  if (!userId || !normalizedToken) {
+  if (!normalizedUserId || !normalizedToken) {
     return { removed: 0 };
   }
 
   const result = await PushDeviceToken.deleteOne({
-    userId,
+    userId: normalizedUserId,
     token: normalizedToken,
   });
 
@@ -61,11 +78,14 @@ async function removeDeviceToken(userId, token) {
 }
 
 async function listTokensForUser(userId) {
-  if (!userId) {
+  const normalizedUserId = normalizeUserId(userId);
+  if (!normalizedUserId) {
     return [];
   }
 
-  const docs = await PushDeviceToken.find({ userId }).select("token platform UpdatedAt").lean();
+  const docs = await PushDeviceToken.find({ userId: normalizedUserId })
+    .select("token platform UpdatedAt")
+    .lean();
   return docs.map((doc) => ({
     id: String(doc._id),
     token: doc.token,

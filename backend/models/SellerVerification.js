@@ -14,15 +14,19 @@ const SellerVerificationSchema = new mongoose.Schema({
     index: true,
   },
 
-  // URL ảnh CCCD mặt trước.
-  cccdFrontImage: { type: String, default: "" },
-  // URL ảnh CCCD mặt sau.
-  cccdBackImage: { type: String, default: "" },
+  // URL ảnh CCCD mặt trước / sau.
+  anhCccdTruoc: { type: String, default: "" },
+  anhCccdSau: { type: String, default: "" },
   // URL ảnh selfie cầm CCCD / xác minh khuôn mặt.
   selfieImage: { type: String, default: "" },
 
+  // Họ tên in trên CCCD/CMND (KYC).
+  fullName: { type: String, default: "", trim: true },
+  // Số CCCD/CMND (chỉ chữ số, 9 hoặc 12).
+  cccdNumber: { type: String, default: "", trim: true, index: true },
+
   // URL ảnh giấy phép kinh doanh hoặc giấy chứng nhận ATTP.
-  businessImage: { type: String, default: "" },
+  anhKD: { type: String, default: "" },
 
   // Danh mục kinh doanh đề xuất (ref ShopCategory).
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopCategory" },

@@ -473,9 +473,9 @@ export default function SellerBannerScreen({ onBack, onOpenWallet, onOpenSubscri
                     : 'Gói này không còn chỉnh sửa được.'}
             </Text>
           )}
-          {selectedBanner.lifecycle === 'rejected' && selectedBanner.violationReason ? (
+          {selectedBanner.lifecycle === 'rejected' && selectedBanner.lyDoVP ? (
             <Text style={styles.rejectReason}>
-              Admin từ chối: {selectedBanner.violationReason}. Hãy sửa rồi gửi lại.
+              Admin từ chối: {selectedBanner.lyDoVP}. Hãy sửa rồi gửi lại.
             </Text>
           ) : null}
         </View>
@@ -610,8 +610,8 @@ export default function SellerBannerScreen({ onBack, onOpenWallet, onOpenSubscri
                         </Text>
                       </>
                     ) : null}
-                    {banner.lifecycle === 'rejected' && banner.violationReason ? (
-                      <Text style={styles.rejectReason}>Lý do: {banner.violationReason}</Text>
+                    {banner.lifecycle === 'rejected' && banner.lyDoVP ? (
+                      <Text style={styles.rejectReason}>Lý do: {banner.lyDoVP}</Text>
                     ) : null}
                   </Pressable>
                 ))

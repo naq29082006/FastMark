@@ -82,7 +82,7 @@ export default function AnalyticsPage() {
     () => [
       { key: 'users', title: 'Người dùng', value: cards.totalUsers },
       { key: 'shops', title: 'Gian hàng', value: cards.totalShops },
-      { key: 'products', title: 'Sản phẩm', value: cards.totalProducts },
+      { key: 'products', title: 'Sản phẩm', value: cards.tongSP },
       { key: 'reservations', title: 'Tổng đơn hàng', value: cards.totalReservations },
       {
         key: 'disputes',

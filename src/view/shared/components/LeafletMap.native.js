@@ -21,6 +21,8 @@ function parseMapMessage(data) {
   }
 }
 
+const MAP_USER_AGENT = 'FastMark/1.0 (Mobile; ReactNativeWebView)';
+
 export default function LeafletMap({
   currentLocation,
   radiusCircle,
@@ -133,6 +135,14 @@ export default function LeafletMap({
   }, [currentLocation, followUser, navigationMode, ready, sendNavLocationUpdate]);
 
   useEffect(() => {
+    if (!ready || !shouldAutoRecenter || navigationMode) {
+      return;
+    }
+
+    sendCommand({ type: 'invalidateSize' });
+  }, [shouldAutoRecenter, navigationMode, ready]);
+
+  useEffect(() => {
     if (!shouldAutoRecenter || navigationMode || !ready || !hasValidLocation(currentLocation)) {
       return;
     }
@@ -236,9 +246,14 @@ export default function LeafletMap({
         style={styles.webView}
         source={{ html }}
         originWhitelist={['*']}
+        userAgent={MAP_USER_AGENT}
         javaScriptEnabled
         domStorageEnabled
         mixedContentMode="always"
+        cacheEnabled
+        scrollEnabled={false}
+        bounces={false}
+        overScrollMode="never"
         setSupportMultipleWindows={false}
         pointerEvents={interactive ? 'auto' : 'none'}
         onLoadEnd={() => {
@@ -267,6 +282,6 @@ const styles = StyleSheet.create({
   },
   webView: {
     flex: 1,
-    backgroundColor: '#eef2f0',
+    backgroundColor: '#f2efe9',
   },
 });

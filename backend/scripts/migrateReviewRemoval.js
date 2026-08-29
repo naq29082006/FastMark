@@ -1,5 +1,5 @@
 /**
- * Migrate Review removal fields → mẫu Product (removedBy / adminRemovalReason / removedAt).
+ * Migrate Review removal fields → mẫu Product (removedBy / lyDoGo / removedAt).
  * Usage: node backend/scripts/migrateReviewRemoval.js
  */
 require("../config/env");
@@ -19,7 +19,7 @@ async function migrateReviewRemoval() {
   for await (const doc of cursor) {
     const $set = {};
     const $unset = {};
-    const reason = pickString(doc.adminRemovalReason || doc.moderationReason);
+    const reason = pickString(doc.lyDoGo || doc.moderationReason);
     const removedAt = doc.removedAt || doc.deletedAt || null;
     const softDeleted =
       Number(doc.isDeleted) === RECORD_STATUS.HIDDEN || doc.isDeleted === true;
@@ -35,8 +35,8 @@ async function migrateReviewRemoval() {
       }
     }
 
-    if (reason && !pickString(doc.adminRemovalReason)) {
-      $set.adminRemovalReason = reason;
+    if (reason && !pickString(doc.lyDoGo)) {
+      $set.lyDoGo = reason;
     }
 
     if (removedAt && !doc.removedAt) {

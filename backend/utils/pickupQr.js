@@ -16,7 +16,7 @@ function buildOrderCode(reservationId) {
   if (!id) {
     return "";
   }
-  return `FM-${id.slice(-8).toUpperCase()}`;
+  return id.slice(-8).toUpperCase();
 }
 
 /** QR đơn hàng — buyer hiển thị, seller quét. */

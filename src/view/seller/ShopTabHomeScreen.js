@@ -103,12 +103,12 @@ export default function ShopTabHomeScreen({
 
   const reservations = stats?.reservations || {};
   const orderCount = String(reservations.total ?? 0);
-  const productCount = String(stats?.totalProducts ?? profile?.totalProducts ?? 0);
+  const productCount = String(stats?.tongSP ?? profile?.tongSP ?? 0);
   const ratingValue =
-    Number(stats?.averageRating ?? profile?.averageRating ?? 0) > 0
-      ? Number(stats?.averageRating ?? profile?.averageRating).toFixed(1)
+    Number(stats?.diemTB ?? profile?.diemTB ?? 0) > 0
+      ? Number(stats?.diemTB ?? profile?.diemTB).toFixed(1)
       : '—';
-  const reviewCount = stats?.totalReviews ?? profile?.totalReviews ?? 0;
+  const reviewCount = stats?.tongDG ?? profile?.tongDG ?? 0;
 
   return (
     <View style={styles.screen}>

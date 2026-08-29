@@ -33,12 +33,12 @@ router.post(
 );
 router.get(
   "/shop-lock-appeal",
-  verifyFirebaseToken,
+  verifyFirebaseTokenAllowBlocked,
   asyncHandler(authController.getShopLockAppealStatus)
 );
 router.post(
   "/shop-lock-appeal",
-  verifyFirebaseToken,
+  verifyFirebaseTokenAllowBlocked,
   asyncHandler(authController.createShopLockAppeal)
 );
 

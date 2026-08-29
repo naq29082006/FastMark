@@ -17,6 +17,7 @@ exports.getRoute = async (req, res) => {
     fromLng: from.lng,
     toLat: to.lat,
     toLng: to.lng,
+    profile: req.query.profile,
   });
 
   if (!geometry?.coordinates?.length) {

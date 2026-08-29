@@ -11,7 +11,7 @@ const SYSTEM_CONFIG = [
     note: 'Mặc định 0% nếu shop chưa cấu hình',
   },
   {
-    key: 'escrowProtectionDays',
+    key: 'soNgayKN',
     label: 'Số ngày bảo vệ escrow',
     value: '7 ngày',
     note: 'DEFAULT_ESCROW_PROTECTION_DAYS',
@@ -31,7 +31,7 @@ const SYSTEM_CONFIG = [
   {
     key: 'disputeWindowHours',
     label: 'Cửa sổ khiếu nại sau pickup',
-    value: '24 giờ',
+    value: '48 giờ',
     note: 'RESERVATION_DISPUTE_WINDOW_HOURS',
   },
   {

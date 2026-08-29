@@ -60,7 +60,14 @@ export default function useLocationWatcher({
       }
 
       const dist = calculateDistanceMeters(prev, loc);
-      if (dist !== null && dist < config.minMovementMeters) {
+      const prevHeading = Number(prev.heading);
+      const nextHeading = Number(loc.heading);
+      const headingChanged =
+        Number.isFinite(nextHeading) &&
+        nextHeading >= 0 &&
+        (!Number.isFinite(prevHeading) || Math.abs(nextHeading - prevHeading) >= 6);
+
+      if (dist !== null && dist < config.minMovementMeters && !headingChanged) {
         return;
       }
 

@@ -29,7 +29,7 @@ export function canReviewPurchaseOrder(order) {
 }
 
 export function canReviewReservationOrder(order) {
-  const reasonCode = String(order?.cancelReason || '').trim();
+  const reasonCode = String(order?.reasonCode || order?.cancelType || '').trim();
   if (reasonCode === 'buyer_forfeit') {
     return false;
   }
@@ -89,10 +89,12 @@ export function canShowReviewButton(order, reviewedOrderCodes) {
 
 /** Còn bản ghi Review active trong DB theo reservationId → hiện「Xem đánh giá」. */
 export function canViewExistingReview(order, reviewsByOrderId) {
-  if (!canReviewOrder(order)) {
-    return false;
-  }
   return hasActiveReviewOnOrder(order, reviewsByOrderId);
+}
+
+/** Khiếu nại và đánh giá độc lập — đã đánh giá vẫn có thể khiếu nại. */
+export function canShowComplaintButton(_order, _reviewsByOrderId = null) {
+  return true;
 }
 
 export function buildViewReviewPayload(order, reviewsByOrderId, extras = {}) {

@@ -114,14 +114,14 @@ function toClientShopCard(owner, shop, extra = {}) {
     fullName: owner?.FullName || "",
     userName: owner?.UserName || "",
     avatar: owner?.Avatar || "",
-    followersCount: Number(shop?.followersCount) || 0,
-    followingCount: Number(owner?.FollowingCount) || 0,
+    soNguoiTheo: Number(shop?.soNguoiTheo) || 0,
+    followingCount: Number(owner?.SoTheoDoi) || 0,
     shopName: resolveShopDisplayName(shop, owner),
     shopUsername: resolveShopUsername(shop, owner),
     shopAvatar: resolveShopAvatar(shop, owner),
     address: shop?.addressHeThong || shop?.address || shop?.DiaChiHeThong || "",
-    averageRating: Number(shop?.averageRating) || 0,
-    totalProducts: Number(shop?.totalProducts) || 0,
+    diemTB: Number(shop?.diemTB) || 0,
+    tongSP: Number(shop?.tongSP) || 0,
     ...extra,
   };
 }
@@ -208,13 +208,13 @@ async function followShop(currentUser, payload = {}) {
 
       await User.updateOne(
         { _id: followerObjectId },
-        { $inc: { FollowingCount: 1 }, $set: { UpdatedAt: now } },
+        { $inc: { SoTheoDoi: 1 }, $set: { UpdatedAt: now } },
         options
       );
 
       await ShopProfile.updateOne(
         { _id: shopObjectId },
-        { $inc: { followersCount: 1 }, $set: { UpdatedAt: now } },
+        { $inc: { soNguoiTheo: 1 }, $set: { UpdatedAt: now } },
         options
       );
     });
@@ -245,8 +245,8 @@ async function followShop(currentUser, payload = {}) {
     followedUserId: String(owner._id),
     user: toClientShopCard(owner, freshShop || shop),
     shop: toClientShopCard(owner, freshShop || shop),
-    followersCount: Number(freshShop?.followersCount ?? shop.followersCount) || 0,
-    followingCount: Number(freshFollower?.FollowingCount) || 0,
+    soNguoiTheo: Number(freshShop?.soNguoiTheo ?? shop.soNguoiTheo) || 0,
+    followingCount: Number(freshFollower?.SoTheoDoi) || 0,
   };
 }
 
@@ -276,14 +276,14 @@ async function unfollowShop(currentUser, payload = {}) {
 
     const now = new Date();
     await User.updateOne(
-      { _id: followerObjectId, FollowingCount: { $gt: 0 } },
-      { $inc: { FollowingCount: -1 }, $set: { UpdatedAt: now } },
+      { _id: followerObjectId, SoTheoDoi: { $gt: 0 } },
+      { $inc: { SoTheoDoi: -1 }, $set: { UpdatedAt: now } },
       options
     );
 
     await ShopProfile.updateOne(
-      { _id: shopObjectId, followersCount: { $gt: 0 } },
-      { $inc: { followersCount: -1 }, $set: { UpdatedAt: now } },
+      { _id: shopObjectId, soNguoiTheo: { $gt: 0 } },
+      { $inc: { soNguoiTheo: -1 }, $set: { UpdatedAt: now } },
       options
     );
   });
@@ -299,8 +299,8 @@ async function unfollowShop(currentUser, payload = {}) {
     followedUserId: owner?._id ? String(owner._id) : "",
     user: owner ? toClientShopCard(owner, freshShop || shop) : null,
     shop: owner ? toClientShopCard(owner, freshShop || shop) : null,
-    followersCount: Number(freshShop?.followersCount ?? shop.followersCount) || 0,
-    followingCount: Number(freshFollower?.FollowingCount) || 0,
+    soNguoiTheo: Number(freshShop?.soNguoiTheo ?? shop.soNguoiTheo) || 0,
+    followingCount: Number(freshFollower?.SoTheoDoi) || 0,
   };
 }
 
@@ -319,13 +319,13 @@ async function getFollowStatus(currentUser, payload = {}) {
       }))
   );
 
-  const freshShop = await ShopProfile.findById(shop._id).select("followersCount").lean();
+  const freshShop = await ShopProfile.findById(shop._id).select("soNguoiTheo").lean();
 
   return {
     shopId: String(shop._id),
     followedUserId: owner?._id ? String(owner._id) : "",
     isFollowing,
-    followersCount: Number(freshShop?.followersCount ?? shop.followersCount) || 0,
+    soNguoiTheo: Number(freshShop?.soNguoiTheo ?? shop.soNguoiTheo) || 0,
   };
 }
 

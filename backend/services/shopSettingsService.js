@@ -72,7 +72,7 @@ function toPublicShopSettings(shop, user) {
     closeTime: shop.closeTime || "",
     isOpen: Number(shop.isOpen) === SHOP_OPEN.OPEN ? 1 : 0,
     status: shop.status ?? 1,
-    followersCount: Number(shop.followersCount) || 0,
+    soNguoiTheo: Number(shop.soNguoiTheo) || 0,
     depositPercent,
     cocTien: depositPercent,
     qrCodeValue: shopQrId,

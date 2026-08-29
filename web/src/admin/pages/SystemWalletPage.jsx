@@ -91,8 +91,8 @@ export default function SystemWalletPage() {
     },
     {
       title: 'Ngày cọc',
-      dataIndex: 'depositPaidAt',
-      key: 'depositPaidAt',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
       render: formatDateTime,
     },
   ];

@@ -64,7 +64,7 @@ function computePromotionPriceFromPercent(originalPrice, discountPercent) {
 }
 
 /** Legacy: giá KM → % giảm (làm tròn xuống). */
-function computeDiscountPercent(originalPrice, promotionPrice) {
+function computePtGiam(originalPrice, promotionPrice) {
   const original = Number(originalPrice) || 0;
   const promo = Number(promotionPrice) || 0;
   if (original <= 0 || promo < 0 || promo >= original) {
@@ -81,8 +81,8 @@ function isPromotionActiveNow(product, now = new Date()) {
   if (!flagged) {
     return false;
   }
-  const start = product.PromotionStartDate ?? product.promotionStartDate;
-  const end = product.PromotionEndDate ?? product.promotionEndDate;
+  const start = product.NgayKmBD ?? product.promotionStartDate;
+  const end = product.NgayKmKT ?? product.promotionEndDate;
   if (start && new Date(start) > now) {
     return false;
   }
@@ -107,7 +107,7 @@ function buildAdminProductPriceFields(product, now = new Date()) {
   const minPrice = Number(product.MinPrice ?? product.minPrice) || 0;
   const maxPrice = Number(product.MaxPrice ?? product.maxPrice) || 0;
   const active = isPromotionActiveNow(product, now);
-  const discountPercent = active ? Number(product.DiscountPercent ?? product.discountPercent) || 0 : 0;
+  const discountPercent = active ? Number(product.PtGiam ?? product.discountPercent) || 0 : 0;
   const isPromotion = active && discountPercent > 0;
   const promotionMinPrice = isPromotion
     ? computePromotionPriceFromPercent(minPrice, discountPercent)
@@ -138,7 +138,7 @@ function getPromotionalUnitPrice(product, variantPrice, now = new Date()) {
   if (!isPromotionActiveNow(product, now) || base <= 0) {
     return base;
   }
-  const percent = Number(product.DiscountPercent) || 0;
+  const percent = Number(product.PtGiam) || 0;
   if (percent > 0) {
     return Math.max(0, Math.round(base * (1 - percent / 100)));
   }
@@ -147,9 +147,9 @@ function getPromotionalUnitPrice(product, variantPrice, now = new Date()) {
 
 function clearPromotionFields(product) {
   product.IsPromotion = false;
-  product.DiscountPercent = 0;
-  product.PromotionStartDate = null;
-  product.PromotionEndDate = null;
+  product.PtGiam = 0;
+  product.NgayKmBD = null;
+  product.NgayKmKT = null;
 }
 
 /**
@@ -181,7 +181,7 @@ function normalizePromotionPayload(payload = {}, fallbackOriginal = 0) {
   }
 
   let discountPercent = pickNumber(
-    payload.discountPercent ?? payload.DiscountPercent ?? payload.percent
+    payload.discountPercent ?? payload.PtGiam ?? payload.percent
   );
   let promotionPrice = pickNumber(
     payload.promotionPrice ?? payload.PromotionPrice
@@ -202,7 +202,7 @@ function normalizePromotionPayload(payload = {}, fallbackOriginal = 0) {
     if (promotionPrice >= originalPrice) {
       throw createServiceError("Giá khuyến mãi phải nhỏ hơn giá gốc.");
     }
-    discountPercent = computeDiscountPercent(originalPrice, promotionPrice);
+    discountPercent = computePtGiam(originalPrice, promotionPrice);
     if (discountPercent < 1) {
       throw createServiceError("Mức giảm quá nhỏ (cần ít nhất 1%).");
     }
@@ -211,8 +211,8 @@ function normalizePromotionPayload(payload = {}, fallbackOriginal = 0) {
     throw createServiceError("Vui lòng nhập phần trăm giảm giá.");
   }
 
-  const startRaw = payload.promotionStartDate ?? payload.PromotionStartDate;
-  const endRaw = payload.promotionEndDate ?? payload.PromotionEndDate;
+  const startRaw = payload.promotionStartDate ?? payload.NgayKmBD;
+  const endRaw = payload.promotionEndDate ?? payload.NgayKmKT;
   const promotionStartDate = startRaw ? new Date(startRaw) : new Date();
   const promotionEndDate = endRaw ? new Date(endRaw) : null;
 
@@ -246,9 +246,9 @@ function applyPromotionToProduct(product, normalized) {
     clearPromotionFields(product);
     return product;
   }
-  product.DiscountPercent = normalized.discountPercent;
-  product.PromotionStartDate = normalized.promotionStartDate;
-  product.PromotionEndDate = normalized.promotionEndDate;
+  product.PtGiam = normalized.discountPercent;
+  product.NgayKmBD = normalized.promotionStartDate;
+  product.NgayKmKT = normalized.promotionEndDate;
   return product;
 }
 
@@ -259,7 +259,7 @@ function attachPromotionDto(dto, product, now = new Date()) {
   const originalMax =
     Number(dto.maxPrice) || Number(product.MaxPrice ?? product.maxPrice) || originalMin;
   const discountPercent = active
-    ? Number(product.DiscountPercent ?? product.discountPercent) || 0
+    ? Number(product.PtGiam ?? product.discountPercent) || 0
     : 0;
   let promotionMinPrice = null;
   let promotionMaxPrice = null;
@@ -277,8 +277,8 @@ function attachPromotionDto(dto, product, now = new Date()) {
     promotionMinPrice: active ? promotionMinPrice : null,
     promotionMaxPrice: active ? promotionMaxPrice : null,
     discountPercent: active && discountPercent > 0 ? discountPercent : 0,
-    promotionStartDate: product.PromotionStartDate ?? product.promotionStartDate ?? null,
-    promotionEndDate: product.PromotionEndDate ?? product.promotionEndDate ?? null,
+    promotionStartDate: product.NgayKmBD ?? product.promotionStartDate ?? null,
+    promotionEndDate: product.NgayKmKT ?? product.promotionEndDate ?? null,
     displayPrice: active && promotionMinPrice != null ? promotionMinPrice : dto.minPrice,
     price: active && promotionMinPrice != null ? promotionMinPrice : dto.minPrice,
   };
@@ -317,7 +317,7 @@ async function expireDuePromotions({ limit = 300 } = {}) {
   const now = new Date();
   const due = await Product.find({
     IsPromotion: true,
-    PromotionEndDate: { $ne: null, $lt: now },
+    NgayKmKT: { $ne: null, $lt: now },
   })
     .limit(limit)
     .select("_id");
@@ -331,7 +331,7 @@ async function expireDuePromotions({ limit = 300 } = {}) {
     {
       $set: {
         IsPromotion: false,
-        DiscountPercent: 0,
+        PtGiam: 0,
         UpdatedAt: now,
       },
     }
@@ -344,7 +344,7 @@ async function ensureProductPromotionFresh(product) {
     return product;
   }
   const now = new Date();
-  if (product.PromotionEndDate && new Date(product.PromotionEndDate) < now) {
+  if (product.NgayKmKT && new Date(product.NgayKmKT) < now) {
     clearPromotionFields(product);
     product.UpdatedAt = now;
     await product.save();
@@ -360,12 +360,12 @@ function activePromotionFilter(now = new Date()) {
     $and: [
       {
         $or: [
-          { PromotionStartDate: null },
-          { PromotionStartDate: { $lte: now } },
+          { NgayKmBD: null },
+          { NgayKmBD: { $lte: now } },
         ],
       },
       {
-        $or: [{ PromotionEndDate: null }, { PromotionEndDate: { $gte: now } }],
+        $or: [{ NgayKmKT: null }, { NgayKmKT: { $gte: now } }],
       },
     ],
   };
@@ -389,7 +389,7 @@ async function listActivePromotions({
   const total = await Product.countDocuments(filter);
   const consumed = (safePage - 1) * safeLimit;
   const take = Math.min(safeLimit, Math.max(0, total - consumed));
-  const stableSort = { DiscountPercent: -1, UpdatedAt: -1, _id: -1 };
+  const stableSort = { PtGiam: -1, UpdatedAt: -1, _id: -1 };
   let rows = [];
 
   if (take > 0) {
@@ -506,7 +506,7 @@ async function listShopPromotions(shopId, { limit = 80 } = {}) {
     ShopId: shopId,
     ...activePromotionFilter(now),
   })
-    .sort({ DiscountPercent: -1, UpdatedAt: -1 })
+    .sort({ PtGiam: -1, UpdatedAt: -1 })
     .limit(Math.min(100, Number(limit) || 80))
     .lean();
 
@@ -580,14 +580,14 @@ async function bulkSetProductPromotions(user, payload = {}) {
   }
 
   const discountPercent = Math.round(
-    Number(payload.discountPercent ?? payload.DiscountPercent ?? payload.percent)
+    Number(payload.discountPercent ?? payload.PtGiam ?? payload.percent)
   );
   if (!Number.isFinite(discountPercent) || discountPercent < 1 || discountPercent > 99) {
     throw createServiceError("Phần trăm giảm giá phải từ 1 đến 99.");
   }
 
-  const startRaw = payload.promotionStartDate ?? payload.PromotionStartDate ?? payload.startDate;
-  const endRaw = payload.promotionEndDate ?? payload.PromotionEndDate ?? payload.endDate;
+  const startRaw = payload.promotionStartDate ?? payload.NgayKmBD ?? payload.startDate;
+  const endRaw = payload.promotionEndDate ?? payload.NgayKmKT ?? payload.endDate;
   const promotionStartDate = startRaw ? new Date(startRaw) : new Date();
   const promotionEndDate = endRaw ? new Date(endRaw) : null;
 
@@ -650,7 +650,7 @@ async function bulkSetProductPromotions(user, payload = {}) {
 }
 
 module.exports = {
-  computeDiscountPercent,
+  computePtGiam,
   computePromotionPriceFromPercent,
   normalizePromotionPayload,
   applyPromotionToProduct,

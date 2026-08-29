@@ -38,27 +38,23 @@ const WithdrawRequestSchema = new mongoose.Schema({
     index: true,
   },
   // Giao dịch ví loại WITHDRAWAL (PENDING → SUCCESS/CANCELLED).
-  walletTransactionId: {
+  gdViId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "WalletTransaction",
     default: null,
   },
-  // Giao dịch hoàn khi admin từ chối.
-  refundTransactionId: {
+  gdHoanId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "WalletTransaction",
     default: null,
   },
-  // Ghi chú admin khi duyệt/từ chối (hiện trên app).
   adminNote: { type: String, default: "", trim: true },
-  // Admin xử lý yêu cầu (ref User).
-  processedBy: {
+  xuLyBoi: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     default: null,
   },
-  // Thời điểm admin duyệt hoặc từ chối.
-  processedAt: { type: Date, default: null },
+  tgXuLy: { type: Date, default: null },
   // Thời điểm tạo yêu cầu.
   CreatedAt: { type: Date, default: Date.now },
   // Thời điểm cập nhật gần nhất (auto trong pre-save).

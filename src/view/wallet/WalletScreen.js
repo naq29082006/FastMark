@@ -1,6 +1,5 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
   ActivityIndicator,
   Pressable,
   RefreshControl,
@@ -21,7 +20,14 @@ import { showErrorAlert } from '../../core/utils/appAlert';
 import WalletTransactionDetailScreen from './WalletTransactionDetailScreen';
 import WalletTransactionRow from './WalletTransactionRow';
 
-export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTransactions }) {
+export default function WalletScreen({
+  onBack,
+  onTopUp,
+  onWithdraw,
+  onSeeAllTransactions,
+  canWithdraw = true,
+  canTopUp = true,
+}) {
   const insets = useScreenInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,6 +75,9 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
     );
   }
 
+  const showTopUp = canTopUp && Boolean(onTopUp);
+  const showWithdraw = canWithdraw && Boolean(onWithdraw);
+
   return (
     <View style={styles.screen}>
       <SubScreenHeader title="Ví FastMark" onBack={onBack} />
@@ -97,21 +106,25 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Tổng số dư</Text>
             <Text style={styles.balanceValue}>{formatPrice(wallet.balance)}</Text>
-            <View style={styles.actionRow}>
+            <View
+              style={[
+                styles.actionRow,
+                showTopUp && showWithdraw ? styles.actionRowSpread : styles.actionRowStart,
+              ]}
+            >
+              {showTopUp ? (
               <Pressable style={styles.actionItem} onPress={onTopUp}>
                 <View style={styles.actionBtn}>
                   <Ionicons name="add" size={22} color={t.primaryDark} />
                 </View>
                 <Text style={styles.actionLabel}>Nạp tiền</Text>
               </Pressable>
+              ) : null}
+              {showWithdraw ? (
               <Pressable
                 style={styles.actionItem}
                 onPress={() => {
-                  if (onWithdraw) {
-                    onWithdraw();
-                    return;
-                  }
-                  Alert.alert('Thông báo', 'Không mở được màn rút tiền.');
+                  onWithdraw();
                 }}
               >
                 <View style={styles.actionBtn}>
@@ -119,6 +132,7 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
                 </View>
                 <Text style={styles.actionLabel}>Rút tiền</Text>
               </Pressable>
+              ) : null}
             </View>
           </View>
 
@@ -168,7 +182,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 20,
   },
-  actionRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  actionRow: { flexDirection: 'row' },
+  actionRowSpread: { justifyContent: 'space-around' },
+  actionRowStart: { justifyContent: 'flex-start', gap: 28 },
   actionItem: { alignItems: 'center', gap: 8 },
   actionBtn: {
     width: 48,

@@ -90,7 +90,6 @@ function CategoryPanel({ type, showIcon = false }) {
       const token = await getIdToken();
       const payload = {
         name,
-        categoryName: name,
         description: form.description.trim(),
       };
 

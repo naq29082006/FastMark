@@ -9,6 +9,14 @@ async function syncReviewCollectionIndexes(connection) {
   }
 
   const reviews = db.collection("reviews");
+
+  try {
+    await reviews.updateMany({ isDeleted: { $exists: false } }, { $set: { isDeleted: 1 } });
+    await reviews.updateMany({ isDeleted: false }, { $set: { isDeleted: 1 } });
+  } catch (error) {
+    console.warn("Could not normalize reviews isDeleted:", error.message);
+  }
+
   let indexes = [];
   try {
     indexes = await reviews.indexes();
@@ -58,13 +66,7 @@ async function syncReviewCollectionIndexes(connection) {
       options: {
         name: "reservationId_1_active",
         unique: true,
-        partialFilterExpression: {
-          $or: [
-            { isDeleted: 1 },
-            { isDeleted: false },
-            { isDeleted: { $exists: false } },
-          ],
-        },
+        partialFilterExpression: { isDeleted: 1 },
       },
     },
   ];

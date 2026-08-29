@@ -53,9 +53,11 @@ export default function TopUpSuccessScreen({
   }
 
   async function handleBackHome() {
-    if (!resume) {
-      await clearReservationResume();
+    if (resume) {
+      await handleContinueReservation();
+      return;
     }
+    await clearReservationResume();
     onBackHome?.();
   }
 

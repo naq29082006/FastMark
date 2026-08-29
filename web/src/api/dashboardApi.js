@@ -1,11 +1,11 @@
 import { apiRequest } from './client';
 
-/** Dashboard API chỉ cho phép khoảng tối đa 366 ngày — không gửi from/to khi "Tất cả thời gian". */
+/** Không gửi from/to → toàn bộ dữ liệu (backend `range=all`). */
 export function buildDashboardQuery(from, to) {
   if (from && to) {
     return { from, to };
   }
-  return { range: '30days' };
+  return { range: 'all' };
 }
 
 export function isDashboardAllTime(from, to) {
@@ -35,4 +35,12 @@ export async function getAdminDashboard(token, params = {}) {
     token,
   });
   return payload.data?.dashboard || null;
+}
+
+export async function getAdminPendingCounts(token) {
+  const payload = await apiRequest('/api/admin/pending-counts', {
+    method: 'GET',
+    token,
+  });
+  return payload.data?.counts || null;
 }

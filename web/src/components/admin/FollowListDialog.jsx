@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import AdminPagination from './AdminPagination';
 import { EmptyState } from '../ui/Feedback';
 import { formatDate } from '../../utils/format';
-import { resolveMediaUrl } from '../../utils/resolveMediaUrl';
+import PreviewableImage from '../../components/PreviewableImage';
 
 const TITLES = {
   following: 'Đang theo dõi',
@@ -93,19 +93,21 @@ export default function FollowListDialog({ open, type, entityLabel, loadPage, on
         {!loading && items.length > 0 ? (
           <ul className="follow-list-items">
             {items.map((item) => {
-              const avatarUrl = resolveMediaUrl(item.avatar || item.shopAvatar);
               const displayName = item.fullName || item.shopName || item.userName || 'Người dùng';
               const handle = item.userName || item.shopUsername || '';
               return (
                 <li key={item.id}>
                   <Link className="follow-list-item" to={`/accounts/${item.userId || item.id}`} onClick={onClose}>
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt="" className="follow-list-avatar" />
-                    ) : (
-                      <div className="follow-list-avatar placeholder">
-                        {displayName.charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                    <PreviewableImage
+                      src={item.avatar || item.shopAvatar}
+                      alt={displayName}
+                      width={44}
+                      height={44}
+                      shape="circle"
+                      className="follow-list-avatar"
+                      fallbackLetter={displayName}
+                      fallbackClassName="follow-list-avatar placeholder"
+                    />
                     <div className="follow-list-meta">
                       <strong>{displayName}</strong>
                       {handle ? <span>@{handle}</span> : null}

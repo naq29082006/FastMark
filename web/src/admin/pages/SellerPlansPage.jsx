@@ -7,9 +7,7 @@ import {
   Input,
   InputNumber,
   Modal,
-  Switch,
   Table,
-  Tabs,
   Tag,
   message,
 } from 'antd';
@@ -32,9 +30,15 @@ import { useUrlQueryString } from '../hooks/useUrlQuery';
 import { extractPlansList } from '../utils/apiNormalize';
 import { formatCurrency, formatDateTime, formatNumber } from '../utils/format';
 import { withSttColumn } from '../utils/tableColumns';
+import {
+  ALL_FILTER_VALUE,
+  apiFilterParam,
+  initialFilterValue,
+  withAllFilterOption,
+} from '../utils/filterOptions';
 import { useAuth } from '../../context/AuthContext';
 
-const emptyForm = { name: '', description: '', durationDays: 30, price: 0, isActive: true };
+const emptyForm = { name: '', description: '', durationDays: 30, price: 0 };
 
 const SUBSCRIPTION_STATUS = {
   0: { color: 'orange', label: 'Chờ thanh toán' },
@@ -43,6 +47,11 @@ const SUBSCRIPTION_STATUS = {
   3: { color: 'red', label: 'Đã hủy' },
 };
 
+const SUBSCRIPTION_STATUS_FILTER_OPTIONS = [
+  { value: '1', label: 'Đang hiệu lực' },
+  { value: '2', label: 'Hết hạn' },
+];
+
 function SellerPlansTab() {
   const { getIdToken } = useAuth();
   const [items, setItems] = useState([]);
@@ -50,6 +59,7 @@ function SellerPlansTab() {
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [tablePage, setTablePage] = useState(1);
   const tablePageSize = 10;
   const [form] = Form.useForm();
@@ -87,34 +97,43 @@ function SellerPlansTab() {
       description: record.description,
       durationDays: record.durationDays,
       price: record.price,
-      isActive: record.isActive === 1 || record.isActive === true,
     });
     setOpen(true);
   }
 
+  function closeModal() {
+    setOpen(false);
+    setEditing(null);
+    form.resetFields();
+  }
+
   async function handleSubmit() {
     const values = await form.validateFields();
-    const token = await getIdToken();
-    const body = { ...values, isActive: values.isActive ? 1 : 0 };
+    setSaving(true);
     try {
+      const token = await getIdToken();
       if (editing) {
-        await updateSellerPlan(token, editing.id || editing._id, body);
+        await updateSellerPlan(token, editing.id || editing._id, values);
         message.success('Đã cập nhật gói');
       } else {
-        await createSellerPlan(token, body);
+        await createSellerPlan(token, values);
         message.success('Đã thêm gói');
       }
-      setOpen(false);
+      closeModal();
       load();
     } catch (err) {
       message.error(err.message || 'Lưu thất bại');
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function handleDelete(record) {
+  function confirmDelete(record) {
     Modal.confirm({
-      title: 'Xóa gói dịch vụ?',
-      content: record.name,
+      title: 'Xóa gói dịch vụ',
+      content: `Bạn có chắc muốn xóa "${record.name}"? Gói sẽ được ẩn khỏi hệ thống.`,
+      okText: 'Xác nhận xóa',
+      cancelText: 'Huỷ',
       okType: 'danger',
       onOk: async () => {
         const token = await getIdToken();
@@ -127,13 +146,14 @@ function SellerPlansTab() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Thêm gói
-        </Button>
-      </div>
       {error ? <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} /> : null}
-      <PanelCard>
+      <PanelCard
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Thêm gói
+          </Button>
+        }
+      >
         <Table
           rowKey={(r) => r.id || r._id}
           loading={loading}
@@ -150,20 +170,10 @@ function SellerPlansTab() {
                 render: formatNumber,
               },
               {
-                title: 'Trạng thái',
-                dataIndex: 'isActive',
-                key: 'isActive',
-                render: (v) => (
-                  <Tag color={v === 1 || v === true ? 'green' : 'default'}>
-                    {v === 1 || v === true ? 'Đang bán' : 'Tắt'}
-                  </Tag>
-                ),
-              },
-              {
                 title: 'Thao tác',
                 width: 140,
                 render: (_, record) => (
-                  <RowActions onEdit={() => openEdit(record)} onDelete={() => handleDelete(record)} />
+                  <RowActions onEdit={() => openEdit(record)} onDelete={() => confirmDelete(record)} />
                 ),
               },
             ],
@@ -175,26 +185,24 @@ function SellerPlansTab() {
       <Modal
         title={editing ? 'Sửa gói dịch vụ' : 'Thêm gói dịch vụ'}
         open={open}
-        onCancel={() => setOpen(false)}
+        onCancel={closeModal}
         onOk={handleSubmit}
+        confirmLoading={saving}
         okText="Lưu"
         destroyOnHidden
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Tên gói" rules={[{ required: true }]}>
-            <Input />
+          <Form.Item name="name" label="Tên gói" rules={[{ required: true, message: 'Vui lòng nhập tên gói' }]}>
+            <Input placeholder="VD: Gói 1 tháng" />
           </Form.Item>
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea rows={3} />
+            <Input.TextArea rows={3} placeholder="Mô tả quyền lợi gói bán" />
           </Form.Item>
-          <Form.Item name="durationDays" label="Thời hạn (ngày)" rules={[{ required: true }]}>
+          <Form.Item name="durationDays" label="Thời hạn (ngày)" rules={[{ required: true, message: 'Vui lòng nhập thời hạn' }]}>
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="price" label="Giá (VNĐ)" rules={[{ required: true }]}>
+          <Form.Item name="price" label="Giá (VNĐ)" rules={[{ required: true, message: 'Vui lòng nhập giá gói' }]}>
             <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="isActive" label="Bật gói" valuePropName="checked">
-            <Switch />
           </Form.Item>
         </Form>
       </Modal>
@@ -207,12 +215,17 @@ function SellerSubscriptionsTab() {
   const { getIdToken } = useAuth();
   const urlStatus = useUrlQueryString('status');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(urlStatus);
+  const [status, setStatus] = useState(() => initialFilterValue(urlStatus));
 
   const fetcher = useCallback(
     async ({ page, limit }) => {
       const token = await getIdToken();
-      const payload = await listSellerSubscriptions(token, { page, limit, search, status });
+      const payload = await listSellerSubscriptions(token, {
+        page,
+        limit,
+        search,
+        status: apiFilterParam(status),
+      });
       const data = payload.data || payload || {};
       return {
         data: {
@@ -262,15 +275,12 @@ function SellerSubscriptionsTab() {
               setStatus(v);
               setPage(1);
             },
-            options: Object.entries(SUBSCRIPTION_STATUS).map(([value, meta]) => ({
-              value,
-              label: meta.label,
-            })),
+            options: withAllFilterOption(SUBSCRIPTION_STATUS_FILTER_OPTIONS),
           },
         ]}
         onReset={() => {
           setSearch('');
-          setStatus(undefined);
+          setStatus(ALL_FILTER_VALUE);
           setPage(1);
         }}
       />
@@ -346,19 +356,13 @@ function SellerSubscriptionsTab() {
 }
 
 export default function SellerPlansPage() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const tab = params.get('tab') === 'history' ? 'history' : 'plans';
+  const title = tab === 'history' ? 'Lịch sử gói bán' : 'Gói bán';
 
   return (
-    <PageContainer>
-      <Tabs
-        activeKey={tab}
-        onChange={(key) => setParams({ tab: key })}
-        items={[
-          { key: 'plans', label: 'Gói dịch vụ', children: <SellerPlansTab /> },
-          { key: 'history', label: 'Lịch sử đăng ký', children: <SellerSubscriptionsTab /> },
-        ]}
-      />
+    <PageContainer title={title}>
+      {tab === 'history' ? <SellerSubscriptionsTab /> : <SellerPlansTab />}
     </PageContainer>
   );
 }

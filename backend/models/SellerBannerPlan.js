@@ -53,7 +53,7 @@ const SellerBannerPlanSchema = new mongoose.Schema({
   // Thời điểm admin duyệt treo banner.
   approvedAt: { type: Date, default: null },
   // Lý do admin từ chối / gỡ banner vi phạm.
-  violationReason: { type: String, default: "", trim: true },
+  lyDoVP: { type: String, default: "", trim: true },
 
   // URL ảnh banner.
   image: { type: String, default: "" },

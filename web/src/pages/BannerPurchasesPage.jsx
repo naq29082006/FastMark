@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch';
 import { useAdminDateFilter } from '../hooks/useAdminDateFilter';
 import { formatDate, formatDateDisplay, formatPrice } from '../utils/format';
+import PreviewableImage, { PreviewableImageGrid } from '../components/PreviewableImage';
 
 function formatNumber(value) {
   return new Intl.NumberFormat('vi-VN').format(Number(value) || 0);
@@ -84,15 +85,19 @@ function BannerPurchaseDetailDialog({ row, onClose }) {
               {row.lifecycleLabel || row.statusLabel || ''}
             </span>
           </DetailField>
-          <DetailField label="Lý do vi phạm">{row.violationReason || ''}</DetailField>
+          <DetailField label="Lý do vi phạm">{row.lyDoVP || ''}</DetailField>
         </dl>
 
         {row.image ? (
-          <div className="image-grid account-verify-images">
-            <a href={row.image} target="_blank" rel="noreferrer">
-              <img src={row.image} alt="Banner" />
-            </a>
-          </div>
+          <PreviewableImageGrid
+            className="image-grid account-verify-images"
+            items={[row.image]}
+            width={160}
+            height={96}
+            shape="rounded"
+            getSrc={(url) => url}
+            getAlt={() => 'Banner'}
+          />
         ) : null}
 
         <div className="dialog-actions" style={{ justifyContent: 'flex-start', gap: 8 }}>

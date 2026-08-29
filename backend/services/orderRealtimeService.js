@@ -26,7 +26,7 @@ function buildOrderUpdatedPayload(reservation, extra = {}) {
     status: Number(reservation.status),
     userId: reservation.userId ? String(reservation.userId) : "",
     shopId: reservation.shopId ? String(reservation.shopId) : "",
-    updatedAt: reservation.UpdatedAt || new Date(),
+    updatedAt: reservation.updatedAt || reservation.UpdatedAt || new Date(),
     ...extra,
   };
 }

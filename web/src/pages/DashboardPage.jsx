@@ -24,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAdminRealtimeRefresh } from '../hooks/useAdminRealtimeRefresh';
 import { REALTIME_COALESCE_MS } from '../constants/realtime';
 import { keepIfSame } from '../utils/realtimeList';
+import PreviewableImage from '../components/PreviewableImage';
 
 function formatNumber(value) {
   return new Intl.NumberFormat('vi-VN').format(Number(value) || 0);
@@ -479,10 +480,18 @@ function DailyPerformanceTable({ charts }) {
 }
 
 function RankAvatar({ src, alt, fallback }) {
-  if (src) {
-    return <img className="rank-avatar" src={src} alt={alt} loading="lazy" />;
-  }
-  return <div className="rank-avatar rank-avatar-fallback">{fallback}</div>;
+  return (
+    <PreviewableImage
+      src={src}
+      alt={alt || ''}
+      width={48}
+      height={48}
+      shape="rounded"
+      className="rank-avatar"
+      fallbackLetter={fallback || '?'}
+      fallbackClassName="rank-avatar rank-avatar-fallback"
+    />
+  );
 }
 
 function TopRankPanel({ title, subtitle, rows, renderRow }) {

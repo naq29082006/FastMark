@@ -1,22 +1,71 @@
-import { useMemo } from 'react';
-import { useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, Outlet, useSearchParams } from 'react-router-dom';
 import { Avatar, Badge, Dropdown, Layout, Menu, Space, Typography } from 'antd';
-import { BellOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { BellOutlined, DownOutlined, LogoutOutlined, RightOutlined, UserOutlined } from '@ant-design/icons';
 
-import { buildAdminMenuItems, resolveMenuKey, resolvePageTitle } from '../config/menu';
+import AdminTopbarTrail from '../components/AdminTopbarTrail';
+import { AdminTopbarProvider, useAdminTopbar } from '../context/AdminTopbarContext';
+import { buildAdminMenuItems, navigateMenuKey, resolveMenuKey, resolveOpenMenuKeys, resolvePageTitle } from '../config/menu';
+import { getAdminPendingCounts } from '../../api/dashboardApi';
+import { ADMIN_PENDING_COUNTS_EVENT } from '../utils/pendingCountsRefresh';
 import { useAuth } from '../../context/AuthContext';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
 
-export default function AdminLayout() {
+function AdminLayoutShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { user, logout, getIdToken } = useAuth();
+  const { trail } = useAdminTopbar();
+  const [openKeys, setOpenKeys] = useState([]);
+  const [pendingCounts, setPendingCounts] = useState({
+    sellerVerifications: 0,
+    reports: 0,
+    withdrawCount: 0,
+    bannerPendingReview: 0,
+    disputeAdminQueue: 0,
+  });
 
-  const selectedKey = resolveMenuKey(location.pathname);
-  const pageTitle = resolvePageTitle(location.pathname);
-  const menuItems = useMemo(() => buildAdminMenuItems(), []);
+  const loadPendingCounts = useCallback(async () => {
+    try {
+      const token = await getIdToken();
+      const counts = await getAdminPendingCounts(token);
+      if (counts) {
+        setPendingCounts(counts);
+      }
+    } catch {
+      // Sidebar badges are optional; ignore transient errors.
+    }
+  }, [getIdToken]);
+
+  useEffect(() => {
+    loadPendingCounts();
+    const intervalId = setInterval(loadPendingCounts, 120_000);
+    const onRefresh = () => loadPendingCounts();
+    window.addEventListener(ADMIN_PENDING_COUNTS_EVENT, onRefresh);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener(ADMIN_PENDING_COUNTS_EVENT, onRefresh);
+    };
+  }, [loadPendingCounts]);
+
+  useEffect(() => {
+    loadPendingCounts();
+  }, [location.pathname, loadPendingCounts]);
+
+  const selectedKey = resolveMenuKey(location.pathname, searchParams);
+  const pageTitle = resolvePageTitle(location.pathname, searchParams);
+  const menuItems = useMemo(() => buildAdminMenuItems(pendingCounts), [pendingCounts]);
+
+  useEffect(() => {
+    const active = resolveOpenMenuKeys(location.pathname, searchParams);
+    if (!active.length) {
+      return;
+    }
+    setOpenKeys((prev) => [...new Set([...prev, ...active])]);
+  }, [location.pathname, searchParams]);
 
   const userMenu = {
     items: [
@@ -56,16 +105,33 @@ export default function AdminLayout() {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
+          openKeys={openKeys}
+          onOpenChange={setOpenKeys}
+          expandIcon={({ isOpen }) =>
+            isOpen ? (
+              <DownOutlined className="admin-sidebar-submenu-arrow" />
+            ) : (
+              <RightOutlined className="admin-sidebar-submenu-arrow" />
+            )
+          }
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={({ key }) => {
+            if (String(key).startsWith('/')) {
+              navigateMenuKey(navigate, key);
+            }
+          }}
           className="admin-sidebar-menu"
         />
       </Sider>
       <Layout>
         <Header className="admin-topbar">
-          <Text strong className="admin-topbar-title">
-            {pageTitle}
-          </Text>
+          {trail?.length ? (
+            <AdminTopbarTrail items={trail} />
+          ) : (
+            <Text strong className="admin-topbar-title">
+              {pageTitle}
+            </Text>
+          )}
           <Space size="large" wrap>
             <Badge count={0} size="small">
               <BellOutlined
@@ -86,5 +152,13 @@ export default function AdminLayout() {
         </Content>
       </Layout>
     </Layout>
+  );
+}
+
+export default function AdminLayout() {
+  return (
+    <AdminTopbarProvider>
+      <AdminLayoutShell />
+    </AdminTopbarProvider>
   );
 }

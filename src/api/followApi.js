@@ -46,7 +46,7 @@ export async function getFollowStatusOnBackend(
     AUTH_TIMEOUT_MS
   );
   const payload = await parseApiResponse(response);
-  return payload.data || { isFollowing: false, followersCount: 0 };
+  return payload.data || { isFollowing: false, soNguoiTheo: 0 };
 }
 
 export async function followShopOnBackend({ idToken, shopId, followedUserId, userId }) {

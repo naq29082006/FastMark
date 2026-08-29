@@ -37,31 +37,31 @@ const ReservationDisputeSchema = new mongoose.Schema({
   // —— Khiếu nại buyer (ref User) ——
   buyerUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
   // Mã lý do (enum DISPUTE_REASON_TYPE / RESERVATION_DISPUTE_REASON).
-  buyerReasonType: { type: Number, default: null },
+  maLyDoBuyer: { type: Number, default: null },
   // Nội dung mô tả chi tiết.
   buyerContent: { type: String, default: "", trim: true },
   // Ảnh chứng cứ (URL, tối đa 5).
   buyerImages: embeddedImagesField,
   // Thời điểm buyer gửi khiếu nại.
-  buyerComplaintAt: { type: Date, default: null },
+  tgKnBuyer: { type: Date, default: null },
 
-  // —— Khiếu nại seller (ref ShopProfile, không ref User trực tiếp) ——
+  // —— Khiếu nại seller (pickup) hoặc phản hồi post-delivery (không set maLyDoShop) ——
   sellerShopId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "ShopProfile",
     default: null,
     index: true,
   },
-  // Mã lý do seller (vd: buyer_no_show).
-  sellerReasonType: { type: Number, default: null },
+  // Mã lý do seller khiếu nại pickup (post-delivery phản hồi không dùng field này).
+  maLyDoShop: { type: Number, default: null },
   sellerContent: { type: String, default: "", trim: true },
   sellerImages: embeddedImagesField,
-  // Thời điểm seller gửi khiếu nại.
-  sellerComplaintAt: { type: Date, default: null },
+  // Thời điểm seller khiếu nại pickup hoặc phản hồi post-delivery.
+  tgKnShop: { type: Date, default: null },
 
   /**
    * Loại tranh chấp: pickup (quá giờ nhận) | post_delivery (sau khi đã giao).
-   * post_delivery: buyer khiếu nại → seller phản hồi (sellerResponse*) → admin xử lý.
+   * post_delivery: buyer khiếu nại (tgKnBuyer) → seller phản hồi (sellerContent/tgKnShop) → admin xử lý.
    */
   disputeKind: {
     type: String,
@@ -69,12 +69,6 @@ const ReservationDisputeSchema = new mongoose.Schema({
     default: "pickup",
     index: true,
   },
-  // —— Phản hồi seller cho khiếu nại post-delivery (không phải khiếu nại mới) ——
-  sellerResponseContent: { type: String, default: "", trim: true },
-  sellerResponseImages: embeddedImagesField,
-  sellerRespondedAt: { type: Date, default: null },
-  // Hạn shop phản hồi (= buyerComplaintAt + 2 ngày).
-  sellerResponseDeadlineAt: { type: Date, default: null, index: true },
 
   // Trạng thái tranh chấp (enum DISPUTE_STATUS: chờ / buyer thắng / seller thắng / đóng).
   status: { type: Number, default: 0, index: true },

@@ -192,6 +192,7 @@ export async function refundSellerDisputeDepositOnBackend(idToken, reservationId
 export async function reportBuyerNoShowOnBackend({
   idToken,
   reservationId,
+  reason,
   description,
   note,
   title,
@@ -209,7 +210,8 @@ export async function reportBuyerNoShowOnBackend({
       headers: await authHeaders(idToken),
       body: JSON.stringify({
         reservationId: id,
-        title: title || 'Người mua không đến nhận hàng',
+        reason: reason || undefined,
+        title: title || 'Báo cáo người mua',
         description: description || note || '',
         note: note || description || '',
         images: images || [],

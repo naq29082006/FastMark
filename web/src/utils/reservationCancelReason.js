@@ -1,4 +1,4 @@
-const CANCELLED_STATUSES = new Set([1, 6, 7]);
+const CANCELLED_STATUSES = new Set([5]);
 
 function isTechnicalToken(value) {
   const text = String(value || '').trim();
@@ -22,7 +22,12 @@ export function getAdminReservationCancelReason(item) {
     return '';
   }
 
-  if (item.cancelledBySellerAfterAccept) {
+  if (
+    item.cancelType === 'seller_after_accept' ||
+    item.cancelType === 'seller_cancel_holding' ||
+    item.cancelType === 'seller_refund_after_pickup' ||
+    item.cancelledBySellerAfterAccept
+  ) {
     const sellerNote = pickHumanText(item.cancelNote);
     if (sellerNote) {
       return sellerNote;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
@@ -16,7 +16,9 @@ import { useShopPresence } from '../../hooks/useShopPresence';
 import { useSellerAccessSync } from '../../hooks/useSellerAccessSync';
 import { useAccountStatusSync } from '../../hooks/useAccountStatusSync';
 import { RESERVATION_TAB } from '../../constants/sellerOrders';
+import { toResumeReserveRequest } from '../../viewmodel/buyer/reservationResumeSession';
 import {
+  selectAuthProfile,
   selectCanSwitchToSeller,
   selectIsAccountLocked,
   selectIsSeller,
@@ -30,6 +32,11 @@ import NotificationsScreen from '../inbox/NotificationsScreen';
 import MapScreen from '../map/MapScreen';
 import ProfilePanel from './ProfilePanel';
 import ShopTabPanel from '../seller/ShopTabPanel';
+import WalletTopUpOverlay from '../wallet/WalletTopUpOverlay';
+import {
+  registerWalletTopUpHandler,
+  unregisterWalletTopUpHandler,
+} from '../wallet/walletTopUpBridge';
 
 const ACTIVE_COLOR = '#076F32';
 const INACTIVE_COLOR = '#94A3B8';
@@ -93,6 +100,7 @@ export default function AuthenticatedHome() {
   const isAccountLocked = useSelector(selectIsAccountLocked);
   const canSwitchToSeller = useSelector(selectCanSwitchToSeller);
   const isSeller = useSelector(selectIsSeller);
+  const profile = useSelector(selectAuthProfile);
   const canPost = Boolean(canSwitchToSeller && isSeller);
   const { appMode, setAppMode, isReady } = useAppMode(false);
   const presenceEnabled = !isAccountLocked;
@@ -103,6 +111,9 @@ export default function AuthenticatedHome() {
   const tabs = TABS;
   const [activeTab, setActiveTab] = useState('home');
   const [mapFocusRequest, setMapFocusRequest] = useState(null);
+  const [returnOrdersDetailRequest, setReturnOrdersDetailRequest] = useState(null);
+  const [returnProductsStoreRequest, setReturnProductsStoreRequest] = useState(null);
+  const [profileOpenStoreRequest, setProfileOpenStoreRequest] = useState(null);
   const [productsFocusRequest, setProductsFocusRequest] = useState(null);
   const [sellerRegisterRequest, setSellerRegisterRequest] = useState(0);
   const [productDetailId, setProductDetailId] = useState(null);
@@ -112,6 +123,7 @@ export default function AuthenticatedHome() {
   const [nestedTabState, setNestedTabState] = useState({});
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [buyerOverlay, setBuyerOverlay] = useState(null);
+  const [walletTopUpOverlay, setWalletTopUpOverlay] = useState(null);
   const [profileNavRequest, setProfileNavRequest] = useState(null);
   const [resumeReserveRequest, setResumeReserveRequest] = useState(null);
   /** Giữ product/store nested khi tạm sang nạp ví từ giữ hàng. */
@@ -158,6 +170,10 @@ export default function AuthenticatedHome() {
     setProductsFocusRequest(null);
   }, []);
 
+  const closeWalletTopUpOverlay = useCallback(() => {
+    setWalletTopUpOverlay(null);
+  }, []);
+
   const handleSelectTab = useCallback(
     (nextTab) => {
       if (!nextTab) {
@@ -167,6 +183,14 @@ export default function AuthenticatedHome() {
       // Overlay (Thông báo/Inbox/Sản phẩm) che tab — bấm tab hiện tại cũng phải đóng được.
       if (buyerOverlay) {
         closeBuyerOverlay();
+        if (nextTab === activeTab) {
+          updateNestedTabState(activeTab, false);
+          return;
+        }
+      }
+
+      if (walletTopUpOverlay) {
+        closeWalletTopUpOverlay();
         if (nextTab === activeTab) {
           updateNestedTabState(activeTab, false);
           return;
@@ -214,7 +238,14 @@ export default function AuthenticatedHome() {
       }));
       setActiveTab(nextTab);
     },
-    [activeTab, buyerOverlay, closeBuyerOverlay, updateNestedTabState]
+    [
+      activeTab,
+      buyerOverlay,
+      closeBuyerOverlay,
+      closeWalletTopUpOverlay,
+      updateNestedTabState,
+      walletTopUpOverlay,
+    ]
   );
 
   const loadUnreadBadges = useCallback(async () => {
@@ -318,6 +349,7 @@ export default function AuthenticatedHome() {
       storeId: String(shopId),
       storeName: storeName || 'Gian hàng',
       showDirections: true,
+      returnTo: { tab: activeTab, storeId: String(shopId) },
       at: Date.now(),
     });
     handleSelectTab('home');
@@ -329,9 +361,57 @@ export default function AuthenticatedHome() {
       reservationId,
       storeName,
       showDirections: true,
+      returnTo: {
+        tab: 'orders',
+        storeId: String(shopId),
+        reservationId: reservationId ? String(reservationId) : null,
+        ordersTab: buyerOrdersTab,
+      },
       at: Date.now(),
     });
     handleSelectTab('home');
+  }
+
+  function handleDirectionsStopped(returnTo) {
+    if (!returnTo?.tab) {
+      return;
+    }
+
+    if (returnTo.tab === 'orders') {
+      if (returnTo.ordersTab) {
+        setBuyerOrdersTab(returnTo.ordersTab);
+      }
+      if (returnTo.reservationId) {
+        setReturnOrdersDetailRequest({
+          at: Date.now(),
+          reservationId: String(returnTo.reservationId),
+          tab: returnTo.ordersTab || buyerOrdersTab,
+        });
+      }
+      handleSelectTab('orders');
+      return;
+    }
+
+    if (returnTo.tab === 'products' && returnTo.storeId) {
+      setReturnProductsStoreRequest({
+        at: Date.now(),
+        storeId: String(returnTo.storeId),
+      });
+      handleSelectTab('products');
+      return;
+    }
+
+    if (returnTo.tab === 'profile' && returnTo.storeId) {
+      setProductDetailId(null);
+      setProfileOpenStoreRequest({
+        at: Date.now(),
+        storeId: String(returnTo.storeId),
+      });
+      handleSelectTab('profile');
+      return;
+    }
+
+    handleSelectTab(returnTo.tab);
   }
 
   function handleOpenProductsFromHome(options = {}) {
@@ -395,68 +475,61 @@ export default function AuthenticatedHome() {
     handleSelectTab('profile');
   }
 
-  function handleOpenWalletTopUp(context) {
-    if (context?.productId) {
+  const handleOpenWalletTopUp = useCallback((context) => {
+    const productId = String(context?.productId || '').trim();
+    if (productId) {
       keepNestedAcrossTabsRef.current = true;
       setKeepNestedAcrossTabs(true);
-      handleOpenProfileNav({
-        screen: 'wallet-topup',
-        returnTo: 'reservation',
-      });
+      setWalletTopUpOverlay({ returnTo: 'reservation', at: Date.now() });
       return;
     }
     keepNestedAcrossTabsRef.current = false;
     setKeepNestedAcrossTabs(false);
-    handleOpenProfileNav({
-      screen: 'wallet-topup',
-      returnTo: 'wallet',
-    });
+    setWalletTopUpOverlay({ returnTo: 'wallet', at: Date.now() });
+  }, []);
+
+  useEffect(() => {
+    registerWalletTopUpHandler(handleOpenWalletTopUp);
+    return () => unregisterWalletTopUpHandler();
+  }, [handleOpenWalletTopUp]);
+
+  function handleOpenWalletFromTopUp(screen = 'wallet') {
+    handleOpenProfileNav(screen);
   }
 
   function handleContinueReservationAfterTopUp(payload) {
     keepNestedAcrossTabsRef.current = false;
     setKeepNestedAcrossTabs(false);
+    setProfileNavRequest({ screen: '__clear__', at: Date.now() });
+
     if (!payload?.productId) {
       handleOpenProfileNav({ screen: 'wallet', returnTo: 'wallet' });
       return;
     }
 
-    const resume = {
-      productId: String(payload.productId),
-      variantId: payload.variantId || null,
-      quantity: Number(payload.quantity) || 1,
-      storeId: payload.storeId || null,
-      source: payload.source || 'home',
-      at: Date.now(),
-    };
+    const source = payload.source || 'products';
 
-    setProfileNavRequest({ screen: '__clear__', at: Date.now() });
-    setResumeReserveRequest(resume);
+    if (source === 'map' || source === 'profile') {
+      setResumeReserveRequest(toResumeReserveRequest(payload));
+    }
 
-    const source = resume.source;
-    if (source === 'map' || source === 'home') {
+    if (source === 'map') {
       setProductDetailId(null);
       setBuyerOverlay(null);
       setActiveTab('home');
       return;
     }
 
-    if (source === 'products') {
-      setProductDetailId(null);
-      setActiveTab('products');
-      setBuyerOverlay('products');
-      return;
-    }
-
+    setBuyerOverlay(null);
     if (source === 'profile') {
-      setBuyerOverlay(null);
-      setProductDetailId(resume.productId);
+      setProductDetailId(String(payload.productId));
       setActiveTab('profile');
       return;
     }
-
-    setProductDetailId(null);
-    setBuyerOverlay(null);
+    if (source === 'orders') {
+      setActiveTab('orders');
+      return;
+    }
     setActiveTab('products');
   }
 
@@ -466,6 +539,7 @@ export default function AuthenticatedHome() {
         <MapScreen
           focusStoreRequest={mapFocusRequest}
           onClearFocus={handleClearMapFocus}
+          onDirectionsStopped={handleDirectionsStopped}
           onPickupCompleted={handlePickupCompleted}
           onOpenBuyerOrders={handleOpenBuyerOrders}
           onOpenWalletTopUp={handleOpenWalletTopUp}
@@ -474,9 +548,7 @@ export default function AuthenticatedHome() {
           onOpenFavoriteProducts={() => handleOpenProfileNav('favorite-products')}
           onOpenReport={() => handleOpenProfileNav('account-report')}
           resumeReserveRequest={
-            resumeReserveRequest?.source === 'home' || resumeReserveRequest?.source === 'map'
-              ? resumeReserveRequest
-              : null
+            resumeReserveRequest?.source === 'map' ? resumeReserveRequest : null
           }
           onResumeReserveHandled={() => setResumeReserveRequest(null)}
           keepNestedAcrossTabs={keepNestedAcrossTabs}
@@ -498,6 +570,7 @@ export default function AuthenticatedHome() {
           onOpenShop={handleOpenShopNav}
           onOpenWalletTopUp={handleOpenWalletTopUp}
           onNavigateDirections={handleNavigateToStore}
+          returnStoreRequest={returnProductsStoreRequest}
           resumeReserveRequest={
             !resumeReserveRequest?.source ||
             resumeReserveRequest.source === 'products' ||
@@ -519,7 +592,14 @@ export default function AuthenticatedHome() {
           initialTab={openBuyerOrdersRequest?.tab || RESERVATION_TAB.PENDING}
           tabRequestKey={openBuyerOrdersRequest?.at || 0}
           onNavigatePickup={handleNavigatePickup}
+          returnDetailRequest={returnOrdersDetailRequest}
           onOpenStore={handleOpenStoreFromProfile}
+          onOpenBuyerOrders={handleOpenBuyerOrders}
+          onOpenWalletTopUp={handleOpenWalletTopUp}
+          resumeReserveRequest={
+            resumeReserveRequest?.source === 'orders' ? resumeReserveRequest : null
+          }
+          onResumeReserveHandled={() => setResumeReserveRequest(null)}
           isScreenActive={activeTab === 'orders'}
           onNavigationStateChange={reportOrdersNested}
         />
@@ -548,6 +628,7 @@ export default function AuthenticatedHome() {
           onNavigateToStore={handleNavigateToStore}
           onNavigatePickup={handleNavigatePickup}
           isProfileVisible={activeTab === 'profile'}
+          openStoreRequest={profileOpenStoreRequest}
           productDetailId={productDetailId}
           productRefreshKey={productRefreshKey}
           onOpenProductDetail={handleOpenProductDetail}
@@ -557,12 +638,14 @@ export default function AuthenticatedHome() {
           onStartSellerRegister={handleStartSellerRegister}
           onOpenShopTab={handleOpenShopNav}
           onContinueReservationAfterTopUp={handleContinueReservationAfterTopUp}
+          keepNestedAcrossTabs={keepNestedAcrossTabs}
           resumeReserveRequest={
             resumeReserveRequest?.source === 'profile' ? resumeReserveRequest : null
           }
           onResumeReserveHandled={() => setResumeReserveRequest(null)}
           onNavigationStateChange={reportProfileNested}
           onOpenBuyerOrdersTab={handleOpenBuyerOrders}
+          onOpenWalletTopUp={handleOpenWalletTopUp}
         />
       ),
     }),
@@ -571,6 +654,9 @@ export default function AuthenticatedHome() {
       canSwitchToSeller,
       keepNestedAcrossTabs,
       mapFocusRequest,
+      returnOrdersDetailRequest,
+      returnProductsStoreRequest,
+      profileOpenStoreRequest,
       openBuyerOrdersRequest,
       buyerOrdersTab,
       productDetailId,
@@ -584,6 +670,7 @@ export default function AuthenticatedHome() {
       reportProfileNested,
       reportShopNested,
       sellerRegisterRequest,
+      handleOpenWalletTopUp,
     ]
   );
 
@@ -623,8 +710,27 @@ export default function AuthenticatedHome() {
         ) : null}
       </SafeAreaView>
 
+      <Modal
+        visible={Boolean(walletTopUpOverlay)}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={closeWalletTopUpOverlay}
+      >
+        <SafeAreaView style={styles.walletOverlaySafe} edges={['top', 'left', 'right', 'bottom']}>
+          {walletTopUpOverlay ? (
+            <WalletTopUpOverlay
+              balance={Number(profile?.walletBalance) || 0}
+              returnTo={walletTopUpOverlay.returnTo || 'wallet'}
+              onClose={closeWalletTopUpOverlay}
+              onContinueReservationAfterTopUp={handleContinueReservationAfterTopUp}
+              onOpenWallet={handleOpenWalletFromTopUp}
+            />
+          ) : null}
+        </SafeAreaView>
+      </Modal>
+
       {/* Bottom nav chỉ ẩn khi overlay phụ hoặc màn nested trong tab. */}
-      {!buyerOverlay && !nestedTabState[activeTab] ? (
+      {!buyerOverlay && !walletTopUpOverlay && !nestedTabState[activeTab] ? (
         <SafeAreaView style={styles.tabBarSafe} edges={['bottom', 'left', 'right']}>
           <View style={styles.tabBar}>
             {tabs.map((tab) => {
@@ -679,6 +785,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafb',
     zIndex: 20,
     elevation: 20,
+  },
+  walletOverlayPane: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#f8fafb',
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  walletOverlaySafe: {
+    flex: 1,
   },
   tabBarSafe: {
     backgroundColor: '#ffffff',

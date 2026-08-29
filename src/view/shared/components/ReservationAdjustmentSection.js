@@ -43,8 +43,7 @@ export function shouldShowQuantityHistory(reservation) {
   }
   return (
     status === RESERVATION_STATUS.RECEIVED ||
-    status === RESERVATION_STATUS.DISPUTED ||
-    status === RESERVATION_STATUS.DISPUTE_RESOLVED
+    status === RESERVATION_STATUS.DISPUTED
   );
 }
 
@@ -63,12 +62,13 @@ export default function ReservationAdjustmentSection({ reservation }) {
   const chronological = sortAdjustmentsChronological(rows);
   const first = chronological[0];
   const initialQty = Number(first?.oldQuantity) || 0;
-  const initialUnit = Number(first?.oldReservedPrice) || 0;
+  const initialUnit = Number(first?.giaCu) || 0;
   const initialTotal = lineTotal(initialUnit, initialQty);
-  const initialDeposit = Number(first?.oldDepositAmount) || 0;
+  const initialDeposit = Number(first?.cocCu) || 0;
 
   return (
     <View style={styles.wrap}>
+      <View style={styles.divider} />
       <Text style={styles.heading}>Lịch sử thay đổi số lượng</Text>
 
       <View style={styles.card}>
@@ -87,7 +87,7 @@ export default function ReservationAdjustmentSection({ reservation }) {
       {chronological.map((item, index) => {
         const depositRefund = Math.max(
           0,
-          Math.round(Number(item.oldDepositAmount) || 0) - Math.round(Number(item.newDepositAmount) || 0)
+          Math.round(Number(item.cocCu) || 0) - Math.round(Number(item.cocMoi) || 0)
         );
         return (
           <View key={item.id || `${item.createdAt}-${item.newQuantity}-${index}`} style={styles.card}>
@@ -118,6 +118,11 @@ const styles = StyleSheet.create({
   wrap: {
     gap: 10,
     marginTop: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 14,
   },
   heading: {
     fontSize: 13,

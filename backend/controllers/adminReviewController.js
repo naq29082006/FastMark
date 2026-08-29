@@ -23,6 +23,7 @@ exports.listReviews = async (req, res) => {
     search: pickQueryValue(req.query, ["search", "q"]),
     rating: pickQueryValue(req.query, ["rating", "stars"]),
     status: pickQueryValue(req.query, ["status"]),
+    removedBy: pickQueryValue(req.query, ["removedBy", "removed_by"]),
     productId: pickQueryValue(req.query, ["productId"]),
     page: req.query.page,
     limit: req.query.limit,

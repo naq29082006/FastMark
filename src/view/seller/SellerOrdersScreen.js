@@ -9,59 +9,100 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { getOrderListCancelDisplay, getCompletedTabDepositLine, isCompletedTabDepositPendingLine } from '../../core/utils/orderDisplay';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import {
+  cancelSellerReservationOnBackend,
   confirmSellerReservationOnBackend,
   getSellerOrdersOnBackend,
   getSellerReservationDetailOnBackend,
   rejectSellerReservationOnBackend,
   reportBuyerNoShowOnBackend,
+  refundSellerDisputeDepositOnBackend,
+  respondSellerPostDeliveryComplaintOnBackend,
 } from '../../api/sellerOpsApi';
 import { showErrorAlert } from '../../core/utils/appAlert';
 import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
 import { orderMatchesSearch, isOrderSearchActive } from '../../core/utils/reservationOrderSearch';
-import { applyReservationRealtimeRow, syncOrderListAfterMutation } from '../../core/utils/orderRealtimeSync';
+import { sortReservationsNewestFirst } from '../../core/utils/reservationOrderSort';
+import { reservationRequiresDeposit } from '../../core/utils/reservationEntity';
+import { applyReservationRealtimeRow, removeReservationIfLeftTab, syncOrderListAfterMutation } from '../../core/utils/orderRealtimeSync';
+import { coalesceReservationFetch } from '../../core/utils/coalesceReservationFetch';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
+import { hasItemId } from '../../core/utils/realtimeList';
+import OrderListActionButton, {
+  OrderListActionRow,
+} from '../shared/components/OrderListActionButton';
 import {
   RESERVATION_TAB,
   RESERVATION_STATUS,
   RESERVATION_STATUS_LABELS,
   ORDER_STATUS_TABS,
-  getCancelledReservationReason,
+  DISPUTE_SUB_TAB,
+  DISPUTE_SUB_TAB_EMPTY_MESSAGE,
+  DISPUTE_SUB_TABS,
+  COMPLETED_SUB_TAB,
+  COMPLETED_SUB_TAB_EMPTY_MESSAGE,
+  COMPLETED_SUB_TABS,
+  resolveOrdersApiTab,
   getSellerCompletedOrderStatusLabel,
+  getReservationTabForStatus,
   isActiveDisputeOrder,
+  isDisputeHistoryReadOnlyOrder,
+  isDisputeResolvedOrder,
   isCancelledReservationStatus,
+  canSellerRefundDisputeDeposit,
+  canSellerRefundDepositOnHolding,
+  canSellerRespondOnDisputeItem,
+  isSellerPostDeliveryResponseAction,
+  getDisputeTabListStatusLabel,
+  isDisputeHistoryListStatus,
   VIEWER_ROLE,
 } from '../../constants/sellerOrders';
 import ClearableSearchField from '../shared/components/ClearableSearchField';
 import OrderItemHeader from '../shared/components/OrderItemHeader';
 import {
-  getSellerDepositReleaseCountdownLabel,
+  getOrderCountdownLine,
+  getDisputeActionButtonLabel,
+  getPrePickupDisputeWindowText,
+  isWithinDepositDecisionWindowForItem,
 } from '../../core/utils/escrowHold';
-import { useMinuteNow } from '../../hooks/useMinuteNow';
+import { useOrderTimeNow } from '../../hooks/useOrderTimeNow';
 import OrderStatusTabBar from '../shared/components/OrderStatusTabBar';
+import OrderListSubFilterCombo from '../shared/components/OrderListSubFilterCombo';
 import OrderTabEmptyState, {
   ORDER_TAB_EMPTY_MESSAGE,
   ORDER_TAB_SEARCH_EMPTY_MESSAGE,
 } from '../shared/components/OrderTabEmptyState';
 import OrderDisputeListHints from '../shared/components/OrderDisputeListHints';
+import OrderCancelListHints from '../shared/components/OrderCancelListHints';
 import ReservationDisputeModal from '../shared/components/ReservationDisputeModal';
+import SellerCancelAcceptedModal from '../shared/components/SellerCancelAcceptedModal';
 import SubScreenHeader, { APP_HEADER_ICON_BUTTON_STYLE } from '../shared/components/SubScreenHeader';
 import { formatPrice } from '../../core/utils/productFormat';
+import { getOrderCodeValue } from '../../core/utils/orderCode';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { useOrderSocket } from '../../hooks/useOrderSocket';
+
+function isWithinDepositDecisionWindow(item, now = Date.now()) {
+  return isWithinDepositDecisionWindowForItem(item, now);
+}
 
 function getReservationStatusStyle(status, { treatReceivedAsCompleted = false } = {}) {
   if (
     treatReceivedAsCompleted &&
-    status === RESERVATION_STATUS.RECEIVED
+    (status === RESERVATION_STATUS.PICKUP_CONFIRMED ||
+      status === RESERVATION_STATUS.RECEIVED)
   ) {
     return { badge: styles.statusBadgeSuccess, text: styles.statusBadgeTextSuccess };
   }
   if (status === RESERVATION_STATUS.WAITING_PICKUP) {
     return { badge: styles.statusBadgePending, text: styles.statusBadgeTextPending };
   }
-  if (status === RESERVATION_STATUS.RECEIVED) {
+  if (
+    status === RESERVATION_STATUS.PICKUP_CONFIRMED ||
+    status === RESERVATION_STATUS.RECEIVED
+  ) {
     return { badge: styles.statusBadgeInfo, text: styles.statusBadgeTextInfo };
   }
   if (
@@ -73,8 +114,7 @@ function getReservationStatusStyle(status, { treatReceivedAsCompleted = false } 
   if (
     status === RESERVATION_STATUS.REJECTED ||
     status === RESERVATION_STATUS.REFUNDED ||
-    status === RESERVATION_STATUS.DISPUTED ||
-    status === RESERVATION_STATUS.DISPUTE_RESOLVED
+    status === RESERVATION_STATUS.DISPUTED
   ) {
     return { badge: styles.statusBadgeDanger, text: styles.statusBadgeTextDanger };
   }
@@ -85,20 +125,6 @@ function isPastPickup(item, now) {
   if (!item?.pickupTime) return false;
   const pickup = new Date(item.pickupTime);
   return Number.isFinite(pickup.getTime()) && now >= pickup.getTime();
-}
-
-function isWithinDepositDecisionWindow(item, now = Date.now()) {
-  if (item?.withinDepositDecisionWindow === true) return true;
-  if (item?.withinDepositDecisionWindow === false) return false;
-  const deadlineRaw = item?.depositDecisionDeadline || item?.autoReleaseAt || item?.reviewDeadlineAt;
-  if (deadlineRaw) {
-    const deadline = new Date(deadlineRaw);
-    return Number.isFinite(deadline.getTime()) && now < deadline.getTime();
-  }
-  if (!item?.pickupTime) return false;
-  const pickup = new Date(item.pickupTime);
-  if (!Number.isFinite(pickup.getTime())) return false;
-  return now < pickup.getTime() + 24 * 60 * 60 * 1000;
 }
 
 function canReportBuyerNoShow(item, now) {
@@ -131,17 +157,29 @@ export default function SellerOrdersScreen({
   onBack,
   onOpenReservation,
   onScanPickupQr,
+  onShowShopQr,
   onRefreshKey = 0,
   embedded = false,
   activeTab: controlledActiveTab,
   onActiveTabChange,
+  isScreenActive = true,
+  accountLockedOrderMode = false,
 }) {
   const insets = useScreenInsets();
   const [internalActiveTab, setInternalActiveTab] = useState(RESERVATION_TAB.PENDING);
+  const [disputeSubTab, setDisputeSubTab] = useState(DISPUTE_SUB_TAB.ACTIVE);
+  const [completedSubTab, setCompletedSubTab] = useState(COMPLETED_SUB_TAB.ALL);
   const activeTab = controlledActiveTab ?? internalActiveTab;
+  const apiTab = resolveOrdersApiTab(activeTab, disputeSubTab, completedSubTab);
   const setActiveTab = useCallback(
     (next) => {
       const resolved = typeof next === 'function' ? next(activeTab) : next;
+      if (resolved !== RESERVATION_TAB.DISPUTE) {
+        setDisputeSubTab(DISPUTE_SUB_TAB.ACTIVE);
+      }
+      if (resolved !== RESERVATION_TAB.COMPLETED) {
+        setCompletedSubTab(COMPLETED_SUB_TAB.ALL);
+      }
       if (controlledActiveTab === undefined) {
         setInternalActiveTab(resolved);
       }
@@ -160,10 +198,18 @@ export default function SellerOrdersScreen({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  const [loadedApiTab, setLoadedApiTab] = useState(apiTab);
   const ordersFetchSeqRef = useRef(0);
   const loadingMoreGuardRef = useRef(false);
   const [disputeTarget, setDisputeTarget] = useState(null);
-  const currentTime = useMinuteNow(true);
+  const [responseTarget, setResponseTarget] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const pickupScheduleItems = useMemo(() => {
+    if (activeTab !== RESERVATION_TAB.HOLDING) {
+      return [];
+    }
+    return items.filter((row) => row.status === RESERVATION_STATUS.WAITING_PICKUP);
+  }, [activeTab, items]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -193,7 +239,7 @@ export default function SellerOrdersScreen({
       const idToken = await getCurrentUserIdToken();
       const data = await getSellerOrdersOnBackend({
         idToken,
-        tab: activeTab,
+        tab: apiTab,
         search: debouncedSearch || undefined,
         page: nextPage,
         limit: DEFAULT_PAGE_SIZE,
@@ -221,15 +267,20 @@ export default function SellerOrdersScreen({
             rows.length +
             (data?.hasMore ? DEFAULT_PAGE_SIZE : 0)
       );
+      if (nextPage === 1) {
+        setLoadedApiTab(apiTab);
+      }
     } catch (loadError) {
       if (fetchSeq !== ordersFetchSeqRef.current) {
         return;
       }
-      showErrorAlert(loadError.message || 'Không tải được đơn hàng.');
+      const message = loadError.message || 'Không tải được đơn hàng.';
+      showErrorAlert(message, 'Lỗi', { accountLockedOrderMode });
       if (nextPage === 1) {
         setItems([]);
         setHasMore(false);
         setTotalCount(0);
+        setLoadedApiTab(apiTab);
       }
     } finally {
       if (nextPage > 1) {
@@ -244,12 +295,42 @@ export default function SellerOrdersScreen({
         setIsLoadingMore(false);
       }
     }
-  }, [activeTab, debouncedSearch]);
+  }, [accountLockedOrderMode, apiTab, debouncedSearch]);
+
+  const handlePickupBoundary = useCallback(() => {
+    loadOrders({ nextPage: 1, silent: true });
+  }, [loadOrders]);
+
+  const currentTime = useOrderTimeNow({
+    enabled: isScreenActive,
+    items: pickupScheduleItems,
+    onPickupBoundary: handlePickupBoundary,
+  });
+
+  useEffect(() => {
+    if (!isScreenActive || activeTab !== RESERVATION_TAB.HOLDING) {
+      return undefined;
+    }
+    const timer = setInterval(() => {
+      loadOrders({ nextPage: 1, silent: true });
+    }, 60 * 1000);
+    return () => clearInterval(timer);
+  }, [activeTab, isScreenActive, loadOrders]);
 
   useEffect(() => {
     setSearch('');
     setDebouncedSearch('');
   }, [activeTab]);
+
+  useEffect(() => {
+    ordersFetchSeqRef.current += 1;
+    loadingMoreGuardRef.current = false;
+    setItems([]);
+    setPage(1);
+    setHasMore(true);
+    setTotalCount(0);
+    setIsLoading(true);
+  }, [apiTab]);
 
   useEffect(() => {
     loadOrders({ nextPage: 1 });
@@ -272,6 +353,8 @@ export default function SellerOrdersScreen({
         reservation,
         reservationId,
         activeTab,
+        disputeSubTab: activeTab === RESERVATION_TAB.DISPUTE ? disputeSubTab : null,
+        completedSubTab: activeTab === RESERVATION_TAB.COMPLETED ? completedSubTab : null,
         search: debouncedSearch,
         itemsRef,
         setItems,
@@ -279,7 +362,7 @@ export default function SellerOrdersScreen({
         loadOrders,
       });
     },
-    [activeTab, debouncedSearch, loadOrders]
+    [activeTab, disputeSubTab, completedSubTab, debouncedSearch, loadOrders]
   );
 
   /**
@@ -292,12 +375,37 @@ export default function SellerOrdersScreen({
         return;
       }
 
+      if (
+        removeReservationIfLeftTab({
+          payloadStatus: payload?.status,
+          reservationId,
+          activeTab,
+          currentItems: itemsRef.current,
+          setItems,
+          setTotalCount,
+        })
+      ) {
+        return;
+      }
+
+      const isInList = hasItemId(itemsRef.current, reservationId);
+      const eventTab = getReservationTabForStatus(payload?.status);
+      const belongsToTab =
+        activeTab === RESERVATION_TAB.ALL || eventTab === activeTab;
+      const hasSearch = String(debouncedSearch || '').trim().length > 0;
+
+      if (!isInList && (!belongsToTab || hasSearch)) {
+        return;
+      }
+
       try {
-        const idToken = await getCurrentUserIdToken();
-        if (!idToken) {
-          return;
-        }
-        const reservation = await getSellerReservationDetailOnBackend(idToken, reservationId);
+        const reservation = await coalesceReservationFetch('seller', reservationId, async () => {
+          const idToken = await getCurrentUserIdToken();
+          if (!idToken) {
+            return null;
+          }
+          return getSellerReservationDetailOnBackend(idToken, reservationId);
+        });
         if (!reservation?.id) {
           return;
         }
@@ -305,6 +413,8 @@ export default function SellerOrdersScreen({
           reservation,
           reservationId,
           activeTab,
+          disputeSubTab: activeTab === RESERVATION_TAB.DISPUTE ? disputeSubTab : null,
+        completedSubTab: activeTab === RESERVATION_TAB.COMPLETED ? completedSubTab : null,
           search: debouncedSearch,
           currentItems: itemsRef.current,
           setItems,
@@ -314,7 +424,7 @@ export default function SellerOrdersScreen({
         // Giữ danh sách hiện tại nếu tải lỗi.
       }
     },
-    [activeTab, debouncedSearch]
+    [activeTab, disputeSubTab, completedSubTab, debouncedSearch]
   );
 
   const handleLoadMore = useCallback(() => {
@@ -325,7 +435,7 @@ export default function SellerOrdersScreen({
   }, [hasMore, isLoading, isLoadingMore, loadOrders, page]);
 
   useOrderSocket({
-    enabled: true,
+    enabled: isScreenActive,
     onOrderUpdated: handleOrderUpdated,
   });
 
@@ -337,7 +447,7 @@ export default function SellerOrdersScreen({
     if (isOrderSearchActive(search)) {
       list = list.filter((item) => orderMatchesSearch(item, search, 'seller'));
     }
-    return list;
+    return sortReservationsNewestFirst(list, activeTab);
   }, [items, activeTab, search]);
 
   function handleConfirmReservation(reservation) {
@@ -355,7 +465,9 @@ export default function SellerOrdersScreen({
             const updated = await confirmSellerReservationOnBackend(idToken, reservation.id);
             syncListAfterMutation(updated, reservation.id);
           } catch (actionError) {
-            Alert.alert('Lỗi', actionError.message || 'Không xác nhận được đơn.');
+            showErrorAlert(actionError.message || 'Không xác nhận được đơn.', 'Lỗi', {
+              accountLockedOrderMode,
+            });
           }
         },
       },
@@ -378,7 +490,9 @@ export default function SellerOrdersScreen({
             });
             syncListAfterMutation(updated, reservation.id);
           } catch (actionError) {
-            Alert.alert('Lỗi', actionError.message || 'Không từ chối được đơn.');
+            showErrorAlert(actionError.message || 'Không từ chối được đơn.', 'Lỗi', {
+              accountLockedOrderMode,
+            });
           }
         },
       },
@@ -395,27 +509,116 @@ export default function SellerOrdersScreen({
       const updated = await reportBuyerNoShowOnBackend({
         idToken,
         reservationId,
+        reason: payload.reason,
         title: payload.title,
         description: payload.description,
         note: payload.note,
         images: payload.images,
       });
       setDisputeTarget(null);
-      Alert.alert('Đã gửi', 'Đã báo cáo người mua không đến. Cọc đang giữ chờ admin.');
+      syncListAfterMutation(updated?.reservation || updated, reservationId);
+      Alert.alert('Đã gửi', 'Phản hồi đã được gửi.');
+    } catch (actionError) {
+      showErrorAlert(actionError.message || 'Không gửi được phản hồi.', 'Lỗi', {
+        accountLockedOrderMode,
+      });
+    }
+  }
+
+  async function handleSubmitDisputeResponse(payload) {
+    if (!responseTarget) {
+      return;
+    }
+    try {
+      const idToken = await getCurrentUserIdToken();
+      const reservationId = responseTarget.id;
+      const updated = await respondSellerPostDeliveryComplaintOnBackend(idToken, {
+        reservationId,
+        description: payload.description,
+        images: payload.images,
+      });
+      setResponseTarget(null);
+      syncListAfterMutation(updated, reservationId);
+      Alert.alert('Đã gửi', 'Phản hồi đã được gửi. Admin sẽ xử lý tranh chấp.');
+    } catch (actionError) {
+      showErrorAlert(actionError.message || 'Không gửi được phản hồi.', 'Lỗi', {
+        accountLockedOrderMode,
+      });
+    }
+  }
+
+  function handleOpenDisputeRespond(item) {
+    if (isSellerPostDeliveryResponseAction(item)) {
+      setResponseTarget(item);
+      return;
+    }
+    setDisputeTarget(item);
+  }
+
+  async function handleSubmitCancelAccepted(payload) {
+    if (!cancelTarget) {
+      return;
+    }
+    try {
+      const idToken = await getCurrentUserIdToken();
+      const reservationId = cancelTarget.id;
+      const updated = await cancelSellerReservationOnBackend({
+        idToken,
+        reservationId,
+        reason: payload.reason,
+        images: payload.images,
+      });
+      setCancelTarget(null);
       syncListAfterMutation(updated, reservationId);
     } catch (actionError) {
-      Alert.alert('Lỗi', actionError.message || 'Không gửi được báo cáo.');
+      showErrorAlert(actionError.message || 'Không hủy được đơn.', 'Lỗi', {
+        accountLockedOrderMode,
+      });
       throw actionError;
     }
   }
 
+  function handleRefundDeposit(item) {
+    const isDispute = Number(item.status) === RESERVATION_STATUS.DISPUTED;
+    Alert.alert(
+      'Hoàn cọc cho người mua?',
+      isDispute
+        ? 'Tiền cọc sẽ được hoàn về ví người mua và đơn sẽ kết thúc tranh chấp.'
+        : 'Tiền cọc sẽ được hoàn về ví người mua và đơn sẽ được hủy.',
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Hoàn cọc',
+          onPress: async () => {
+            try {
+              const idToken = await getCurrentUserIdToken();
+              const updated = await refundSellerDisputeDepositOnBackend(idToken, item.id);
+              syncListAfterMutation(updated, item.id);
+              Alert.alert('Đã hoàn cọc', 'Tiền cọc đã được hoàn cho người mua.');
+            } catch (actionError) {
+              showErrorAlert(actionError.message || 'Không hoàn cọc được.', 'Lỗi', {
+                accountLockedOrderMode,
+              });
+            }
+          },
+        },
+      ]
+    );
+  }
+
   function renderReservationItem({ item }) {
-    const statusLabel = isCompletedTab
-      ? getSellerCompletedOrderStatusLabel(item.status)
-      : RESERVATION_STATUS_LABELS[item.status] || 'Không rõ';
-    const statusStyle = getReservationStatusStyle(item.status, {
-      treatReceivedAsCompleted: isCompletedTab,
-    });
+    const isCompletedTab = activeTab === RESERVATION_TAB.COMPLETED;
+    const isCancelledTab = activeTab === RESERVATION_TAB.CANCELLED;
+    const isDisputeTab = activeTab === RESERVATION_TAB.DISPUTE;
+    const statusLabel = isDisputeTab
+      ? getDisputeTabListStatusLabel(item, disputeSubTab)
+      : isCompletedTab
+        ? getSellerCompletedOrderStatusLabel(item.status)
+        : RESERVATION_STATUS_LABELS[item.status] || 'Không rõ';
+    const statusStyle =
+      isDisputeTab && isDisputeHistoryListStatus(item, disputeSubTab)
+        ? { badge: styles.statusBadgeSuccess, text: styles.statusBadgeTextSuccess }
+        : getReservationStatusStyle(item.status);
     const productName = item.product?.productName || 'Sản phẩm';
     const thumb = item.product?.thumbnail || '';
     const qty = Number(item.quantity) || 0;
@@ -428,13 +631,58 @@ export default function SellerOrdersScreen({
       activeTab === RESERVATION_TAB.CANCELLED;
     const useBlackUnitPrice =
       canConfirm || activeTab === RESERVATION_TAB.HOLDING;
-    const canReportBuyer = canReportBuyerNoShow(item, currentTime);
-    const cancelReasonText = getCancelledReservationReason(item, VIEWER_ROLE.SELLER);
     const showActiveDisputeHint = isActiveDisputeOrder(item);
-    const isCompletedTab = activeTab === RESERVATION_TAB.COMPLETED;
-    const escrowHoldLabel = isCompletedTab
-      ? getSellerDepositReleaseCountdownLabel(item, currentTime)
-      : '';
+    const isDisputeHistoryReadOnly = isDisputeHistoryReadOnlyOrder(item);
+    const canReportBuyer =
+      !isDisputeHistoryReadOnly && canReportBuyerNoShow(item, currentTime);
+    const canRefundDeposit =
+      !isDisputeHistoryReadOnly &&
+      pastPickup &&
+      activeTab === RESERVATION_TAB.HOLDING &&
+      !showActiveDisputeHint &&
+      canSellerRefundDepositOnHolding(item);
+    const canCancelBeforePickup =
+      !pastPickup &&
+      activeTab === RESERVATION_TAB.HOLDING &&
+      item.status === RESERVATION_STATUS.WAITING_PICKUP &&
+      !showActiveDisputeHint &&
+      canSellerRefundDepositOnHolding(item);
+    const canRefundDisputeDeposit = canSellerRefundDisputeDeposit(item);
+    const canRespondDispute = canSellerRespondOnDisputeItem(item);
+    const showDisputeItemActions =
+      isDisputeTab &&
+      disputeSubTab === DISPUTE_SUB_TAB.ACTIVE &&
+      isActiveDisputeOrder(item) &&
+      (canRespondDispute || canRefundDisputeDeposit);
+    const showPastPickupItemActions =
+      activeTab === RESERVATION_TAB.HOLDING &&
+      item.status === RESERVATION_STATUS.WAITING_PICKUP &&
+      pastPickup &&
+      !showActiveDisputeHint &&
+      (canRefundDeposit || canReportBuyer);
+    const showHoldingPrimaryActions =
+      activeTab === RESERVATION_TAB.HOLDING &&
+      item.status === RESERVATION_STATUS.WAITING_PICKUP &&
+      !pastPickup &&
+      !showActiveDisputeHint &&
+      (onScanPickupQr || onShowShopQr);
+    const showPickupTimeLine = !isDisputeTab && !isCompletedTab && !isCancelledTab;
+    const cancelDisplay = getOrderListCancelDisplay(item, VIEWER_ROLE.SELLER);
+    const cancelReasonText = cancelDisplay.reasonLine;
+    const countdownLine =
+      isCompletedTab || isActiveDisputeOrder(item)
+        ? ''
+        : getOrderCountdownLine(item, currentTime, VIEWER_ROLE.SELLER);
+    const escrowHoldLabel =
+      isCompletedTab && reservationRequiresDeposit(item)
+        ? getCompletedTabDepositLine(item, VIEWER_ROLE.SELLER, currentTime)
+        : '';
+    const escrowHoldPending = isCompletedTabDepositPendingLine(escrowHoldLabel);
+    const disputeActionLabel = getDisputeActionButtonLabel(
+      item,
+      VIEWER_ROLE.SELLER,
+      currentTime
+    );
     const unitPrice =
       item.agreedPrice != null
         ? Number(item.agreedPrice)
@@ -470,60 +718,133 @@ export default function SellerOrdersScreen({
             lineTotalText={formatPrice(item.totalAmount)}
             priceRowMeta
           >
-            {item.pickupTime ? (
+            {showPickupTimeLine && item.pickupTime ? (
               <Text style={styles.infoLinePickup}>
                 Thời gian nhận: {formatOrderTime(item.pickupTime)}
               </Text>
-            ) : (
+            ) : showPickupTimeLine ? (
               <Text style={styles.infoLinePickup}>Giữ: {formatOrderTime(item.createdAt)}</Text>
-            )}
+            ) : null}
             {escrowHoldLabel ? (
-              <Text style={styles.infoLineEscrowCountdown}>{escrowHoldLabel}</Text>
+              <Text
+                style={
+                  escrowHoldPending ? styles.infoLineEscrowCountdown : styles.infoLineDeposit
+                }
+              >
+                {escrowHoldLabel}
+              </Text>
+            ) : null}
+            {countdownLine ? (
+              <Text style={styles.infoLineCountdown}>{countdownLine}</Text>
             ) : null}
             {item.status === RESERVATION_STATUS.WAITING_PICKUP &&
             pastPickup &&
-            !showActiveDisputeHint ? (
+            !showActiveDisputeHint &&
+            !countdownLine &&
+            reservationRequiresDeposit(item) ? (
               <Text style={styles.infoLineDanger}>
                 {isWithinDepositDecisionWindow(item, currentTime)
-                  ? 'Trong 24h bạn có thể khiếu nại và chờ admin xử lý hoặc hoàn cọc cho người mua.'
-                  : 'Đã quá 24 giờ sau giờ nhận. Cọc mặc định đã chuyển cho bạn.'}
+                  ? `Đã quá giờ nhận. Trong ${getPrePickupDisputeWindowText()} người bán có thể khiếu nại hoặc hoàn cọc cho người mua.`
+                  : `Đã quá ${getPrePickupDisputeWindowText()} sau giờ nhận. Cọc mặc định đã chuyển cho người bán.`}
               </Text>
             ) : null}
-            <OrderDisputeListHints item={item} viewerRole={VIEWER_ROLE.SELLER} />
-            {!showActiveDisputeHint && cancelReasonText ? (
-              <Text style={styles.infoLineDanger}>{cancelReasonText}</Text>
-            ) : null}
+            <OrderDisputeListHints
+              item={item}
+              viewerRole={VIEWER_ROLE.SELLER}
+            />
+            {isCancelledTab ? (
+              <OrderCancelListHints reasonLine={cancelReasonText} />
+            ) : (
+              <>
+                {!showActiveDisputeHint && !isDisputeResolvedOrder(item) && cancelReasonText ? (
+                  <Text style={styles.infoLineDanger}>{cancelReasonText}</Text>
+                ) : null}
+              </>
+            )}
           </OrderItemHeader>
         </Pressable>
 
         {canConfirm ? (
-          <View style={styles.actionRow}>
-            <Pressable
-              style={[styles.actionButton, styles.actionButtonFlex]}
-              onPress={() => handleConfirmReservation(item)}
-            >
-              <Text style={styles.actionButtonText}>Đồng ý</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.actionButton, styles.actionButtonDanger, styles.actionButtonFlex]}
+          <OrderListActionRow>
+            <OrderListActionButton
+              label="Từ chối"
+              variant="dangerOutline"
               onPress={() => handleRejectReservation(item)}
-            >
-              <Text style={styles.actionButtonTextDanger}>Từ chối</Text>
-            </Pressable>
-          </View>
+            />
+            <OrderListActionButton
+              label="Đồng ý"
+              variant="primary"
+              onPress={() => handleConfirmReservation(item)}
+            />
+          </OrderListActionRow>
         ) : null}
 
-        {canReportBuyer ? (
-          <Pressable
-            style={styles.reportButton}
-            onPress={() => setDisputeTarget(item)}
-          >
-            <Text style={styles.reportButtonText}>Báo cáo người mua không đến</Text>
-          </Pressable>
+        {showDisputeItemActions ? (
+          <OrderListActionRow>
+            {canRespondDispute ? (
+              <OrderListActionButton
+                label="Phản hồi"
+                variant="warning"
+                onPress={() => handleOpenDisputeRespond(item)}
+              />
+            ) : null}
+            {canRefundDisputeDeposit ? (
+              <OrderListActionButton
+                label="Hoàn cọc"
+                variant="primary"
+                onPress={() => handleRefundDeposit(item)}
+              />
+            ) : null}
+          </OrderListActionRow>
+        ) : showPastPickupItemActions ? (
+          <OrderListActionRow>
+            {canReportBuyer ? (
+              <OrderListActionButton
+                label={disputeActionLabel}
+                variant="warning"
+                onPress={() => setDisputeTarget(item)}
+              />
+            ) : null}
+            {canRefundDeposit ? (
+              <OrderListActionButton
+                label="Hoàn cọc"
+                variant="primary"
+                onPress={() => handleRefundDeposit(item)}
+              />
+            ) : null}
+          </OrderListActionRow>
+        ) : canCancelBeforePickup ? (
+          <OrderListActionRow>
+            <OrderListActionButton
+              label="Hủy đơn"
+              variant="dangerOutline"
+              onPress={() => setCancelTarget(item)}
+            />
+          </OrderListActionRow>
+        ) : showHoldingPrimaryActions ? (
+          <OrderListActionRow>
+            {onScanPickupQr ? (
+              <OrderListActionButton
+                label="Đến nhận hàng"
+                variant="primary"
+                onPress={onScanPickupQr}
+              />
+            ) : null}
+            {onShowShopQr ? (
+              <OrderListActionButton
+                label="Mã QR gian hàng"
+                variant="outline"
+                onPress={onShowShopQr}
+              />
+            ) : null}
+          </OrderListActionRow>
         ) : null}
       </View>
     );
   }
+
+  const isListStale = loadedApiTab !== apiTab;
+  const showListLoading = isLoading || isListStale;
 
   return (
     <View style={styles.screen}>
@@ -559,13 +880,34 @@ export default function SellerOrdersScreen({
         onChangeTab={setActiveTab}
       />
 
-      {isLoading ? (
+      {activeTab === RESERVATION_TAB.DISPUTE || activeTab === RESERVATION_TAB.COMPLETED ? (
+        <View style={styles.subFilterRow}>
+          <OrderListSubFilterCombo
+            options={
+              activeTab === RESERVATION_TAB.DISPUTE ? DISPUTE_SUB_TABS : COMPLETED_SUB_TABS
+            }
+            value={
+              activeTab === RESERVATION_TAB.DISPUTE ? disputeSubTab : completedSubTab
+            }
+            onChange={(next) => {
+              if (activeTab === RESERVATION_TAB.DISPUTE) {
+                setDisputeSubTab(next);
+                return;
+              }
+              setCompletedSubTab(next);
+            }}
+          />
+        </View>
+      ) : null}
+
+      {showListLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator color="#076F32" />
         </View>
       ) : (
         <FlatList
           data={filteredItems}
+          extraData={currentTime}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={[
             styles.listContent,
@@ -595,7 +937,13 @@ export default function SellerOrdersScreen({
               message={
                 isOrderSearchActive(search)
                   ? ORDER_TAB_SEARCH_EMPTY_MESSAGE
-                  : ORDER_TAB_EMPTY_MESSAGE
+                  : activeTab === RESERVATION_TAB.DISPUTE
+                    ? DISPUTE_SUB_TAB_EMPTY_MESSAGE[disputeSubTab] ||
+                      ORDER_TAB_EMPTY_MESSAGE
+                    : activeTab === RESERVATION_TAB.COMPLETED
+                      ? COMPLETED_SUB_TAB_EMPTY_MESSAGE[completedSubTab] ||
+                        ORDER_TAB_EMPTY_MESSAGE
+                      : ORDER_TAB_EMPTY_MESSAGE
               }
             />
           }
@@ -607,6 +955,18 @@ export default function SellerOrdersScreen({
         mode="seller"
         onClose={() => setDisputeTarget(null)}
         onSubmit={handleSubmitBuyerNoShow}
+      />
+      <ReservationDisputeModal
+        visible={Boolean(responseTarget)}
+        mode="seller_response"
+        onClose={() => setResponseTarget(null)}
+        onSubmit={handleSubmitDisputeResponse}
+      />
+      <SellerCancelAcceptedModal
+        visible={Boolean(cancelTarget)}
+        orderCode={cancelTarget ? getOrderCodeValue(cancelTarget.id) : ''}
+        onClose={() => setCancelTarget(null)}
+        onSubmit={handleSubmitCancelAccepted}
       />
     </View>
   );
@@ -635,6 +995,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 4,
+    backgroundColor: '#ffffff',
+  },
+  subFilterRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
     backgroundColor: '#ffffff',
   },
   card: {
@@ -693,6 +1061,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 4,
   },
+  infoLineCountdown: {
+    color: '#ea580c',
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
+  },
   infoLinePickup: {
     color: '#0f172a',
     fontSize: 14,
@@ -711,60 +1085,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 4,
   },
+  infoLineDeposit: {
+    color: '#076F32',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   sectionHeading: {
     marginTop: 8,
     fontSize: 13,
     fontWeight: '800',
     color: '#0f172a',
     letterSpacing: 0.4,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 12,
-  },
-  actionButton: {
-    minHeight: 40,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#076F32',
-  },
-  actionButtonFlex: {
-    flexGrow: 1,
-    flexBasis: '30%',
-  },
-  actionButtonDanger: {
-    backgroundColor: '#DC2626',
-  },
-  actionButtonText: {
-    color: '#ffffff',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  actionButtonTextDanger: {
-    color: '#ffffff',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  reportButton: {
-    marginTop: 12,
-    minHeight: 40,
-    borderRadius: 10,
-    backgroundColor: '#fff7ed',
-    borderWidth: 1,
-    borderColor: '#fdba74',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  reportButtonText: {
-    color: '#c2410c',
-    fontWeight: '800',
-    fontSize: 13,
-    textAlign: 'center',
   },
   centered: { alignItems: 'center', paddingVertical: 40 },
   errorText: {

@@ -632,6 +632,13 @@ export default function ProductsScreen({
           setSelectedProductId(productId);
         }}
         onNavigateDirections={onNavigateDirections}
+        onOrderSuccess={(tab) => {
+          setSelectedProductId(null);
+          setSelectedStoreId(null);
+          onOpenBuyerOrders?.(tab);
+        }}
+        onOpenTopUp={onOpenWalletTopUp}
+        reservationSource="products"
       />
     );
   }

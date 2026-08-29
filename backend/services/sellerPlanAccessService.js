@@ -192,6 +192,7 @@ async function ensureSubscriptionFresh(shop) {
   }
   if (!isRecordActive(shop.isActive)) {
     await syncShopFromSubscription(shop, active);
+    await unhideShopProducts(shop._id);
   }
   return active;
 }

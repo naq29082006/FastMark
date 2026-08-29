@@ -57,6 +57,12 @@ async function ensureSharedSocket(getIdToken) {
     socket.on('order_updated', (payload) => {
       notifyListeners(payload);
     });
+    socket.on('admin_updated', (payload) => {
+      const type = String(payload?.type || '').trim().toLowerCase();
+      if (type === 'order' || type === 'reservation') {
+        notifyListeners(payload);
+      }
+    });
 
     socket.on('disconnect', () => {
       if (listenerCount === 0) {

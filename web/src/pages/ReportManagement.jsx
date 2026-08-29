@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { REALTIME_COALESCE_MS } from '../constants/realtime';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import PreviewableImage, { PreviewableImageGrid } from '../components/PreviewableImage';
 import { formatDate } from '../utils/format';
 import { keepIfSame, mergeListById } from '../utils/realtimeList';
 
@@ -193,12 +194,20 @@ function getAvatarInitial(person) {
 }
 
 function PartyAvatar({ person, name }) {
-  const avatarUrl = resolveMediaUrl(person?.avatar || '');
   const initial = getAvatarInitial(person || { fullName: name });
-  if (avatarUrl) {
-    return <img src={avatarUrl} alt="" className="report-party-avatar" />;
-  }
-  return <div className="report-party-avatar placeholder">{initial}</div>;
+  return (
+    <PreviewableImage
+      src={person?.avatar || ''}
+      alt={person?.fullName || person?.userName || name || ''}
+      width={48}
+      height={48}
+      shape="rounded"
+      className="report-party-avatar"
+      style={{ borderRadius: 14 }}
+      fallbackLetter={initial}
+      fallbackClassName="report-party-avatar placeholder"
+    />
+  );
 }
 
 function getReportedAccountId(detail) {
@@ -371,50 +380,30 @@ function SkeletonRows() {
   );
 }
 
-function EvidenceImagesSection({ images, onPreview }) {
+function EvidenceImagesSection({ images }) {
+  const urls = (images || [])
+    .map((image) => resolveMediaUrl(image?.url))
+    .filter(Boolean);
+
   return (
     <div className="evidence-section">
       <div className="evidence-section-header">
         <h4>Hình ảnh bằng chứng</h4>
-        {images.length > 0 ? <span className="badge badge-info">{images.length} ảnh</span> : null}
+        {urls.length > 0 ? <span className="badge badge-info">{urls.length} ảnh</span> : null}
       </div>
-      {images.length > 0 ? (
-        <div className="evidence-thumbnail-grid">
-          {images.map((image, index) => {
-            const imageSrc = resolveMediaUrl(image.url);
-            return (
-            <button
-              key={image.id}
-              type="button"
-              className="evidence-thumbnail"
-              onClick={() => onPreview(imageSrc, index)}
-              aria-label={`Xem bằng chứng ${index + 1}`}
-            >
-              <img src={imageSrc} alt={`Bằng chứng ${index + 1}`} loading="lazy" />
-            </button>
-            );
-          })}
-        </div>
+      {urls.length > 0 ? (
+        <PreviewableImageGrid
+          items={urls}
+          width={120}
+          height={120}
+          shape="rounded"
+          className="evidence-thumbnail-grid previewable-image-grid"
+          getKey={(url, index) => images[index]?.id || `${url}-${index}`}
+          getAlt={(_, index) => `Bằng chứng ${index + 1}`}
+        />
       ) : (
         <div className="evidence-empty-box">Không có hình ảnh bằng chứng</div>
       )}
-    </div>
-  );
-}
-
-function ImagePreviewModal({ imageUrl, onClose }) {
-  if (!imageUrl) {
-    return null;
-  }
-
-  return (
-    <div className="image-preview-overlay" role="presentation" onClick={onClose}>
-      <div className="image-preview-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-        <button type="button" className="ghost-btn image-preview-close" onClick={onClose}>
-          Đóng
-        </button>
-        <img src={imageUrl} alt="Hình ảnh bằng chứng phóng to" className="image-preview-full" />
-      </div>
     </div>
   );
 }
@@ -443,7 +432,6 @@ function ReportDetailModal({
   const shop = detail?.shop;
   const product = detail?.product;
   const evidenceImages = detail?.evidenceImages || [];
-  const [previewImage, setPreviewImage] = useState('');
   const replyTemplates = showDismissOptions
     ? isAccountLockAppeal
       ? LOCK_APPEAL_DISMISS_TEMPLATES
@@ -456,14 +444,6 @@ function ReportDetailModal({
         ? SHOP_LOCK_APPEAL_APPROVE_TEMPLATES
         : APPROVE_REPLY_TEMPLATES;
   const composingReply = showApproveOptions || showDismissOptions;
-
-  function handlePreview(url) {
-    setPreviewImage(url);
-  }
-
-  function closePreview() {
-    setPreviewImage('');
-  }
 
   return (
     <div className="dialog-overlay" role="presentation" onClick={() => !actionLoading && onClose()}>
@@ -585,20 +565,20 @@ function ReportDetailModal({
                 </div>
 
                 <div className="report-evidence-block">
-                  <EvidenceImagesSection images={evidenceImages} onPreview={handlePreview} />
+                  <EvidenceImagesSection images={evidenceImages} />
                 </div>
 
-                {detail?.processedBy || detail?.processedAt ? (
+                {detail?.xuLyBoi || detail?.tgXuLy ? (
                   <dl className="detail-list report-process-meta">
-                    {detail?.processedBy ? (
+                    {detail?.xuLyBoi ? (
                       <div>
                         <dt>Người xử lý</dt>
-                        <dd>{detail.processedBy.fullName || detail.processedBy.userName || ''}</dd>
+                        <dd>{detail.xuLyBoi.fullName || detail.xuLyBoi.userName || ''}</dd>
                       </div>
                     ) : null}
                     <div>
                       <dt>Thời gian xử lý</dt>
-                      <dd>{formatDate(detail?.processedAt)}</dd>
+                      <dd>{formatDate(detail?.tgXuLy)}</dd>
                     </div>
                   </dl>
                 ) : null}
@@ -787,8 +767,6 @@ function ReportDetailModal({
           </div>
         )}
       </div>
-
-      <ImagePreviewModal imageUrl={previewImage} onClose={closePreview} />
     </div>
   );
 }
@@ -1220,7 +1198,7 @@ export default function ReportManagement() {
                     </td>
                     <td>
                       <div className="account-secondary">Gửi: {formatDate(item.createdAt)}</div>
-                      <div className="account-secondary">Xử lý: {formatDate(item.processedAt)}</div>
+                      <div className="account-secondary">Xử lý: {formatDate(item.tgXuLy)}</div>
                     </td>
                     <td>
                       <TableIconActions

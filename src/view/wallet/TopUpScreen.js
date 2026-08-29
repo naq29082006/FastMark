@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -39,7 +42,51 @@ const TOPUP_SCREEN_TABS = [
 const PRESETS = [50000, 100000, 200000, 500000];
 const POLL_MS = 2000;
 
-/** Ẩn thanh brand merchant (FASTMARK + payOS) trên trang checkout PayOS nếu DOM cho phép. */
+function buildQrImageUrl(payload, size = 240) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${encodeURIComponent(
+    payload
+  )}`;
+}
+
+function formatTransferAmount(amount) {
+  const value = Math.round(Number(amount) || 0);
+  return `${value.toLocaleString('vi-VN')} vnd`;
+}
+
+async function copyTransferValue(label, value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return;
+  }
+  await Clipboard.setStringAsync(text);
+  Alert.alert('Đã sao chép', `${label} đã được sao chép.`);
+}
+
+function TransferCopyRow({ label, value, copyValue: copyRaw, copyable = true }) {
+  const display = String(value || '—');
+  return (
+    <View style={styles.transferRow}>
+      <Text style={styles.transferLabel}>{label}</Text>
+      <View style={styles.transferValueRow}>
+        <Text style={styles.transferValue} selectable>
+          {display}
+        </Text>
+        {copyable ? (
+          <Pressable
+            style={styles.copyBtn}
+            onPress={() => copyTransferValue(label, copyRaw ?? value)}
+            accessibilityRole="button"
+            accessibilityLabel={`Sao chép ${label}`}
+          >
+            <Text style={styles.copyBtnText}>Sao chép</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/** Fallback WebView — chỉ dùng khi PayOS không trả qrCode. */
 const HIDE_PAYOS_BRAND_JS = `
 (function () {
   function hideBrandBar() {
@@ -272,13 +319,18 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
     setSubmitting(true);
     try {
       const result = await createTopupViewModel(selectedAmount);
-      if (!result.checkoutUrl) {
-        throw new Error('Không nhận được liên kết thanh toán PayOS.');
+      if (!result.qrCode && !result.checkoutUrl) {
+        throw new Error('Không nhận được thông tin thanh toán PayOS.');
       }
       setCheckout({
         url: result.checkoutUrl,
         orderCode: result.orderCode,
         description: result.description || '',
+        qrCode: result.qrCode || '',
+        accountNumber: result.accountNumber || '',
+        accountName: result.accountName || '',
+        bankName: result.bankName || '',
+        amount: result.amount ?? selectedAmount,
       });
     } catch (error) {
       Alert.alert('Không nạp được', error.message || 'Vui lòng thử lại.');
@@ -324,57 +376,115 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
     );
   }
 
-  if (checkout?.url) {
-    return (
-      <View style={styles.screen}>
-        <SubScreenHeader title="Thanh toán PayOS" onBack={handleCloseCheckout} />
+  if (checkout?.orderCode != null) {
+    const useNativeQr = Boolean(String(checkout.qrCode || '').trim());
 
-        <View style={styles.checkoutMeta}>
-          <Text style={styles.checkoutMetaText}>
-            Nội dung CK: {checkout.description || 'userId'}
-          </Text>
-          {polling ? (
+    if (useNativeQr) {
+      const transferAmount = checkout.amount ?? selectedAmount;
+      const amountDigits = String(Math.round(Number(transferAmount) || 0));
+
+      return (
+        <View style={styles.screen}>
+          <SubScreenHeader title="Nạp tiền" onBack={handleCloseCheckout} />
+
+          <View style={styles.checkoutMeta}>
             <View style={styles.pollingRow}>
               <ActivityIndicator size="small" color={t.primaryDark} />
               <Text style={styles.pollingText}>Đang chờ xác nhận… cộng tiền tự động</Text>
             </View>
-          ) : null}
-        </View>
+          </View>
 
-        <WebView
-          source={{ uri: checkout.url }}
-          style={styles.webview}
-          startInLoadingState
-          javaScriptEnabled
-          domStorageEnabled
-          originWhitelist={['*', 'http://*', 'https://*', 'fastmark://*']}
-          setSupportMultipleWindows={false}
-          injectedJavaScript={HIDE_PAYOS_BRAND_JS}
-          onShouldStartLoadWithRequest={(request) => {
-            const url = request?.url || '';
-            if (isPayosReturnUrl(url) && url.startsWith('fastmark://')) {
-              handleReturnUrl(url);
-              return false;
-            }
-            return true;
-          }}
-          onNavigationStateChange={(navState) => {
-            const url = navState?.url || '';
-            if (isPayosReturnUrl(url)) {
-              handleReturnUrl(url);
-            }
-          }}
-          renderLoading={() => (
-            <View style={styles.webviewLoading}>
-              <ActivityIndicator color={t.primaryDark} />
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.qrCheckoutContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.qrCard}>
+              <Image
+                source={{ uri: buildQrImageUrl(checkout.qrCode, 260) }}
+                style={styles.qrImage}
+                accessibilityLabel="Mã QR chuyển khoản"
+              />
             </View>
-          )}
-        />
 
-        {/* Safe area dưới để nút Huỷ của PayOS không bị thanh home che */}
-        <View style={{ height: Math.max(insets.bottom, 12) }} />
-      </View>
-    );
+            {checkout.bankName ? (
+              <View style={styles.transferRow}>
+                <Text style={styles.transferLabel}>Ngân hàng</Text>
+                <Text style={styles.transferValueBold}>{checkout.bankName}</Text>
+              </View>
+            ) : null}
+
+            <TransferCopyRow label="Chủ tài khoản" value={checkout.accountName} copyable={false} />
+            <TransferCopyRow label="Số tài khoản" value={checkout.accountNumber} />
+            <TransferCopyRow
+              label="Số tiền"
+              value={formatTransferAmount(transferAmount)}
+              copyValue={amountDigits}
+            />
+            <TransferCopyRow label="Nội dung" value={checkout.description} />
+
+            <Text style={styles.transferNote}>
+              {`*Lưu ý: Nhập chính xác số tiền ${Number(transferAmount).toLocaleString('vi-VN')} khi chuyển khoản*`}
+            </Text>
+
+            <Pressable style={styles.checkoutCancelBtn} onPress={handleCloseCheckout}>
+              <Text style={styles.checkoutCancelBtnText}>Huỷ</Text>
+            </Pressable>
+          </ScrollView>
+
+          <View style={{ height: Math.max(insets.bottom, 12) }} />
+        </View>
+      );
+    }
+
+    if (checkout?.url) {
+      return (
+        <View style={styles.screen}>
+          <SubScreenHeader title="Nạp tiền" onBack={handleCloseCheckout} />
+
+          <View style={styles.checkoutMeta}>
+            {polling ? (
+              <View style={styles.pollingRow}>
+                <ActivityIndicator size="small" color={t.primaryDark} />
+                <Text style={styles.pollingText}>Đang chờ xác nhận… cộng tiền tự động</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <WebView
+            source={{ uri: checkout.url }}
+            style={styles.webview}
+            startInLoadingState
+            javaScriptEnabled
+            domStorageEnabled
+            originWhitelist={['*', 'http://*', 'https://*', 'fastmark://*']}
+            setSupportMultipleWindows={false}
+            injectedJavaScript={HIDE_PAYOS_BRAND_JS}
+            onShouldStartLoadWithRequest={(request) => {
+              const url = request?.url || '';
+              if (isPayosReturnUrl(url) && url.startsWith('fastmark://')) {
+                handleReturnUrl(url);
+                return false;
+              }
+              return true;
+            }}
+            onNavigationStateChange={(navState) => {
+              const url = navState?.url || '';
+              if (isPayosReturnUrl(url)) {
+                handleReturnUrl(url);
+              }
+            }}
+            renderLoading={() => (
+              <View style={styles.webviewLoading}>
+                <ActivityIndicator color={t.primaryDark} />
+              </View>
+            )}
+          />
+
+          <View style={{ height: Math.max(insets.bottom, 12) }} />
+        </View>
+      );
+    }
   }
 
   return (
@@ -427,18 +537,6 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
                   keyboardType="number-pad"
                 />
                 <Text style={styles.inputSuffix}>VNĐ</Text>
-              </View>
-
-              <Text style={styles.sectionTitle}>Phương thức nạp</Text>
-              <View style={[styles.methodCard, styles.methodCardActive]}>
-                <View style={styles.methodIcon}>
-                  <Ionicons name="card-outline" size={20} color={t.primaryDark} />
-                </View>
-                <View style={styles.methodBody}>
-                  <Text style={styles.methodTitle}>Thanh toán PayOS</Text>
-                  <Text style={styles.methodSub}>Nhúng trong app · nội dung CK = userId</Text>
-                </View>
-                <Ionicons name="checkmark-circle" size={22} color={t.primary} />
               </View>
 
               <Pressable
@@ -594,31 +692,84 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, fontSize: 15, fontWeight: '600', color: t.text },
   inputSuffix: { fontWeight: '700', color: t.textMuted },
-  methodCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  qrCheckoutContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 14,
+  },
+  qrCard: {
+    alignSelf: 'center',
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: t.border,
-    borderRadius: 14,
-    padding: 14,
+  },
+  qrImage: {
+    width: 260,
+    height: 260,
+    borderRadius: 8,
     backgroundColor: '#fff',
   },
-  methodCardActive: {
-    borderColor: t.primary,
-    backgroundColor: '#f0fdf4',
+  transferRow: {
+    gap: 6,
   },
-  methodIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: t.primarySoft,
+  transferLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: t.textMuted,
+  },
+  transferValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  transferValue: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: t.text,
+    lineHeight: 22,
+  },
+  transferValueBold: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: t.text,
+    lineHeight: 22,
+  },
+  copyBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  copyBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: t.primary,
+  },
+  transferNote: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: t.textMuted,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  checkoutCancelBtn: {
+    marginTop: 8,
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: t.border,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  methodBody: { flex: 1, gap: 2 },
-  methodTitle: { fontSize: 15, fontWeight: '800', color: t.text },
-  methodSub: { fontSize: 12, fontWeight: '600', color: t.textMuted },
+  checkoutCancelBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: t.text,
+  },
   confirmBtn: {
     marginTop: 8,
     minHeight: 56,

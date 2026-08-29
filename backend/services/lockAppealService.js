@@ -119,7 +119,7 @@ async function closePendingAccountLockAppeals(
   userId,
   adminUserId = null,
   {
-    adminDecision = "unblock-account",
+    qdAdmin = "unblock-account",
     adminNote = "Khiếu nại đã kết thúc do tài khoản được mở khóa.",
   } = {}
 ) {
@@ -132,9 +132,9 @@ async function closePendingAccountLockAppeals(
     {
       $set: {
         status: REPORT_STATUS.PROCESSED,
-        processedBy: adminUserId || null,
-        processedAt: now,
-        adminDecision,
+        xuLyBoi: adminUserId || null,
+        tgXuLy: now,
+        qdAdmin,
         adminNote,
         UpdatedAt: now,
       },
@@ -146,7 +146,7 @@ async function closePendingShopLockAppeals(
   shopId,
   adminUserId = null,
   {
-    adminDecision = "unblock-shop",
+    qdAdmin = "unblock-shop",
     adminNote = "Khiếu nại đã kết thúc do gian hàng được mở khóa.",
   } = {}
 ) {
@@ -171,9 +171,9 @@ async function closePendingShopLockAppeals(
     {
       $set: {
         status: REPORT_STATUS.PROCESSED,
-        processedBy: adminUserId || null,
-        processedAt: now,
-        adminDecision,
+        xuLyBoi: adminUserId || null,
+        tgXuLy: now,
+        qdAdmin,
         adminNote,
         UpdatedAt: now,
       },

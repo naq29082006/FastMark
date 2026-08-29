@@ -147,7 +147,7 @@ export default function AccountReportScreen({ onBack }) {
       await submitReportOnBackend({
         idToken,
         reportType,
-        title: selectedType?.label || 'Report',
+        title: selectedType?.label || 'Báo cáo',
         content: trimmed,
         images: validImages,
       });
@@ -165,7 +165,7 @@ export default function AccountReportScreen({ onBack }) {
   }
 
   return (
-    <ProfileSubScreen title="Report" onBack={onBack}>
+    <ProfileSubScreen title="Báo cáo" onBack={onBack}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -182,7 +182,7 @@ export default function AccountReportScreen({ onBack }) {
         </Pressable>
 
         <Text style={styles.hint}>
-          Báo cáo gian hàng / người dùng hãy mở trang gian hàng hoặc hồ sơ tương ứng rồi bấm Report.
+          Báo cáo gian hàng / người dùng hãy mở trang gian hàng hoặc hồ sơ tương ứng rồi bấm Báo cáo.
           Tại đây chỉ gửi tố cáo hệ thống hoặc loại khác.
         </Text>
 

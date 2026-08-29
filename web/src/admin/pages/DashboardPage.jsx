@@ -1,52 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Col, Empty, Row, Table, Tooltip } from 'antd';
+import { Alert, Button, Col, Row, Table, Tooltip } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip as ChartTooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 
 import {
-  buildDashboardQuery,
-  formatDashboardPeriodLabel,
   getAdminDashboard,
+  buildDashboardQuery,
+  isDashboardAllTime,
 } from '../../api/dashboardApi';
-import { presetDates } from '../../components/DashboardDateRange';
 import DashboardSystemOverview from '../components/DashboardSystemOverview';
-import DashboardPendingActions from '../components/DashboardPendingActions';
+import DashboardStructureTabsChart from '../components/DashboardStructureTabsChart';
+import DashboardTrendTabsChart from '../components/DashboardTrendTabsChart';
 import PageContainer, { PanelCard } from '../components/PageContainer';
+import ShopCell from '../components/ShopCell';
+import PreviewableImage from '../../components/PreviewableImage';
 import { useAuth } from '../../context/AuthContext';
+import { presetRange } from '../../components/DashboardDateRange';
 import { formatCurrency, formatNumber } from '../utils/format';
-import { buildSttColumn } from '../utils/tableColumns';
-
-function formatDateDisplay(value) {
-  const [year, month, day] = String(value || '').split('-');
-  if (!year || !month || !day) return '';
-  return `${day}-${month}-${year}`;
-}
-
-function periodSummary(from, to) {
-  if (!from || !to) {
-    return { label: 'tất cả thời gian', shortLabel: 'tất cả' };
-  }
-  const label = formatDashboardPeriodLabel(from, to, formatDateDisplay);
-  const start = new Date(from);
-  const end = new Date(to);
-  const days = Math.max(1, Math.round((end - start) / 86400000) + 1);
-  return {
-    label,
-    shortLabel: from === to ? '1 ngày' : `${days} ngày`,
-  };
-}
 
 function chartData(series = []) {
   return (series || []).map((item) => ({
@@ -136,19 +106,64 @@ function buildOrderStatusPieGroups(pieRows = []) {
   };
 }
 
-function pieTooltipFormatter(value, name, props) {
-  const payload = props?.payload;
-  const pct = payload?.percent != null ? ` (${payload.percent.toFixed(1)}%)` : '';
-  return [`${formatNumber(value)} đơn${pct}`, name];
+/** Doanh thu gói bán lũy kế: gói Seller + Banner. */
+function buildRevenueStructurePie(cards = {}) {
+  const seller = Number(cards.sellerPlanRevenueAllTime) || 0;
+  const banner = Number(cards.bannerPlanRevenueAllTime) || 0;
+  const total =
+    Number(cards.packageRevenueAllTime) || seller + banner;
+
+  const allSegments = [
+    { key: 'seller', name: 'Gói Seller', value: seller, color: '#7c3aed' },
+    { key: 'banner', name: 'Gói Banner', value: banner, color: '#16a34a' },
+  ].map((item) => ({
+    ...item,
+    percent: total ? (item.value / total) * 100 : 0,
+  }));
+
+  return {
+    segments: allSegments.filter((item) => item.value > 0),
+    legendSegments: allSegments,
+    total,
+  };
+}
+
+function dashboardProductCell(name, thumbnail) {
+  const label = name || '—';
+  return (
+    <div className="admin-dashboard-product-cell">
+      <PreviewableImage
+        src={thumbnail}
+        alt={label}
+        width={32}
+        height={32}
+        shape="rounded"
+        fallbackLetter={label}
+        className="admin-dashboard-product-cell-thumb"
+      />
+      <span className="admin-dashboard-product-cell-name" title={label}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function dashboardSttColumn() {
+  return {
+    title: 'STT',
+    key: 'stt',
+    width: 44,
+    align: 'center',
+    render: (_value, _record, index) => index + 1,
+  };
 }
 
 function dashboardViewColumn(navigate, getPath, title) {
   return {
     title: '',
     key: 'view',
-    width: 44,
+    width: 40,
     align: 'center',
-    fixed: 'right',
     render: (_, row) => {
       const path = getPath(row);
       if (!path) return null;
@@ -171,15 +186,15 @@ function dashboardViewColumn(navigate, getPath, title) {
 export default function DashboardPage() {
   const { getIdToken } = useAuth();
   const navigate = useNavigate();
-  const defaultRange = useMemo(() => presetDates(30), []);
+  const initialRange = useMemo(() => presetRange('30days'), []);
   const [preset, setPreset] = useState('30days');
-  const [from, setFrom] = useState(defaultRange.from);
-  const [to, setTo] = useState(defaultRange.to);
+  const [from, setFrom] = useState(initialRange.from);
+  const [to, setTo] = useState(initialRange.to);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [data, setData] = useState(null);
 
-  const period = useMemo(() => periodSummary(from, to), [from, to]);
+  const isAllTime = preset === 'all' || isDashboardAllTime(from, to);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -189,7 +204,11 @@ export default function DashboardPage() {
       if (!token) {
         throw new Error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
       }
-      const dashboard = await getAdminDashboard(token, buildDashboardQuery(from, to));
+      const params =
+        preset === 'all' || isDashboardAllTime(from, to)
+          ? { range: 'all' }
+          : buildDashboardQuery(from, to);
+      const dashboard = await getAdminDashboard(token, params);
       if (!dashboard) {
         throw new Error('Backend không trả về dữ liệu dashboard.');
       }
@@ -200,32 +219,53 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [getIdToken, from, to]);
+  }, [getIdToken, from, to, preset]);
 
   useEffect(() => {
+    if (!isAllTime && (!from || !to)) {
+      return;
+    }
     load();
-  }, [load]);
+  }, [load, isAllTime, from, to]);
 
   const cards = data?.cards || {};
   const charts = data?.charts || {};
   const rankings = data?.rankings || {};
-  const pending = data?.pending || {};
 
-  const chartSeries = [
-    { key: 'users', title: 'Người dùng mới', data: chartData(charts.usersOverTime), color: '#16a34a' },
-    { key: 'sellers', title: 'Gian hàng mới', data: chartData(charts.sellersOverTime), color: '#2563eb' },
-    { key: 'reservations', title: 'Đơn hàng', data: chartData(charts.reservationsOverTime), color: '#f59e0b' },
-    { key: 'revenue', title: 'Doanh thu', data: chartData(charts.revenueOverTime), color: '#7c3aed' },
-  ];
+  const chartSeries = useMemo(
+    () => [
+      { key: 'users', data: chartData(charts.usersOverTime), color: '#16a34a' },
+      { key: 'sellers', data: chartData(charts.sellersOverTime), color: '#2563eb' },
+      { key: 'reservations', data: chartData(charts.reservationsOverTime), color: '#f59e0b' },
+      { key: 'revenue', data: chartData(charts.revenueOverTime), color: '#7c3aed', isCurrency: true },
+    ],
+    [charts]
+  );
 
   const orderStatusPie = useMemo(
     () => buildOrderStatusPieGroups(charts.reservationStatusPie),
     [charts.reservationStatusPie]
   );
 
+  const revenueStructurePie = useMemo(
+    () =>
+      isAllTime
+        ? buildRevenueStructurePie(cards)
+        : buildRevenueStructurePie({
+            sellerPlanRevenueAllTime: cards.sellerPlanRevenueInRange,
+            bannerPlanRevenueAllTime: cards.bannerPlanRevenueInRange,
+            packageRevenueAllTime:
+              (Number(cards.sellerPlanRevenueInRange) || 0) +
+              (Number(cards.bannerPlanRevenueInRange) || 0),
+          }),
+    [cards, isAllTime]
+  );
+
   const topShopsByRevenue = asArray(rankings.topSellingShops).map((row) => ({
     shopId: row.shopId,
     shopName: row.shopName,
+    shopUsername: row.shopUsername,
+    avatar: row.avatar,
     revenue: row.revenue,
     orderCount: row.orders,
   }));
@@ -233,85 +273,61 @@ export default function DashboardPage() {
   const topProducts = asArray(rankings.topSellingProducts).map((row) => ({
     productId: row.productId,
     productName: row.name,
+    thumbnail: row.thumbnail,
     count: row.soldQuantity,
     revenue: row.revenue,
   }));
 
+  const topReportedShops = asArray(rankings.topReportedShops).map((row) => ({
+    shopId: row.shopId,
+    shopName: row.shopName,
+    shopUsername: row.shopUsername,
+    avatar: row.avatar,
+    reportCount: row.reportCount,
+  }));
+
   return (
-    <PageContainer subtitle={`Dashboard FastMark — ${period.label}`}>
+    <PageContainer subtitle="Dashboard FastMark">
       {error ? (
         <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} action={<a onClick={load}>Thử lại</a>} />
       ) : null}
 
       <DashboardSystemOverview
         loading={loading}
+        cards={cards}
+        metrics={data?.metrics}
+        previousPeriod={data?.previousPeriod}
+        periodDays={data?.periodDays}
+        isAllTime={isAllTime}
         from={from}
         to={to}
         preset={preset}
-        onApply={(range) => {
+        onDateApply={(range) => {
           setPreset(range.preset);
           setFrom(range.from);
           setTo(range.to);
         }}
-        periodDays={data?.periodDays}
-        cards={cards}
-        metrics={data?.metrics}
-        previousPeriod={data?.previousPeriod}
       />
 
-      <DashboardPendingActions loading={loading} pending={pending} />
-
-      <Row gutter={[16, 16]} className="admin-dashboard-rank-row" style={{ marginTop: 8 }} align="stretch">
-        <Col xs={24} lg={7} xl={7}>
-          <PanelCard className="admin-dashboard-pie-panel admin-dashboard-rank-panel" title="Cơ cấu trạng thái đơn">
-            <div className="admin-dashboard-rank-panel-body">
-            <p className="admin-dashboard-pie-note admin-dashboard-pie-note--compact">
-              {formatNumber(orderStatusPie.total || cards.totalReservations || 0)} đơn (toàn hệ thống)
-            </p>
-            <div className="admin-dashboard-pie-chart">
-              {loading ? (
-                <Empty description="Đang tải..." image={Empty.PRESENTED_IMAGE_SIMPLE} />
-              ) : orderStatusPie.segments.length ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={orderStatusPie.segments}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={44}
-                      outerRadius={76}
-                      paddingAngle={2}
-                    >
-                      {orderStatusPie.segments.map((entry) => (
-                        <Cell key={entry.key} fill={entry.color} stroke="#fff" strokeWidth={2} />
-                      ))}
-                    </Pie>
-                    <ChartTooltip formatter={pieTooltipFormatter} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <Empty description="Chưa có đơn" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-              )}
-            </div>
-            {!loading && orderStatusPie.segments.length ? (
-              <ul className="admin-dashboard-pie-legend-list admin-dashboard-pie-legend-list--compact">
-                {orderStatusPie.segments.map((row) => (
-                  <li key={row.key}>
-                    <span className="admin-dashboard-pie-swatch" style={{ background: row.color }} />
-                    <span className="admin-dashboard-pie-legend-name">{row.name}</span>
-                    <span className="admin-dashboard-pie-legend-meta">
-                      {formatNumber(row.value)} · {row.percent.toFixed(0)}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            </div>
+      <Row gutter={[12, 12]} className="admin-dashboard-charts-row" style={{ marginTop: 8 }} align="stretch">
+        <Col xs={24} flex="2.75 2.75 320px">
+          <PanelCard className="admin-dashboard-trend-panel">
+            <DashboardTrendTabsChart series={chartSeries} loading={loading} />
           </PanelCard>
         </Col>
-        <Col xs={24} lg={9} xl={9}>
+        <Col xs={24} flex="0.95 0.95 220px">
+          <PanelCard className="admin-dashboard-trend-panel admin-dashboard-structure-panel">
+            <DashboardStructureTabsChart
+              loading={loading}
+              orderStatus={orderStatusPie}
+              revenueStructure={revenueStructurePie}
+            />
+          </PanelCard>
+        </Col>
+      </Row>
+
+      <Row gutter={[12, 12]} className="admin-dashboard-rank-row" style={{ marginTop: 12 }} align="stretch">
+        <Col xs={24} lg={12} xl={8}>
           <PanelCard className="admin-dashboard-rank-panel" title="Top 10 shop doanh thu">
             <div className="admin-dashboard-rank-panel-body">
             <Table
@@ -319,19 +335,29 @@ export default function DashboardPage() {
               size="small"
               pagination={false}
               loading={loading}
-              scroll={{ x: 320 }}
+              tableLayout="fixed"
               rowKey={(r) => r.shopId || r.id || r._id}
               dataSource={topShopsByRevenue.slice(0, 10)}
               locale={{ emptyText: 'Chưa có dữ liệu' }}
               columns={[
-                buildSttColumn({ page: 1, pageSize: 1 }),
-                { title: 'Shop', dataIndex: 'shopName', key: 'shopName', ellipsis: true, width: 100 },
+                dashboardSttColumn(),
+                {
+                  title: 'Shop',
+                  key: 'shop',
+                  render: (_, row) => (
+                    <ShopCell
+                      shopName={row.shopName}
+                      shopUsername={row.shopUsername}
+                      shopAvatar={row.avatar}
+                    />
+                  ),
+                },
                 {
                   title: 'Doanh thu',
                   dataIndex: 'revenue',
                   key: 'revenue',
                   render: formatCurrency,
-                  width: 108,
+                  width: 96,
                   align: 'right',
                 },
                 {
@@ -339,7 +365,7 @@ export default function DashboardPage() {
                   dataIndex: 'orderCount',
                   key: 'orderCount',
                   render: formatNumber,
-                  width: 48,
+                  width: 52,
                   align: 'right',
                 },
                 dashboardViewColumn(
@@ -352,7 +378,7 @@ export default function DashboardPage() {
             </div>
           </PanelCard>
         </Col>
-        <Col xs={24} lg={8} xl={8}>
+        <Col xs={24} lg={12} xl={8}>
           <PanelCard className="admin-dashboard-rank-panel" title="Top 10 sản phẩm">
             <div className="admin-dashboard-rank-panel-body">
             <Table
@@ -360,18 +386,23 @@ export default function DashboardPage() {
               size="small"
               pagination={false}
               loading={loading}
+              tableLayout="fixed"
               rowKey={(r) => r.productId || r.id || r._id}
               dataSource={topProducts.slice(0, 10)}
               locale={{ emptyText: 'Chưa có' }}
               columns={[
-                buildSttColumn({ page: 1, pageSize: 1 }),
-                { title: 'Sản phẩm', dataIndex: 'productName', key: 'productName', ellipsis: true },
+                dashboardSttColumn(),
+                {
+                  title: 'Sản phẩm',
+                  key: 'product',
+                  render: (_, row) => dashboardProductCell(row.productName, row.thumbnail),
+                },
                 {
                   title: 'Đã bán',
                   dataIndex: 'count',
                   key: 'count',
                   render: formatNumber,
-                  width: 56,
+                  width: 64,
                   align: 'right',
                 },
                 dashboardViewColumn(
@@ -384,30 +415,49 @@ export default function DashboardPage() {
             </div>
           </PanelCard>
         </Col>
-      </Row>
-
-      <Row gutter={[20, 20]} style={{ marginTop: 8 }}>
-        {chartSeries.map((chart) => (
-          <Col key={chart.key} xs={24} lg={12}>
-            <PanelCard title={chart.title}>
-              <div style={{ width: '100%', height: 260 }}>
-                {chart.data.length ? (
-                  <ResponsiveContainer>
-                    <AreaChart data={chart.data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis tickFormatter={(v) => formatNumber(v)} />
-                      <ChartTooltip formatter={(v) => formatNumber(v)} />
-                      <Area type="monotone" dataKey="value" stroke={chart.color} fill={chart.color} fillOpacity={0.15} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Empty description="Chưa có dữ liệu" style={{ paddingTop: 72 }} />
-                )}
-              </div>
-            </PanelCard>
-          </Col>
-        ))}
+        <Col xs={24} lg={12} xl={8}>
+          <PanelCard className="admin-dashboard-rank-panel" title="Top 10 shop bị báo cáo">
+            <div className="admin-dashboard-rank-panel-body">
+            <Table
+              className="admin-dashboard-rank-table"
+              size="small"
+              pagination={false}
+              loading={loading}
+              tableLayout="fixed"
+              rowKey={(r) => r.shopId || r.id || r._id}
+              dataSource={topReportedShops.slice(0, 10)}
+              locale={{ emptyText: 'Chưa có dữ liệu' }}
+              columns={[
+                dashboardSttColumn(),
+                {
+                  title: 'Shop',
+                  key: 'shop',
+                  render: (_, row) => (
+                    <ShopCell
+                      shopName={row.shopName}
+                      shopUsername={row.shopUsername}
+                      shopAvatar={row.avatar}
+                    />
+                  ),
+                },
+                {
+                  title: 'Báo cáo',
+                  dataIndex: 'reportCount',
+                  key: 'reportCount',
+                  render: formatNumber,
+                  width: 72,
+                  align: 'right',
+                },
+                dashboardViewColumn(
+                  navigate,
+                  (row) => (row.shopId ? `/sellers/shops/${row.shopId}` : null),
+                  'Xem shop'
+                ),
+              ]}
+            />
+            </div>
+          </PanelCard>
+        </Col>
       </Row>
     </PageContainer>
   );

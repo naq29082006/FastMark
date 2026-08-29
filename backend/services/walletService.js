@@ -25,6 +25,16 @@ function createServiceError(message, statusCode = 400) {
   return error;
 }
 
+function resolveTransactionReservationId(tx) {
+  if (tx?.reservationId) {
+    return String(tx.reservationId);
+  }
+  if (String(tx?.referenceType || "") === WALLET_REFERENCE_TYPE.RESERVATION && tx?.referenceId) {
+    return String(tx.referenceId);
+  }
+  return null;
+}
+
 function toPublicTransaction(tx, extras = {}) {
   return {
     id: String(tx._id),
@@ -38,7 +48,7 @@ function toPublicTransaction(tx, extras = {}) {
     description: tx.description || "",
     balanceBefore: tx.balanceBefore == null ? null : Number(tx.balanceBefore),
     balanceAfter: tx.balanceAfter == null ? null : Number(tx.balanceAfter),
-    reservationId: tx.reservationId ? String(tx.reservationId) : null,
+    reservationId: resolveTransactionReservationId(tx),
     referenceId: tx.referenceId ? String(tx.referenceId) : null,
     referenceType: tx.referenceType || "",
     createdAt: tx.CreatedAt,
@@ -60,7 +70,7 @@ async function enrichWithdrawTransaction(tx, publicTx) {
     withdraw = await WithdrawRequest.findById(tx.referenceId).lean();
   }
   if (!withdraw) {
-    withdraw = await WithdrawRequest.findOne({ walletTransactionId: tx._id }).lean();
+    withdraw = await WithdrawRequest.findOne({ gdViId: tx._id }).lean();
   }
   if (!withdraw) {
     return publicTx;
@@ -164,7 +174,7 @@ async function applyUserWalletDelta(userId, delta, session = null) {
     return getOrCreateWallet(userId, session);
   }
 
-  const baseOpts = { new: true, runValidators: true, ...mongoSessionOptions(session) };
+  const baseOpts = { returnDocument: "after", runValidators: true, ...mongoSessionOptions(session) };
 
   if (change > 0) {
     const updated = await Wallet.findOneAndUpdate(
@@ -202,12 +212,12 @@ async function applySystemWalletDelta(delta, session = null) {
     return getOrCreateSystemWallet(session);
   }
 
-  await getOrCreateSystemWallet(session);
-  const baseOpts = { new: true, runValidators: true, ...mongoSessionOptions(session) };
+  const wallet = await getOrCreateSystemWallet(session);
+  const baseOpts = { returnDocument: "after", runValidators: true, ...mongoSessionOptions(session) };
 
   if (change > 0) {
     const updated = await SystemWallet.findOneAndUpdate(
-      { key: "system" },
+      { _id: wallet._id },
       { $inc: { balance: change } },
       baseOpts
     );
@@ -220,7 +230,7 @@ async function applySystemWalletDelta(delta, session = null) {
 
   const debit = Math.abs(change);
   const updated = await SystemWallet.findOneAndUpdate(
-    { key: "system", balance: { $gte: debit } },
+    { _id: wallet._id, balance: { $gte: debit } },
     { $inc: { balance: change } },
     baseOpts
   );
@@ -250,7 +260,7 @@ async function reconcileUserWalletBalanceFromLedger(userId) {
   const wallet = await Wallet.findOneAndUpdate(
     { userId },
     { $set: { balance: target, UpdatedAt: new Date() } },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
   );
   return wallet;
 }
@@ -272,6 +282,24 @@ function buildPayosDescription(user) {
     return userId;
   }
   return userId.slice(0, 25) || "FastMark";
+}
+
+const PAYOS_BIN_LABELS = {
+  "970422": "Ngân hàng TMCP Quân đội",
+  "970436": "Ngân hàng TMCP Ngoại thương Việt Nam",
+  "970415": "Ngân hàng TMCP Công thương Việt Nam",
+  "970418": "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam",
+  "970407": "Ngân hàng TMCP Kỹ thương Việt Nam",
+  "970416": "Ngân hàng TMCP Á Châu",
+  "970432": "Ngân hàng TMCP Việt Nam Thịnh Vượng",
+  "970403": "Ngân hàng TMCP Sài Gòn Thương Tín",
+  "970405": "Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam",
+  "970448": "Ngân hàng TMCP Phương Đông",
+};
+
+function resolvePayosBankLabel(bin) {
+  const key = String(bin || "").trim();
+  return PAYOS_BIN_LABELS[key] || (key ? `Ngân hàng (${key})` : "");
 }
 
 async function applySuccessfulTopup(orderCode, { amount, paymentLinkId } = {}) {
@@ -392,7 +420,12 @@ async function createTopup(user, amountInput) {
     checkoutUrl: String(paymentLink.checkoutUrl || ""),
     orderCode,
     paymentLinkId: String(paymentLink.paymentLinkId || ""),
-    qrCode: paymentLink.qrCode || "",
+    qrCode: String(paymentLink.qrCode || ""),
+    accountNumber: String(paymentLink.accountNumber || ""),
+    accountName: String(paymentLink.accountName || ""),
+    bin: String(paymentLink.bin || ""),
+    bankName: resolvePayosBankLabel(paymentLink.bin),
+    amount,
     description: payosDescription,
   };
 }
@@ -598,7 +631,7 @@ async function creditWalletRefund(userId, amount, { description, session } = {})
 }
 
 async function getOrCreateSystemWallet(session = null) {
-  const query = SystemWallet.findOne({ key: "system" });
+  const query = SystemWallet.findOne().sort({ _id: 1 });
   if (session) {
     query.session(session);
   }
@@ -608,13 +641,13 @@ async function getOrCreateSystemWallet(session = null) {
   }
   try {
     const created = await SystemWallet.create(
-      [{ key: "system", balance: 0 }],
+      [{ balance: 0 }],
       session ? { session } : undefined
     );
     return created[0];
   } catch (error) {
     if (error?.code === 11000) {
-      const retry = SystemWallet.findOne({ key: "system" });
+      const retry = SystemWallet.findOne().sort({ _id: 1 });
       if (session) {
         retry.session(session);
       }
@@ -776,7 +809,10 @@ async function loadWalletTransactionsForReservation(reservationId) {
     status: WALLET_TX_STATUS.SUCCESS,
     $or: [
       { reservationId: objectId },
-      { referenceId: objectId, referenceType: WALLET_REFERENCE_TYPE.RESERVATION },
+      {
+        referenceId: objectId,
+        referenceType: WALLET_REFERENCE_TYPE.RESERVATION,
+      },
     ],
   })
     .sort({ CreatedAt: 1 })
@@ -804,4 +840,5 @@ module.exports = {
   refundDepositFromSystem,
   releaseDepositFromSystem,
   loadWalletTransactionsForReservation,
+  resolveTransactionReservationId,
 };

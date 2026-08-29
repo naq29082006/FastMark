@@ -22,6 +22,8 @@ const LEGACY_STATUS_TO_NEW = {
   7: 6,
 };
 
+const { RESERVATION_STATUS } = require("../constants");
+
 async function migrateReservations() {
   const col = Reservation.collection;
   const cursor = col.find({});
@@ -32,11 +34,8 @@ async function migrateReservations() {
     const set = {};
     const unset = {};
 
-    if (doc.userId && !doc.buyerId) {
-      set.buyerId = doc.userId;
-    }
-    if (doc.disputed !== undefined && doc.hasDispute === undefined) {
-      set.hasDispute = Boolean(doc.disputed);
+    if (doc.buyerId && !doc.userId) {
+      set.userId = doc.buyerId;
     }
     if (doc.hasReviewed !== undefined && doc.hasReview === undefined) {
       set.hasReview = Boolean(doc.hasReviewed);
@@ -47,6 +46,24 @@ async function migrateReservations() {
     if (doc.UpdatedAt && !doc.updatedAt) {
       set.updatedAt = doc.UpdatedAt;
     }
+    if (!doc.tgNhanHang && doc.completedAt) {
+      set.tgNhanHang = doc.completedAt;
+    }
+    if (doc.cancelledBySellerAfterAccept && !doc.cancelType) {
+      set.cancelType = "seller_after_accept";
+    }
+    if (doc.cancelReason && !String(doc.cancelNote || "").trim()) {
+      set.cancelNote = doc.cancelReason;
+    }
+    if (doc.cancelledBy && !String(doc.cancelType || "").trim()) {
+      set.cancelType = doc.cancelledBy;
+    }
+    if (doc.legacyCancelNote && !String(doc.cancelNote || "").trim()) {
+      set.cancelNote = doc.legacyCancelNote;
+    }
+    if ((doc.hasDispute || doc.disputed) && Number(doc.status) !== 3) {
+      set.status = 3;
+    }
     if (!doc.pickupCode) {
       set.pickupCode = generatePickupCode();
     }
@@ -54,11 +71,17 @@ async function migrateReservations() {
       set.status = LEGACY_STATUS_TO_NEW[doc.status];
     }
 
-    unset.userId = "";
     unset.disputed = "";
+    unset.hasDispute = "";
     unset.hasReviewed = "";
     unset.CreatedAt = "";
     unset.UpdatedAt = "";
+    unset.completedAt = "";
+    unset.cancelNote = "";
+    unset.cancelledBySellerAfterAccept = "";
+    unset.buyerId = "";
+    unset.sellerId = "";
+    unset.depositPaidAt = "";
     unset.pickupExpiredAt = "";
     unset.buyerLatAtExpire = "";
     unset.buyerLngAtExpire = "";
@@ -67,13 +90,17 @@ async function migrateReservations() {
     unset.expireDistanceMeters = "";
     unset.reviewDeadlineAt = "";
     unset.autoReleaseAt = "";
-    unset.cancelNote = "";
-    unset.cancelledBy = "";
-    unset.cancelledBySellerAfterAccept = "";
-    unset.sellerCancelImages = "";
+    unset.agreedPrice = "";
+    unset.reasonCode = "";
     unset.pickupReminderSentAt = "";
     unset.buyerReceivedAt = "";
     unset.paymentStatus = "";
+
+    if (!doc.hanGiaiCoc && doc.reviewDeadlineAt) {
+      set.hanGiaiCoc = doc.reviewDeadlineAt;
+    } else if (!doc.hanGiaiCoc && doc.autoReleaseAt) {
+      set.hanGiaiCoc = doc.autoReleaseAt;
+    }
 
     if (Object.keys(set).length || Object.keys(unset).length) {
       await col.updateOne({ _id: doc._id }, { $set: set, $unset: unset });

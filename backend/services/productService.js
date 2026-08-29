@@ -4,13 +4,14 @@ const ProductCategory = require("../models/ProductCategory");
 const { assertProductCategoryExists } = require("./productCategoryService");
 const ShopProfile = require("../models/ShopProfile");
 const { PRODUCT_STATUS, PRODUCT_REMOVED_BY } = require("../constants");
-const { isSubscriptionActive, isRecordActive } = require("../constants");
+const { isSubscriptionActive } = require("../constants");
 const {
   isSellerRemovedProduct,
   notRemovedProductMatch,
 } = require("../utils/productRemoval");
 const {
   assertCanManageProducts,
+  ensureSubscriptionFresh,
 } = require("./sellerPlanAccessService");
 const { assertNoActiveReservationsForProduct } = require("./reservationService");
 const { sanitizeUploadLabel } = require("../utils/sanitizeFileName");
@@ -245,6 +246,7 @@ function publicProductFilter(extra = {}) {
       $or: [
         { Status: PRODUCT_STATUS.ACTIVE },
         { Status: true },
+        { Status: "1" },
         { Status: { $exists: false } },
       ],
     }
@@ -305,8 +307,8 @@ function toPublicProduct(product, variants = [], category = null, imageDocs = nu
 
   if (
     product.IsPromotion &&
-    product.PromotionEndDate &&
-    new Date(product.PromotionEndDate) < new Date() &&
+    product.NgayKmKT &&
+    new Date(product.NgayKmKT) < new Date() &&
     typeof product.save === "function"
   ) {
     const { ensureProductPromotionFresh } = require("./productPromotionService");
@@ -317,7 +319,7 @@ function toPublicProduct(product, variants = [], category = null, imageDocs = nu
     id: product._id,
     shopId: product.ShopId,
     categoryId: product.CategoryId,
-    categoryName: category?.name || category?.categoryName || product.CategoryName || "",
+    categoryName: category?.name || product.CategoryName || "",
     productName: product.ProductName,
     description: product.Description || "",
     donVi: product.DonVi || "",
@@ -332,6 +334,7 @@ function toPublicProduct(product, variants = [], category = null, imageDocs = nu
     variantCount: normalizedVariants.length,
     status,
     isUnavailable: status === PRODUCT_STATUS.HIDDEN,
+    statusLabel: status === PRODUCT_STATUS.HIDDEN ? "Đã ẩn" : "Đang hiện",
     minPrice,
     maxPrice: maxPrice || minPrice,
     pinProduct: Math.max(0, Math.min(2, Number(product.pinProduct) || 0)),
@@ -393,8 +396,8 @@ async function buildVariantDocs(user, variantsInput) {
 
 async function syncShopProductStats(shop) {
   const products = await Product.find(activeProductFilter({ ShopId: shop._id }));
-  shop.totalProducts = products.length;
-  // Shop followersCount is maintained by Follow, not product likes.
+  shop.tongSP = products.length;
+  // Shop soNguoiTheo is maintained by Follow, not product likes.
   shop.UpdatedAt = new Date();
   await shop.save();
   return shop;
@@ -524,9 +527,9 @@ async function createProduct(user, payload) {
     MaxPrice: maxPrice,
     Status: status,
     IsPromotion: promotion.isPromotion,
-    DiscountPercent: promotion.discountPercent,
-    PromotionStartDate: promotion.promotionStartDate,
-    PromotionEndDate: promotion.promotionEndDate,
+    PtGiam: promotion.discountPercent,
+    NgayKmBD: promotion.promotionStartDate,
+    NgayKmKT: promotion.promotionEndDate,
   });
 
   const imageDocs = await replaceProductImages(product._id, thumbnails);
@@ -622,8 +625,12 @@ async function getProductById(productId) {
     throw createServiceError("Không tìm thấy sản phẩm.", 404);
   }
 
-  const shop = await ShopProfile.findById(product.ShopId).lean();
-  if (!shop || !isSubscriptionActive(shop) || !isRecordActive(shop.isActive)) {
+  const shopDoc = await ShopProfile.findById(product.ShopId);
+  if (!shopDoc) {
+    throw createServiceError("Không tìm thấy sản phẩm.", 404);
+  }
+  await ensureSubscriptionFresh(shopDoc);
+  if (!isSubscriptionActive(shopDoc)) {
     throw createServiceError("Không tìm thấy sản phẩm.", 404);
   }
 
@@ -744,9 +751,9 @@ async function softDeleteProduct(user, productId) {
   product.RemovedAt = new Date();
   product.pinProduct = 0;
   product.IsPromotion = false;
-  product.DiscountPercent = 0;
-  product.PromotionStartDate = null;
-  product.PromotionEndDate = null;
+  product.PtGiam = 0;
+  product.NgayKmBD = null;
+  product.NgayKmKT = null;
   product.UpdatedAt = new Date();
   await product.save();
 
@@ -843,8 +850,8 @@ async function listCategories() {
   }).sort({ CreatedAt: 1, _id: 1 });
   return categories.map((category) => ({
     id: String(category._id),
-    name: category.name || category.categoryName || "",
-    categoryName: category.name || category.categoryName || "",
+    name: category.name || "",
+    categoryName: category.name || "",
     description: category.description || "",
     isDeleted: Number(category.IsDeleted) === 0 ? 0 : 1,
   }));

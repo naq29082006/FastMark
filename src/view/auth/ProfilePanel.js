@@ -64,8 +64,12 @@ import { subscribeTopupDeepLink } from '../../viewmodel/wallet/topupSession';
 import {
   loadReservationResume,
 } from '../../viewmodel/buyer/reservationResumeSession';
+import { requestWalletTopUp } from '../wallet/walletTopUpBridge';
 
 function resolveTopUpBackLabel(returnNav) {
+  if (returnNav === 'reservation') {
+    return 'Tiếp tục giữ hàng';
+  }
   if (returnNav === 'banner' || returnNav === 'seller-banner') {
     return 'Quay lại banner';
   }
@@ -98,6 +102,9 @@ export default function ProfilePanel({
   onResumeReserveHandled,
   onNavigationStateChange,
   onOpenBuyerOrdersTab,
+  keepNestedAcrossTabs = false,
+  onOpenWalletTopUp,
+  openStoreRequest = null,
 }) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
@@ -122,6 +129,7 @@ export default function ProfilePanel({
   const [buyerOrdersTabKey, setBuyerOrdersTabKey] = useState(0);
   const [sellerOrdersTab, setSellerOrdersTab] = useState(RESERVATION_TAB.PENDING);
   const [productStoreId, setProductStoreId] = useState(null);
+  const lastOpenStoreAtRef = useRef(0);
   const handledProfileNavRef = useRef(0);
   const handledRegisterRequestRef = useRef(0);
 
@@ -179,6 +187,9 @@ export default function ProfilePanel({
 
   useEffect(() => {
     if (!isProfileVisible) {
+      if (keepNestedAcrossTabs && topUpReturnNav === 'reservation') {
+        return;
+      }
       setProfileNav(null);
       setSellerStep(null);
       setOrderDetailTarget(null);
@@ -189,7 +200,7 @@ export default function ProfilePanel({
       setFollowConnectionsTab('following');
       return;
     }
-  }, [isProfileVisible]);
+  }, [isProfileVisible, keepNestedAcrossTabs, topUpReturnNav]);
 
   useEffect(() => {
     if (!sellerStep || sellerStep === 'phone' || sellerStep === 'verify' || !reduxVerification) {
@@ -249,6 +260,17 @@ export default function ProfilePanel({
   }, [isProfileVisible, profileNavRequest]);
 
   useEffect(() => {
+    const requestAt = openStoreRequest?.at || 0;
+    if (!isProfileVisible || !openStoreRequest?.storeId || requestAt === lastOpenStoreAtRef.current) {
+      return;
+    }
+    lastOpenStoreAtRef.current = requestAt;
+    setProfileNav(null);
+    onOpenProductDetail?.(null);
+    setProductStoreId(String(openStoreRequest.storeId));
+  }, [isProfileVisible, onOpenProductDetail, openStoreRequest]);
+
+  useEffect(() => {
     return subscribeTopupDeepLink(async (parsed) => {
       if (parsed?.cancelled || !isProfileVisible) {
         return;
@@ -270,9 +292,23 @@ export default function ProfilePanel({
     });
   }, [dispatch, isProfileVisible]);
 
+  function openReservationTopUp(context) {
+    const productId = String(context?.productId || '').trim();
+    if (productId) {
+      setTopUpReturnNav('reservation');
+      requestWalletTopUp({ ...context, productId });
+      return;
+    }
+    openBuyerWalletTopUp();
+  }
+
   function openTopUp(returnNav = 'wallet') {
     setTopUpReturnNav(returnNav || 'wallet');
     setProfileNav('wallet-topup');
+  }
+
+  function openBuyerWalletTopUp() {
+    requestWalletTopUp(null);
   }
 
   useEffect(() => {
@@ -664,6 +700,11 @@ export default function ProfilePanel({
         onActiveTabChange={setBuyerOrdersTab}
         initialTab={buyerOrdersTab}
         tabRequestKey={buyerOrdersTabKey}
+        onOpenBuyerOrders={(tab) => {
+          setBuyerOrdersTab(tab || RESERVATION_TAB.PENDING);
+          onOpenBuyerOrdersTab?.(tab);
+        }}
+        onOpenWalletTopUp={openReservationTopUp}
       />
     );
   }
@@ -692,14 +733,26 @@ export default function ProfilePanel({
     return (
       <WalletScreen
         onBack={() => setProfileNav(null)}
-        onTopUp={() => openTopUp('wallet')}
-        onWithdraw={() => setProfileNav('wallet-withdraw')}
+        onTopUp={() => openBuyerWalletTopUp()}
+        onWithdraw={isSeller ? () => setProfileNav('wallet-withdraw') : undefined}
+        canWithdraw={isSeller}
+        canTopUp
         onSeeAllTransactions={() => setProfileNav('wallet-transactions')}
       />
     );
   }
 
   if (profileNav === 'wallet-withdraw') {
+    if (!isSeller) {
+      return (
+        <WalletScreen
+          onBack={() => setProfileNav(null)}
+          onTopUp={() => openBuyerWalletTopUp()}
+          canWithdraw={false}
+          onSeeAllTransactions={() => setProfileNav('wallet-transactions')}
+        />
+      );
+    }
     return (
       <View style={styles.screen}>
         <WithdrawScreen
@@ -734,9 +787,22 @@ export default function ProfilePanel({
           }
           setProfileNav(topUpReturnNav === 'reservation' ? null : topUpReturnNav || 'wallet');
         }}
-        onSuccess={(result) => {
+        onSuccess={async (result) => {
           setTopUpResult(result || null);
           dispatch(loadUserProfile());
+          if (topUpReturnNav === 'reservation') {
+            let resume = null;
+            try {
+              resume = await loadReservationResume();
+            } catch {
+              resume = null;
+            }
+            setProfileNav(null);
+            if (resume?.productId) {
+              onContinueReservationAfterTopUp?.(resume);
+              return;
+            }
+          }
           setProfileNav('wallet-success');
         }}
         />
@@ -759,17 +825,34 @@ export default function ProfilePanel({
           setProfileNav(null);
           onContinueReservationAfterTopUp?.(payload);
         }}
-        onBackHome={() => {
+        onBackHome={async () => {
           setTopUpResult(null);
+          if (topUpReturnNav === 'reservation') {
+            let resume = null;
+            try {
+              resume = await loadReservationResume();
+            } catch {
+              resume = null;
+            }
+            setProfileNav(null);
+            if (resume?.productId) {
+              onContinueReservationAfterTopUp?.(resume);
+            }
+            return;
+          }
           setProfileNav(topUpReturnNav || 'wallet');
         }}
         onViewHistory={() => {
           setTopUpResult(null);
           if (topUpReturnNav === 'wallet') {
             setProfileNav('wallet-transactions');
-          } else {
-            setProfileNav(topUpReturnNav || 'wallet');
+            return;
           }
+          if (topUpReturnNav === 'reservation') {
+            setProfileNav('wallet-transactions');
+            return;
+          }
+          setProfileNav(topUpReturnNav || 'wallet');
         }}
       />
     );
@@ -824,6 +907,13 @@ export default function ProfilePanel({
               onOpenProductDetail?.(nextProductId);
             }}
             onNavigateDirections={onNavigateToStore}
+            onOrderSuccess={(tab) => {
+              setProductStoreId(null);
+              onOpenProductDetail?.(null);
+              onOpenBuyerOrdersTab?.(tab);
+            }}
+            onOpenTopUp={openReservationTopUp}
+            reservationSource="profile"
           />
         );
       }
@@ -837,14 +927,12 @@ export default function ProfilePanel({
             onResumeReserveHandled?.();
           }}
           onStorePress={(storeId) => setProductStoreId(String(storeId))}
-          onOpenTopUp={(context) => {
-            if (context?.productId) {
-              setTopUpReturnNav('reservation');
-              setProfileNav('wallet-topup');
-              return;
-            }
-            openTopUp('wallet');
+          onOrderSuccess={(tab) => {
+            setProductStoreId(null);
+            onOpenProductDetail?.(null);
+            onOpenBuyerOrdersTab?.(tab);
           }}
+          onOpenTopUp={openReservationTopUp}
           reservationSource="profile"
           resumeReserveRequest={
             resumeReserveRequest &&
@@ -899,7 +987,7 @@ export default function ProfilePanel({
         onOpenReport={() => setProfileNav('account-report')}
         onOpenVisitedStores={() => setProfileNav('visited-stores')}
         onOpenWallet={() => setProfileNav('wallet')}
-        onOpenWalletTopUp={() => openTopUp('wallet')}
+        onOpenWalletTopUp={openBuyerWalletTopUp}
         onOpenSellerShopSettings={() => setProfileNav('seller-shop-settings')}
         onOpenSellerReviews={() => setProfileNav('seller-reviews')}
         onOpenSellerOrders={() => setProfileNav('seller-orders')}

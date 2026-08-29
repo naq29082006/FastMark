@@ -66,7 +66,7 @@ const MODEL_RELATIONS = {
   SellerBannerPlan: ["N-1 → User, ShopProfile, BannerPlan"],
   SellerPlan: ["1-N → SellerSubscription"],
   SellerSubscription: ["N-1 → User, ShopProfile, SellerPlan"],
-  SellerVerification: ["N-1 → User (seller); N-1 → User (processedBy)"],
+  SellerVerification: ["N-1 → User (seller); N-1 → User (xuLyBoi)"],
 };
 
 function esc(s) {

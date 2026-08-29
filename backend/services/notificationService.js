@@ -59,7 +59,7 @@ function buildTabListFilter(tab) {
 
 async function createNotificationsBulk(
   userIds,
-  { title, content, audience, index, isAdminBroadcast = false } = {}
+  { title, content, audience, index, tbAdmin = false } = {}
 ) {
   const ids = (Array.isArray(userIds) ? userIds : []).filter(Boolean);
   if (!ids.length) {
@@ -89,7 +89,7 @@ async function createNotificationsBulk(
       content: normalizedContent,
       audience: normalizedAudience,
       index: normalizedIndex,
-      isAdminBroadcast: Boolean(isAdminBroadcast),
+      tbAdmin: Boolean(tbAdmin),
       isRead: 0,
       CreatedAt: now,
       UpdatedAt: now,
@@ -101,8 +101,9 @@ async function createNotificationsBulk(
   return inserted;
 }
 
-async function createNotification(userId, { title, content, audience, index, isAdminBroadcast } = {}) {
-  if (!userId) {
+async function createNotification(userId, { title, content, audience, index, tbAdmin } = {}) {
+  const normalizedUserId = userId;
+  if (!normalizedUserId) {
     return null;
   }
 
@@ -116,12 +117,12 @@ async function createNotification(userId, { title, content, audience, index, isA
   );
   const now = new Date();
   const notification = await Notification.create({
-    userId,
+    userId: normalizedUserId,
     title: String(title || "").trim(),
     content: String(content || "").trim(),
     audience: normalizedAudience,
     index: normalizedIndex,
-    isAdminBroadcast: Boolean(isAdminBroadcast),
+    tbAdmin: Boolean(tbAdmin),
     isRead: 0,
     CreatedAt: now,
     UpdatedAt: now,
@@ -133,7 +134,7 @@ async function createNotification(userId, { title, content, audience, index, isA
     content: notification.content,
     audience: notification.audience,
     index: notification.index,
-    isAdminBroadcast: Boolean(notification.isAdminBroadcast),
+    tbAdmin: Boolean(notification.tbAdmin),
     isRead: notification.isRead,
     createdAt: notification.CreatedAt,
   };
@@ -141,7 +142,7 @@ async function createNotification(userId, { title, content, audience, index, isA
   socketBus.emitUserEvent(String(userId), "notification:new", payload);
   socketBus.emitUserEvent(String(userId), "notification_created", payload);
 
-  sendPushToUser(userId, {
+  sendPushToUser(normalizedUserId, {
     title: notification.title,
     content: notification.content,
     data: {
@@ -164,7 +165,7 @@ function toClientNotification(notification) {
     body: notification.content || "",
     audience: notification.audience || NOTIFICATION_AUDIENCE.SYSTEM,
     index: normalizeNotificationIndex(notification.index, NOTIFICATION_INDEX.SYSTEM),
-    isAdminBroadcast: Boolean(notification.isAdminBroadcast),
+    tbAdmin: Boolean(notification.tbAdmin),
     isRead: Number(notification.isRead) === 1,
     createdAt: notification.CreatedAt || null,
   };

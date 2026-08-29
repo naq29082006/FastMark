@@ -31,10 +31,10 @@ const ReservationAdjustmentSchema = new mongoose.Schema({
   },
   oldQuantity: { type: Number, required: true },
   newQuantity: { type: Number, required: true },
-  oldReservedPrice: { type: Number, required: true },
-  newReservedPrice: { type: Number, required: true },
-  oldDepositAmount: { type: Number, required: true },
-  newDepositAmount: { type: Number, required: true },
+  giaCu: { type: Number, required: true },
+  giaMoi: { type: Number, required: true },
+  cocCu: { type: Number, required: true },
+  cocMoi: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now, index: true },
 });
 

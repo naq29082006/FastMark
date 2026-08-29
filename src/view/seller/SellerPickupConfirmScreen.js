@@ -21,6 +21,7 @@ import {
   confirmSellerDeliveredOnBackend,
 } from '../../api/sellerOpsApi';
 import { RESERVATION_STATUS } from '../../constants/sellerOrders';
+import { getOrderCodeValue } from '../../core/utils/orderCode';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 
 export default function SellerPickupConfirmScreen({
@@ -209,6 +210,7 @@ export default function SellerPickupConfirmScreen({
 
       <SellerCancelAcceptedModal
         visible={showCancelModal}
+        orderCode={getOrderCodeValue(reservation?.id || reservation?._id)}
         onClose={() => {
           if (!isCancelling) {
             setShowCancelModal(false);

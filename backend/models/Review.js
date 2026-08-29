@@ -3,7 +3,7 @@ const { embeddedImagesField } = require("../utils/embeddedImages");
 
 /**
  * Review — đánh giá sản phẩm sau khi đơn giữ hàng hoàn thành.
- * Xóa mềm / ẩn theo mẫu Product: isDeleted + removedBy + adminRemovalReason + removedAt.
+ * Xóa mềm / ẩn theo mẫu Product: isDeleted + removedBy + lyDoGo + removedAt.
  */
 const ReviewSchema = new mongoose.Schema({
   // Người viết đánh giá (ref User).
@@ -51,7 +51,7 @@ const ReviewSchema = new mongoose.Schema({
   /** Ai gỡ / ẩn: buyer | admin — rỗng khi còn hiển thị công khai. */
   removedBy: { type: String, default: "", trim: true, index: true },
   /** Lý do gỡ (bắt buộc khi removedBy = admin). */
-  adminRemovalReason: { type: String, default: "", trim: true },
+  lyDoGo: { type: String, default: "", trim: true },
   /** Thời điểm gỡ hoặc admin ẩn. */
   removedAt: { type: Date, default: null },
 
@@ -68,13 +68,8 @@ ReviewSchema.index(
   { reservationId: 1 },
   {
     unique: true,
-    partialFilterExpression: {
-      $or: [
-        { isDeleted: 1 },
-        { isDeleted: false },
-        { isDeleted: { $exists: false } },
-      ],
-    },
+    // Chỉ một đánh giá “còn hiệu lực” / đơn — Mongo không hỗ trợ $exists trong partial index.
+    partialFilterExpression: { isDeleted: 1 },
     name: "reservationId_1_active",
   }
 );

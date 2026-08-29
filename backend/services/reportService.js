@@ -23,7 +23,7 @@ const {
   ensureShopLockedAt,
   isLegacyShopLockAppealReport,
 } = require("./lockAppealService");
-const { normalizeReportType } = require("../utils/reportType");
+const { normalizeReportType, resolveReportTypeLabelForReport } = require("../utils/reportType");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -61,6 +61,11 @@ async function resolveShopByStoreId(storeId) {
     return shopByObjectId;
   }
 
+  const shopByExternalId = await ShopProfile.findOne({ externalRestaurantId: rawId }).lean();
+  if (shopByExternalId) {
+    return shopByExternalId;
+  }
+
   throw createServiceError("Không tìm thấy gian hàng để báo cáo.", 404);
 }
 
@@ -86,11 +91,8 @@ function inferReportType(payload = {}) {
     REPORT_TYPE.SYSTEM,
     REPORT_TYPE.OTHER,
   ];
-  const explicitType = normalizeReportType(payload.reportType);
-  if (explicitType != null && CONTENT_TYPES.includes(explicitType)) {
-    return explicitType;
-  }
 
+  // Ưu tiên đối tượng gắn kèm — tránh legacy map làm sai loại (vd. app gửi 2=shop → 5=khác).
   if (pickString(payload.reviewId || payload.review_id)) {
     return REPORT_TYPE.REVIEW;
   }
@@ -103,7 +105,126 @@ function inferReportType(payload = {}) {
     return REPORT_TYPE.SHOP;
   }
 
+  const rawType = Number(payload.reportType);
+  if (Number.isFinite(rawType) && rawType >= 1 && rawType <= 7) {
+    return rawType;
+  }
+
+  const explicitType = normalizeReportType(payload.reportType);
+  if (explicitType != null && CONTENT_TYPES.includes(explicitType)) {
+    return explicitType;
+  }
+
   return REPORT_TYPE.OTHER;
+}
+
+async function attachReportTargetsFromPayload(reportData, payload, user) {
+  const reviewId = pickString(payload.reviewId || payload.review_id);
+  if (reviewId) {
+    const review = await resolveReviewById(reviewId);
+    if (user && String(review.userId) === String(user._id)) {
+      throw createServiceError("Bạn không thể báo cáo đánh giá của chính mình.", 400);
+    }
+    reportData.reviewId = review._id;
+    reportData.shopId = review.shopId || null;
+    reportData.productId = review.productId || null;
+    reportData._review = review;
+    return REPORT_TYPE.REVIEW;
+  }
+
+  const productId = pickString(payload.productId || payload.product_id);
+  if (productId) {
+    const product = await resolveProductById(productId);
+    reportData.productId = product._id;
+    reportData._product = product;
+    if (product.ShopId) {
+      const shop = await findShopByObjectId(String(product.ShopId));
+      reportData.shopId = shop?._id || product.ShopId || null;
+      if (shop) {
+        reportData._shop = shop;
+      }
+    }
+    return REPORT_TYPE.PRODUCT;
+  }
+
+  const storeId = pickString(
+    payload.shopId || payload.shop_id || payload.storeId || payload.store_id
+  );
+  if (storeId) {
+    const shop = await resolveShopByStoreId(storeId);
+    reportData.shopId = shop._id;
+    reportData._shop = shop;
+    return REPORT_TYPE.SHOP;
+  }
+
+  return null;
+}
+
+async function buildReportContent(reportData, payload, reportType, resolvedTitle, note) {
+  if (reportType === REPORT_TYPE.REVIEW) {
+    const review = reportData._review || (await resolveReviewById(payload.reviewId || payload.review_id));
+    const reviewerName = pickString(payload.reviewerName || payload.userName) || "khách hàng";
+    const snippet = pickString(review.comment).slice(0, 120);
+    reportData.content =
+      note ||
+      `Báo cáo đánh giá của ${reviewerName}${snippet ? `: "${snippet}"` : ""} — ${resolvedTitle}`;
+    return;
+  }
+
+  if (reportType === REPORT_TYPE.PRODUCT) {
+    const product =
+      reportData._product ||
+      (await resolveProductById(pickString(payload.productId || payload.product_id)));
+    const productName = pickString(payload.productName || payload.product_name) || product.ProductName;
+    let shop = reportData._shop || null;
+    if (!shop && product.ShopId) {
+      shop = await findShopByObjectId(String(product.ShopId));
+    }
+    const shopOwner = shop?.userId
+      ? await User.findById(shop.userId).select("FullName UserName").lean()
+      : null;
+    const shopDisplayName = pickShopDisplayName(shop, shopOwner);
+    reportData.content =
+      note ||
+      `Báo cáo sản phẩm "${productName}"${shopDisplayName ? ` thuộc gian hàng "${shopDisplayName}"` : ""}: ${resolvedTitle}`;
+    return;
+  }
+
+  if (reportType === REPORT_TYPE.SHOP) {
+    const storeName = pickString(
+      payload.shopName || payload.shop_name || payload.storeName || payload.store_name
+    );
+    const shop =
+      reportData._shop ||
+      (await resolveShopByStoreId(
+        pickString(payload.shopId || payload.shop_id || payload.storeId || payload.store_id)
+      ));
+    const shopOwner = shop?.userId
+      ? await User.findById(shop.userId).select("FullName UserName").lean()
+      : null;
+    const shopName = storeName || pickShopDisplayName(shop, shopOwner);
+    reportData.content = note || `Báo cáo gian hàng "${shopName}": ${resolvedTitle}`;
+    return;
+  }
+
+  if (reportType === REPORT_TYPE.SYSTEM) {
+    reportData.content = note || `Báo cáo lỗi hệ thống: ${resolvedTitle}`;
+    return;
+  }
+
+  if (reportType === REPORT_TYPE.OTHER) {
+    reportData.content = note || `Tố cáo khác: ${resolvedTitle}`;
+    return;
+  }
+
+  reportData.content = note || resolvedTitle;
+}
+
+function stripReportDraftFields(reportData) {
+  delete reportData._review;
+  delete reportData._product;
+  delete reportData._shop;
+  return reportData;
 }
 
 async function resolveReviewById(reviewId) {
@@ -239,7 +360,17 @@ function normalizeReportImages(imageUrls = []) {
 async function createReport(user, payload = {}) {
   const title = pickString(payload.title || payload.reason);
   const note = pickString(payload.content || payload.message || payload.note);
-  const reportType = inferReportType(payload);
+  const now = new Date();
+
+  const reportData = {
+    userId: user._id,
+    status: REPORT_STATUS.PENDING,
+    CreatedAt: now,
+    UpdatedAt: now,
+  };
+
+  const targetType = await attachReportTargetsFromPayload(reportData, payload, user);
+  const reportType = targetType ?? inferReportType(payload);
   const isAccountStyle = ACCOUNT_REPORT_TYPES.includes(reportType);
 
   if (!title && !note) {
@@ -250,83 +381,24 @@ async function createReport(user, payload = {}) {
     throw createServiceError("Vui lòng nhập nội dung tố cáo.", 400);
   }
 
-  const now = new Date();
+  if (reportType === REPORT_TYPE.SHOP && !reportData.shopId) {
+    throw createServiceError(
+      "Thiếu gian hàng bị tố cáo. Hãy báo cáo từ trang gian hàng.",
+      400
+    );
+  }
+
+  if (reportType === REPORT_TYPE.PRODUCT && !reportData.productId) {
+    throw createServiceError("Thiếu sản phẩm bị tố cáo. Hãy báo cáo từ trang sản phẩm.", 400);
+  }
+
   const typeLabel = REPORT_TYPE_LABELS[reportType] || "Tố cáo";
   const resolvedTitle = title || typeLabel;
+  reportData.reportType = reportType;
+  reportData.title = resolvedTitle;
 
-  const reportData = {
-    userId: user._id,
-    reportType,
-    title: resolvedTitle,
-    status: REPORT_STATUS.PENDING,
-    CreatedAt: now,
-    UpdatedAt: now,
-  };
-
-  if (reportType === REPORT_TYPE.REVIEW) {
-    const review = await resolveReviewById(payload.reviewId || payload.review_id);
-    if (String(review.userId) === String(user._id)) {
-      throw createServiceError("Bạn không thể báo cáo đánh giá của chính mình.", 400);
-    }
-
-    const reviewerName = pickString(payload.reviewerName || payload.userName) || "khách hàng";
-    const snippet = pickString(review.comment).slice(0, 120);
-
-    reportData.reviewId = review._id;
-    reportData.shopId = review.shopId || null;
-    reportData.productId = review.productId || null;
-    reportData.content =
-      note ||
-      `Báo cáo đánh giá của ${reviewerName}${snippet ? `: "${snippet}"` : ""} — ${resolvedTitle}`;
-  } else if (reportType === REPORT_TYPE.PRODUCT) {
-    const productId = pickString(payload.productId || payload.product_id);
-    const product = await resolveProductById(productId);
-    const productName = pickString(payload.productName || payload.product_name) || product.ProductName;
-    let shop = null;
-
-    if (product.ShopId) {
-      shop = await findShopByObjectId(String(product.ShopId));
-    }
-
-    const shopOwner = shop?.userId
-      ? await User.findById(shop.userId).select("FullName UserName").lean()
-      : null;
-    const shopDisplayName = pickShopDisplayName(shop, shopOwner);
-
-    reportData.productId = product._id;
-    reportData.shopId = shop?._id || product.ShopId || null;
-    reportData.content =
-      note ||
-      `Báo cáo sản phẩm "${productName}"${shopDisplayName ? ` thuộc gian hàng "${shopDisplayName}"` : ""}: ${resolvedTitle}`;
-  } else if (reportType === REPORT_TYPE.SHOP) {
-    const storeId = pickString(
-      payload.shopId || payload.shop_id || payload.storeId || payload.store_id
-    );
-    const storeName = pickString(
-      payload.shopName || payload.shop_name || payload.storeName || payload.store_name
-    );
-
-    if (!storeId) {
-      throw createServiceError(
-        "Thiếu gian hàng bị tố cáo. Hãy báo cáo từ trang gian hàng.",
-        400
-      );
-    }
-
-    const shop = await resolveShopByStoreId(storeId);
-    const shopOwner = shop?.userId
-      ? await User.findById(shop.userId).select("FullName UserName").lean()
-      : null;
-    const shopName = storeName || pickShopDisplayName(shop, shopOwner);
-    reportData.shopId = shop._id;
-    reportData.content = note || `Báo cáo gian hàng "${shopName}": ${resolvedTitle}`;
-  } else if (reportType === REPORT_TYPE.SYSTEM) {
-    reportData.content = note || `Báo cáo lỗi hệ thống: ${resolvedTitle}`;
-  } else if (reportType === REPORT_TYPE.OTHER) {
-    reportData.content = note || `Tố cáo khác: ${resolvedTitle}`;
-  } else {
-    reportData.content = note || resolvedTitle;
-  }
+  await buildReportContent(reportData, payload, reportType, resolvedTitle, note);
+  stripReportDraftFields(reportData);
 
   const imageUrls = await normalizeImageUrls(payload.images || payload.imageUrls || []);
   const report = await Report.create({
@@ -338,7 +410,7 @@ async function createReport(user, payload = {}) {
   return {
     id: String(report._id),
     reportType: report.reportType,
-    reportTypeLabel: REPORT_TYPE_LABELS[normalizeReportType(report.reportType)] || "Không rõ",
+    reportTypeLabel: resolveReportTypeLabelForReport(report),
     title: report.title,
     content: report.content,
     status: report.status,
@@ -404,7 +476,7 @@ async function getAccountLockAppealStatus(user) {
     adminNote: latest.adminNote || "",
     images,
     createdAt: latest.CreatedAt,
-    processedAt: latest.processedAt || null,
+    tgXuLy: latest.tgXuLy || null,
   };
 
   if (latest.status === REPORT_STATUS.PENDING) {
@@ -474,7 +546,7 @@ async function createAccountLockAppeal(user, payload = {}) {
     title,
     content: note,
     status: REPORT_STATUS.PENDING,
-    lockSessionAt: lockedAt || now,
+    phienKhoa: lockedAt || now,
     images: normalizeEmbeddedImages(imageUrls),
     CreatedAt: now,
     UpdatedAt: now,
@@ -544,7 +616,7 @@ async function getShopLockAppealStatus(user) {
     adminNote: latest.adminNote || "",
     images,
     createdAt: latest.CreatedAt,
-    processedAt: latest.processedAt || null,
+    tgXuLy: latest.tgXuLy || null,
   };
 
   if (latest.status === REPORT_STATUS.PENDING) {
@@ -622,7 +694,7 @@ async function createShopLockAppeal(user, payload = {}) {
     title,
     content: note,
     status: REPORT_STATUS.PENDING,
-    lockSessionAt: lockedAt || now,
+    phienKhoa: lockedAt || now,
     images: normalizeEmbeddedImages(imageUrls),
     CreatedAt: now,
     UpdatedAt: now,

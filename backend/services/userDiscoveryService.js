@@ -27,8 +27,8 @@ function toUserCard(user, shop = null) {
     fullName: user.FullName || "",
     userName: user.UserName || "",
     avatar: user.Avatar || "",
-    followersCount: Number(shop?.followersCount) || 0,
-    followingCount: Number(user.FollowingCount) || 0,
+    soNguoiTheo: Number(shop?.soNguoiTheo) || 0,
+    followingCount: Number(user.SoTheoDoi) || 0,
     shopId: shop?._id ? String(shop._id) : "",
     shopName: shop ? resolveShopDisplayName(shop, user) : "",
     shopUsername: shop ? resolveShopUsername(shop, user) : "",
@@ -68,8 +68,8 @@ async function searchUsers(currentUser, query = {}) {
 
   const [rows, total] = await Promise.all([
     User.find(filter)
-      .select("FullName UserName Avatar FollowingCount Role")
-      .sort({ FollowingCount: -1, CreatedAt: -1, _id: -1 })
+      .select("FullName UserName Avatar SoTheoDoi Role")
+      .sort({ SoTheoDoi: -1, CreatedAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
@@ -82,7 +82,7 @@ async function searchUsers(currentUser, query = {}) {
         userId: { $in: userIds },
         status: { $ne: SHOP_STATUS.BLOCKED },
       })
-        .select("userId shopName shopUsername avatar followersCount")
+        .select("userId shopName shopUsername avatar soNguoiTheo")
         .lean()
     : [];
   const shopByUserId = new Map(shops.map((shop) => [String(shop.userId), shop]));
@@ -123,8 +123,8 @@ async function getPublicUserProfile(currentUser, userIdInput) {
 
   let followMeta = {
     isFollowing: false,
-    followersCount: Number(shop?.followersCount) || 0,
-    followingCount: Number(user.FollowingCount) || 0,
+    soNguoiTheo: Number(shop?.soNguoiTheo) || 0,
+    followingCount: Number(user.SoTheoDoi) || 0,
     shopId: shop?._id ? String(shop._id) : "",
   };
 
@@ -132,7 +132,7 @@ async function getPublicUserProfile(currentUser, userIdInput) {
     const status = await getFollowStatus(currentUser, { shopId: String(shop._id) });
     followMeta = {
       ...status,
-      followingCount: Number(user.FollowingCount) || 0,
+      followingCount: Number(user.SoTheoDoi) || 0,
     };
   }
 
@@ -170,7 +170,7 @@ async function listPublicUserFollowing(userIdInput, query = {}) {
         _id: { $in: shopIds },
         status: { $ne: SHOP_STATUS.BLOCKED },
       })
-        .select("userId shopName shopUsername avatar followersCount")
+        .select("userId shopName shopUsername avatar soNguoiTheo")
         .lean()
     : [];
   const shopById = new Map(shops.map((shop) => [String(shop._id), shop]));
@@ -182,7 +182,7 @@ async function listPublicUserFollowing(userIdInput, query = {}) {
         Status: { $ne: USER_STATUS.BLOCKED },
         Role: { $ne: USER_ROLE.ADMIN },
       })
-        .select("FullName UserName Avatar FollowingCount")
+        .select("FullName UserName Avatar SoTheoDoi")
         .lean()
     : [];
   const userById = new Map(users.map((row) => [String(row._id), row]));

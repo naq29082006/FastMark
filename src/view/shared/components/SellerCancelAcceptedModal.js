@@ -33,7 +33,12 @@ function assetToDataUri(asset) {
  * Modal hủy đơn sau khi seller đã xác nhận giữ hàng.
  * Bắt buộc lý do cụ thể + 1–5 ảnh chứng minh.
  */
-export default function SellerCancelAcceptedModal({ visible, onClose, onSubmit }) {
+export default function SellerCancelAcceptedModal({
+  visible,
+  orderCode = '',
+  onClose,
+  onSubmit,
+}) {
   const [reason, setReason] = useState('');
   const [imageUris, setImageUris] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,6 +152,14 @@ export default function SellerCancelAcceptedModal({ visible, onClose, onSubmit }
               disabled={isSubmitting}
             />
 
+            {orderCode ? (
+              <View style={styles.orderCodeRow}>
+                <Text style={styles.orderCodeText}>
+                  Mã đơn hàng: <Text style={styles.orderCodeValue}>{orderCode}</Text>
+                </Text>
+              </View>
+            ) : null}
+
             <KeyboardAwareScrollView
               style={FORM_SHEET_SCROLL_STYLE}
               contentContainerStyle={styles.body}
@@ -243,6 +256,21 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   body: { paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
+  orderCodeRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
+  orderCodeText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#64748b',
+  },
+  orderCodeValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: 0.4,
+  },
   warning: {
     fontSize: 13,
     lineHeight: 18,

@@ -27,6 +27,7 @@ import {
   upsertById,
 } from '../../core/utils/realtimeList';
 import { useReviewedOrderCodes } from '../../hooks/useReviewedOrderCodes';
+import { coalesceReservationFetch } from '../../core/utils/coalesceReservationFetch';
 import { useOrderSocket } from '../../hooks/useOrderSocket';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
@@ -221,13 +222,21 @@ export default function ReservationHistoryScreen({
     }
 
     const isInList = hasItemId(reservationsRef.current, reservationId);
+    const isPendingEvent =
+      Number(payload?.status) === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION;
+
+    if (!isInList && !isPendingEvent) {
+      return;
+    }
 
     try {
-      const idToken = await getCurrentUserIdToken();
-      if (!idToken) {
-        return;
-      }
-      const reservation = await getBuyerReservationOnBackend(idToken, reservationId);
+      const reservation = await coalesceReservationFetch('buyer', reservationId, async () => {
+        const idToken = await getCurrentUserIdToken();
+        if (!idToken) {
+          return null;
+        }
+        return getBuyerReservationOnBackend(idToken, reservationId);
+      });
       if (!reservation?.id) {
         return;
       }

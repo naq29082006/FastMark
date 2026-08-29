@@ -5,6 +5,7 @@ const shopDiscoveryController = require('../controllers/shopDiscoveryController'
 const router = express.Router();
 
 router.get('/shops/nearby', asyncHandler(shopDiscoveryController.listNearbyShops));
+router.get('/shops/nearby/map', asyncHandler(shopDiscoveryController.listNearbyShopsForMap));
 router.get('/shops/search', asyncHandler(shopDiscoveryController.searchShops));
 router.get('/shops/categories', asyncHandler(shopDiscoveryController.listShopCategories));
 router.get('/shops/:id', asyncHandler(shopDiscoveryController.getShop));

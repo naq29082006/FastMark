@@ -401,6 +401,7 @@ export default function HomeScreen({
   onOpenShop,
   onOpenWalletTopUp,
   onNavigateDirections,
+  returnStoreRequest = null,
   resumeReserveRequest = null,
   onResumeReserveHandled,
   keepNestedAcrossTabs = false,
@@ -450,7 +451,18 @@ export default function HomeScreen({
   const [showSearchScreen, setShowSearchScreen] = useState(false);
   const [returnToSearchAfterDetail, setReturnToSearchAfterDetail] = useState(false);
   const searchDetailStackRef = useRef({ productId: null, storeId: null });
+  const lastReturnStoreAtRef = useRef(0);
   const [seeAllSection, setSeeAllSection] = useState(null);
+
+  useEffect(() => {
+    const requestAt = returnStoreRequest?.at || 0;
+    if (!returnStoreRequest?.storeId || requestAt === lastReturnStoreAtRef.current) {
+      return;
+    }
+    lastReturnStoreAtRef.current = requestAt;
+    setSelectedProductId(null);
+    setSelectedStoreId(String(returnStoreRequest.storeId));
+  }, [returnStoreRequest]);
 
   useEffect(() => {
     onNavigationStateChange?.(
@@ -1024,9 +1036,13 @@ export default function HomeScreen({
           setSelectedProductId(null);
           setSelectedStoreId(storeId);
         }}
-        onOrderSuccess={onOpenBuyerOrders}
+        onOrderSuccess={(tab) => {
+          setSelectedProductId(null);
+          setSelectedStoreId(null);
+          onOpenBuyerOrders?.(tab);
+        }}
         onOpenTopUp={onOpenWalletTopUp}
-        reservationSource="home"
+        reservationSource="products"
         resumeReserveRequest={
           resumeReserveRequest &&
           String(resumeReserveRequest.productId) === String(selectedProductId)
@@ -1066,6 +1082,13 @@ export default function HomeScreen({
           setSelectedProductId(productId);
         }}
         onNavigateDirections={onNavigateDirections}
+        onOrderSuccess={(tab) => {
+          setSelectedProductId(null);
+          setSelectedStoreId(null);
+          onOpenBuyerOrders?.(tab);
+        }}
+        onOpenTopUp={onOpenWalletTopUp}
+        reservationSource="products"
       />
     );
   }

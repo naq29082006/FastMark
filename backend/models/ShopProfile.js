@@ -48,14 +48,11 @@ const ShopProfileSchema = new mongoose.Schema({
   isActive: { type: Number, default: 0, index: true },
 
   // Số người theo dõi gian hàng (Follow.shopId).
-  followersCount: { type: Number, default: 0, min: 0 },
+  soNguoiTheo: { type: Number, default: 0, min: 0 },
 
-  // Điểm đánh giá trung bình (0–5).
-  averageRating: { type: Number, default: 0 },
-  // Tổng số đánh giá.
-  totalReviews: { type: Number, default: 0 },
-  // Tổng số sản phẩm đang có.
-  totalProducts: { type: Number, default: 0 },
+  diemTB: { type: Number, default: 0 },
+  tongDG: { type: Number, default: 0 },
+  tongSP: { type: Number, default: 0 },
   // Tổng số lượng đã bán.
   soldCount: { type: Number, default: 0 },
 
@@ -71,5 +68,8 @@ const ShopProfileSchema = new mongoose.Schema({
 ShopProfileSchema.pre("save", function saveHook() {
   this.UpdatedAt = new Date();
 });
+
+ShopProfileSchema.index({ status: 1, isActive: 1, "latlong.lat": 1, "latlong.long": 1 });
+ShopProfileSchema.index({ status: 1, isActive: 1, categoryId: 1 });
 
 module.exports = mongoose.model("ShopProfile", ShopProfileSchema);

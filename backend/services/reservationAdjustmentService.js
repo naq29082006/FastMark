@@ -5,7 +5,7 @@ const ReservationAdjustment = require("../models/ReservationAdjustment");
 const Product = require("../models/Product");
 const ProductVariant = require("../models/ProductVariant");
 const { RESERVATION_STATUS } = require("../constants");
-const { getReservationBuyerId } = require("../utils/reservationCompat");
+const { getReservationBuyerId, reservationHasEscrowDeposit } = require("../utils/reservationCompat");
 const {
   refundDepositFromSystem,
   notifyWalletBalanceUpdated,
@@ -18,6 +18,7 @@ const {
   processReservationLifecycle,
 } = require("./reservationService");
 const { emitOrderUpdated } = require("./orderRealtimeService");
+const { notifyReservationBuyer, resolveProductName } = require("./orderNotificationHelper");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -82,19 +83,20 @@ function mapAdjustmentToPublic(doc, productName = "") {
   if (!doc) {
     return null;
   }
+  const buyerUserId = doc.userId || doc.buyerId;
   return {
     id: String(doc._id),
     reservationId: doc.reservationId ? String(doc.reservationId) : "",
     shopId: doc.shopId ? String(doc.shopId) : "",
-    buyerId: doc.buyerId ? String(doc.buyerId) : "",
+    userId: buyerUserId ? String(buyerUserId) : "",
     productId: doc.productId ? String(doc.productId) : "",
     productName: productName || "",
     oldQuantity: Number(doc.oldQuantity) || 0,
     newQuantity: Number(doc.newQuantity) || 0,
-    oldReservedPrice: Number(doc.oldReservedPrice) || 0,
-    newReservedPrice: Number(doc.newReservedPrice) || 0,
-    oldDepositAmount: Number(doc.oldDepositAmount) || 0,
-    newDepositAmount: Number(doc.newDepositAmount) || 0,
+    giaCu: Number(doc.giaCu) || 0,
+    giaMoi: Number(doc.giaMoi) || 0,
+    cocCu: Number(doc.cocCu) || 0,
+    cocMoi: Number(doc.cocMoi) || 0,
     createdAt: doc.createdAt || null,
   };
 }
@@ -139,25 +141,25 @@ async function adjustReservationAtPickup(user, reservationId, payload = {}) {
   }
 
   const oldQuantity = Number(reservation.quantity) || 0;
-  const oldReservedPrice = Number(reservation.reservedPrice) || resolveUnitPrice(reservation);
-  const oldDepositAmount = Number(reservation.depositAmount) || 0;
+  const giaCu = Number(reservation.reservedPrice) || resolveUnitPrice(reservation);
+  const cocCu = Number(reservation.depositAmount) || 0;
 
   if (newQuantity >= oldQuantity) {
     throw createServiceError("Chỉ được giảm số lượng so với đơn hiện tại.", 400);
   }
 
-  const newReservedPrice = oldReservedPrice;
+  const giaMoi = giaCu;
 
-  const newDepositAmount = computeDepositAmount(
-    newReservedPrice,
+  const cocMoi = computeDepositAmount(
+    giaMoi,
     newQuantity,
     reservation.depositPercent
   );
 
   if (
     oldQuantity === newQuantity &&
-    amountsEqual(oldReservedPrice, newReservedPrice) &&
-    amountsEqual(oldDepositAmount, newDepositAmount)
+    amountsEqual(giaCu, giaMoi) &&
+    amountsEqual(cocCu, cocMoi)
   ) {
     const product = reservation.productId
       ? await Product.findById(reservation.productId).select("ProductName").lean()
@@ -192,10 +194,10 @@ async function adjustReservationAtPickup(user, reservationId, payload = {}) {
             productId: reservation.productId,
             oldQuantity,
             newQuantity,
-            oldReservedPrice,
-            newReservedPrice,
-            oldDepositAmount,
-            newDepositAmount,
+            giaCu,
+            giaMoi,
+            cocCu,
+            cocMoi,
             createdAt: new Date(),
           },
         ],
@@ -203,14 +205,13 @@ async function adjustReservationAtPickup(user, reservationId, payload = {}) {
       );
 
       reservation.quantity = newQuantity;
-      reservation.reservedPrice = newReservedPrice;
-      reservation.agreedPrice = newReservedPrice;
-      reservation.depositAmount = newDepositAmount;
+      reservation.reservedPrice = giaMoi;
+      reservation.depositAmount = cocMoi;
       reservation.updatedAt = new Date();
       await reservation.save({ session });
 
-      const depositRefund = oldDepositAmount - newDepositAmount;
-      if (depositRefund > 0 && reservation.depositPaidAt && buyerId) {
+      const depositRefund = cocCu - cocMoi;
+      if (depositRefund > 0 && reservationHasEscrowDeposit(reservation) && buyerId) {
         await refundDepositFromSystem(buyerId, depositRefund, {
           description: "Hoàn phần cọc do điều chỉnh đơn giữ hàng",
           reservationId: reservation._id,
@@ -238,12 +239,25 @@ async function adjustReservationAtPickup(user, reservationId, payload = {}) {
     newQuantity,
   });
 
-  const depositRefund = oldDepositAmount - newDepositAmount;
+  const depositRefund = cocCu - cocMoi;
   if (depositRefund > 0 && buyerId) {
     await reconcileUserWalletBalanceFromLedger(buyerId);
     const wallet = await getWalletBalance(buyerId);
     notifyWalletBalanceUpdated(buyerId, wallet.balance, {
       reservationId: String(savedReservation._id),
+    });
+
+    const productName = product?.ProductName || "sản phẩm";
+    const refundLabel = depositRefund.toLocaleString("vi-VN");
+    await notifyReservationBuyer(savedReservation, {
+      title: "Shop điều chỉnh đơn giữ hàng",
+      content: `Shop đã giảm số lượng từ ${oldQuantity} xuống ${newQuantity} (${productName}). Phần cọc ${refundLabel}đ đã hoàn về ví của bạn.`,
+    });
+  } else if (buyerId) {
+    const productName = product?.ProductName || (await resolveProductName(savedReservation));
+    await notifyReservationBuyer(savedReservation, {
+      title: "Shop điều chỉnh đơn giữ hàng",
+      content: `Shop đã giảm số lượng từ ${oldQuantity} xuống ${newQuantity} (${productName}).`,
     });
   }
 

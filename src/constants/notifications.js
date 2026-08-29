@@ -41,7 +41,7 @@ export function resolveNotificationIndex(item) {
   if (parsed === NOTIFICATION_INDEX.ORDER) {
     return NOTIFICATION_INDEX.ORDER;
   }
-  if (parsed === NOTIFICATION_INDEX.SYSTEM && item?.isAdminBroadcast) {
+  if (parsed === NOTIFICATION_INDEX.SYSTEM && item?.tbAdmin) {
     return NOTIFICATION_INDEX.SYSTEM;
   }
 

@@ -3,7 +3,7 @@ export function resolveIsOutOfStock(product) {
     return false;
   }
 
-  if (product.isUnavailable || Number(product.status) === 0) {
+  if (isProductHidden(product)) {
     return false;
   }
 
@@ -26,12 +26,16 @@ export function resolveIsOutOfStock(product) {
   return product.isOutOfStock === true;
 }
 
+export function isProductHidden(product) {
+  return Boolean(product?.isUnavailable || Number(product?.status) === 0);
+}
+
 export function getProductImageOverlayLabel(product) {
   if (!product) {
     return null;
   }
-  if (product.isUnavailable || Number(product.status) === 0) {
-    return 'Không có sẵn';
+  if (isProductHidden(product)) {
+    return 'Đã ẩn';
   }
   if (resolveIsOutOfStock(product)) {
     return 'Hết hàng';

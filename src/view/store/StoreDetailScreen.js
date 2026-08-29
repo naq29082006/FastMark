@@ -119,6 +119,9 @@ export default function StoreDetailScreen({
   onProductPress,
   onNavigateDirections,
   previewMode = false,
+  onOrderSuccess,
+  onOpenTopUp,
+  reservationSource = 'store',
 }) {
   const insets = useScreenInsets();
   const authProfile = useSelector(selectAuthProfile);
@@ -242,12 +245,12 @@ export default function StoreDetailScreen({
         setLikedProducts(likedMap);
         setIsFollowing(Boolean(followStatus?.isFollowing));
 
-        if (Number.isFinite(Number(followStatus?.followersCount))) {
+        if (Number.isFinite(Number(followStatus?.soNguoiTheo))) {
           setStore((prev) =>
             prev
               ? {
                   ...prev,
-                  follow_count: Number(followStatus.followersCount),
+                  follow_count: Number(followStatus.soNguoiTheo),
                 }
               : prev
           );
@@ -294,9 +297,9 @@ export default function StoreDetailScreen({
         ? await unfollowShopOnBackend({ idToken, shopId: effectiveShopId })
         : await followShopOnBackend({ idToken, shopId: effectiveShopId });
 
-      if (Number.isFinite(Number(result?.followersCount))) {
+      if (Number.isFinite(Number(result?.soNguoiTheo))) {
         setStore((prev) =>
-          prev ? { ...prev, follow_count: Number(result.followersCount) } : prev
+          prev ? { ...prev, follow_count: Number(result.soNguoiTheo) } : prev
         );
       }
       setIsFollowing(Boolean(result?.isFollowing ?? !wasFollowing));
@@ -509,7 +512,10 @@ export default function StoreDetailScreen({
         productId={selectedProductId}
         onBack={() => setSelectedProductId(null)}
         onStorePress={() => setSelectedProductId(null)}
-        reservationSource="store"
+        onOrderSuccess={onOrderSuccess}
+        onOpenTopUp={onOpenTopUp}
+        reservationSource={reservationSource}
+        reservationStoreId={storeId}
       />
     );
   }

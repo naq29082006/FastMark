@@ -130,6 +130,14 @@ export default function LeafletMap({
   }, [currentLocation, followUser, navigationMode, ready, sendNavLocationUpdate]);
 
   useEffect(() => {
+    if (!ready || !shouldAutoRecenter || navigationMode) {
+      return;
+    }
+
+    sendCommand({ type: 'invalidateSize' });
+  }, [shouldAutoRecenter, navigationMode, ready]);
+
+  useEffect(() => {
     if (!shouldAutoRecenter || navigationMode || !ready || !hasValidLocation(currentLocation)) {
       return;
     }

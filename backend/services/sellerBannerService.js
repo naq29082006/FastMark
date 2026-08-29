@@ -139,7 +139,7 @@ function toSellerBannerDto(doc, extras = {}) {
     lifecycle,
     lifecycleLabel: lifecycleLabel(lifecycle),
     canEditCreative,
-    violationReason: doc.violationReason || "",
+    lyDoVP: doc.lyDoVP || "",
     image: doc.image || "",
     targetType,
     targetTypeLabel: BANNER_TARGET_TYPE_LABEL[targetType] || "Gian hàng",
@@ -174,8 +174,8 @@ function emitBannerRealtime(banner, extra = {}) {
 }
 
 async function listAdminBannerPlans() {
-  const rows = await BannerPlan.find({})
-    .sort({ isActive: -1, price: 1, CreatedAt: 1 })
+  const rows = await BannerPlan.find(activeRecordFilter())
+    .sort({ price: 1, CreatedAt: 1 })
     .limit(100);
   return rows.map(toBannerPlanDto);
 }
@@ -406,7 +406,7 @@ async function purchaseBannerPlan(user, payload = {}) {
           endDate: null,
           approvedAt: null,
           status: SELLER_BANNER_STATUS.PURCHASED,
-          violationReason: "",
+          lyDoVP: "",
           image: "",
           targetType: BANNER_TARGET_TYPE.SHOP,
           targetId: "",
@@ -517,7 +517,7 @@ async function requestBannerHang(user, payload = {}) {
   banner.targetType = target.targetType;
   banner.targetId = target.targetId;
   banner.status = SELLER_BANNER_STATUS.PENDING_REVIEW;
-  banner.violationReason = "";
+  banner.lyDoVP = "";
   banner.startDate = null;
   banner.endDate = null;
   banner.approvedAt = null;
@@ -578,6 +578,15 @@ async function listAdminSellerBanners({
     query.status = SELLER_BANNER_STATUS.PURCHASED;
   } else if (lifecycle === "pending" || lifecycle === "4") {
     query.status = SELLER_BANNER_STATUS.PENDING_REVIEW;
+  } else if (lifecycle === "manage" || lifecycle === "queue") {
+    query.$or = [
+      { status: SELLER_BANNER_STATUS.PENDING_REVIEW },
+      {
+        status: SELLER_BANNER_STATUS.ACTIVE,
+        approvedAt: { $ne: null },
+        endDate: { $gte: now },
+      },
+    ];
   } else if (lifecycle === "active" || lifecycle === "dang-hoat-dong") {
     query.status = SELLER_BANNER_STATUS.ACTIVE;
     query.approvedAt = { $ne: null };
@@ -617,7 +626,7 @@ async function listAdminSellerBanners({
 
       orConditions.push(
         { planName: regex },
-        { violationReason: regex },
+        { lyDoVP: regex },
         ...(matchedUsers.length ? [{ sellerId: { $in: matchedUsers.map((user) => user._id) } }] : []),
         ...(matchedShops.length ? [{ shopId: { $in: matchedShops.map((shop) => shop._id) } }] : [])
       );
@@ -641,7 +650,7 @@ async function listAdminSellerBanners({
     SELLER_BANNER_STATUS.REJECTED,
   ];
 
-  const [rows, total, summaryTotal, summaryActive, summaryRevenue, summaryShops] =
+  const [rows, total, summaryTotal, summaryActive, summaryPending, summaryExpired, summaryPurchased, summaryRevenue, summaryShops] =
     await Promise.all([
     SellerBannerPlan.find(query)
       .sort({ ngayMua: -1, CreatedAt: -1, _id: -1 })
@@ -654,6 +663,17 @@ async function listAdminSellerBanners({
       status: SELLER_BANNER_STATUS.ACTIVE,
       approvedAt: { $ne: null },
       endDate: { $gte: now },
+    }),
+    SellerBannerPlan.countDocuments({
+      status: SELLER_BANNER_STATUS.PENDING_REVIEW,
+    }),
+    SellerBannerPlan.countDocuments({
+      status: SELLER_BANNER_STATUS.ACTIVE,
+      approvedAt: { $ne: null },
+      endDate: { $lt: now },
+    }),
+    SellerBannerPlan.countDocuments({
+      status: SELLER_BANNER_STATUS.PURCHASED,
     }),
     SellerBannerPlan.aggregate([
       { $match: { status: { $in: paidBannerStatuses } } },
@@ -712,6 +732,9 @@ async function listAdminSellerBanners({
     summary: {
       total: summaryTotal,
       active: summaryActive,
+      pending: summaryPending,
+      expired: summaryExpired,
+      purchased: summaryPurchased,
       totalRevenue: Number(summaryRevenue[0]?.total) || 0,
       uniqueShops: summaryShops.length,
     },
@@ -813,7 +836,7 @@ async function approveSellerBanner(bannerId) {
   banner.endDate = addDays(now, durationDays);
   banner.approvedAt = now;
   banner.status = SELLER_BANNER_STATUS.ACTIVE;
-  banner.violationReason = "";
+  banner.lyDoVP = "";
   await banner.save();
   emitBannerRealtime(banner);
   return toSellerBannerDto(banner);
@@ -827,14 +850,14 @@ async function rejectSellerBanner(bannerId, { reason } = {}) {
   if (Number(banner.status) !== SELLER_BANNER_STATUS.PENDING_REVIEW) {
     throw createServiceError("Chỉ từ chối được banner đang chờ duyệt treo.");
   }
-  const violationReason = pickString(reason);
-  if (!violationReason) {
+  const lyDoVP = pickString(reason);
+  if (!lyDoVP) {
     throw createServiceError("Vui lòng nhập lý do từ chối.");
   }
 
   // Không hoàn tiền — seller sửa creative rồi gửi yêu cầu treo lại.
   banner.status = SELLER_BANNER_STATUS.REJECTED;
-  banner.violationReason = violationReason;
+  banner.lyDoVP = lyDoVP;
   banner.startDate = null;
   banner.endDate = null;
   banner.approvedAt = null;

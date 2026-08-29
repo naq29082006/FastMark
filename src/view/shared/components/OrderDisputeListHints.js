@@ -1,44 +1,69 @@
 import { memo } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import {
-  VIEWER_ROLE,
-  buildDisputeOrderListDisplay,
-} from '../../../constants/sellerOrders';
+import { VIEWER_ROLE } from '../../../constants/sellerOrders';
+import { getOrderListDisputeDisplay } from '../../../core/utils/orderDisplay';
+import { useMinuteNow } from '../../../hooks/useMinuteNow';
 
 function OrderDisputeListHints({ item, viewerRole = VIEWER_ROLE.BUYER }) {
-  const display = buildDisputeOrderListDisplay(item, viewerRole);
+  const currentTime = useMinuteNow();
+  const display = getOrderListDisputeDisplay(item, viewerRole, currentTime);
   if (!display) {
     return null;
   }
 
+  const variant = display.variant || 'awaiting_response';
+  const eventLineStyle =
+    variant === 'resolved' ? styles.resolvedLine : styles.eventLine;
+  const secondaryLine = String(display.responseLine || display.pendingLine || '').trim();
+  const secondaryStyle =
+    variant === 'waiting_admin' ? styles.pendingLine : styles.responseLine;
+
   return (
-    <>
-      {display.lines.map((line, index) => (
-        <Text key={`${line}-${index}`} style={styles.line}>
+    <View style={styles.block}>
+      {display.eventLines.map((line, index) => (
+        <Text key={`${line}-${index}`} style={eventLineStyle}>
           {line}
         </Text>
       ))}
-      {display.footer ? <Text style={styles.footer}>{display.footer}</Text> : null}
-    </>
+      {secondaryLine ? <Text style={secondaryStyle}>{secondaryLine}</Text> : null}
+    </View>
   );
 }
 
 export default memo(OrderDisputeListHints);
 
 const styles = StyleSheet.create({
-  line: {
+  block: {
     marginTop: 4,
+    gap: 2,
+  },
+  eventLine: {
     fontSize: 14,
     color: '#b91c1c',
     fontWeight: '700',
-    lineHeight: 22,
-  },
-  footer: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#64748b',
-    fontWeight: '600',
     lineHeight: 20,
+    includeFontPadding: false,
+  },
+  resolvedLine: {
+    fontSize: 14,
+    color: '#076F32',
+    fontWeight: '700',
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
+  pendingLine: {
+    fontSize: 14,
+    color: '#ea580c',
+    fontWeight: '700',
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
+  responseLine: {
+    fontSize: 14,
+    color: '#ea580c',
+    fontWeight: '700',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 });

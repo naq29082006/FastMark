@@ -15,8 +15,11 @@ import * as ImagePicker from 'expo-image-picker';
 
 import {
   BUYER_DISPUTE_REASON_OPTIONS,
+  BUYER_POST_DELIVERY_COMPLAINT_OPTIONS,
   RESERVATION_DISPUTE_REASON,
   RESERVATION_DISPUTE_REASON_LABELS,
+  SELLER_DISPUTE_REASON_OPTIONS,
+  getSellerDisputeReasonPickerLabel,
 } from '../../../constants/sellerOrders';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 import FormSheetActions from './KeyboardStickyFooter';
@@ -47,10 +50,15 @@ function assetToDataUri(asset) {
 export default function ReservationDisputeModal({
   visible,
   mode = 'buyer',
+  buyerComplaintKind = 'pickup',
   onClose,
   onSubmit,
 }) {
   const isBuyer = mode === 'buyer';
+  const isPostDeliveryComplaint = isBuyer && buyerComplaintKind === 'post_delivery';
+  const buyerReasonOptions = isPostDeliveryComplaint
+    ? BUYER_POST_DELIVERY_COMPLAINT_OPTIONS
+    : BUYER_DISPUTE_REASON_OPTIONS;
   const isSellerResponse = mode === 'seller_response';
   const isSellerReport = mode === 'seller';
   const [reason, setReason] = useState('');
@@ -60,12 +68,20 @@ export default function ReservationDisputeModal({
 
   useEffect(() => {
     if (visible) {
-      setReason(isBuyer ? RESERVATION_DISPUTE_REASON.SELLER_ABSENT : '');
+      setReason(
+        isBuyer
+          ? isPostDeliveryComplaint
+            ? RESERVATION_DISPUTE_REASON.DAMAGED_ITEM
+            : RESERVATION_DISPUTE_REASON.SELLER_ABSENT
+          : isSellerReport
+            ? RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW
+            : ''
+      );
       setNote('');
       setImageUris([]);
       setIsSubmitting(false);
     }
-  }, [visible, isBuyer]);
+  }, [visible, isBuyer, isPostDeliveryComplaint, isSellerReport]);
 
   async function pickFromLibrary() {
     const remaining = MAX_IMAGES - imageUris.length;
@@ -130,13 +146,16 @@ export default function ReservationDisputeModal({
   }
 
   async function handleSubmit() {
-    if (isBuyer && !reason) {
+    if ((isBuyer || isSellerReport) && !reason) {
       Alert.alert('Thiếu lý do', 'Vui lòng chọn lý do báo cáo.');
       return;
     }
     const trimmedNote = note.trim();
-    if (isBuyer && reason === RESERVATION_DISPUTE_REASON.OTHER && !trimmedNote) {
-      Alert.alert('Thiếu mô tả', 'Vui lòng nhập giải thích khi chọn lý do Khác.');
+    if (
+      (isBuyer && reason === RESERVATION_DISPUTE_REASON.OTHER && !trimmedNote) ||
+      (isSellerReport && reason === RESERVATION_DISPUTE_REASON.OTHER && !trimmedNote)
+    ) {
+      Alert.alert('Thiếu mô tả', 'Vui lòng nhập giải thích khi chọn lý do khác.');
       return;
     }
     if ((isSellerReport || isSellerResponse) && !trimmedNote) {
@@ -144,7 +163,9 @@ export default function ReservationDisputeModal({
         'Thiếu mô tả',
         isSellerResponse
           ? 'Vui lòng nhập nội dung phản hồi khiếu nại.'
-          : 'Vui lòng nhập ghi chú báo cáo người mua không đến.'
+          : reason === RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW
+            ? 'Vui lòng nhập mô tả tình huống người mua không đến.'
+            : 'Vui lòng nhập mô tả lý do báo cáo.'
       );
       return;
     }
@@ -156,14 +177,16 @@ export default function ReservationDisputeModal({
     setIsSubmitting(true);
     try {
       await onSubmit?.({
-        reason: isBuyer ? reason : RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW,
+        reason: isSellerResponse
+          ? RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW
+          : reason,
         description: trimmedNote,
         note: trimmedNote,
         title: isSellerResponse
           ? 'Phản hồi khiếu nại'
           : isBuyer
             ? RESERVATION_DISPUTE_REASON_LABELS[reason]
-            : 'Người mua không đến nhận hàng',
+            : getSellerDisputeReasonPickerLabel(reason),
         images: imageUris,
       });
     } catch (error) {
@@ -176,8 +199,10 @@ export default function ReservationDisputeModal({
   const modalTitle = isSellerResponse
     ? 'Phản hồi khiếu nại của khách'
     : isBuyer
-      ? 'Báo cáo người bán'
-      : 'Báo cáo người mua không đến';
+      ? isPostDeliveryComplaint
+        ? 'Khiếu nại sau nhận hàng'
+        : 'Báo cáo người bán'
+      : 'Báo cáo người mua';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -200,7 +225,7 @@ export default function ReservationDisputeModal({
             {isBuyer ? (
               <View style={styles.reasonBlock}>
                 <Text style={styles.label}>Lý do</Text>
-                {BUYER_DISPUTE_REASON_OPTIONS.map((option) => {
+                {buyerReasonOptions.map((option) => {
                   const selected = reason === option;
                   return (
                     <Pressable
@@ -219,6 +244,28 @@ export default function ReservationDisputeModal({
               </View>
             ) : null}
 
+            {isSellerReport ? (
+              <View style={styles.reasonBlock}>
+                <Text style={styles.label}>Lý do</Text>
+                {SELLER_DISPUTE_REASON_OPTIONS.map((option) => {
+                  const selected = reason === option;
+                  return (
+                    <Pressable
+                      key={option}
+                      style={[styles.reasonChip, selected && styles.reasonChipActive]}
+                      onPress={() => setReason(option)}
+                    >
+                      <Text
+                        style={[styles.reasonChipText, selected && styles.reasonChipTextActive]}
+                      >
+                        {getSellerDisputeReasonPickerLabel(option)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+
             <Text style={styles.label}>
               {isSellerResponse
                 ? 'Nội dung phản hồi *'
@@ -226,7 +273,9 @@ export default function ReservationDisputeModal({
                   ? reason === RESERVATION_DISPUTE_REASON.OTHER
                     ? 'Giải thích lý do *'
                     : 'Ghi chú thêm (tuỳ chọn)'
-                  : 'Ghi chú *'}
+                  : reason === RESERVATION_DISPUTE_REASON.OTHER
+                    ? 'Giải thích lý do *'
+                    : 'Ghi chú *'}
             </Text>
             <KeyboardAwareTextInput
               style={styles.input}
@@ -236,8 +285,14 @@ export default function ReservationDisputeModal({
                 isSellerResponse
                   ? 'Giải thích tình huống, bổ sung thông tin cho admin...'
                   : isBuyer
-                    ? 'Mô tả tình huống tại điểm nhận hàng...'
-                    : 'Mô tả: người mua không đến nhận hàng...'
+                    ? isPostDeliveryComplaint
+                      ? 'Mô tả tình trạng hàng, số lượng thiếu, khác biệt so với mô tả...'
+                      : reason === RESERVATION_DISPUTE_REASON.OTHER
+                        ? 'Mô tả tình huống tại điểm nhận hàng...'
+                        : 'Ghi chú thêm (tuỳ chọn)'
+                    : reason === RESERVATION_DISPUTE_REASON.OTHER
+                      ? 'Mô tả chi tiết lý do báo cáo...'
+                      : 'Mô tả: người mua không đến nhận hàng...'
               }
               placeholderTextColor="#94a3b8"
               multiline

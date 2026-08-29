@@ -3,6 +3,7 @@ const Bank = require("../models/Bank");
 const WithdrawRequest = require("../models/WithdrawRequest");
 const WalletTransaction = require("../models/WalletTransaction");
 const User = require("../models/User");
+const ShopProfile = require("../models/ShopProfile");
 const {
   WALLET_TX_TYPE,
   WALLET_TX_STATUS,
@@ -13,6 +14,7 @@ const {
   MAX_WITHDRAW_AMOUNT,
   NOTIFICATION_AUDIENCE,
   NOTIFICATION_INDEX,
+  USER_ROLE,
   isRecordActive,
 } = require("../constants");
 const { buildSearchRegex } = require("../utils/searchText");
@@ -24,6 +26,11 @@ const {
   appendUniqueOrConditions,
 } = require("../utils/adminSearchHelpers");
 const { createNotification } = require("./notificationService");
+const {
+  resolveShopDisplayName,
+  resolveShopUsername,
+  resolveShopAvatar,
+} = require("../utils/shopIdentity");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
 const {
   getOrCreateWallet,
@@ -31,11 +38,74 @@ const {
   getWalletBalance,
   toPublicTransaction,
 } = require("./walletService");
+const SellerVerification = require("../models/SellerVerification");
+const { SELLER_VERIFICATION_STATUS } = require("../constants");
+
+function normalizeWithdrawAccountName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toUpperCase();
+}
+
+/** Họ tên CCCD đã duyệt lúc đăng ký bán hàng — dùng cố định cho rút tiền. */
+async function resolveSellerWithdrawAccountName(userId) {
+  const verification = await SellerVerification.findOne({
+    userId,
+    status: SELLER_VERIFICATION_STATUS.APPROVED,
+  })
+    .select("fullName")
+    .sort({ UpdatedAt: -1 })
+    .lean();
+
+  const name = normalizeWithdrawAccountName(verification?.fullName);
+  if (!name || name.length < 2) {
+    throw createServiceError(
+      "Không tìm thấy họ tên CCCD đã duyệt khi đăng ký bán hàng. Vui lòng liên hệ hỗ trợ.",
+      400
+    );
+  }
+  return name;
+}
+
+async function getWithdrawFormProfile(user) {
+  if (Number(user?.Role) !== USER_ROLE.SELLER) {
+    return null;
+  }
+  const accountName = await resolveSellerWithdrawAccountName(user._id);
+  return {
+    accountName,
+    accountNameLocked: true,
+    accountNameNotice:
+      "Tên chủ tài khoản phải trùng họ tên trên CCCD khi đăng ký bán hàng. Bạn không thể đổi tên này.",
+  };
+}
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
+}
+
+function buildWithdrawShopExtras(user, shop) {
+  return {
+    shopId: shop?._id ? String(shop._id) : "",
+    shopName: resolveShopDisplayName(shop, user) || "",
+    shopUsername: resolveShopUsername(shop, user) || "",
+    shopAvatar: resolveShopAvatar(shop, user) || "",
+    userPhone: user?.Phone || "",
+    userEmail: user?.Email || "",
+  };
+}
+
+async function loadShopsByUserIds(userIds = []) {
+  if (!userIds.length) {
+    return new Map();
+  }
+  const shops = await ShopProfile.find({ userId: { $in: userIds } })
+    .select("userId shopName shopUsername avatar")
+    .lean();
+  return new Map(shops.map((shop) => [String(shop.userId), shop]));
 }
 
 function toPublicWithdraw(doc, extras = {}) {
@@ -52,10 +122,10 @@ function toPublicWithdraw(doc, extras = {}) {
     status: Number(doc.status),
     statusLabel: WITHDRAW_STATUS_LABEL[doc.status] || "",
     adminNote: doc.adminNote || "",
-    walletTransactionId: doc.walletTransactionId
-      ? String(doc.walletTransactionId)
+    gdViId: doc.gdViId
+      ? String(doc.gdViId)
       : "",
-    processedAt: doc.processedAt || null,
+    tgXuLy: doc.tgXuLy || null,
     createdAt: doc.CreatedAt || null,
     updatedAt: doc.UpdatedAt || null,
     ...extras,
@@ -63,10 +133,25 @@ function toPublicWithdraw(doc, extras = {}) {
 }
 
 async function createWithdrawRequest(user, payload = {}) {
+  if (Number(user?.Role) !== USER_ROLE.SELLER) {
+    throw createServiceError(
+      "Chỉ tài khoản người bán mới được rút tiền. Người mua chỉ có thể nạp tiền vào ví.",
+      403
+    );
+  }
+
   const amount = Math.round(Number(payload.amount));
   const bankId = String(payload.bankId || "").trim();
   const accountNumber = String(payload.accountNumber || "").replace(/\s/g, "");
-  const accountName = String(payload.accountName || "").trim().toUpperCase();
+  const accountName = await resolveSellerWithdrawAccountName(user._id);
+
+  const sentName = normalizeWithdrawAccountName(payload.accountName);
+  if (sentName && sentName !== accountName) {
+    throw createServiceError(
+      "Tên chủ tài khoản phải trùng họ tên CCCD đã đăng ký bán hàng.",
+      400
+    );
+  }
 
   if (!Number.isFinite(amount) || amount < MIN_WITHDRAW_AMOUNT) {
     throw createServiceError(
@@ -83,9 +168,6 @@ async function createWithdrawRequest(user, payload = {}) {
   }
   if (!/^\d{6,20}$/.test(accountNumber)) {
     throw createServiceError("Số tài khoản phải gồm 6–20 chữ số.");
-  }
-  if (!accountName || accountName.length < 2) {
-    throw createServiceError("Vui lòng nhập tên chủ tài khoản.");
   }
 
   const bank = await Bank.findById(bankId);
@@ -137,7 +219,7 @@ async function createWithdrawRequest(user, payload = {}) {
             accountName,
             amount,
             status: WITHDRAW_STATUS.PENDING,
-            walletTransactionId: txCreated[0]._id,
+            gdViId: txCreated[0]._id,
           },
         ],
         { session }
@@ -245,12 +327,19 @@ async function listAdminWithdraws({
     if (regex) {
       const matchedUsers = await findUsersBySearchRegex(User, regex);
       const matchedUserIds = matchedUsers.map((user) => user._id);
+      const matchedShops = await ShopProfile.find({
+        $or: [{ shopName: regex }, { shopUsername: regex }],
+      })
+        .select("userId")
+        .lean();
+      const shopOwnerIds = matchedShops.map((shop) => shop.userId).filter(Boolean);
       orConditions.push(
         { accountNumber: regex },
         { accountName: regex },
         { bankName: regex },
         { bankCode: regex },
-        ...(matchedUserIds.length ? [{ userId: { $in: matchedUserIds } }] : [])
+        ...(matchedUserIds.length ? [{ userId: { $in: matchedUserIds } }] : []),
+        ...(shopOwnerIds.length ? [{ userId: { $in: shopOwnerIds } }] : [])
       );
     }
 
@@ -266,13 +355,17 @@ async function listAdminWithdraws({
   const limitNum = Math.min(100, Math.max(1, Number(limit) || 50));
   const skip = (pageNum - 1) * limitNum;
 
-  const [rows, total] = await Promise.all([
+  const [rows, total, totalAll, pendingCount, approvedCount, rejectedCount] = await Promise.all([
     WithdrawRequest.find(filter)
       .sort({ CreatedAt: -1, _id: -1 })
       .skip(skip)
       .limit(limitNum)
       .lean(),
     WithdrawRequest.countDocuments(filter),
+    WithdrawRequest.countDocuments({}),
+    WithdrawRequest.countDocuments({ status: WITHDRAW_STATUS.PENDING }),
+    WithdrawRequest.countDocuments({ status: WITHDRAW_STATUS.APPROVED }),
+    WithdrawRequest.countDocuments({ status: WITHDRAW_STATUS.REJECTED }),
   ]);
 
   const userIds = [...new Set(rows.map((row) => String(row.userId)).filter(Boolean))];
@@ -282,19 +375,23 @@ async function listAdminWithdraws({
         .lean()
     : [];
   const userMap = new Map(users.map((u) => [String(u._id), u]));
+  const shopMap = await loadShopsByUserIds(userIds);
 
   return {
     items: rows.map((row) => {
       const user = userMap.get(String(row.userId));
-      return toPublicWithdraw(row, {
-        userName: user?.FullName || user?.UserName || "",
-        userPhone: user?.Phone || "",
-        userEmail: user?.Email || "",
-      });
+      const shop = shopMap.get(String(row.userId));
+      return toPublicWithdraw(row, buildWithdrawShopExtras(user, shop));
     }),
     total,
     page: pageNum,
     limit: limitNum,
+    stats: {
+      total: totalAll,
+      pending: pendingCount,
+      approved: approvedCount,
+      rejected: rejectedCount,
+    },
   };
 }
 
@@ -311,8 +408,8 @@ async function approveWithdraw(adminUser, withdrawId, { adminNote } = {}) {
         throw createServiceError("Yêu cầu đã được xử lý.");
       }
 
-      if (withdraw.walletTransactionId) {
-        const tx = await WalletTransaction.findById(withdraw.walletTransactionId).session(
+      if (withdraw.gdViId) {
+        const tx = await WalletTransaction.findById(withdraw.gdViId).session(
           session
         );
         if (tx && tx.status === WALLET_TX_STATUS.PENDING) {
@@ -324,8 +421,8 @@ async function approveWithdraw(adminUser, withdrawId, { adminNote } = {}) {
 
       withdraw.status = WITHDRAW_STATUS.APPROVED;
       withdraw.adminNote = String(adminNote || "").trim();
-      withdraw.processedBy = adminUser._id;
-      withdraw.processedAt = new Date();
+      withdraw.xuLyBoi = adminUser._id;
+      withdraw.tgXuLy = new Date();
       withdraw.UpdatedAt = new Date();
       await withdraw.save({ session });
     });
@@ -391,8 +488,8 @@ async function rejectWithdraw(adminUser, withdrawId, { adminNote } = {}) {
         { session }
       );
 
-      if (withdraw.walletTransactionId) {
-        const tx = await WalletTransaction.findById(withdraw.walletTransactionId).session(
+      if (withdraw.gdViId) {
+        const tx = await WalletTransaction.findById(withdraw.gdViId).session(
           session
         );
         if (tx && tx.status === WALLET_TX_STATUS.PENDING) {
@@ -404,9 +501,9 @@ async function rejectWithdraw(adminUser, withdrawId, { adminNote } = {}) {
 
       withdraw.status = WITHDRAW_STATUS.REJECTED;
       withdraw.adminNote = String(adminNote || "").trim() || "Admin từ chối yêu cầu rút tiền.";
-      withdraw.refundTransactionId = refundTx[0]._id;
-      withdraw.processedBy = adminUser._id;
-      withdraw.processedAt = new Date();
+      withdraw.gdHoanId = refundTx[0]._id;
+      withdraw.xuLyBoi = adminUser._id;
+      withdraw.tgXuLy = new Date();
       withdraw.UpdatedAt = new Date();
       await withdraw.save({ session });
 
@@ -442,13 +539,35 @@ async function rejectWithdraw(adminUser, withdrawId, { adminNote } = {}) {
   }
 }
 
+async function getAdminWithdrawById(withdrawId) {
+  const withdraw = await WithdrawRequest.findById(withdrawId).lean();
+  if (!withdraw) {
+    throw createServiceError("Không tìm thấy yêu cầu rút tiền.", 404);
+  }
+
+  const user = withdraw.userId
+    ? await User.findById(withdraw.userId)
+        .select("FullName UserName Phone Email Avatar")
+        .lean()
+    : null;
+  const shop = withdraw.userId
+    ? await ShopProfile.findOne({ userId: withdraw.userId })
+        .select("shopName shopUsername avatar userId")
+        .lean()
+    : null;
+
+  return toPublicWithdraw(withdraw, buildWithdrawShopExtras(user, shop));
+}
+
 module.exports = {
   createWithdrawRequest,
   listMyWithdraws,
   listAdminWithdraws,
+  getAdminWithdrawById,
   approveWithdraw,
   rejectWithdraw,
   toPublicWithdraw,
+  getWithdrawFormProfile,
   getWalletBalance,
   toPublicTransaction,
 };

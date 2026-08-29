@@ -237,7 +237,7 @@ function UserResultRow({ user, onPress }) {
           </Text>
         ) : null}
         <Text style={styles.resultMetaText} numberOfLines={1}>
-          {Number(user.followersCount) || 0} người theo dõi
+          {Number(user.soNguoiTheo) || 0} người theo dõi
         </Text>
       </View>
       <Ionicons name="chevron-forward" size={16} color="#94a3b8" />

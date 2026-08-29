@@ -21,6 +21,12 @@ router.get(
   asyncHandler(adminDashboardController.getDashboard)
 );
 router.get(
+  "/pending-counts",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminDashboardController.getPendingCounts)
+);
+router.get(
   "/accounts/statistics",
   verifyFirebaseToken,
   requireAdmin,
@@ -198,6 +204,12 @@ router.post(
   verifyFirebaseToken,
   requireAdmin,
   asyncHandler(adminReservationController.releaseToSeller)
+);
+router.post(
+  "/reservations/:id/reject-dispute",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(adminReservationController.rejectDispute)
 );
 router.post(
   "/reservations/:id/cancel",
@@ -426,6 +438,12 @@ router.get(
   verifyFirebaseToken,
   requireAdmin,
   asyncHandler(withdrawController.listAdminWithdraws)
+);
+router.get(
+  "/withdraws/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(withdrawController.getAdminWithdraw)
 );
 router.post(
   "/withdraws/:id/approve",

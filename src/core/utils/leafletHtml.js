@@ -4,7 +4,7 @@ const DEFAULT_LOCATION = {
 };
 
 const MAP_EVENT_SOURCE = 'fastmark-map';
-export const LEAFLET_HTML_REVISION = 34;
+export const LEAFLET_HTML_REVISION = 39;
 
 function safeJson(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
@@ -34,15 +34,16 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: #eef2f0;
+        background: #f2efe9;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
       .leaflet-container {
-        background: #eef2f0;
+        background: #f2efe9;
       }
 
-      .leaflet-control-attribution {
+      .leaflet-control-attribution,
+      .leaflet-control-scale {
         display: none !important;
       }
 
@@ -345,6 +346,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
   <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
       const EVENT_SOURCE = '${MAP_EVENT_SOURCE}';
@@ -355,6 +357,11 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       let accuracyCircle = null;
       let radiusCircleLayer = null;
       let activeRadiusMeters = null;
+      let activeRadiusCenter = null;
+      let activeScanLocation = null;
+      let lastCurrentLocation = null;
+      let overlaySvgRenderer = null;
+      let geoOverlaySyncTimer = null;
       let userMovedMap = false;
       const restaurantMarkerById = {};
       let drawRestaurantsFrame = null;
@@ -363,11 +370,15 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       let routeLayer = null;
       let destinationMarker = null;
       let lastRoutePolylineKey = '';
+      let lastRouteLatLngs = [];
       let lastNavLocation = null;
       let lastNavPanAt = 0;
       let activeRouteDestination = null;
       let scanMarker = null;
       let lastMapTap = null;
+      let mapRotating = false;
+      let pendingRoutePolylinePayload = null;
+      let routeRedrawFrame = null;
 
       function hasLocation(value) {
         return (
@@ -427,27 +438,109 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       const map = L.map('map', {
         zoomControl: false,
         attributionControl: false,
+        rotate: true,
+        touchRotate: true,
+        touchGestures: true,
+        shiftKeyRotate: false,
+        bearing: 0,
+        bounceAtRotationLimits: false,
+        preferCanvas: true,
+        fadeAnimation: false,
+        zoomAnimation: true,
       }).setView(getLatLng(startLocation), 18);
+
+      overlaySvgRenderer = L.svg({ padding: 0.5 });
 
       L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '',
-      }).addTo(map);
+      /** Giống bản đồ trên nominatim.openstreetmap.org — OSM chuẩn, dễ đọc. */
+      const TILE_PROVIDERS = [
+        {
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          options: {
+            maxZoom: 19,
+            detectRetina: false,
+            updateWhenIdle: true,
+            updateWhenZooming: false,
+            keepBuffer: 2,
+            noWrap: true,
+          },
+        },
+        {
+          url: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
+          options: {
+            maxZoom: 18,
+            detectRetina: false,
+            updateWhenIdle: true,
+            updateWhenZooming: false,
+            keepBuffer: 2,
+          },
+        },
+        {
+          url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+          options: {
+            subdomains: 'abcd',
+            maxZoom: 20,
+            detectRetina: false,
+            updateWhenIdle: true,
+            updateWhenZooming: false,
+            keepBuffer: 2,
+          },
+        },
+      ];
+
+      let baseTileLayerIndex = 0;
+      let baseTileErrorCount = 0;
+      let baseTileLayer = null;
+
+      function refreshMapLayout() {
+        if (typeof map.invalidateSize === 'function') {
+          map.invalidateSize({ animate: false });
+        }
+      }
+
+      function installBaseTileLayer() {
+        if (baseTileLayer) {
+          map.removeLayer(baseTileLayer);
+        }
+
+        const provider = TILE_PROVIDERS[baseTileLayerIndex];
+        baseTileLayer = L.tileLayer(provider.url, {
+          ...provider.options,
+          attribution: '',
+        });
+        baseTileErrorCount = 0;
+
+        baseTileLayer.on('tileerror', function () {
+          baseTileErrorCount += 1;
+          if (baseTileErrorCount >= 8 && baseTileLayerIndex < TILE_PROVIDERS.length - 1) {
+            baseTileLayerIndex += 1;
+            installBaseTileLayer();
+          }
+        });
+
+        baseTileLayer.on('load', function () {
+          refreshMapLayout();
+        });
+
+        baseTileLayer.addTo(map);
+      }
+
+      installBaseTileLayer();
 
       function createRestaurantLayerGroup() {
         if (typeof L.markerClusterGroup === 'function') {
           return L.markerClusterGroup({
             showCoverageOnHover: false,
             zoomToBoundsOnClick: true,
-            maxClusterRadius: 54,
-            disableClusteringAtZoom: 17,
+            maxClusterRadius: 42,
+            disableClusteringAtZoom: 16,
             chunkedLoading: true,
-            chunkInterval: 48,
-            chunkDelay: 24,
+            chunkInterval: 72,
+            chunkDelay: 32,
             spiderfyOnMaxZoom: true,
             removeOutsideVisibleBounds: true,
+            animate: false,
           });
         }
         return L.layerGroup();
@@ -497,7 +590,15 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       }
 
       function drawScanLocation(location) {
-        if (!hasLocation(location)) {
+        activeScanLocation =
+          location && hasLocation(location)
+            ? {
+                latitude: Number(location.latitude),
+                longitude: Number(location.longitude),
+              }
+            : null;
+
+        if (!activeScanLocation) {
           if (scanMarker) {
             map.removeLayer(scanMarker);
             scanMarker = null;
@@ -505,13 +606,78 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           return;
         }
 
-        const latLng = getLatLng(location);
+        const latLng = getLatLng(activeScanLocation);
 
         if (!scanMarker) {
           scanMarker = L.marker(latLng, { icon: scanIcon, interactive: false }).addTo(map);
         } else {
           scanMarker.setLatLng(latLng);
         }
+      }
+
+      function refreshMarkerPositions() {
+        if (lastCurrentLocation && hasLocation(lastCurrentLocation)) {
+          const latLng = getLatLng(lastCurrentLocation);
+          if (!currentMarker) {
+            currentMarker = L.marker(latLng, { icon: userIcon, interactive: false }).addTo(map);
+          } else {
+            currentMarker.setLatLng(latLng);
+          }
+        }
+
+        if (activeScanLocation && hasLocation(activeScanLocation)) {
+          const latLng = getLatLng(activeScanLocation);
+          if (!scanMarker) {
+            scanMarker = L.marker(latLng, { icon: scanIcon, interactive: false }).addTo(map);
+          } else {
+            scanMarker.setLatLng(latLng);
+          }
+        }
+      }
+
+      function applyRadiusCircleLayer() {
+        if (radiusCircleLayer) {
+          map.removeLayer(radiusCircleLayer);
+          radiusCircleLayer = null;
+        }
+
+        if (!activeRadiusCenter || !hasLocation(activeRadiusCenter) || !activeRadiusMeters) {
+          return;
+        }
+
+        const latLng = getLatLng(activeRadiusCenter);
+        radiusCircleLayer = L.circle(latLng, {
+          radius: activeRadiusMeters,
+          color: '#076F32',
+          weight: 2,
+          opacity: 0.85,
+          fillColor: '#076F32',
+          fillOpacity: 0.14,
+          dashArray: '8, 6',
+          interactive: false,
+          renderer: overlaySvgRenderer,
+        }).addTo(map);
+      }
+
+      function syncGeoOverlays() {
+        applyRadiusCircleLayer();
+        refreshMarkerPositions();
+        if (routeLayer && typeof routeLayer.redraw === 'function') {
+          routeLayer.redraw();
+        }
+      }
+
+      function scheduleGeoOverlaySync() {
+        if (mapRotating) {
+          return;
+        }
+        if (geoOverlaySyncTimer) {
+          return;
+        }
+        geoOverlaySyncTimer = setTimeout(function() {
+          geoOverlaySyncTimer = null;
+          syncGeoOverlays();
+        }, 48);
       }
 
       function hideAccuracyCircle() {
@@ -529,7 +695,14 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         map.fitBounds(bounds, { padding: [48, 48], maxZoom: 18, animate: true });
       }
 
+      function resetMapBearing() {
+        if (typeof map.setBearing === 'function' && Math.abs(Number(map.getBearing?.() ?? 0)) > 0.5) {
+          map.setBearing(0);
+        }
+      }
+
       function recenterMap(latLng) {
+        resetMapBearing();
         map.flyTo(latLng, 18, { duration: 1.2, easeLinearity: 0.22 });
       }
 
@@ -538,7 +711,11 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           return;
         }
 
-        const latLng = getLatLng(location);
+        lastCurrentLocation = {
+          latitude: Number(location.latitude),
+          longitude: Number(location.longitude),
+        };
+        const latLng = getLatLng(lastCurrentLocation);
 
         if (!currentMarker) {
           currentMarker = L.marker(latLng, { icon: userIcon, interactive: false }).addTo(map);
@@ -560,39 +737,30 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
 
       function drawRadiusCircle(center, radiusMeters) {
         activeRadiusMeters = radiusMeters || null;
+        activeRadiusCenter =
+          center && hasLocation(center)
+            ? {
+                latitude: Number(center.latitude),
+                longitude: Number(center.longitude),
+              }
+            : null;
 
-        if (radiusCircleLayer) {
-          map.removeLayer(radiusCircleLayer);
-          radiusCircleLayer = null;
-        }
-
-        if (!center || !hasLocation(center) || !radiusMeters) {
-          if (currentMarker) {
-            const latLng = currentMarker.getLatLng();
-            drawCurrentLocation(
-              { latitude: latLng.lat, longitude: latLng.lng },
-              { recenter: !userMovedMap }
-            );
+        if (!activeRadiusCenter || !activeRadiusMeters) {
+          if (radiusCircleLayer) {
+            map.removeLayer(radiusCircleLayer);
+            radiusCircleLayer = null;
+          }
+          if (lastCurrentLocation && hasLocation(lastCurrentLocation)) {
+            drawCurrentLocation(lastCurrentLocation, { recenter: !userMovedMap });
           }
           return;
         }
 
         hideAccuracyCircle();
-
-        const latLng = getLatLng(center);
-        radiusCircleLayer = L.circle(latLng, {
-          radius: radiusMeters,
-          color: '#076F32',
-          weight: 2,
-          opacity: 0.85,
-          fillColor: '#076F32',
-          fillOpacity: 0.14,
-          dashArray: '8, 6',
-          interactive: false,
-        }).addTo(map);
+        applyRadiusCircleLayer();
 
         if (!userMovedMap) {
-          fitMapToRadius(center, radiusMeters);
+          fitMapToRadius(activeRadiusCenter, activeRadiusMeters);
         }
       }
 
@@ -614,6 +782,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       }
 
       function clearRoute() {
+        pendingRoutePolylinePayload = null;
         if (routeLayer) {
           map.removeLayer(routeLayer);
           routeLayer = null;
@@ -624,6 +793,48 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         }
         activeRouteDestination = null;
         lastRoutePolylineKey = '';
+        lastRouteLatLngs = [];
+      }
+
+      function rebuildRouteLayer() {
+        if (!lastRouteLatLngs.length) {
+          return;
+        }
+        if (routeLayer) {
+          map.removeLayer(routeLayer);
+          routeLayer = null;
+        }
+        routeLayer = createRoutePolyline(lastRouteLatLngs).addTo(map);
+        scheduleRouteRedraw();
+      }
+
+      function scheduleRouteRedraw() {
+        if (!routeLayer) {
+          return;
+        }
+        if (routeRedrawFrame) {
+          return;
+        }
+        routeRedrawFrame = requestAnimationFrame(function() {
+          routeRedrawFrame = null;
+          if (routeLayer && typeof routeLayer.redraw === 'function') {
+            routeLayer.redraw();
+          }
+          if (destinationMarker && typeof destinationMarker.update === 'function') {
+            destinationMarker.update();
+          }
+        });
+      }
+
+      function createRoutePolyline(coords) {
+        return L.polyline(coords, {
+          color: '#2563eb',
+          weight: 6,
+          opacity: 0.92,
+          lineJoin: 'round',
+          lineCap: 'round',
+          interactive: false,
+        });
       }
 
       function routePolylineKey(coords) {
@@ -687,24 +898,27 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           return;
         }
 
+        if (mapRotating && !payload?.fitBounds) {
+          pendingRoutePolylinePayload = payload;
+          return;
+        }
+
         const nextKey = routePolylineKey(coords);
         if (!payload.fitBounds && nextKey === lastRoutePolylineKey && routeLayer) {
           drawDestinationMarker(destination);
+          scheduleRouteRedraw();
           return;
         }
         lastRoutePolylineKey = nextKey;
+        lastRouteLatLngs = coords.slice();
 
         drawDestinationMarker(destination);
 
         if (!routeLayer) {
-          routeLayer = L.polyline(coords, {
-            color: '#2563eb',
-            weight: 6,
-            opacity: 0.92,
-            lineJoin: 'round',
-          }).addTo(map);
+          routeLayer = createRoutePolyline(lastRouteLatLngs).addTo(map);
         } else {
-          routeLayer.setLatLngs(coords);
+          routeLayer.setLatLngs(lastRouteLatLngs);
+          scheduleRouteRedraw();
         }
 
         if (payload.fitBounds) {
@@ -803,12 +1017,10 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
             return [point[1], point[0]];
           });
 
-          routeLayer = L.polyline(coords, {
-            color: '#076F32',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round',
-          }).addTo(map);
+          routeLayer = createRoutePolyline(coords);
+          routeLayer.setStyle({ color: '#076F32' });
+          lastRouteLatLngs = coords.slice();
+          routeLayer.addTo(map);
 
           map.fitBounds(routeLayer.getBounds(), { padding: [100, 48], maxZoom: 17, animate: true });
 
@@ -1098,6 +1310,10 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           recenterMap(latLng);
         }
 
+        if (command.type === 'invalidateSize') {
+          refreshMapLayout();
+        }
+
         if (command.type === 'showRestaurants') {
           scheduleDrawRestaurants(command.restaurants);
         }
@@ -1160,12 +1376,44 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         L.DomEvent.preventDefault(event);
       });
 
-      map.on('dragstart zoomstart', function() {
+      function markUserMovedMap() {
+        if (userMovedMap) {
+          return;
+        }
         userMovedMap = true;
         postToApp({ type: 'userMovedMap' });
+      }
+
+      map.on('dragstart zoomstart rotatestart', markUserMovedMap);
+
+      map.on('rotatestart', function() {
+        mapRotating = true;
+        if (routeLayer) {
+          map.removeLayer(routeLayer);
+          routeLayer = null;
+        }
+        if (radiusCircleLayer) {
+          map.removeLayer(radiusCircleLayer);
+          radiusCircleLayer = null;
+        }
       });
 
+      map.on('rotateend', function() {
+        mapRotating = false;
+        rebuildRouteLayer();
+        syncGeoOverlays();
+        if (pendingRoutePolylinePayload) {
+          const pending = pendingRoutePolylinePayload;
+          pendingRoutePolylinePayload = null;
+          setRoutePolyline(pending);
+        }
+      });
+
+      map.on('move zoom', scheduleGeoOverlaySync);
+      map.on('moveend zoomend', syncGeoOverlays);
+
       drawCurrentLocation(startLocation, { recenter: true });
+      refreshMapLayout();
       postToApp({ type: 'ready' });
     </script>
   </body>

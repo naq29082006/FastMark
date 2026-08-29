@@ -4,7 +4,17 @@ const { success, fail } = require("../utils/apiResponse");
 
 exports.listActiveBanks = async (req, res) => {
   const banks = await bankService.listActiveBanksForUser();
-  return success(res, { data: { banks } });
+  let withdrawProfile = null;
+  try {
+    withdrawProfile = await withdrawService.getWithdrawFormProfile(req.currentUser);
+  } catch (error) {
+    withdrawProfile = {
+      accountName: "",
+      accountNameLocked: true,
+      accountNameNotice: error.message || "Không tải được họ tên CCCD.",
+    };
+  }
+  return success(res, { data: { banks, withdrawProfile } });
 };
 
 exports.createWithdraw = async (req, res) => {
@@ -40,6 +50,18 @@ exports.listAdminWithdraws = async (req, res) => {
     to: req.query.to,
   });
   return success(res, { data: result });
+};
+
+exports.getAdminWithdraw = async (req, res) => {
+  try {
+    const withdraw = await withdrawService.getAdminWithdrawById(req.params.id);
+    return success(res, { data: { withdraw } });
+  } catch (error) {
+    return fail(res, {
+      status: error.statusCode || 500,
+      message: error.message || "Không tải được chi tiết rút tiền.",
+    });
+  }
 };
 
 exports.approveWithdraw = async (req, res) => {

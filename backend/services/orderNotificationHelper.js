@@ -2,6 +2,7 @@ const ShopProfile = require("../models/ShopProfile");
 const Product = require("../models/Product");
 const { NOTIFICATION_AUDIENCE } = require("../constants");
 const { createNotification, NOTIFICATION_INDEX } = require("./notificationService");
+const { getReservationBuyerId } = require("../utils/reservationCompat");
 const { buildOrderCode } = require("../utils/pickupQr");
 
 async function resolveShop(reservation, shop = null) {
@@ -23,10 +24,11 @@ async function resolveProductName(reservation) {
 }
 
 async function notifyReservationBuyer(reservation, { title, content }) {
-  if (!reservation?.userId) {
+  const buyerId = getReservationBuyerId(reservation);
+  if (!buyerId) {
     return;
   }
-  await createNotification(reservation.userId, {
+  await createNotification(buyerId, {
     title: String(title || "").trim(),
     content: String(content || "").trim(),
     audience: NOTIFICATION_AUDIENCE.BUYER,

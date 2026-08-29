@@ -55,6 +55,6 @@ export function resolvePickupQrPayload(reservation) {
     return '';
   }
   const orderCode = String(reservation?.orderCode || '').trim();
-  const buyerId = String(reservation?.buyer?.id || reservation?.buyerId || '').trim();
+  const buyerId = String(reservation?.buyer?.id || reservation?.userId || '').trim();
   return buildPickupQrPayload({ reservationId: id, orderCode, buyerId });
 }

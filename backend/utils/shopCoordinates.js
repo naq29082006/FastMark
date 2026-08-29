@@ -38,6 +38,39 @@ function shopHasCoordinatesFilter() {
   };
 }
 
+const EARTH_RADIUS_METERS = 6371000;
+
+function toRadians(value) {
+  return (Number(value) * Math.PI) / 180;
+}
+
+/** Hộp bao quanh bán kính quét — lọc sơ bộ trên Mongo trước khi tính khoảng cách chính xác. */
+function buildBoundingBoxFilter(lat, lng, radiusMeters) {
+  const safeLat = Number(lat);
+  const safeLng = Number(lng);
+  const safeRadius = Math.max(Number(radiusMeters) || 0, 100);
+  const latDelta = (safeRadius / EARTH_RADIUS_METERS) * (180 / Math.PI);
+  const cosLat = Math.cos(toRadians(safeLat));
+  const lngDelta = Math.abs(cosLat) > 0.001 ? latDelta / cosLat : latDelta;
+  const minLat = safeLat - latDelta;
+  const maxLat = safeLat + latDelta;
+  const minLng = safeLng - lngDelta;
+  const maxLng = safeLng + lngDelta;
+
+  return {
+    $or: [
+      {
+        "latlong.lat": { $gte: minLat, $lte: maxLat },
+        "latlong.long": { $gte: minLng, $lte: maxLng },
+      },
+      {
+        latitude: { $gte: minLat, $lte: maxLat },
+        longitude: { $gte: minLng, $lte: maxLng },
+      },
+    ],
+  };
+}
+
 function applyShopLatlongFromPayload(shop, payload = {}) {
   if (payload.latlong !== undefined) {
     const coords = resolveShopLatlong(payload);
@@ -90,5 +123,6 @@ module.exports = {
   resolveShopLatlong,
   hasShopLatlong,
   shopHasCoordinatesFilter,
+  buildBoundingBoxFilter,
   applyShopLatlongFromPayload,
 };

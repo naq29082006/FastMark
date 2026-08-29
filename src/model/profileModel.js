@@ -92,18 +92,18 @@ export function mergeProfile(authUser, baseProfile, updates = {}) {
       patch.sellerPhoneVerified !== undefined
         ? Boolean(patch.sellerPhoneVerified)
         : Boolean(baseProfile?.sellerPhoneVerified ?? fallback.sellerPhoneVerified),
-    totalProducts:
-      patch.totalProducts !== undefined
-        ? Number(patch.totalProducts) || 0
-        : Number(baseProfile?.totalProducts) || 0,
+    tongSP:
+      patch.tongSP !== undefined
+        ? Number(patch.tongSP) || 0
+        : Number(baseProfile?.tongSP) || 0,
     likesCount:
       patch.likesCount !== undefined
         ? Number(patch.likesCount) || 0
         : Number(baseProfile?.likesCount) || 0,
-    followersCount:
-      patch.followersCount !== undefined
-        ? Number(patch.followersCount) || 0
-        : Number(baseProfile?.followersCount) || 0,
+    soNguoiTheo:
+      patch.soNguoiTheo !== undefined
+        ? Number(patch.soNguoiTheo) || 0
+        : Number(baseProfile?.soNguoiTheo) || 0,
     followingCount:
       patch.followingCount !== undefined
         ? Number(patch.followingCount) || 0
@@ -112,14 +112,14 @@ export function mergeProfile(authUser, baseProfile, updates = {}) {
       patch.soldCount !== undefined
         ? Number(patch.soldCount) || 0
         : Number(baseProfile?.soldCount) || 0,
-    totalReviews:
-      patch.totalReviews !== undefined
-        ? Number(patch.totalReviews) || 0
-        : Number(baseProfile?.totalReviews) || 0,
-    averageRating:
-      patch.averageRating !== undefined
-        ? Number(patch.averageRating) || 0
-        : Number(baseProfile?.averageRating) || 0,
+    tongDG:
+      patch.tongDG !== undefined
+        ? Number(patch.tongDG) || 0
+        : Number(baseProfile?.tongDG) || 0,
+    diemTB:
+      patch.diemTB !== undefined
+        ? Number(patch.diemTB) || 0
+        : Number(baseProfile?.diemTB) || 0,
     responseRate:
       patch.responseRate !== undefined
         ? Number(patch.responseRate) || 0
@@ -249,13 +249,13 @@ export function mapBackendUserToProfile(backendUser, authUser) {
     authProvider: backendUser?.authProvider || '',
     role: backendUser?.role,
     sellerPhoneVerified: Boolean(backendUser?.sellerPhoneVerified),
-    totalProducts: backendUser?.totalProducts ?? 0,
+    tongSP: backendUser?.tongSP ?? 0,
     likesCount: backendUser?.likesCount ?? 0,
-    followersCount: backendUser?.followersCount ?? 0,
+    soNguoiTheo: backendUser?.soNguoiTheo ?? 0,
     followingCount: backendUser?.followingCount ?? 0,
     soldCount: backendUser?.soldCount ?? 0,
-    totalReviews: backendUser?.totalReviews ?? 0,
-    averageRating: backendUser?.averageRating ?? 0,
+    tongDG: backendUser?.tongDG ?? 0,
+    diemTB: backendUser?.diemTB ?? 0,
     responseRate: backendUser?.responseRate ?? 0,
     shopPhone: backendUser?.shopPhone || '',
     shopName: backendUser?.shopName || '',

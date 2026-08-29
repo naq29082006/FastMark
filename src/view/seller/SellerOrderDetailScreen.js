@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { getOrderDetailDisplay, getCompletedTabDepositLine, isCompletedTabDepositPendingLine } from '../../core/utils/orderDisplay';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -26,35 +27,50 @@ import { showErrorAlert } from '../../core/utils/appAlert';
 import {
   RESERVATION_STATUS,
   getCancelledReservationReason,
+  getOrderDetailStatusLabel,
   getSellerCancelNote,
-  getSellerCompletedOrderStatusLabel,
   hasAdminDisputeResolution,
   hasDisputeReportHistory,
   isActiveDisputeOrder,
+  isDisputeHistoryReadOnlyOrder,
+  isDisputeResolvedOrder,
   isCancelledReservationStatus,
   isSellerCancelAfterAcceptOrder,
+  canSellerRefundDisputeDeposit,
+  canSellerRefundDepositOnHolding,
+  canSellerRespondOnDisputeItem,
+  isSellerPostDeliveryResponseAction,
   VIEWER_ROLE,
 } from '../../constants/sellerOrders';
 import { formatPrice } from '../../core/utils/productFormat';
 import { getOrderCodeValue } from '../../core/utils/orderCode';
 import {
+  getOrderCountdownLine,
+  getDisputeActionButtonLabel,
+  getPastPickupReportDetailLine,
   getSellerDepositReleaseCountdownLabel,
+  getSellerDepositReleaseDetailCountdownLabel,
   getSellerResponseCountdownLabel,
+  getPrePickupDisputeWindowText,
+  isWithinDepositDecisionWindowForItem,
+  isPastPickupTime,
 } from '../../core/utils/escrowHold';
-import { useMinuteNow } from '../../hooks/useMinuteNow';
+import { useOrderTimeNow } from '../../hooks/useOrderTimeNow';
 import {
   getReservationBuyerId,
   getReservationProductId,
+  reservationRequiresDeposit,
 } from '../../core/utils/reservationEntity';
 import AvatarBadge from '../shared/components/AvatarBadge';
 import ReservationDisputeModal from '../shared/components/ReservationDisputeModal';
 import ReservationDisputeSection from '../shared/components/ReservationDisputeSection';
+import ReservationDisputeResultBlock from '../shared/components/ReservationDisputeResultBlock';
 import ReservationAdjustmentSection from '../shared/components/ReservationAdjustmentSection';
-import ReservationAdminResolutionSection from '../shared/components/ReservationAdminResolutionSection';
 import SellerCancelAcceptedModal from '../shared/components/SellerCancelAcceptedModal';
 import SellerOrderReviewSection from '../shared/components/SellerOrderReviewSection';
 import SubScreenHeader from '../shared/components/SubScreenHeader';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
+import { coalesceReservationFetch } from '../../core/utils/coalesceReservationFetch';
 import { useOrderSocket } from '../../hooks/useOrderSocket';
 
 function formatPickupSchedule(iso) {
@@ -81,24 +97,8 @@ function PaymentRow({ label, value, valueStyle }) {
   );
 }
 
-function isPastPickup(item, now) {
-  if (!item?.pickupTime) return false;
-  const pickup = new Date(item.pickupTime);
-  return Number.isFinite(pickup.getTime()) && now >= pickup.getTime();
-}
-
 function isWithinDepositDecisionWindow(item, now = Date.now()) {
-  if (item?.withinDepositDecisionWindow === true) return true;
-  if (item?.withinDepositDecisionWindow === false) return false;
-  const deadlineRaw = item?.depositDecisionDeadline || item?.autoReleaseAt || item?.reviewDeadlineAt;
-  if (deadlineRaw) {
-    const deadline = new Date(deadlineRaw);
-    return Number.isFinite(deadline.getTime()) && now < deadline.getTime();
-  }
-  if (!item?.pickupTime) return false;
-  const pickup = new Date(item.pickupTime);
-  if (!Number.isFinite(pickup.getTime())) return false;
-  return now < pickup.getTime() + 24 * 60 * 60 * 1000;
+  return isWithinDepositDecisionWindowForItem(item, now);
 }
 
 function OrderDetailLayout({ onBack, children }) {
@@ -139,19 +139,21 @@ function mergeLoadedItem(previous, next) {
   const prevReason = getCancelledReservationReason(prev, VIEWER_ROLE.SELLER);
   const nextReason = getCancelledReservationReason(merged, VIEWER_ROLE.SELLER);
   if (prevReason && !nextReason) {
-    merged.cancelReason = prev.cancelReason || merged.cancelReason;
+    merged.cancelNote = prev.cancelNote || merged.cancelNote;
     merged.reasonCode = prev.reasonCode || merged.reasonCode;
     merged.reasonLabelBuyer = prev.reasonLabelBuyer || merged.reasonLabelBuyer;
     merged.reasonLabelSeller = prev.reasonLabelSeller || merged.reasonLabelSeller;
+    merged.cancelType = prev.cancelType || merged.cancelType;
     merged.cancelledBy = prev.cancelledBy || merged.cancelledBy;
+    merged.cancelReason = prev.cancelReason || merged.cancelReason;
     merged.cancelledAt = prev.cancelledAt || merged.cancelledAt;
-    merged.depositSettleTo =
-      prev.depositSettleTo != null ? prev.depositSettleTo : merged.depositSettleTo;
+    merged.cocChuyenDen =
+      prev.cocChuyenDen != null ? prev.cocChuyenDen : merged.cocChuyenDen;
     merged.cancelNote = prev.cancelNote || merged.cancelNote;
-    merged.sellerCancelImages =
-      Array.isArray(prev.sellerCancelImages) && prev.sellerCancelImages.length
-        ? prev.sellerCancelImages
-        : merged.sellerCancelImages;
+    merged.anhHuyShop =
+      Array.isArray(prev.anhHuyShop) && prev.anhHuyShop.length
+        ? prev.anhHuyShop
+        : merged.anhHuyShop;
     merged.cancelledBySellerAfterAccept =
       prev.cancelledBySellerAfterAccept ?? merged.cancelledBySellerAfterAccept;
   }
@@ -167,6 +169,7 @@ export default function SellerOrderDetailScreen({
   onChanged,
   onOpenBuyer,
   onOpenProduct,
+  accountLockedOrderMode = false,
 }) {
   const resolvedId = String(reservationId || initialItem?.id || '').trim();
   const [reservation, setReservation] = useState(initialItem);
@@ -176,7 +179,12 @@ export default function SellerOrderDetailScreen({
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [showCancelAcceptedModal, setShowCancelAcceptedModal] = useState(false);
   const [disputeReports, setDisputeReports] = useState([]);
-  const currentTime = useMinuteNow(true);
+  const pickupScheduleItems = useMemo(() => {
+    if (reservation?.status !== RESERVATION_STATUS.WAITING_PICKUP || !reservation?.pickupTime) {
+      return [];
+    }
+    return [reservation];
+  }, [reservation?.id, reservation?.status, reservation?.pickupTime]);
 
   const loadDisputeReports = useCallback(async () => {
     if (!resolvedId) {
@@ -209,7 +217,8 @@ export default function SellerOrderDetailScreen({
         await loadDisputeReports();
       } catch (loadError) {
         if (!silent) {
-          showErrorAlert(loadError.message || 'Không tải được chi tiết đơn.');
+          const message = loadError.message || 'Không tải được chi tiết đơn.';
+          showErrorAlert(message, 'Lỗi', { accountLockedOrderMode });
         }
         setReservation((prev) => prev || initialItem);
       } finally {
@@ -218,8 +227,18 @@ export default function SellerOrderDetailScreen({
         }
       }
     },
-    [resolvedId, initialItem, loadDisputeReports]
+    [resolvedId, initialItem, loadDisputeReports, accountLockedOrderMode]
   );
+
+  const handlePickupBoundary = useCallback(() => {
+    loadDetail({ silent: true });
+  }, [loadDetail]);
+
+  const currentTime = useOrderTimeNow({
+    enabled: true,
+    items: pickupScheduleItems,
+    onPickupBoundary: handlePickupBoundary,
+  });
 
   useEffect(() => {
     loadDetail();
@@ -230,8 +249,9 @@ export default function SellerOrderDetailScreen({
       if (!payload?.reservationId || String(payload.reservationId) !== String(resolvedId)) {
         return;
       }
-      // Cập nhật im lặng: không bật spinner khi đang xem chi tiết.
-      loadDetail({ silent: true });
+      coalesceReservationFetch('seller', resolvedId, () => loadDetail({ silent: true })).catch(
+        () => {}
+      );
     },
     [loadDetail, resolvedId]
   );
@@ -258,7 +278,9 @@ export default function SellerOrderDetailScreen({
       setReservation(updated);
       onChanged?.();
     } catch (actionError) {
-      Alert.alert('Lỗi', actionError.message || 'Không thực hiện được thao tác.');
+      showErrorAlert(actionError.message || 'Không thực hiện được thao tác.', 'Lỗi', {
+        accountLockedOrderMode,
+      });
     } finally {
       setIsActing(false);
     }
@@ -304,17 +326,22 @@ export default function SellerOrderDetailScreen({
       setShowCancelAcceptedModal(false);
       onChanged?.();
     } catch (actionError) {
-      Alert.alert('Lỗi', actionError.message || 'Không hủy được đơn.');
+      showErrorAlert(actionError.message || 'Không hủy được đơn.', 'Lỗi', {
+        accountLockedOrderMode,
+      });
       throw actionError;
     } finally {
       setIsActing(false);
     }
   }
 
-  function handleRefundDisputeDeposit() {
+  function handleRefundDeposit() {
+    const isDispute = Number(reservation?.status) === RESERVATION_STATUS.DISPUTED;
     Alert.alert(
       'Hoàn cọc cho người mua?',
-      'Tiền cọc sẽ được hoàn về ví người mua và đơn sẽ kết thúc tranh chấp.',
+      isDispute
+        ? 'Tiền cọc sẽ được hoàn về ví người mua và đơn sẽ kết thúc tranh chấp.'
+        : 'Tiền cọc sẽ được hoàn về ví người mua và đơn sẽ được hủy.',
       [
         { text: 'Huỷ', style: 'cancel' },
         {
@@ -328,7 +355,9 @@ export default function SellerOrderDetailScreen({
               onChanged?.();
               Alert.alert('Đã hoàn cọc', 'Tiền cọc đã được hoàn cho người mua.');
             } catch (actionError) {
-              Alert.alert('Lỗi', actionError.message || 'Không hoàn cọc được.');
+              showErrorAlert(actionError.message || 'Không hoàn cọc được.', 'Lỗi', {
+                accountLockedOrderMode,
+              });
             } finally {
               setIsActing(false);
             }
@@ -354,6 +383,7 @@ export default function SellerOrderDetailScreen({
       const result = await reportBuyerNoShowOnBackend({
         idToken,
         reservationId,
+        reason: payload.reason,
         title: payload.title,
         description: payload.description,
         note: payload.note,
@@ -363,9 +393,11 @@ export default function SellerOrderDetailScreen({
       setShowDisputeModal(false);
       await loadDisputeReports();
       onChanged?.();
-      Alert.alert('Đã gửi', 'Đã báo cáo người mua không đến. Cọc đang giữ chờ admin.');
+      Alert.alert('Đã gửi', 'Đã gửi báo cáo. Cọc đang giữ chờ admin xử lý.');
     } catch (actionError) {
-      Alert.alert('Lỗi', actionError.message || 'Không gửi được báo cáo.');
+      showErrorAlert(actionError.message || 'Không gửi được báo cáo.', 'Lỗi', {
+        accountLockedOrderMode,
+      });
       throw actionError;
     } finally {
       setIsActing(false);
@@ -385,13 +417,23 @@ export default function SellerOrderDetailScreen({
       setShowResponseModal(false);
       await loadDisputeReports();
       onChanged?.();
-      Alert.alert('Đã gửi', 'Phản hồi khiếu nại đã gửi. Admin sẽ xử lý tranh chấp.');
+      Alert.alert('Đã gửi', 'Phản hồi đã được gửi. Admin sẽ xử lý tranh chấp.');
     } catch (actionError) {
-      Alert.alert('Lỗi', actionError.message || 'Không gửi được phản hồi.');
+      showErrorAlert(actionError.message || 'Không gửi được phản hồi.', 'Lỗi', {
+        accountLockedOrderMode,
+      });
       throw actionError;
     } finally {
       setIsActing(false);
     }
+  }
+
+  function handleOpenDisputeRespond() {
+    if (isSellerPostDeliveryResponseAction(reservation)) {
+      setShowResponseModal(true);
+      return;
+    }
+    setShowDisputeModal(true);
   }
 
   if (isLoading && !reservation) {
@@ -415,7 +457,7 @@ export default function SellerOrderDetailScreen({
   }
 
   const canConfirm = reservation.status === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION;
-  const pastPickup = isPastPickup(reservation, currentTime);
+  const pastPickup = isPastPickupTime(reservation, currentTime);
   const withinDecision = isWithinDepositDecisionWindow(reservation, currentTime);
   const holdingAccepted =
     reservation.status === RESERVATION_STATUS.WAITING_PICKUP &&
@@ -423,34 +465,45 @@ export default function SellerOrderDetailScreen({
     !reservation.disputeBySeller;
   const canCancelAccepted =
     reservation.canCancelAccepted === true || holdingAccepted;
+  const isDisputeHistoryReadOnly = isDisputeHistoryReadOnlyOrder(reservation);
+  const canRefundDepositPastPickup =
+    !isDisputeHistoryReadOnly && canSellerRefundDepositOnHolding(reservation);
   const canReportBuyer =
-    reservation.canReportBuyer === true ||
-    ((reservation.status === RESERVATION_STATUS.WAITING_PICKUP ||
-      reservation.status === RESERVATION_STATUS.DISPUTED) &&
-      pastPickup &&
-      !reservation.disputeBySeller);
+    !isDisputeHistoryReadOnly &&
+    (reservation.canReportBuyer === true ||
+      ((reservation.status === RESERVATION_STATUS.WAITING_PICKUP ||
+        reservation.status === RESERVATION_STATUS.DISPUTED) &&
+        pastPickup &&
+        !reservation.disputeBySeller));
   const canRefundDisputeDeposit =
-    !reservation.disputeBySeller &&
-    (reservation.canRefundDisputeDeposit === true ||
-      (reservation.status === RESERVATION_STATUS.DISPUTED &&
-        Number(reservation.depositSettleTo || 0) === 0 &&
-        !reservation.depositSettledAt &&
-        !reservation.depositReleasedAt &&
-        !reservation.depositRefundedAt));
+    !isDisputeHistoryReadOnly && canSellerRefundDisputeDeposit(reservation);
+  const canRespondDispute =
+    !isDisputeHistoryReadOnly && canSellerRespondOnDisputeItem(reservation);
+  const showActiveDisputeActions =
+    !isDisputeHistoryReadOnly &&
+    isActiveDisputeOrder(reservation) &&
+    (canRespondDispute || canRefundDisputeDeposit);
   const showDisputeActions =
+    !isDisputeHistoryReadOnly &&
     reservation.status === RESERVATION_STATUS.DISPUTED &&
+    !showActiveDisputeActions &&
     (canRefundDisputeDeposit || canReportBuyer);
   const showConfirmedNotice =
     reservation.status === RESERVATION_STATUS.WAITING_PICKUP && !pastPickup;
   const showPastPickupNotice =
     reservation.status === RESERVATION_STATUS.WAITING_PICKUP && pastPickup;
   const showPastPickupActions =
-    showPastPickupNotice && (canCancelAccepted || canReportBuyer);
+    showPastPickupNotice && (canRefundDepositPastPickup || canReportBuyer);
   const showCancelBeforePickup = canCancelAccepted && !pastPickup;
   const canSellerRespondToComplaint = reservation?.canSellerRespondToComplaint === true;
   const sellerResponseCountdownText = canSellerRespondToComplaint
     ? getSellerResponseCountdownLabel(reservation, currentTime)
     : '';
+  const disputeReportLabel = getDisputeActionButtonLabel(
+    reservation,
+    VIEWER_ROLE.SELLER,
+    currentTime
+  );
   const buyerName = reservation.buyer?.fullName || 'Khách';
   const buyerId = getReservationBuyerId(reservation);
   const productId = getReservationProductId(reservation);
@@ -471,22 +524,26 @@ export default function SellerOrderDetailScreen({
     onOpenProduct?.({ productId, productName: reservation.product?.productName || '' });
   }
 
-  const statusLabel = getSellerCompletedOrderStatusLabel(reservation.status);
+  const statusLabel = getOrderDetailStatusLabel(reservation);
   const statusChipStyle =
-    isCancelledReservationStatus(reservation.status) ||
-    reservation.status === RESERVATION_STATUS.DISPUTED
-      ? styles.statusChipCancelled
-      : reservation.status === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION ||
-          reservation.status === RESERVATION_STATUS.WAITING_PICKUP
-        ? styles.statusChipPending
-        : styles.statusChip;
+    isDisputeResolvedOrder(reservation)
+      ? styles.statusChip
+      : isCancelledReservationStatus(reservation.status) ||
+          reservation.status === RESERVATION_STATUS.DISPUTED
+        ? styles.statusChipCancelled
+        : reservation.status === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION ||
+            reservation.status === RESERVATION_STATUS.WAITING_PICKUP
+          ? styles.statusChipPending
+          : styles.statusChip;
   const pickupDisplay = formatPickupSchedule(reservation.pickupTime);
+  const orderPlacedDisplay = formatPickupSchedule(reservation.createdAt);
+  const orderDisplay = getOrderDetailDisplay(reservation, VIEWER_ROLE.SELLER, currentTime);
   const cancelReasonText =
-    String(listCancelReasonText || '').trim() ||
-    getCancelledReservationReason(reservation, VIEWER_ROLE.SELLER);
+    String(listCancelReasonText || '').trim() || orderDisplay.cancelReasonLine;
+  const cancelDepositLine = orderDisplay.depositLine;
   const sellerCancelNote = getSellerCancelNote(reservation);
-  const sellerCancelImages = Array.isArray(reservation.sellerCancelImages)
-    ? reservation.sellerCancelImages.filter(Boolean)
+  const anhHuyShop = Array.isArray(reservation.anhHuyShop)
+    ? reservation.anhHuyShop.filter(Boolean)
     : [];
   const showSellerCancelEvidence =
     isSellerCancelAfterAcceptOrder(reservation) &&
@@ -494,13 +551,34 @@ export default function SellerOrderDetailScreen({
   const showAdminResolutionSection = hasAdminDisputeResolution(reservation, disputeReports);
   const showCancelReasonSection =
     !isActiveDisputeOrder(reservation) &&
+    !isDisputeResolvedOrder(reservation) &&
     !showAdminResolutionSection &&
     (Boolean(cancelReasonText) ||
       (showSellerCancelEvidence && Boolean(sellerCancelNote)) ||
-      (showSellerCancelEvidence && sellerCancelImages.length > 0));
+      (showSellerCancelEvidence && anhHuyShop.length > 0));
   const totalAmount = Number(reservation.totalAmount) || 0;
   const depositAmount = Number(reservation.depositAmount) || 0;
   const depositPercent = Math.max(0, Math.min(100, Number(reservation.depositPercent) || 0));
+  const hasDeposit = reservationRequiresDeposit(reservation);
+  const isCompletedOrder =
+    reservation.status === RESERVATION_STATUS.COMPLETED ||
+    reservation.status === RESERVATION_STATUS.AUTO_COMPLETED ||
+    reservation.status === RESERVATION_STATUS.PICKUP_CONFIRMED ||
+    reservation.status === RESERVATION_STATUS.RECEIVED;
+  const detailDepositLine = (() => {
+    if (!hasDeposit || showAdminResolutionSection || isActiveDisputeOrder(reservation)) {
+      return '';
+    }
+    if (isCompletedOrder) {
+      return getCompletedTabDepositLine(reservation, VIEWER_ROLE.SELLER, currentTime);
+    }
+    if (isDisputeResolvedOrder(reservation) || isCancelledReservationStatus(reservation.status)) {
+      return cancelDepositLine;
+    }
+    return cancelDepositLine;
+  })();
+  const showDepositSection = Boolean(detailDepositLine);
+  const detailDepositPending = isCompletedTabDepositPendingLine(detailDepositLine);
   const cashDue = Math.max(0, totalAmount - depositAmount);
   const qty = Number(reservation.quantity) || 0;
   const unitPrice =
@@ -513,15 +591,19 @@ export default function SellerOrderDetailScreen({
           : 0;
   const buyerReport = disputeReports.find((report) => report.reporterSide === 'buyer');
   const sellerReport = disputeReports.find((report) => report.reporterSide === 'seller');
-  const isCompletedOrder =
-    reservation.status === RESERVATION_STATUS.COMPLETED ||
-    reservation.status === RESERVATION_STATUS.AUTO_COMPLETED;
   const buyerReview =
     isCompletedOrder && reservation.buyerReview?.id ? reservation.buyerReview : null;
-  const escrowDepositCountdown = getSellerDepositReleaseCountdownLabel(
+  const depositReleaseCountdown = getSellerDepositReleaseDetailCountdownLabel(
     reservation,
     currentTime
   );
+  const headerCountdownLine = isDisputeResolvedOrder(reservation)
+    ? depositReleaseCountdown || ''
+    : isCompletedOrder
+      ? getPastPickupReportDetailLine(reservation, VIEWER_ROLE.SELLER, currentTime) || ''
+      : depositReleaseCountdown ||
+        getPastPickupReportDetailLine(reservation, VIEWER_ROLE.SELLER, currentTime) ||
+        getOrderCountdownLine(reservation, currentTime, VIEWER_ROLE.SELLER);
 
   return (
     <OrderDetailLayout onBack={onBack}>
@@ -535,8 +617,8 @@ export default function SellerOrderDetailScreen({
           </Text>
         </View>
 
-        {escrowDepositCountdown ? (
-          <Text style={styles.escrowDepositCountdown}>{escrowDepositCountdown}</Text>
+        {headerCountdownLine ? (
+          <Text style={styles.escrowDepositCountdown}>{headerCountdownLine}</Text>
         ) : null}
 
         <View style={styles.divider} />
@@ -608,12 +690,31 @@ export default function SellerOrderDetailScreen({
 
         <Text style={styles.sectionHeading}>CHI TIẾT THANH TOÁN</Text>
         <PaymentRow label="Tổng tiền hàng:" value={formatPrice(totalAmount)} />
-        <PaymentRow label={`Đặt cọc ${depositPercent}%:`} value={formatPrice(depositAmount)} />
+        <PaymentRow
+          label={`Đặt cọc ${hasDeposit ? depositPercent : 0}%:`}
+          value={formatPrice(hasDeposit ? depositAmount : 0)}
+        />
         <PaymentRow
           label="Thanh toán khi nhận hàng:"
-          value={formatPrice(cashDue)}
+          value={formatPrice(hasDeposit ? cashDue : totalAmount)}
           valueStyle={styles.paymentValueDanger}
         />
+
+        <View style={styles.divider} />
+
+        <Text style={styles.sectionHeading}>THỜI GIAN ĐẶT HÀNG</Text>
+        <View style={styles.pickupTimeRow}>
+          <Ionicons name="time-outline" size={18} color="#64748b" />
+          {orderPlacedDisplay ? (
+            <Text style={styles.pickupTimeText}>
+              Giờ: <Text style={styles.pickupTimeValue}>{orderPlacedDisplay.time}</Text>
+              {' · '}
+              Ngày: <Text style={styles.pickupTimeValue}>{orderPlacedDisplay.date}</Text>
+            </Text>
+          ) : (
+            <Text style={styles.pickupTimeText}>Giờ: — · Ngày: —</Text>
+          )}
+        </View>
 
         <View style={styles.divider} />
 
@@ -652,8 +753,12 @@ export default function SellerOrderDetailScreen({
               <Text style={styles.pickupOverdueTitle}>ĐÃ QUÁ GIỜ NHẬN HÀNG</Text>
               <Text style={styles.pickupNoticeBody}>
                 {withinDecision
-                  ? 'Trong 24h bạn có thể khiếu nại và chờ admin xử lý hoặc hoàn cọc cho người mua.'
-                  : 'Đã quá 24 giờ sau giờ nhận. Cọc mặc định đã chuyển cho bạn.'}
+                  ? hasDeposit
+                    ? `Trong ${getPrePickupDisputeWindowText()} người bán có thể khiếu nại và chờ admin xử lý hoặc hoàn cọc cho người mua.`
+                    : `Trong ${getPrePickupDisputeWindowText()} người bán có thể khiếu nại và chờ admin xử lý.`
+                  : hasDeposit
+                    ? `Đã quá ${getPrePickupDisputeWindowText()} sau giờ nhận. Cọc mặc định đã chuyển cho người bán.`
+                    : `Đã quá ${getPrePickupDisputeWindowText()} sau giờ nhận.`}
               </Text>
             </View>
           </>
@@ -669,7 +774,6 @@ export default function SellerOrderDetailScreen({
           />
         ) : null}
 
-        <View style={styles.divider} />
         <ReservationAdjustmentSection reservation={reservation} />
 
         <ReservationDisputeSection
@@ -679,7 +783,7 @@ export default function SellerOrderDetailScreen({
           viewerRole={VIEWER_ROLE.SELLER}
         />
 
-        <ReservationAdminResolutionSection
+        <ReservationDisputeResultBlock
           reservation={reservation}
           reports={disputeReports}
           viewerRole={VIEWER_ROLE.SELLER}
@@ -689,24 +793,40 @@ export default function SellerOrderDetailScreen({
           <>
             <View style={styles.divider} />
             <Text style={styles.cancelReasonHeading}>LÝ DO</Text>
-            {cancelReasonText ? (
-              <Text style={styles.cancelReasonBody}>{cancelReasonText}</Text>
-            ) : null}
+              {cancelReasonText ? (
+                <Text style={styles.cancelReasonBody}>{cancelReasonText}</Text>
+              ) : null}
             {!showSellerCancelEvidence || !sellerCancelNote ? null : (
               <View style={styles.cancelDetailBlock}>
                 <Text style={styles.cancelDetailBody}>{sellerCancelNote}</Text>
               </View>
             )}
-            {!showSellerCancelEvidence || !sellerCancelImages.length ? null : (
+            {!showSellerCancelEvidence || !anhHuyShop.length ? null : (
               <View style={styles.cancelEvidenceBlock}>
                 <Text style={styles.cancelDetailLabel}>Ảnh minh chứng</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {sellerCancelImages.map((uri) => (
+                  {anhHuyShop.map((uri) => (
                     <Image key={uri} source={{ uri }} style={styles.evidencePhoto} />
                   ))}
                 </ScrollView>
               </View>
             )}
+          </>
+        ) : null}
+
+        {showDepositSection ? (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.depositSectionHeading}>TIỀN CỌC</Text>
+            <Text
+              style={
+                detailDepositPending
+                  ? styles.depositSectionPending
+                  : styles.depositSectionSettled
+              }
+            >
+              {detailDepositLine}
+            </Text>
           </>
         ) : null}
       </View>
@@ -716,60 +836,89 @@ export default function SellerOrderDetailScreen({
           <View style={styles.confirmActionRow}>
             <Pressable
               disabled={isActing}
-              onPress={handleConfirm}
-              style={styles.primaryBtn}
-            >
-              <Text style={styles.primaryBtnText}>Đồng ý</Text>
-            </Pressable>
-            <Pressable
-              disabled={isActing}
               onPress={handleReject}
               style={styles.outlineDangerBtn}
             >
               <Text style={styles.outlineDangerBtnText}>Từ chối</Text>
             </Pressable>
+            <Pressable
+              disabled={isActing}
+              onPress={handleConfirm}
+              style={styles.primaryBtn}
+            >
+              <Text style={styles.primaryBtnText}>Đồng ý</Text>
+            </Pressable>
           </View>
         ) : null}
-        {showDisputeActions ? (
-          <View style={styles.pastPickupActionCol}>
+        {showActiveDisputeActions ? (
+          <View style={styles.confirmActionRow}>
+            {canRespondDispute ? (
+              <Pressable
+                disabled={isActing}
+                onPress={handleOpenDisputeRespond}
+                style={[
+                  styles.reportBtn,
+                  styles.actionBtnFlex,
+                  sellerResponseCountdownText ? styles.actionBtnStacked : null,
+                ]}
+              >
+                <Text style={styles.reportBtnText}>Phản hồi</Text>
+                {sellerResponseCountdownText ? (
+                  <Text style={styles.responseCountdownText}>{sellerResponseCountdownText}</Text>
+                ) : null}
+              </Pressable>
+            ) : null}
             {canRefundDisputeDeposit ? (
               <Pressable
                 disabled={isActing}
-                onPress={handleRefundDisputeDeposit}
-                style={styles.refundBtn}
+                onPress={handleRefundDeposit}
+                style={[styles.refundBtn, styles.actionBtnFlex]}
               >
-                <Text style={styles.refundBtnText}>Hoàn cọc cho người mua</Text>
-              </Pressable>
-            ) : null}
-            {canReportBuyer ? (
-              <Pressable
-                disabled={isActing}
-                onPress={() => setShowDisputeModal(true)}
-                style={styles.reportBtn}
-              >
-                <Text style={styles.reportBtnText}>Báo cáo người mua không đến</Text>
+                <Text style={styles.refundBtnText}>Hoàn cọc</Text>
               </Pressable>
             ) : null}
           </View>
         ) : null}
-        {showPastPickupActions ? (
-          <View style={styles.pastPickupActionCol}>
-            {canCancelAccepted ? (
-              <Pressable
-                disabled={isActing}
-                onPress={handleOpenCancelAccepted}
-                style={styles.refundBtn}
-              >
-                <Text style={styles.refundBtnText}>Hoàn cọc cho người mua</Text>
-              </Pressable>
-            ) : null}
+        {showDisputeActions ? (
+          <View style={styles.confirmActionRow}>
             {canReportBuyer ? (
               <Pressable
                 disabled={isActing}
                 onPress={() => setShowDisputeModal(true)}
-                style={styles.reportBtn}
+                style={[styles.reportBtn, styles.actionBtnFlex]}
               >
-                <Text style={styles.reportBtnText}>Báo cáo người mua không đến</Text>
+                <Text style={styles.reportBtnText}>{disputeReportLabel}</Text>
+              </Pressable>
+            ) : null}
+            {canRefundDisputeDeposit ? (
+              <Pressable
+                disabled={isActing}
+                onPress={handleRefundDeposit}
+                style={[styles.refundBtn, styles.actionBtnFlex]}
+              >
+                <Text style={styles.refundBtnText}>Hoàn cọc</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+        {showPastPickupActions && !showDisputeActions && !showActiveDisputeActions ? (
+          <View style={styles.confirmActionRow}>
+            {canReportBuyer ? (
+              <Pressable
+                disabled={isActing}
+                onPress={() => setShowDisputeModal(true)}
+                style={[styles.reportBtn, styles.actionBtnFlex]}
+              >
+                <Text style={styles.reportBtnText}>{disputeReportLabel}</Text>
+              </Pressable>
+            ) : null}
+            {canRefundDepositPastPickup ? (
+              <Pressable
+                disabled={isActing}
+                onPress={handleRefundDeposit}
+                style={[styles.refundBtn, styles.actionBtnFlex]}
+              >
+                <Text style={styles.refundBtnText}>Hoàn cọc</Text>
               </Pressable>
             ) : null}
           </View>
@@ -780,28 +929,19 @@ export default function SellerOrderDetailScreen({
             onPress={handleOpenCancelAccepted}
             style={styles.dangerBtn}
           >
-            <Text style={styles.dangerBtnText}>Hủy đơn (hoàn cọc)</Text>
+            <Text style={styles.dangerBtnText}>Hủy đơn</Text>
           </Pressable>
         ) : null}
-        {canSellerRespondToComplaint ? (
-          <Pressable
-            disabled={isActing}
-            onPress={() => setShowResponseModal(true)}
-            style={[styles.primaryBtn, sellerResponseCountdownText ? styles.actionBtnStacked : null]}
-          >
-            <Text style={styles.primaryBtnText}>Phản hồi khiếu nại</Text>
-            {sellerResponseCountdownText ? (
-              <Text style={styles.responseCountdownText}>{sellerResponseCountdownText}</Text>
-            ) : null}
-          </Pressable>
-        ) : null}
-        {!showPastPickupActions && !showDisputeActions && canReportBuyer ? (
+        {!showPastPickupActions &&
+        !showDisputeActions &&
+        !showActiveDisputeActions &&
+        canReportBuyer ? (
           <Pressable
             disabled={isActing}
             onPress={() => setShowDisputeModal(true)}
             style={styles.reportBtn}
           >
-            <Text style={styles.reportBtnText}>Báo cáo người mua không đến</Text>
+            <Text style={styles.reportBtnText}>{disputeReportLabel}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -820,6 +960,7 @@ export default function SellerOrderDetailScreen({
       />
       <SellerCancelAcceptedModal
         visible={showCancelAcceptedModal}
+        orderCode={getOrderCodeValue(reservation?.id || resolvedId)}
         onClose={() => setShowCancelAcceptedModal(false)}
         onSubmit={handleSubmitCancelAccepted}
       />
@@ -1042,6 +1183,32 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '600',
   },
+  cancelDepositBody: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#0f172a',
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  depositSectionHeading: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0f172a',
+    letterSpacing: 0.3,
+    marginBottom: 8,
+  },
+  depositSectionPending: {
+    fontSize: 14,
+    color: '#ea580c',
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  depositSectionSettled: {
+    fontSize: 14,
+    color: '#0f172a',
+    fontWeight: '600',
+    lineHeight: 22,
+  },
   cancelDetailBlock: {
     marginTop: 10,
     gap: 4,
@@ -1081,13 +1248,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionRow: { gap: 10, marginTop: 4 },
-  pastPickupActionCol: {
-    gap: 10,
-  },
   confirmActionRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
     gap: 10,
+  },
+  actionBtnFlex: {
+    flex: 1,
+    width: undefined,
+    minWidth: 0,
   },
   primaryBtn: {
     flex: 1,
@@ -1136,7 +1305,6 @@ const styles = StyleSheet.create({
   },
   dangerBtnText: { color: '#ffffff', fontWeight: '800' },
   refundBtn: {
-    width: '100%',
     minHeight: 48,
     borderRadius: 12,
     backgroundColor: '#076F32',
@@ -1152,7 +1320,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   reportBtn: {
-    width: '100%',
     minHeight: 48,
     borderRadius: 12,
     backgroundColor: '#fff7ed',

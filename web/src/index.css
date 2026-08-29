@@ -1411,6 +1411,46 @@ a {
   margin-top: 4px;
 }
 
+.report-template-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.report-template-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-template-chip {
+  text-align: left;
+  white-space: normal;
+  line-height: 1.4;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+  color: #1e3a8a;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.report-template-chip:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.report-template-chip.is-active {
+  background: #dbeafe;
+  border-color: #2563eb;
+}
+
+.report-template-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .report-reply-templates {
   display: flex;
   flex-direction: column;
@@ -1674,6 +1714,27 @@ a {
   object-fit: cover;
 }
 
+.evidence-thumbnail-grid.previewable-image-grid .previewable-image {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.evidence-thumbnail-grid.previewable-image-grid .previewable-image:hover {
+  transform: translateY(-1px);
+  border-color: #076F32;
+  box-shadow: 0 8px 20px rgba(15, 115, 119, 0.12);
+}
+
+.evidence-thumbnail-grid.previewable-image-grid .previewable-image .ant-image-img {
+  display: block;
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
 .image-preview-overlay {
   position: fixed;
   inset: 0;
@@ -1697,12 +1758,60 @@ a {
 }
 
 .image-preview-full {
+  display: block;
   width: 100%;
   max-height: calc(100vh - 120px);
   object-fit: contain;
-  border-radius: 16px;
-  background: #0f172a;
-  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.previewable-image.ant-image {
+  display: inline-flex;
+  vertical-align: middle;
+  line-height: 0;
+}
+
+.previewable-image .ant-image-img {
+  display: block;
+}
+
+.previewable-image-mask {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.previewable-image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.previewable-image-grid .previewable-image {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.verify-doc-preview-image.ant-image,
+.verify-doc-preview-image .ant-image-img {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+.seller-verify-doc-preview .previewable-image.ant-image {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+}
+
+.seller-verify-doc-preview .previewable-image {
+  width: 100%;
+  max-width: 100%;
 }
 
 .modal-loading {
@@ -3924,6 +4033,171 @@ td .table-icon-actions {
   border-radius: 16px;
   padding: 20px;
   border: 1px solid #e2e8f0;
+}
+
+.dispute-resolution-modal {
+  display: grid;
+  gap: 18px;
+}
+
+.dispute-resolution-modal .modal-header {
+  display: grid;
+  gap: 8px;
+}
+
+.dispute-resolution-modal .report-template-list {
+  margin-top: 0;
+}
+
+.dispute-resolution-modal .report-reply-field {
+  margin-top: 0;
+  gap: 10px;
+}
+
+.dispute-resolution-modal .report-reply-field textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.dispute-resolution-modal .report-action-row {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.dispute-resolution-modal .dispute-modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.dispute-resolution-modal .dispute-cancel-btn,
+.dispute-resolution-modal .dispute-confirm-btn {
+  min-height: 46px;
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.dispute-resolution-modal .dispute-cancel-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.dispute-resolution-modal .dispute-cancel-btn:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.dispute-resolution-modal .dispute-confirm-btn {
+  border: 0;
+  background: #076f32;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(7, 111, 50, 0.18);
+}
+
+.dispute-resolution-modal .dispute-confirm-btn:hover:not(:disabled) {
+  background: #055a28;
+}
+
+.dispute-resolution-modal .dispute-cancel-btn:disabled,
+.dispute-resolution-modal .dispute-confirm-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.dispute-outcome-fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.dispute-outcome-fieldset legend {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 2px;
+}
+
+.dispute-outcome-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dispute-outcome-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dispute-outcome-option input {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: #076f32;
+}
+
+.dispute-outcome-option-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dispute-outcome-option-body strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.dispute-outcome-option-body span {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.dispute-outcome-option.is-active {
+  box-shadow: 0 0 0 1px rgba(7, 111, 50, 0.12);
+}
+
+.dispute-outcome-option--refund.is-active {
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
+.dispute-outcome-option--release.is-active {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.dispute-outcome-description {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .dispute-outcome-options {
+    grid-template-columns: 1fr;
+  }
+
+  .dispute-resolution-modal .dispute-modal-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 

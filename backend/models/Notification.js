@@ -28,7 +28,7 @@ const NotificationSchema = new mongoose.Schema({
   index: { type: Number, default: 2, index: true },
 
   // true = admin gửi broadcast từ Quản lý thông báo (dùng cho lịch sử admin).
-  isAdminBroadcast: { type: Boolean, default: false, index: true },
+  tbAdmin: { type: Boolean, default: false, index: true },
 
   // Thời điểm tạo thông báo.
   CreatedAt: { type: Date, default: Date.now },

@@ -205,7 +205,7 @@ function enrichRoutes(routes) {
     setProductPin: { desc: "Ghim sản phẩm", params: "Header: Bearer token (Seller); Path: :id; Body: { pinned }", result: '{ "success": true }' },
     softDeleteProduct: { desc: "Xóa mềm sản phẩm", params: "Header: Bearer token (Seller); Path: :id", result: '{ "success": true }' },
     buyerReportSeller: { desc: "Buyer báo seller không có mặt", params: "Header: Bearer token; Body: { reservationId, reason, description, lat, lng, images }", result: '{ "success": true, "data": { "report" } }' },
-    sellerReportBuyer: { desc: "Seller báo buyer không đến", params: "Header: Bearer token (Seller); Body: { reservationId, description, lat, lng, images }", result: '{ "success": true, "data": { "report" } }' },
+    sellerReportBuyer: { desc: "Seller báo cáo người mua (không đến / khác)", params: "Header: Bearer token (Seller); Body: { reservationId, reason (buyer_no_show|other), description, lat, lng, images }", result: '{ "success": true, "data": { "report", "dispute" } }' },
     listReservationReports: { desc: "Báo cáo tranh chấp của đơn", params: "Header: Bearer token; Path: reservationId", result: '{ "success": true, "data": { "reports" } }' },
     listActiveBanks: { desc: "Ngân hàng hỗ trợ rút tiền", params: "Header: Bearer token", result: '{ "success": true, "data": [...] }' },
     listMyWithdraws: { desc: "Lịch sử rút tiền", params: "Header: Bearer token", result: '{ "success": true, "data": [...] }' },

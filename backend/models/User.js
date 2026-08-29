@@ -74,10 +74,10 @@ const userSchema = new mongoose.Schema({
   lockedAt: { type: Date, default: null },
 
   // Số gian hàng mà tài khoản này đang theo dõi (Follow.followerId → shopId).
-  FollowingCount: { type: Number, default: 0 },
+  SoTheoDoi: { type: Number, default: 0 },
 
   // Lần hoạt động gần nhất — admin theo dõi, cập nhật khi user online/offline hoặc tương tác.
-  LanHoatDongCuoi: { type: Date, default: null },
+  HoatDongCuoi: { type: Date, default: null },
 
   // true sau khi xác nhận mã OTP email (đăng ký email). Google có thể set sẵn true.
   VerifyAccount: { type: Boolean, default: false },
@@ -111,7 +111,7 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     verifyAccount: this.VerifyAccount,
     // Tương thích client: đã xác minh SĐT khi có Phone hợp lệ.
     sellerPhoneVerified: isPhoneVerified(this),
-    followingCount: Number(this.FollowingCount) || 0,
+    followingCount: Number(this.SoTheoDoi ?? this.SoTheoDoi) || 0,
     createdAt: this.CreatedAt,
     updatedAt: this.UpdatedAt,
   };

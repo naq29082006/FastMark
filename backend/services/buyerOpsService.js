@@ -12,8 +12,8 @@ const {
   SHOP_OPEN,
   NOTIFICATION_AUDIENCE,
   RESERVATION_CANCEL_REASON,
-  RESERVATION_TAB_STATUS_MAP,
 } = require("../constants");
+const { applyTabFilterToQuery } = require("../utils/reservationTabFilter");
 const {
   toPublicReservation,
   reserveVariantInventory,
@@ -27,7 +27,11 @@ const {
   isPastPickupTime,
   isWithinDepositDecisionWindow,
 } = require("./reservationService");
-const { loadDisputesByReservationIds } = require("../utils/reservationDisputeView");
+const {
+  loadDisputesByReservationIds,
+  disputeViewFromRecord,
+} = require("../utils/reservationDisputeView");
+const { isActiveDispute } = require("../utils/reservationCompat");
 const { holdDepositToSystem, notifyWalletBalanceUpdated, getWalletBalance } = require("./walletService");
 const { createNotification, NOTIFICATION_INDEX } = require("./notificationService");
 const { emitOrderUpdated } = require("./orderRealtimeService");
@@ -137,6 +141,8 @@ async function createReservation(user, payload) {
   }
 
   const { product, variant, shop } = await validateProductAndShop(productId, variantId);
+  const { resolveEscrowProtectionDaysForProduct } = require("../utils/escrowProtection");
+  const soNgayKN = await resolveEscrowProtectionDaysForProduct(product._id);
 
   if ((variant.Quantity ?? 0) < quantity) {
     throw createServiceError("Số lượng vượt quá tồn kho.", 400);
@@ -158,11 +164,10 @@ async function createReservation(user, payload) {
       reservation = await Reservation.create(
         [
           {
+            userId: user._id,
             variantId: variant._id,
             shopId: shop._id,
             productId: product._id,
-            buyerId: user._id,
-            sellerId: shop.userId || null,
             pickupCode: require("../utils/reservationCompat").generatePickupCode(),
             quantity,
             reservedPrice: agreedPrice,
@@ -172,9 +177,9 @@ async function createReservation(user, payload) {
             inventoryHeld: true,
             depositPercent,
             depositAmount,
-            depositPaidAt: null,
-            depositSettledAt: null,
-            depositSettleTo: 0,
+            soNgayKN,
+            tgGiaiCoc: null,
+            cocChuyenDen: 0,
             createdAt: now,
             updatedAt: now,
           },
@@ -189,7 +194,6 @@ async function createReservation(user, payload) {
           reservationId: reservation._id,
           session,
         });
-        reservation.depositPaidAt = now;
         await reservation.save({ session });
       }
     });
@@ -226,43 +230,14 @@ async function createReservation(user, payload) {
 
 async function listBuyerReservations(user, { tab = "pending", search, page, limit } = {}) {
   await processReservationLifecycle();
-  let statusFilter = null;
-
-  switch (tab) {
-    case "all":
-      statusFilter = RESERVATION_TAB_STATUS_MAP.all;
-      break;
-    case "pending":
-    case "awaiting":
-    case "awaiting_confirm":
-      statusFilter = RESERVATION_TAB_STATUS_MAP.pending;
-      break;
-    case "holding":
-      statusFilter = RESERVATION_TAB_STATUS_MAP.holding;
-      break;
-    case "dispute":
-      statusFilter = RESERVATION_TAB_STATUS_MAP.dispute;
-      break;
-    case "cancelled":
-      statusFilter = RESERVATION_TAB_STATUS_MAP.cancelled;
-      break;
-    case "completed":
-      statusFilter = RESERVATION_TAB_STATUS_MAP.completed;
-      break;
-    default:
-      statusFilter = RESERVATION_TAB_STATUS_MAP.holding;
-  }
-
   const reservationQuery = { userId: user._id };
-  if (statusFilter) {
-    reservationQuery.status = { $in: statusFilter };
-  }
+  const tabKey = applyTabFilterToQuery(reservationQuery, tab);
 
   const { listReservationsWithSearch } = require("../utils/reservationSearch");
 
   return listReservationsWithSearch({
     reservationQuery,
-    tab,
+    tab: tabKey,
     search,
     page,
     limit,
@@ -341,19 +316,18 @@ async function cancelReservationByBuyer(user, reservationId) {
         403
       );
     }
-    if (reservation.disputed) {
+    if (isActiveDispute(reservation)) {
       throw createServiceError("Không thể hủy đơn đang tranh chấp.", 403);
     }
     reservation.status = RESERVATION_STATUS.CANCELLED;
     reservation.cancelledAt = now;
-    reservation.cancelledBy = "buyer";
-    reservation.cancelReason = RESERVATION_CANCEL_REASON.BUYER_CANCEL_HOLDING;
+    reservation.cancelType = RESERVATION_CANCEL_REASON.BUYER_CANCEL_HOLDING;
     await releaseVariantInventory(reservation);
     const shop = await ShopProfile.findById(reservation.shopId);
     if (shop) {
       await releaseDepositIfHeld(reservation, shop);
     }
-    reservation.UpdatedAt = now;
+    reservation.updatedAt = now;
     await reservation.save();
 
     await notifyShopOwner(shop, {
@@ -378,11 +352,10 @@ async function cancelReservationByBuyer(user, reservationId) {
 
   reservation.status = RESERVATION_STATUS.CANCELLED;
   reservation.cancelledAt = now;
-  reservation.cancelledBy = "buyer";
-  reservation.cancelReason = RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING;
+  reservation.cancelType = RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING;
   await releaseVariantInventory(reservation);
   await refundDepositIfHeld(reservation);
-  reservation.UpdatedAt = now;
+  reservation.updatedAt = now;
   await reservation.save();
 
   const shop = await ShopProfile.findById(reservation.shopId);
@@ -428,17 +401,16 @@ async function reportReservationByBuyer(user, reservationId, payload = {}) {
   }
   const status = Number(reservation.status);
   if (
-    status === RESERVATION_STATUS.RECEIVED ||
+    status === RESERVATION_STATUS.PICKUP_CONFIRMED ||
     status === RESERVATION_STATUS.COMPLETED
   ) {
-    const result = await reservationDisputeService.buyerPostDeliveryComplaint(user, {
+    return reservationDisputeService.buyerPostDeliveryComplaint(user, {
       reservationId,
       reason,
       description: description || reason,
       images,
       videos,
     });
-    return result.reservation;
   }
   return reservationDisputeService.buyerReportSeller(user, {
     reservationId,
@@ -449,7 +421,7 @@ async function reportReservationByBuyer(user, reservationId, payload = {}) {
 }
 
 /**
- * Buyer đồng ý mất cọc sau quá giờ nhận (trong 24h).
+ * Buyer đồng ý mất cọc sau quá giờ nhận (trong 48h).
  * Giải ngân SystemWallet → Seller, đơn chuyển tab Đã hủy.
  */
 async function forfeitDepositByBuyer(user, reservationId) {
@@ -476,24 +448,31 @@ async function forfeitDepositByBuyer(user, reservationId) {
     status !== RESERVATION_STATUS.DISPUTED
   ) {
     throw createServiceError(
-      "Đã quá 24 giờ sau giờ nhận hàng. Cọc đã (hoặc sẽ) chuyển cho người bán theo mặc định.",
+      "Đã quá 48 giờ sau giờ nhận hàng. Cọc đã (hoặc sẽ) chuyển cho người bán theo mặc định.",
       403
     );
   }
   if (
-    Number(reservation.depositSettleTo) === 1 ||
-    Number(reservation.depositSettleTo) === 2 ||
-    reservation.depositSettledAt ||
+    Number(reservation.cocChuyenDen) === 1 ||
+    Number(reservation.cocChuyenDen) === 2 ||
+    reservation.tgGiaiCoc ||
     reservation.depositReleasedAt ||
     reservation.depositRefundedAt
   ) {
     throw createServiceError("Cọc đã được xử lý trước đó.", 400);
   }
-  if (reservation.disputed) {
-    throw createServiceError(
-      "Bạn đã gửi báo cáo tranh chấp. Không thể đồng ý mất cọc.",
-      403
+
+  if (status === RESERVATION_STATUS.DISPUTED) {
+    const disputes = await loadDisputesByReservationIds([reservation._id]);
+    const disputeView = disputeViewFromRecord(
+      disputes.get(String(reservation._id)) || null
     );
+    if (disputeView.disputeByBuyer) {
+      throw createServiceError(
+        "Bạn đã gửi báo cáo tranh chấp. Không thể đồng ý mất cọc.",
+        403
+      );
+    }
   }
 
   const shop = await ShopProfile.findById(reservation.shopId);

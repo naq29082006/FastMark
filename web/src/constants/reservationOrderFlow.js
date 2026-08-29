@@ -12,6 +12,7 @@ export const RESERVATION_CANCEL_REASON = {
   BUYER_REPORT_SELLER_ABSENT: 'buyer_report_seller_absent',
   SELLER_REPORT_BUYER_NO_SHOW: 'seller_report_buyer_no_show',
   DISPUTE_BOTH_REPORTED: 'dispute_both_reported',
+  BUYER_POST_DELIVERY_COMPLAINT: 'buyer_post_delivery_complaint',
   PICKUP_TIMEOUT: 'pickup_timeout',
   ADMIN_BUYER_WIN: 'admin_buyer_win',
   ADMIN_SELLER_WIN: 'admin_seller_win',
@@ -33,53 +34,55 @@ export const VIEWER_ROLE = {
 const CANCEL_REASON_VIEW_LABELS = {
   [RESERVATION_CANCEL_REASON.SELLER_REJECTED]: {
     buyer: 'Người bán đã từ chối giữ hàng.',
-    seller: 'Bạn đã từ chối giữ hàng.',
+    seller: 'Người bán đã từ chối giữ hàng.',
   },
   [RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING]: {
-    buyer: 'Bạn đã hủy đơn.',
+    buyer: 'Người mua đã hủy đơn.',
     seller: 'Người mua đã hủy đơn.',
   },
   [RESERVATION_CANCEL_REASON.CONFIRM_TIMEOUT]: {
     buyer: 'Đơn đã bị hủy do người bán chưa xác nhận giữ hàng.',
-    seller: 'Đơn đã bị hủy do bạn chưa xác nhận giữ hàng.',
+    seller: 'Đơn đã bị hủy do người bán chưa xác nhận giữ hàng.',
   },
   [RESERVATION_CANCEL_REASON.BUYER_RECEIVED]: {
     buyer: 'Đã nhận hàng',
     seller: 'Đã giao hàng',
   },
   [RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING]: {
-    buyer: 'Người bán đã hủy đơn. Tiền cọc đã được hoàn lại cho bạn.',
-    seller: 'Bạn đã hủy đơn. Tiền cọc đã được hoàn lại cho người mua.',
+    buyer: 'Người bán đã hủy đơn.',
+    seller: 'Người bán đã hủy đơn.',
   },
   [RESERVATION_CANCEL_REASON.BUYER_CANCEL_HOLDING]: {
-    buyer: 'Bạn đã hủy đơn. Tiền cọc đã được chuyển cho người bán.',
-    seller: 'Người mua đã hủy đơn. Tiền cọc đã được chuyển cho bạn.',
+    buyer: 'Người mua đã hủy đơn.',
+    seller: 'Người mua đã hủy đơn.',
   },
   [RESERVATION_CANCEL_REASON.BUYER_REPORT_SELLER_ABSENT]: {
     buyer: 'Người bán không có mặt',
-    seller: 'Bạn không có mặt',
+    seller: 'Người bán không có mặt',
   },
   [RESERVATION_CANCEL_REASON.SELLER_REPORT_BUYER_NO_SHOW]: {
-    buyer: 'Bạn không đến nhận',
+    buyer: 'Người mua không đến nhận',
     seller: 'Người mua không đến nhận',
   },
   [RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED]: {
     buyer: 'Đang tranh chấp',
     seller: 'Đang tranh chấp',
   },
+  [RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT]: {
+    buyer: 'Khiếu nại sau khi đã nhận hàng',
+    seller: 'Khách khiếu nại sau khi đã nhận hàng',
+  },
   [RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT]: {
-    buyer:
-      'Quá giờ nhận hàng, đơn đã tự động hủy do không có phản hồi từ hai bên. Tiền cọc đã được chuyển cho người bán.',
-    seller:
-      'Quá giờ nhận hàng, đơn đã tự động hủy do không có phản hồi từ hai bên. Tiền cọc đã được chuyển cho bạn.',
+    buyer: 'Quá giờ nhận hàng, đơn đã tự động hủy do không có phản hồi từ hai bên.',
+    seller: 'Quá giờ nhận hàng, đơn đã tự động hủy do không có phản hồi từ hai bên.',
   },
   [RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN]: {
-    buyer: 'Người bán vắng mặt',
-    seller: 'Không có mặt',
+    buyer: 'Admin xử lý tranh chấp.',
+    seller: 'Admin xử lý tranh chấp.',
   },
   [RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN]: {
-    buyer: 'Bạn không đến nhận',
-    seller: 'Người mua không đến nhận',
+    buyer: 'Admin xử lý tranh chấp.',
+    seller: 'Admin xử lý tranh chấp.',
   },
   [RESERVATION_CANCEL_REASON.ADMIN_COMPLETED]: {
     buyer: 'Đã nhận hàng',
@@ -98,24 +101,20 @@ const CANCEL_REASON_VIEW_LABELS = {
     seller: 'Người mua bị khóa',
   },
   [RESERVATION_CANCEL_REASON.AUTO_BUYER_WIN]: {
-    buyer: 'Người bán không phản hồi',
-    seller: 'Không phản hồi báo cáo',
+    buyer: 'Người mua thắng tranh chấp do người bán không phản hồi trong 48 giờ',
+    seller: 'Người mua thắng tranh chấp do người bán không phản hồi trong 48 giờ',
   },
   [RESERVATION_CANCEL_REASON.AUTO_SELLER_WIN]: {
-    buyer: 'Bạn không phản hồi báo cáo',
-    seller: 'Người mua không phản hồi',
+    buyer: 'Người bán thắng tranh chấp do người mua không phản hồi trong 48 giờ',
+    seller: 'Người bán thắng tranh chấp do người mua không phản hồi trong 48 giờ',
   },
   [RESERVATION_CANCEL_REASON.BUYER_FORFEIT]: {
-    buyer:
-      'Quá giờ nhận hàng, bạn đã đồng ý mất cọc. Tiền cọc đã được chuyển cho người bán.',
-    seller:
-      'Quá giờ nhận hàng, người mua đã đồng ý mất cọc. Tiền cọc đã được chuyển cho bạn.',
+    buyer: 'Quá giờ nhận hàng, người mua đã đồng ý mất cọc.',
+    seller: 'Quá giờ nhận hàng, người mua đã đồng ý mất cọc.',
   },
   [RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP]: {
-    buyer:
-      'Quá giờ nhận hàng, người bán đã hoàn cọc cho bạn. Tiền cọc đã được hoàn lại vào ví của bạn.',
-    seller:
-      'Quá giờ nhận hàng, bạn đã hoàn cọc cho người mua. Tiền cọc đã được hoàn lại cho người mua.',
+    buyer: 'Quá giờ nhận hàng, người bán đã đồng ý hoàn cọc.',
+    seller: 'Quá giờ nhận hàng, người bán đã đồng ý hoàn cọc.',
   },
 };
 
@@ -127,6 +126,10 @@ const LEGACY_CANCEL_REASON_ALIASES = {
   'Người bán đã từ chối giữ hàng': RESERVATION_CANCEL_REASON.SELLER_REJECTED,
   'Bạn đã từ chối giữ hàng': RESERVATION_CANCEL_REASON.SELLER_REJECTED,
   'Bạn đã đồng ý mất cọc': RESERVATION_CANCEL_REASON.BUYER_FORFEIT,
+  'Bạn đã đồng ý mất cọc sau quá giờ nhận hàng.': RESERVATION_CANCEL_REASON.BUYER_FORFEIT,
+  'Người mua đã đồng ý mất cọc sau quá giờ nhận hàng.': RESERVATION_CANCEL_REASON.BUYER_FORFEIT,
+  'Người bán đã hoàn cọc sau quá giờ nhận hàng.': RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP,
+  'Bạn đã hoàn cọc cho người mua sau quá giờ nhận hàng.': RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP,
   'Quá hạn nhận hàng': RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT,
 };
 
@@ -159,25 +162,89 @@ function normalizeViewerRole(role) {
     : VIEWER_ROLE.BUYER;
 }
 
+/** Tranh chấp / khiếu nại sau khi shop đã xác nhận giao (khác luồng quá giờ nhận). */
+export function isPostDeliveryDisputeReservation(reservation) {
+  if (!reservation) {
+    return false;
+  }
+  if (reservation.isPostDeliveryDispute === true) {
+    return true;
+  }
+  const kind = String(reservation.disputeKind || '').trim().toLowerCase();
+  if (kind === 'post_delivery') {
+    return true;
+  }
+  const reason = String(reservation.cancelType || reservation.reasonCode || '').trim();
+  if (reason === RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT) {
+    return true;
+  }
+  const legacyReason = String(reservation.cancelNote || '').trim();
+  if (legacyReason === RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT) {
+    return true;
+  }
+  const pickupAt = reservation.tgNhanHang || reservation.completedAt;
+  if (pickupAt && (reservation.disputedAt || reservation.disputeByBuyer)) {
+    const completed = new Date(pickupAt);
+    const disputed = new Date(
+      reservation.disputedAt || reservation.buyerDisputedAt || reservation.updatedAt
+    );
+    if (
+      Number.isFinite(completed.getTime()) &&
+      Number.isFinite(disputed.getTime()) &&
+      disputed.getTime() >= completed.getTime()
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function inferCancelReasonCode(item) {
   const fromReasonCode = resolveCancelReasonCode(item?.reasonCode);
   if (CANCEL_REASON_VIEW_LABELS[fromReasonCode]) {
     return fromReasonCode;
   }
 
-  const fromCancelReason = resolveCancelReasonCode(item?.cancelReason);
+  const fromCancelType = resolveCancelReasonCode(item?.cancelType);
+  if (CANCEL_REASON_VIEW_LABELS[fromCancelType]) {
+    return fromCancelType;
+  }
+
+  const fromCancelReason = resolveCancelReasonCode(item?.cancelNote);
   if (CANCEL_REASON_VIEW_LABELS[fromCancelReason]) {
     return fromCancelReason;
   }
 
-  const explicit = fromCancelReason || fromReasonCode;
-
+  const explicit = fromCancelReason || fromCancelType || fromReasonCode;
   const status = Number(item?.status);
-  const cancelledBy = String(item?.cancelledBy || '').trim();
+  const cancelledBy = String(item?.cancelType || '').trim();
   const disputeByBuyer = Boolean(item?.disputeByBuyer);
   const disputeBySeller = Boolean(item?.disputeBySeller);
 
-  if (status === 4) {
+  if (status === 3) {
+    const settleTo = Number(item?.cocChuyenDen);
+    if (settleTo === 1 || settleTo === 2) {
+      const explicitSettled =
+        resolveCancelReasonCode(item?.reasonCode) ||
+        resolveCancelReasonCode(item?.cancelNote);
+      if (CANCEL_REASON_VIEW_LABELS[explicitSettled]) {
+        return explicitSettled;
+      }
+      if (settleTo === 1) {
+        if (cancelledBy === 'system') return RESERVATION_CANCEL_REASON.AUTO_BUYER_WIN;
+        if (cancelledBy === 'seller_after_accept') {
+          return RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP;
+        }
+        return RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
+      }
+      if (settleTo === 2) {
+        if (cancelledBy === 'system') return RESERVATION_CANCEL_REASON.AUTO_SELLER_WIN;
+        return RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN;
+      }
+    }
+    if (isPostDeliveryDisputeReservation(item)) {
+      return RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT;
+    }
     if (disputeByBuyer && disputeBySeller) {
       return RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED;
     }
@@ -190,14 +257,21 @@ export function inferCancelReasonCode(item) {
     return RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED;
   }
 
-  if (status === 3 || status === 5) {
+  if (status === 4) {
     return RESERVATION_CANCEL_REASON.BUYER_RECEIVED;
   }
 
   if (cancelledBy === 'seller_reject') {
     return RESERVATION_CANCEL_REASON.SELLER_REJECTED;
   }
-  if (cancelledBy === 'seller_after_accept' || item?.cancelledBySellerAfterAccept) {
+
+  if (status === 5) {
+    if (cancelledBy === 'buyer' && Number(item?.cocChuyenDen) === 2) {
+      return RESERVATION_CANCEL_REASON.BUYER_FORFEIT;
+    }
+  }
+
+  if (cancelledBy === 'seller_after_accept') {
     if (
       explicit === RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP ||
       wasCancelledAfterPickup(item)
@@ -207,19 +281,22 @@ export function inferCancelReasonCode(item) {
     return RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING;
   }
   if (cancelledBy === 'buyer') {
-    return item?.sellerConfirmedAt
+    return status === 1 || item?.tgShopXN
       ? RESERVATION_CANCEL_REASON.BUYER_CANCEL_HOLDING
       : RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING;
   }
   if (cancelledBy === 'system') {
-    return explicit.includes('xác nhận')
-      ? RESERVATION_CANCEL_REASON.CONFIRM_TIMEOUT
-      : RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT;
+    if (explicit.includes('xác nhận') || explicit.includes('shop chưa')) {
+      return RESERVATION_CANCEL_REASON.CONFIRM_TIMEOUT;
+    }
+    return RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT;
   }
   if (cancelledBy === 'admin') {
-    return Number(item?.depositSettleTo) === 2
-      ? RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN
-      : RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
+    const settleTo = Number(item?.cocChuyenDen);
+    if (settleTo === 2) {
+      return RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN;
+    }
+    return RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
   }
 
   if (status === 1) {
@@ -228,30 +305,37 @@ export function inferCancelReasonCode(item) {
     }
     return RESERVATION_CANCEL_REASON.SELLER_REJECTED;
   }
-  if (status === 6) {
-    if (disputeByBuyer || disputeBySeller) {
-      return RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
-    }
-    if (cancelledBy === 'seller_after_accept' || item?.cancelledBySellerAfterAccept) {
-      return wasCancelledAfterPickup(item)
-        ? RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP
-        : RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING;
-    }
-    return RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING;
-  }
-  if (status === 7) {
-    if (CANCEL_REASON_VIEW_LABELS[explicit]) {
-      return explicit;
-    }
-    if (cancelledBy === 'buyer' && Number(item?.depositSettleTo) === 2) {
-      return RESERVATION_CANCEL_REASON.BUYER_FORFEIT;
-    }
-    return Number(item?.depositSettleTo) === 1
-      ? RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN
-      : RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT;
-  }
-
   return explicit;
+}
+
+const GENERIC_ADMIN_RESOLUTION_NOTES = new Set([
+  'Admin hoàn cọc cho người mua.',
+  'Admin xử lý tranh chấp: đền cọc cho người bán.',
+  'Shop tự hoàn cọc trong tranh chấp.',
+  'Shop tự hoàn cọc cho người mua.',
+  'Buyer đồng ý mất cọc.',
+]);
+
+function resolveAdminResolutionNote(item) {
+  const note = String(item?.cancelNote || '').trim();
+  if (!note || GENERIC_ADMIN_RESOLUTION_NOTES.has(note)) {
+    return '';
+  }
+  if (/^[a-z0-9_]+$/i.test(note) && note.includes('_')) {
+    return '';
+  }
+  return note;
+}
+
+function formatDisputeOutcomeLabel(baseLabel, code, item) {
+  if (
+    code !== RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN &&
+    code !== RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN
+  ) {
+    return baseLabel;
+  }
+  const note = resolveAdminResolutionNote(item);
+  return note ? `${baseLabel}. Lý do: ${note}` : baseLabel;
 }
 
 export function getReservationReasonLabel(item, viewerRole = VIEWER_ROLE.BUYER) {
@@ -265,7 +349,8 @@ export function getReservationReasonLabel(item, viewerRole = VIEWER_ROLE.BUYER) 
   const code = inferCancelReasonCode(item);
   const labels = CANCEL_REASON_VIEW_LABELS[code];
   if (labels) {
-    return labels[role] || labels.buyer || '';
+    const base = labels[role] || labels.buyer || '';
+    return formatDisputeOutcomeLabel(base, code, item);
   }
 
   return '';

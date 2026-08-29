@@ -1,59 +1,104 @@
-import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Alert, Button, Input, Modal, Rate, Space, Table, Tag, message } from 'antd';
 
-import { deleteAdminReview, getAdminReviewDetail, hideAdminReview, listAdminReviews, showAdminReview } from '../../api/adminReviewApi';
-import AdminDetailModal from '../components/AdminDetailModal';
+import { deleteAdminReview, getAdminReviewDetail, listAdminReviews } from '../../api/adminReviewApi';
 import ReviewDetailPanel from '../components/ReviewDetailPanel';
 import PageContainer from '../components/PageContainer';
 import RowActions from '../components/RowActions';
+import ProductCell from '../components/ProductCell';
 import ShopCell from '../components/ShopCell';
+import StatCards from '../components/StatCards';
 import ListToolbar from '../components/ListToolbar';
 import { usePaginatedQuery } from '../hooks/usePaginatedQuery';
 import { useUrlQueryString } from '../hooks/useUrlQuery';
 import { formatDateTime } from '../utils/format';
 import { buildSttColumn } from '../utils/tableColumns';
+import {
+  ALL_FILTER_VALUE,
+  apiFilterParam,
+  initialFilterValue,
+  withAllFilterOption,
+} from '../utils/filterOptions';
 import { useAuth } from '../../context/AuthContext';
+import { formatReservationOrderCodeShort } from '../../utils/reservationOrderCode';
 
-const STATUS_OPTIONS = [
-  { value: 'visible', label: 'Đang hiển thị' },
-  { value: 'hidden', label: 'Đã ẩn' },
-];
+const STATUS_OPTIONS = withAllFilterOption([
+  { value: 'visible', label: 'Hiển thị' },
+  { value: 'deleted', label: 'Đã xóa' },
+]);
 
-const RATING_OPTIONS = [
+const REMOVED_BY_OPTIONS = withAllFilterOption([
+  { value: 'admin', label: 'Admin xóa' },
+  { value: 'buyer', label: 'Người dùng xóa' },
+]);
+
+const RATING_OPTIONS = withAllFilterOption([
   { value: '5', label: '5 sao' },
   { value: '4', label: '4 sao' },
   { value: '3', label: '3 sao' },
   { value: '2', label: '2 sao' },
   { value: '1', label: '1 sao' },
-];
+]);
 
 export default function ReviewsPage() {
   const navigate = useNavigate();
   const { getIdToken } = useAuth();
   const urlStatus = useUrlQueryString('status');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(urlStatus);
-  const [rating, setRating] = useState(undefined);
+  const [status, setStatus] = useState(() => initialFilterValue(urlStatus));
+  const [removedBy, setRemovedBy] = useState(ALL_FILTER_VALUE);
+  const [rating, setRating] = useState(ALL_FILTER_VALUE);
   const [viewTarget, setViewTarget] = useState(null);
   const [viewDetail, setViewDetail] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteReason, setDeleteReason] = useState('');
-  const [hideReasonOpen, setHideReasonOpen] = useState(false);
-  const [hideReason, setHideReason] = useState('');
   const [actionLoading, setActionLoading] = useState('');
 
   const fetcher = useCallback(
     async ({ page, limit }) => {
       const token = await getIdToken();
-      return listAdminReviews(token, { page, limit, search, status, rating });
+      const payload = await listAdminReviews(token, {
+        page,
+        limit,
+        search,
+        status: apiFilterParam(status),
+        removedBy: status === 'deleted' ? apiFilterParam(removedBy) : undefined,
+        rating: apiFilterParam(rating),
+      });
+      return {
+        data: {
+          items: payload.data?.items || [],
+          pagination: payload.data?.pagination,
+          stats: payload.data?.stats,
+        },
+      };
     },
-    [getIdToken, search, status, rating]
+    [getIdToken, search, status, removedBy, rating]
   );
 
-  const { items, loading, error, pagination, page, setPage, limit, setLimit, reload } =
-    usePaginatedQuery({ fetcher, deps: [search, status, rating] });
+  const { items, loading, error, pagination, page, setPage, limit, setLimit, stats, reload } =
+    usePaginatedQuery({ fetcher, deps: [search, status, removedBy, rating] });
+
+  const statItems = useMemo(
+    () => [
+      { key: 'total', title: 'Tổng', value: stats?.total ?? 0 },
+      { key: 'visible', title: 'Hiển thị', value: stats?.visible ?? 0 },
+      { key: 'deleted', title: 'Đã xóa', value: stats?.deleted ?? 0 },
+    ],
+    [stats]
+  );
+
+  function closeReviewDetail() {
+    setViewTarget(null);
+    setViewDetail(null);
+  }
+
+  function navigateFromDetail(path) {
+    closeReviewDetail();
+    navigate(path);
+  }
 
   async function openReviewDetail(record) {
     const id = record.id || record._id;
@@ -68,52 +113,6 @@ export default function ReviewsPage() {
       setViewDetail(record);
     } finally {
       setViewLoading(false);
-    }
-  }
-
-  async function handleHideToggle() {
-    if (!viewDetail) return;
-    const id = viewDetail.id || viewDetail._id;
-    const hidden = viewDetail.isHidden || viewDetail.adminHidden;
-    if (!hidden) {
-      setHideReason('');
-      setHideReasonOpen(true);
-      return;
-    }
-    setActionLoading(id);
-    try {
-      const token = await getIdToken();
-      await showAdminReview(token, id);
-      message.success('Đã hiện lại đánh giá');
-      await reload();
-      await openReviewDetail(viewDetail);
-    } catch (err) {
-      message.error(err.message || 'Thao tác thất bại');
-    } finally {
-      setActionLoading('');
-    }
-  }
-
-  async function confirmHideReview() {
-    if (!viewDetail) return;
-    const reason = hideReason.trim();
-    if (!reason) {
-      message.warning('Vui lòng nhập lý do ẩn');
-      return;
-    }
-    const id = viewDetail.id || viewDetail._id;
-    setActionLoading(id);
-    try {
-      const token = await getIdToken();
-      await hideAdminReview(token, id, { reason });
-      message.success('Đã ẩn đánh giá');
-      setHideReasonOpen(false);
-      await reload();
-      await openReviewDetail(viewDetail);
-    } catch (err) {
-      message.error(err.message || 'Thao tác thất bại');
-    } finally {
-      setActionLoading('');
     }
   }
 
@@ -141,28 +140,63 @@ export default function ReviewsPage() {
   }
 
   const columns = [
-    buildSttColumn({ page, pageSize: limit }),
+    { ...buildSttColumn({ page, pageSize: limit }), fixed: undefined },
+    {
+      title: 'Mã đơn',
+      key: 'orderCode',
+      width: 80,
+      ellipsis: true,
+      render: (_, row) => {
+        const code = row.orderCode || formatReservationOrderCodeShort(row.reservationId);
+        if (!code) return '—';
+        if (row.reservationId) {
+          return (
+            <Link
+              to={`/reservations/${row.reservationId}`}
+              className="admin-reviews-order-code"
+              title={code}
+            >
+              {code}
+            </Link>
+          );
+        }
+        return (
+          <span className="admin-reviews-order-code" title={code}>
+            {code}
+          </span>
+        );
+      },
+    },
     {
       title: 'Người đánh giá',
       key: 'reviewer',
-      render: (_, row) => row.reviewer?.fullName || row.reviewer?.userName || '—',
+      width: '15%',
+      ellipsis: true,
+      render: (_, row) => {
+        const reviewer = row.reviewer;
+        if (!reviewer) {
+          return '—';
+        }
+        return (
+          <ShopCell
+            shopName={reviewer.fullName || reviewer.userName}
+            shopUsername={reviewer.fullName ? reviewer.userName : ''}
+            avatar={reviewer.avatar}
+            onClick={reviewer.id ? () => navigate(`/users/${reviewer.id}`) : undefined}
+          />
+        );
+      },
     },
     {
       title: 'Sản phẩm',
-      dataIndex: 'productName',
-      key: 'productName',
-      render: (v, row) => v || '—',
-    },
-    {
-      title: 'Gian hàng',
-      key: 'shop',
-      width: 220,
+      key: 'product',
+      width: 132,
+      ellipsis: true,
       render: (_, row) => (
-        <ShopCell
-          shopName={row.shopName}
-          shopUsername={row.shopUsername}
-          shopAvatar={row.shopAvatar}
-          onClick={row.shopId ? () => navigate(`/sellers/shops/${row.shopId}`) : undefined}
+        <ProductCell
+          productName={row.productName}
+          productImage={row.productImage}
+          onClick={row.productId ? () => navigate(`/products/${row.productId}`) : undefined}
         />
       ),
     },
@@ -170,20 +204,31 @@ export default function ReviewsPage() {
       title: 'Sao',
       dataIndex: 'rating',
       key: 'rating',
-      render: (v) => <Rate disabled value={Number(v) || 0} />,
+      width: 148,
+      align: 'center',
+      render: (v) => <Rate disabled allowHalf={false} value={Number(v) || 0} className="admin-reviews-rate" />,
     },
     {
       title: 'Nội dung',
       dataIndex: 'comment',
       key: 'comment',
+      width: 96,
       ellipsis: true,
       render: (v) => v || '—',
     },
     {
       title: 'Trạng thái',
       key: 'visibility',
+      width: 108,
+      align: 'center',
       render: (_, row) => {
         if (row.isDeleted || row.deletedAt) {
+          if (row.isAdminRemoved || row.removedBy === 'admin') {
+            return <Tag color="error">Admin xóa</Tag>;
+          }
+          if (row.isBuyerRemoved || row.removedBy === 'buyer') {
+            return <Tag color="error">Người dùng xóa</Tag>;
+          }
           return <Tag color="error">Đã xóa</Tag>;
         }
         if (row.isHidden || row.adminHidden) {
@@ -196,24 +241,29 @@ export default function ReviewsPage() {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: formatDateTime,
+      width: 128,
+      ellipsis: true,
+      render: (v) => formatDateTime(v),
     },
     {
       title: 'Thao tác',
       key: 'actions',
       width: 140,
-      fixed: 'right',
+      align: 'right',
       render: (_, record) => {
         const id = record.id || record._id;
         const isDeleted = record.isDeleted || record.deletedAt;
-        if (isDeleted) return '—';
         return (
           <RowActions
             onView={() => openReviewDetail(record)}
-            onDelete={() => {
-              setDeleteTarget(record);
-              setDeleteReason('');
-            }}
+            onDelete={
+              isDeleted
+                ? undefined
+                : () => {
+                    setDeleteTarget(record);
+                    setDeleteReason('');
+                  }
+            }
             deleteLoading={actionLoading === id}
           />
         );
@@ -222,9 +272,13 @@ export default function ReviewsPage() {
   ];
 
   return (
-    <PageContainer title="Đánh giá" subtitle="Kiểm duyệt đánh giá sản phẩm và shop">
+    <PageContainer
+      title="Đánh giá"
+      subtitle="Kiểm duyệt đánh giá sản phẩm và shop"
+      stats={<StatCards items={statItems} loading={loading && !stats} columns={3} />}
+    >
       <ListToolbar
-        searchPlaceholder="Tìm theo người đánh giá, sản phẩm..."
+        searchPlaceholder="Tìm theo mã đơn, người đánh giá, sản phẩm..."
         searchValue={search}
         onSearchChange={setSearch}
         onSearch={setSearch}
@@ -236,9 +290,26 @@ export default function ReviewsPage() {
             value: status,
             onChange: (v) => {
               setStatus(v);
+              if (v !== 'deleted') {
+                setRemovedBy(ALL_FILTER_VALUE);
+              }
               setPage(1);
             },
           },
+          ...(status === 'deleted'
+            ? [
+                {
+                  key: 'removedBy',
+                  placeholder: 'Người xóa',
+                  options: REMOVED_BY_OPTIONS,
+                  value: removedBy,
+                  onChange: (v) => {
+                    setRemovedBy(v);
+                    setPage(1);
+                  },
+                },
+              ]
+            : []),
           {
             key: 'rating',
             placeholder: 'Số sao',
@@ -252,8 +323,9 @@ export default function ReviewsPage() {
         ]}
         onReset={() => {
           setSearch('');
-          setStatus(undefined);
-          setRating(undefined);
+          setStatus(ALL_FILTER_VALUE);
+          setRemovedBy(ALL_FILTER_VALUE);
+          setRating(ALL_FILTER_VALUE);
           setPage(1);
         }}
       />
@@ -261,11 +333,12 @@ export default function ReviewsPage() {
       {error ? <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} /> : null}
 
       <Table
+        className="admin-reviews-table"
         rowKey={(row) => row.id || row._id}
         loading={loading}
         columns={columns}
         dataSource={items}
-        scroll={{ x: 1100 }}
+        tableLayout="fixed"
         pagination={{
           current: page,
           pageSize: limit,
@@ -279,62 +352,41 @@ export default function ReviewsPage() {
         }}
       />
 
-      <AdminDetailModal
+      <Modal
         open={Boolean(viewTarget)}
-        onClose={() => {
-          setViewTarget(null);
-          setViewDetail(null);
-        }}
+        centered
         title="Chi tiết đánh giá"
-        subtitle={viewDetail?.productName || viewDetail?.shopName || ''}
-        loading={viewLoading}
-        fullscreen
+        onCancel={closeReviewDetail}
+        width={640}
+        destroyOnClose
         footer={
           viewDetail && !(viewDetail.isDeleted || viewDetail.deletedAt) ? (
-            <Space wrap className="admin-detail-modal-footer">
+            <Space>
+              <Button onClick={closeReviewDetail}>Đóng</Button>
               <Button
+                danger
+                loading={actionLoading === (viewDetail.id || viewDetail._id)}
                 onClick={() => {
-                  setViewTarget(null);
+                  closeReviewDetail();
                   setDeleteTarget(viewDetail);
                   setDeleteReason('');
                 }}
               >
-                Xóa mềm
+                Xóa đánh giá
               </Button>
-              <Button onClick={handleHideToggle} loading={actionLoading === (viewDetail.id || viewDetail._id)}>
-                {viewDetail.isHidden || viewDetail.adminHidden ? 'Hiện lại' : 'Ẩn đánh giá'}
-              </Button>
-              {viewDetail.productId ? (
-                <Button type="link" onClick={() => navigate(`/products/${viewDetail.productId}`)}>
-                  Sản phẩm
-                </Button>
-              ) : null}
-              {viewDetail.shopId ? (
-                <Button type="link" onClick={() => navigate(`/sellers/shops/${viewDetail.shopId}`)}>
-                  Gian hàng
-                </Button>
-              ) : null}
             </Space>
-          ) : null
+          ) : (
+            <Button type="primary" onClick={closeReviewDetail}>
+              Đóng
+            </Button>
+          )
         }
       >
-        <ReviewDetailPanel review={viewDetail} />
-      </AdminDetailModal>
-
-      <Modal
-        title="Ẩn đánh giá"
-        open={hideReasonOpen}
-        okText="Ẩn"
-        onOk={confirmHideReview}
-        confirmLoading={Boolean(actionLoading)}
-        onCancel={() => setHideReasonOpen(false)}
-      >
-        <Input.TextArea
-          rows={3}
-          placeholder="Lý do (bắt buộc)"
-          value={hideReason}
-          onChange={(e) => setHideReason(e.target.value)}
-        />
+        {viewLoading && !viewDetail ? (
+          <p>Đang tải...</p>
+        ) : (
+          <ReviewDetailPanel review={viewDetail} onNavigate={navigateFromDetail} />
+        )}
       </Modal>
 
       <Modal

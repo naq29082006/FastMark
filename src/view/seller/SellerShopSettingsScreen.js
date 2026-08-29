@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -27,7 +28,7 @@ import ProfileSubScreen from '../profile/ProfileSubScreen';
 import SellerLocationPickerScreen from './SellerLocationPickerScreen';
 import TimePickerField from '../shared/components/TimePickerField';
 import KeyboardAwareTextInput from '../shared/components/KeyboardAwareTextInput';
-import AvatarBadge from '../shared/components/AvatarBadge';
+import { getAvatarInitial, isRemoteAvatarUrl } from '../../core/utils/avatarInitial';
 
 const SHOP_USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 
@@ -127,27 +128,45 @@ function chooseShopAvatarSource() {
   });
 }
 
+const SHOP_AVATAR_PREVIEW_HEIGHT = 148;
+
 function ShopAvatarField({ name, photoUrl, isUploading, onPress }) {
+  const previewUrl = isRemoteAvatarUrl(photoUrl) ? String(photoUrl).trim() : '';
+  const initial = getAvatarInitial(name || 'Shop');
+
   return (
     <View style={styles.avatarSection}>
-      <View style={styles.avatarWrap}>
-        <AvatarBadge name={name || 'Shop'} uri={photoUrl} size={88} />
-        <Pressable
-          onPress={onPress}
-          disabled={isUploading}
-          style={({ pressed }) => [styles.avatarPlusButton, pressed && styles.buttonPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Đổi ảnh đại diện gian hàng"
-        >
-          {isUploading ? (
-            <ActivityIndicator color="#ffffff" size="small" />
+      <Pressable
+        onPress={onPress}
+        disabled={isUploading}
+        style={({ pressed }) => [styles.avatarPreviewPress, pressed && styles.buttonPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Đổi ảnh đại diện gian hàng"
+      >
+        <View style={styles.avatarPreviewFrame}>
+          {previewUrl ? (
+            <Image source={{ uri: previewUrl }} style={styles.avatarPreviewImage} resizeMode="cover" />
           ) : (
-            <Ionicons name="camera" size={14} color="#ffffff" />
+            <View style={styles.avatarPreviewFallback}>
+              <Text style={styles.avatarPreviewInitial}>{initial}</Text>
+            </View>
           )}
-        </Pressable>
-      </View>
+          <View style={styles.avatarPreviewOverlay}>
+            {isUploading ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="camera" size={18} color="#ffffff" />
+                <Text style={styles.avatarPreviewOverlayText}>Đổi ảnh</Text>
+              </>
+            )}
+          </View>
+        </View>
+      </Pressable>
       <Text style={styles.avatarHint}>Ảnh đại diện gian hàng</Text>
-      <Text style={styles.avatarSubHint}>Nhấn biểu tượng camera để đổi ảnh</Text>
+      <Text style={styles.avatarSubHint}>
+        Hiển thị dạng banner ngang trên trang gian hàng — nên dùng ảnh rộng, không cắt tròn.
+      </Text>
     </View>
   );
 }
@@ -594,6 +613,7 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
             value={openTime}
             onChange={setOpenTime}
             placeholder="08:00"
+            minuteInterval={5}
             compact
           />
           <View style={styles.divider} />
@@ -602,6 +622,7 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
             value={closeTime}
             onChange={setCloseTime}
             placeholder="21:00"
+            minuteInterval={5}
             compact
           />
           <View style={styles.divider} />
@@ -710,36 +731,67 @@ const styles = StyleSheet.create({
   },
   centered: { alignItems: 'center', paddingVertical: 40 },
   avatarSection: {
-    alignItems: 'center',
+    alignItems: 'stretch',
     paddingVertical: 4,
   },
-  avatarWrap: {
-    position: 'relative',
+  avatarPreviewPress: {
+    alignSelf: 'stretch',
   },
-  avatarPlusButton: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  avatarPreviewFrame: {
+    width: '100%',
+    height: SHOP_AVATAR_PREVIEW_HEIGHT,
+    borderRadius: 14,
+    overflow: 'hidden',
     backgroundColor: '#076F32',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  avatarPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPreviewFallback: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#ffffff',
+    backgroundColor: '#076F32',
+  },
+  avatarPreviewInitial: {
+    fontSize: 56,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  avatarPreviewOverlay: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+  },
+  avatarPreviewOverlayText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   avatarHint: {
     marginTop: 12,
     fontSize: 15,
     fontWeight: '800',
     color: '#0f172a',
+    textAlign: 'center',
   },
   avatarSubHint: {
     marginTop: 4,
     fontSize: 12,
     color: '#64748b',
     fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 17,
   },
   card: {
     backgroundColor: '#ffffff',

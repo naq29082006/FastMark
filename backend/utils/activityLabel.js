@@ -31,9 +31,11 @@ function formatActivityLabel(isOnline, lastActiveAt) {
   return `Hoạt động ${days} ngày trước`;
 }
 
+const { readUserHoatDongCuoi } = require("./fieldCompat");
+
 function mapPresenceFields(entity) {
   const isOnline = Boolean(entity?.DangHoatDong);
-  const lastActiveAt = entity?.LanHoatDongCuoi || null;
+  const lastActiveAt = readUserHoatDongCuoi(entity);
 
   return {
     isOnline,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
   Eye,
   Heart,
@@ -14,13 +14,15 @@ import {
   getProductDetail,
 } from '../api/catalogApi';
 import ProductRemoveDialog from '../components/admin/ProductRemoveDialog';
+import { useAdminTopbar } from '../admin/context/AdminTopbarContext';
 import { useAuth } from '../context/AuthContext';
 import { useAdminRealtimeRefresh } from '../hooks/useAdminRealtimeRefresh';
 import { REALTIME_COALESCE_MS } from '../constants/realtime';
 import { formatDateTimeDetail, formatMoney } from '../utils/format';
-import { goBackOr } from '../utils/navigation';
 import { keepIfSame } from '../utils/realtimeList';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import PreviewableImage from '../components/PreviewableImage';
+import { Image } from 'antd';
 
 function statusBadgeClass(product) {
   if (product?.isDeleted) return 'badge badge-danger';
@@ -44,14 +46,17 @@ function DetailSkeleton() {
 }
 
 function ShopAvatar({ src, name }) {
-  const avatarUrl = resolveMediaUrl(src);
-  if (avatarUrl) {
-    return <img src={avatarUrl} alt="" className="product-detail-shop-avatar" />;
-  }
   return (
-    <div className="product-detail-shop-avatar product-detail-shop-avatar--fallback">
-      {String(name || 'S').charAt(0).toUpperCase()}
-    </div>
+    <PreviewableImage
+      src={src}
+      alt={name || ''}
+      width={44}
+      height={44}
+      shape="circle"
+      className="product-detail-shop-avatar"
+      fallbackLetter={name || 'S'}
+      fallbackClassName="product-detail-shop-avatar product-detail-shop-avatar--fallback"
+    />
   );
 }
 
@@ -111,15 +116,37 @@ function buildProductStats(product) {
     {
       icon: Star,
       label: 'Đánh giá trung bình',
-      value: `${(product.averageRating || 0).toFixed(1)} ★ (${product.reviewCount || 0})`,
+      value: `${(product.diemTB || 0).toFixed(1)} ★ (${product.reviewCount || 0})`,
       tone: 'amber',
     },
   ];
 }
 
+function resolveProductStock(product, variant) {
+  const variantQty = (item) => {
+    if (item?.stock != null) return Number(item.stock) || 0;
+    if (item?.quantity != null) return Number(item.quantity) || 0;
+    return null;
+  };
+
+  if (variant) {
+    const picked = variantQty(variant);
+    if (picked != null) return picked;
+  }
+
+  if (product?.totalStock != null) return Number(product.totalStock) || 0;
+  if (product?.stock != null) return Number(product.stock) || 0;
+
+  const list = product?.variants || [];
+  if (list.length) {
+    return list.reduce((sum, item) => sum + (variantQty(item) ?? 0), 0);
+  }
+
+  return 0;
+}
+
 export default function ProductDetailPage() {
   const { productId } = useParams();
-  const navigate = useNavigate();
   const { getIdToken } = useAuth();
 
   const [product, setProduct] = useState(null);
@@ -131,6 +158,16 @@ export default function ProductDetailPage() {
   const [removeTarget, setRemoveTarget] = useState(null);
   const [removeError, setRemoveError] = useState('');
   const [removeLoading, setRemoveLoading] = useState(false);
+
+  const { setTrail, clearTrail } = useAdminTopbar();
+
+  const productDisplayName =
+    product?.productName || (loading ? '…' : 'Chi tiết sản phẩm');
+
+  useEffect(() => {
+    setTrail([{ label: 'Sản phẩm', to: '/products' }, { label: productDisplayName }]);
+    return () => clearTrail();
+  }, [productDisplayName, setTrail, clearTrail]);
 
   const loadDetail = useCallback(
     async ({ silent = false } = {}) => {
@@ -268,29 +305,6 @@ export default function ProductDetailPage() {
 
   return (
     <div className="admin-detail-page product-detail-page">
-      <header className="admin-detail-toolbar product-detail-toolbar no-print">
-        <button
-          type="button"
-          className="ghost-btn"
-          onClick={() => goBackOr(navigate, '/products')}
-        >
-          ← Quay lại
-        </button>
-        <div className="header-actions">
-          {!product?.isDeleted ? (
-            <button
-              type="button"
-              className="danger-btn product-detail-delete-btn"
-              disabled={loading || removeLoading || !product}
-              onClick={openRemoveDialog}
-            >
-              <Trash2 size={16} aria-hidden="true" />
-              Xóa sản phẩm
-            </button>
-          ) : null}
-        </div>
-      </header>
-
       {error ? <p className="error-banner">{error}</p> : null}
       {message ? <div className="snackbar">{message}</div> : null}
 
@@ -299,9 +313,9 @@ export default function ProductDetailPage() {
       {!loading && !product ? (
         <section className="table-card">
           <p>Không tìm thấy sản phẩm.</p>
-          <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/products')}>
-            Quay lại
-          </button>
+          <Link to="/products" className="link-btn">
+            Về danh sách sản phẩm
+          </Link>
         </section>
       ) : null}
 
@@ -312,57 +326,75 @@ export default function ProductDetailPage() {
               <span className="product-detail-card-id" title={product.id}>
                 ID: <code>{product.id}</code>
               </span>
-              <span className={statusBadgeClass(product)}>{resolveStatusLabel(product)}</span>
+              <div className="product-detail-hero-status-group">
+                <span className={statusBadgeClass(product)}>{resolveStatusLabel(product)}</span>
+                {!product.isDeleted ? (
+                  <button
+                    type="button"
+                    className="account-hero-lock-btn account-hero-lock-btn--lock"
+                    title="Xóa sản phẩm"
+                    aria-label="Xóa sản phẩm"
+                    disabled={removeLoading}
+                    onClick={openRemoveDialog}
+                  >
+                    <Trash2 size={18} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="product-detail-gallery">
-              <div className="product-detail-main-image-wrap">
-                {activeImage ? (
-                  <img src={activeImage} alt={product.productName} className="product-detail-main-image" />
-                ) : (
-                  <div className="product-detail-main-image product-detail-main-image--empty">SP</div>
-                )}
-              </div>
-              {gallery.length > 1 ? (
-                <div className="product-detail-thumbs">
-                  {gallery.slice(0, 4).map((url) => (
-                    <button
-                      key={url}
-                      type="button"
-                      className={activeImage === url ? 'active' : undefined}
-                      onClick={() => setActiveImage(url)}
-                    >
-                      <img src={url} alt="" />
-                    </button>
-                  ))}
-                  {gallery.length > 4 ? (
-                    <span className="product-detail-thumbs-more">+{gallery.length - 4}</span>
-                  ) : null}
+              <Image.PreviewGroup items={gallery.map((url) => ({ src: resolveMediaUrl(url) }))}>
+                <div className="product-detail-main-image-wrap">
+                  {activeImage ? (
+                    <PreviewableImage
+                      src={activeImage}
+                      alt={product.productName}
+                      width="100%"
+                      height={320}
+                      shape="rounded"
+                      className="product-detail-main-image"
+                    />
+                  ) : (
+                    <div className="product-detail-main-image product-detail-main-image--empty">SP</div>
+                  )}
                 </div>
-              ) : null}
+                {gallery.length > 1 ? (
+                  <div className="product-detail-thumbs">
+                    {gallery.slice(0, 4).map((url) => (
+                      <button
+                        key={url}
+                        type="button"
+                        className={activeImage === url ? 'active' : undefined}
+                        onClick={() => setActiveImage(url)}
+                      >
+                        <PreviewableImage
+                          src={url}
+                          alt=""
+                          width={64}
+                          height={64}
+                          shape="rounded"
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                      </button>
+                    ))}
+                    {gallery.length > 4 ? (
+                      <span className="product-detail-thumbs-more">+{gallery.length - 4}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </Image.PreviewGroup>
             </div>
 
             <div className="product-detail-hero-body">
-              <div className="product-detail-shop-head">
-                <ShopAvatar
-                  src={product.shopAvatar || product.avatar}
-                  name={product.shopName}
-                />
-                <div className="product-detail-shop-head-text">
-                  {product.shopId ? (
-                    <Link to={`/shops/${product.shopId}`} className="product-detail-shop-link">
-                      {product.shopName || 'Gian hàng'}
-                    </Link>
-                  ) : (
-                    <span className="product-detail-shop-name">{product.shopName || '—'}</span>
-                  )}
-                  {product.shopUsername ? (
-                    <span className="product-detail-shop-handle">@{product.shopUsername}</span>
-                  ) : null}
-                </div>
-              </div>
-
               <div className="product-detail-hero-fields">
+                <div className="product-detail-field">
+                  <span className="product-detail-field-label">Tên sản phẩm</span>
+                  <span className="product-detail-field-value product-detail-field-value--name">
+                    {product.productName || '—'}
+                  </span>
+                </div>
+
                 <div className="product-detail-field">
                   <span className="product-detail-field-label">Giá bán</span>
                   <div className="product-detail-price-block">
@@ -409,6 +441,13 @@ export default function ProductDetailPage() {
                 ) : null}
 
                 <div className="product-detail-field">
+                  <span className="product-detail-field-label">Tồn kho</span>
+                  <span className="product-detail-field-value">
+                    {resolveProductStock(product, selectedVariant)}
+                  </span>
+                </div>
+
+                <div className="product-detail-field">
                   <span className="product-detail-field-label">Đơn vị tính</span>
                   <span className="product-detail-field-value">{product.donVi || '—'}</span>
                 </div>
@@ -443,6 +482,25 @@ export default function ProductDetailPage() {
                   <span className="product-detail-field-value">
                     {formatDateTimeDetail(product.updatedAt) || '—'}
                   </span>
+                </div>
+              </div>
+
+              <div className="product-detail-shop-head product-detail-shop-head--footer">
+                <ShopAvatar
+                  src={product.shopAvatar || product.avatar}
+                  name={product.shopName}
+                />
+                <div className="product-detail-shop-head-text">
+                  {product.shopId ? (
+                    <Link to={`/sellers/shops/${product.shopId}`} className="product-detail-shop-link">
+                      {product.shopName || 'Gian hàng'}
+                    </Link>
+                  ) : (
+                    <span className="product-detail-shop-name">{product.shopName || '—'}</span>
+                  )}
+                  {product.shopUsername ? (
+                    <span className="product-detail-shop-handle">@{product.shopUsername}</span>
+                  ) : null}
                 </div>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { createLogger } from '../core/utils/logger';
 import {
   fetchNearbyShopsFromNode,
+  fetchMapShopsFromNode,
   fetchSearchShopsFromNode,
   hasStoreNodeApi,
 } from '../api/storeNodeApi';
@@ -58,4 +59,35 @@ export async function fetchNearbyRegisteredShops({
     items,
     shops: items,
   };
+}
+
+export async function fetchMapNearbyShops({
+  latitude,
+  longitude,
+  radiusMeters = 2000,
+  shopCategoryId = '',
+  limit = 500,
+}) {
+  if (!hasStoreNodeApi()) {
+    return [];
+  }
+
+  const result = await fetchMapShopsFromNode({
+    latitude,
+    longitude,
+    radiusMeters,
+    shopCategoryId,
+    limit,
+  });
+  const items = (result.items || result.shops || []).map(normalizeStore);
+
+  log.ok('fetchMapNearbyShops', {
+    count: items.length,
+    total: result.total,
+    truncated: result.truncated,
+    radiusMeters,
+    shopCategoryId: String(shopCategoryId || '').trim() || 'all',
+  });
+
+  return items;
 }

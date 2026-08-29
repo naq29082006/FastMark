@@ -36,6 +36,10 @@ export async function listAdminWithdraws(token, params = {}) {
   return apiRequest(`/api/admin/withdraws${suffix}`, { token });
 }
 
+export async function getAdminWithdraw(token, withdrawId) {
+  return apiRequest(`/api/admin/withdraws/${withdrawId}`, { token });
+}
+
 export async function approveAdminWithdraw(token, withdrawId, body = {}) {
   return apiRequest(`/api/admin/withdraws/${withdrawId}/approve`, {
     method: 'POST',

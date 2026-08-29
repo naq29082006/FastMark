@@ -8,11 +8,8 @@ const {
   LEGACY_REPORT_TYPE_LABELS,
 } = require("../constants");
 
-/** Map mã reportType cũ (DB legacy) sang mã chuẩn 1–7. */
+/** Map mã reportType legacy (8–11) sang mã chuẩn 1–7. Mã 1–7 giữ nguyên. */
 const LEGACY_REPORT_TYPE_MAP = {
-  2: REPORT_TYPE.OTHER,
-  3: REPORT_TYPE.SHOP,
-  4: REPORT_TYPE.PRODUCT,
   8: REPORT_TYPE.SYSTEM,
   9: REPORT_TYPE.OTHER,
   10: REPORT_TYPE.ACCOUNT_LOCK_APPEAL,
@@ -42,6 +39,35 @@ function resolveReportTypeLabel(raw) {
   return LEGACY_REPORT_TYPE_LABELS[type] || "Không rõ";
 }
 
+/** Loại báo cáo thực tế — ưu tiên productId/shopId/reviewId, sau đó mã chuẩn 1–7. */
+function resolveCanonicalReportType(report) {
+  if (report?.productId) {
+    return REPORT_TYPE.PRODUCT;
+  }
+  if (report?.shopId) {
+    return REPORT_TYPE.SHOP;
+  }
+  if (report?.reviewId) {
+    return REPORT_TYPE.REVIEW;
+  }
+
+  const rawType = Number(report?.reportType);
+  if (Number.isFinite(rawType) && rawType >= 1 && rawType <= 7) {
+    return rawType;
+  }
+
+  return normalizeReportType(rawType);
+}
+
+/** Nhãn loại cho tab Khiếu nại admin — theo schema 1–7. */
+function resolveReportTypeLabelForReport(report) {
+  const type = resolveCanonicalReportType(report);
+  if (REPORT_TYPE_LABELS[type]) {
+    return REPORT_TYPE_LABELS[type];
+  }
+  return resolveReportTypeLabel(report?.reportType) || "Không rõ";
+}
+
 function isDisputeVirtualReportType(raw) {
   const type = Number(raw);
   return [
@@ -62,6 +88,19 @@ function isReservationDisputeReportType(report) {
 function isContentTargetReportType(raw) {
   const type = normalizeReportType(raw);
   return type === REPORT_TYPE.SHOP || type === REPORT_TYPE.PRODUCT;
+}
+
+/** Báo cáo gắn reservationId — tranh chấp đơn, không thuộc tab Khiếu nại admin. */
+function isOrderLinkedReport(report) {
+  const id = report?.reservationId;
+  return id != null && String(id).trim() !== "";
+}
+
+/** Mongo: chỉ báo cáo nội dung (đánh giá, shop, SP, hệ thống, khóa TK…). */
+function mongoExcludeOrderLinkedReportsCondition() {
+  return {
+    $or: [{ reservationId: { $exists: false } }, { reservationId: null }],
+  };
 }
 
 async function buildReportsReceivedFilter(userId) {
@@ -92,8 +131,12 @@ async function buildReportsReceivedFilter(userId) {
 module.exports = {
   normalizeReportType,
   resolveReportTypeLabel,
+  resolveCanonicalReportType,
+  resolveReportTypeLabelForReport,
   isDisputeVirtualReportType,
   isReservationDisputeReportType,
   isContentTargetReportType,
+  isOrderLinkedReport,
+  mongoExcludeOrderLinkedReportsCondition,
   buildReportsReceivedFilter,
 };

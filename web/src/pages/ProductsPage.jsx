@@ -42,6 +42,7 @@ import { useAuth } from '../context/AuthContext';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { REALTIME_COALESCE_MS } from '../constants/realtime';
 import { keepIfSame, mergeListById } from '../utils/realtimeList';
+import PreviewableImage from '../components/PreviewableImage';
 
 
 
@@ -89,7 +90,7 @@ export default function ProductsPage() {
 
   });
 
-  const [summary, setSummary] = useState({ total: 0, visible: 0, removed: 0 });
+  const [summary, setSummary] = useState({ total: 0, visible: 0, hidden: 0, removed: 0 });
 
   const [loading, setLoading] = useState(true);
 
@@ -257,7 +258,7 @@ export default function ProductsPage() {
 
       setSummary((current) =>
 
-        keepIfSame(current, payload.data?.summary || { total: 0, visible: 0, removed: 0 }),
+        keepIfSame(current, payload.data?.summary || { total: 0, visible: 0, hidden: 0, removed: 0 }),
 
       );
 
@@ -289,7 +290,7 @@ export default function ProductsPage() {
 
       setItems([]);
 
-      setSummary({ total: 0, visible: 0, removed: 0 });
+      setSummary({ total: 0, visible: 0, hidden: 0, removed: 0 });
 
     } finally {
 
@@ -419,6 +420,8 @@ export default function ProductsPage() {
 
   const visibleCount = summary.visible;
 
+  const hiddenCount = summary.hidden ?? 0;
+
   const removedCount = summary.removed;
 
 
@@ -438,6 +441,8 @@ export default function ProductsPage() {
         { label: 'Tổng sản phẩm', value: loading ? '…' : summary.total, icon: Package, tone: 'green' },
 
         { label: 'Đang hiện', value: loading ? '…' : visibleCount, icon: Eye, tone: 'blue' },
+
+        { label: 'Đã ẩn', value: loading ? '…' : hiddenCount, icon: Eye, tone: 'amber' },
 
         { label: 'Đã xóa', value: loading ? '…' : removedCount, icon: Trash2, tone: 'red' },
 
@@ -638,15 +643,16 @@ export default function ProductsPage() {
 
                     <td className="col-thumb">
 
-                      {product.thumbnail ? (
-
-                        <img src={product.thumbnail} alt="" className="thumb-sm" />
-
-                      ) : (
-
-                        <div className="thumb-sm thumb-fallback">SP</div>
-
-                      )}
+                      <PreviewableImage
+                        src={product.thumbnail}
+                        alt={product.productName || ''}
+                        width={48}
+                        height={48}
+                        shape="rounded"
+                        className="thumb-sm"
+                        fallbackLetter="SP"
+                        fallbackClassName="thumb-sm thumb-fallback"
+                      />
 
                     </td>
 

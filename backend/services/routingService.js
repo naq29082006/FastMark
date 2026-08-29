@@ -3,6 +3,45 @@ const OSRM_BASE_URL = String(process.env.OSRM_BASE_URL || "https://router.projec
   ""
 );
 
+const ROUTING_PROFILE = {
+  CAR: "car",
+  MOTORBIKE: "motorbike",
+};
+
+const MOTORBIKE_DURATION_FACTOR = 0.76;
+
+function normalizeRoutingProfile(value) {
+  return String(value || "").toLowerCase() === ROUTING_PROFILE.CAR
+    ? ROUTING_PROFILE.CAR
+    : ROUTING_PROFILE.MOTORBIKE;
+}
+
+function resolveOsrmProfile(profile) {
+  const normalized = normalizeRoutingProfile(profile);
+  if (normalized === ROUTING_PROFILE.MOTORBIKE) {
+    return process.env.OSRM_MOTORBIKE_PROFILE || "driving";
+  }
+  return process.env.OSRM_CAR_PROFILE || "driving";
+}
+
+function applyProfileDuration(geometry, profile) {
+  if (!geometry) {
+    return geometry;
+  }
+  if (normalizeRoutingProfile(profile) !== ROUTING_PROFILE.MOTORBIKE) {
+    return geometry;
+  }
+  const durationSeconds = Number(geometry.durationSeconds);
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return geometry;
+  }
+  return {
+    ...geometry,
+    durationSeconds: Math.max(60, Math.round(durationSeconds * MOTORBIKE_DURATION_FACTOR)),
+    profile: ROUTING_PROFILE.MOTORBIKE,
+  };
+}
+
 function isValidCoordinate(value) {
   const number = Number(value);
   return Number.isFinite(number) && Math.abs(number) <= 180;
@@ -59,31 +98,37 @@ async function requestOsrm(url) {
   return payload;
 }
 
-async function fetchRouteGeometry({ fromLat, fromLng, toLat, toLng }) {
+async function fetchRouteGeometry({ fromLat, fromLng, toLat, toLng, profile = ROUTING_PROFILE.MOTORBIKE }) {
   if (![fromLat, fromLng, toLat, toLng].every(isValidCoordinate)) {
     const error = new Error("Tọa độ không hợp lệ.");
     error.statusCode = 400;
     throw error;
   }
 
+  const osrmProfile = resolveOsrmProfile(profile);
   const url =
-    `${OSRM_BASE_URL}/route/v1/driving/` +
+    `${OSRM_BASE_URL}/route/v1/${osrmProfile}/` +
     `${formatCoordinate(fromLng, fromLat)};${formatCoordinate(toLng, toLat)}` +
     "?overview=full&geometries=geojson";
 
   const payload = await requestOsrm(url);
-  return parseRoutePayload(payload, { overviewFull: true });
+  const geometry = parseRoutePayload(payload, { overviewFull: true });
+  return applyProfileDuration(
+    geometry ? { ...geometry, profile: normalizeRoutingProfile(profile) } : null,
+    profile
+  );
 }
 
-async function fetchRouteDistanceMeters({ fromLat, fromLng, toLat, toLng }) {
+async function fetchRouteDistanceMeters({ fromLat, fromLng, toLat, toLng, profile = ROUTING_PROFILE.MOTORBIKE }) {
   if (![fromLat, fromLng, toLat, toLng].every(isValidCoordinate)) {
     const error = new Error("Tọa độ không hợp lệ.");
     error.statusCode = 400;
     throw error;
   }
 
+  const osrmProfile = resolveOsrmProfile(profile);
   const url =
-    `${OSRM_BASE_URL}/route/v1/driving/` +
+    `${OSRM_BASE_URL}/route/v1/${osrmProfile}/` +
     `${formatCoordinate(fromLng, fromLat)};${formatCoordinate(toLng, toLat)}` +
     "?overview=false";
 

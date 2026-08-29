@@ -23,6 +23,7 @@ import {
   showBuyerPickupQrAlertFromStatusTransition,
   showBuyerPickupQrOrderAlert,
 } from '../../core/utils/buyerOrderUpdateAlert';
+import { coalesceReservationFetch } from '../../core/utils/coalesceReservationFetch';
 import { buildQrImageUrl, resolvePickupQrPayload } from '../../core/utils/pickupQr';
 import { useOrderSocket } from '../../hooks/useOrderSocket';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -33,6 +34,7 @@ import { PickupOrderSummaryCard } from '../shared/components/PickupOrderLayout';
 const QR_IMAGE_SIZE = 280;
 const QR_RENDER_SIZE = 220;
 const SOCKET_REFRESH_RETRY_MS = 450;
+const PICKUP_QR_POLL_MS = 15000;
 
 function delay(ms) {
   return new Promise((resolve) => {
@@ -96,21 +98,23 @@ export default function BuyerPickupQrDisplayScreen({
       return null;
     }
     try {
-      const idToken = await getCurrentUserIdToken();
-      if (!idToken) {
-        return null;
-      }
-      const updated = await getBuyerReservationOnBackend(idToken, reservationId);
-      if (updated) {
-        const previous = reservationRef.current;
-        reservationRef.current = updated;
-        setReservation(updated);
-        onReservationUpdated?.(updated);
-        if (notifyTransition) {
-          showBuyerPickupQrAlertFromStatusTransition(previous, updated, reservationId);
+      return await coalesceReservationFetch('buyer', reservationId, async () => {
+        const idToken = await getCurrentUserIdToken();
+        if (!idToken) {
+          return null;
         }
-      }
-      return updated || null;
+        const updated = await getBuyerReservationOnBackend(idToken, reservationId);
+        if (updated) {
+          const previous = reservationRef.current;
+          reservationRef.current = updated;
+          setReservation(updated);
+          onReservationUpdated?.(updated);
+          if (notifyTransition) {
+            showBuyerPickupQrAlertFromStatusTransition(previous, updated, reservationId);
+          }
+        }
+        return updated || null;
+      });
     } catch (error) {
       console.warn('refresh pickup qr reservation failed:', error?.message || error);
       return null;
@@ -164,7 +168,7 @@ export default function BuyerPickupQrDisplayScreen({
     }
     const interval = setInterval(
       () => refreshReservation({ notifyTransition: true }),
-      5000
+      PICKUP_QR_POLL_MS
     );
     return () => clearInterval(interval);
   }, [refreshReservation, reservation?.status, reservationId]);

@@ -78,11 +78,11 @@ const SELLER_ACCESS_PROFILE_KEYS = [
   'openTime',
   'closeTime',
   'isOpen',
-  'totalProducts',
+  'tongSP',
   'soldCount',
   'likesCount',
-  'totalReviews',
-  'averageRating',
+  'tongDG',
+  'diemTB',
   'verifyAccount',
 ];
 
@@ -364,7 +364,7 @@ export const loginUser = createAsyncThunk(
       log.step('[AUTH] loginUser SUCCESS', { uid: user.uid });
       return { user, profile, message: 'Đăng nhập thành công.' };
     } catch (error) {
-      log.fail('[AUTH] loginUser FAILED', error);
+      log.fail(`[AUTH] loginUser FAILED — ${error?.message || 'unknown'}`, error);
       return rejectWithReadableError(error, rejectWithValue);
     }
   }

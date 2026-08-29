@@ -15,7 +15,7 @@ import { showErrorAlert } from '../../core/utils/appAlert';
 import AdminAppealCompose from '../shared/components/AdminAppealCompose';
 import KeyboardAwareScrollView from '../shared/components/KeyboardAwareScrollView';
 
-export default function ShopLockedScreen() {
+export default function ShopLockedScreen({ onManageOrders }) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
   const [loading, setLoading] = useState(true);
@@ -83,9 +83,17 @@ export default function ShopLockedScreen() {
         <Text style={styles.title}>Gian hàng đã bị khóa</Text>
         <Text style={styles.subtitle}>
           {shopName}
-          {shopHandle ? ` (${shopHandle})` : ''} hiện không thể đăng bài hoặc nhận đơn cho đến khi admin mở
-          khóa. Bạn vẫn có thể dùng các tính năng khác trên FastMark.
+          {shopHandle ? ` (${shopHandle})` : ''} hiện không thể đăng bài hoặc nhận đơn mới cho đến
+          khi admin mở khóa. Đơn chờ xác nhận và đang giữ hàng sẽ được hủy tự động; đơn tranh
+          chấp và đơn đang giam tiền vẫn quản lý được.
         </Text>
+
+        {typeof onManageOrders === 'function' ? (
+          <Pressable style={styles.manageOrdersBtn} onPress={onManageOrders}>
+            <Ionicons name="receipt-outline" size={18} color="#076F32" />
+            <Text style={styles.manageOrdersBtnText}>Quản lý đơn hàng</Text>
+          </Pressable>
+        ) : null}
 
         {loading ? <Text style={styles.muted}>Đang tải trạng thái...</Text> : null}
 
@@ -199,6 +207,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  manageOrdersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#076F32',
+    backgroundColor: '#ffffff',
+  },
+  manageOrdersBtnText: { color: '#076F32', fontWeight: '800', fontSize: 15 },
   refreshBtn: { alignItems: 'center', paddingVertical: 16, marginTop: 8 },
   refreshText: { color: '#0369a1', fontWeight: '700' },
 });

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Input, Modal, Table, Tag, message } from 'antd';
+import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 
 import {
   approveVerification,
@@ -13,28 +14,31 @@ import StatCards from '../components/StatCards';
 import ListToolbar from '../components/ListToolbar';
 import { usePaginatedQuery } from '../hooks/usePaginatedQuery';
 import { useUrlQueryString } from '../hooks/useUrlQuery';
-import { formatDateTime, verificationStatusLabel } from '../utils/format';
+import { formatDateTime, resolveSellerAdminDetailPath, sellerAdminStatusLabel, sellerAdminStatusTagColor } from '../utils/format';
 import { buildSttColumn } from '../utils/tableColumns';
+import {
+  apiFilterParam,
+  initialFilterValue,
+  withAllFilterOption,
+} from '../utils/filterOptions';
 import { useAuth } from '../../context/AuthContext';
 
-const STATUS_OPTIONS = [
-  { value: '0', label: 'Chờ duyệt' },
-  { value: '1', label: 'Đã duyệt' },
-  { value: '2', label: 'Từ chối' },
-];
+const PENDING_STATUS = '0';
+const SHOP_LOCKED_STATUS = 'shop_locked';
 
-function statusColor(status) {
-  if (status === 1) return 'success';
-  if (status === 2) return 'error';
-  return 'warning';
-}
+const STATUS_OPTIONS = withAllFilterOption([
+  { value: PENDING_STATUS, label: 'Chờ duyệt' },
+  { value: '1', label: 'Đang hoạt động' },
+  { value: '2', label: 'Từ chối' },
+  { value: SHOP_LOCKED_STATUS, label: 'Đã khóa' },
+]);
 
 export default function SellersPage() {
   const navigate = useNavigate();
   const { getIdToken } = useAuth();
   const urlStatus = useUrlQueryString('status');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState(urlStatus);
+  const [status, setStatus] = useState(() => initialFilterValue(urlStatus, PENDING_STATUS));
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState('');
@@ -42,7 +46,12 @@ export default function SellersPage() {
   const fetcher = useCallback(
     async ({ page, limit }) => {
       const token = await getIdToken();
-      const payload = await listAdminVerifications(token, { page, limit, search, status });
+      const payload = await listAdminVerifications(token, {
+        page,
+        limit,
+        search,
+        status: apiFilterParam(status),
+      });
       return {
         data: {
           items: payload.data?.verifications || [],
@@ -61,8 +70,9 @@ export default function SellersPage() {
     () => [
       { key: 'total', title: 'Tổng hồ sơ', value: stats?.total ?? 0 },
       { key: 'pending', title: 'Chờ duyệt', value: stats?.pending ?? 0 },
-      { key: 'approved', title: 'Đã duyệt', value: stats?.approved ?? 0 },
+      { key: 'active', title: 'Đang hoạt động', value: stats?.active ?? 0 },
       { key: 'rejected', title: 'Từ chối', value: stats?.rejected ?? 0 },
+      { key: 'shopsLocked', title: 'Đã khóa', value: stats?.shopsLocked ?? 0 },
     ],
     [stats]
   );
@@ -114,17 +124,26 @@ export default function SellersPage() {
       render: (v) => v || '—',
     },
     {
-      title: 'Chủ shop',
+      title: 'Họ tên (CCCD)',
+      key: 'cccdFullName',
+      render: (_, row) => row.fullName || '—',
+    },
+    {
+      title: 'Số CCCD',
+      key: 'cccdNumber',
+      render: (_, row) => row.cccdNumber || '—',
+    },
+    {
+      title: 'Chủ gian hàng',
       key: 'owner',
       render: (_, row) =>
         row.user?.fullName || row.user?.userName || row.ownerName || '—',
     },
     {
-      title: 'Xác minh',
-      dataIndex: 'status',
+      title: 'Trạng thái',
       key: 'status',
-      render: (v) => (
-        <Tag color={statusColor(v)}>{verificationStatusLabel(v)}</Tag>
+      render: (_, row) => (
+        <Tag color={sellerAdminStatusTagColor(row)}>{sellerAdminStatusLabel(row)}</Tag>
       ),
     },
     {
@@ -148,9 +167,15 @@ export default function SellersPage() {
         return (
           <div className="admin-row-actions">
             <RowActions
-              onView={() => navigate(`/sellers/${id}`)}
+              onView={() => {
+                const path = resolveSellerAdminDetailPath(record);
+                if (path) {
+                  navigate(path);
+                }
+              }}
               onEdit={isPending ? () => handleApprove(record) : undefined}
               editLabel="Duyệt"
+              editIcon={CheckOutlined}
               editLoading={actionLoading === id}
               onDelete={
                 isPending
@@ -161,6 +186,7 @@ export default function SellersPage() {
                   : undefined
               }
               deleteLabel="Từ chối"
+              deleteIcon={CloseOutlined}
             />
           </div>
         );
@@ -172,17 +198,17 @@ export default function SellersPage() {
     <PageContainer
       title="Người bán"
       subtitle="Duyệt hồ sơ đăng ký seller và quản lý gian hàng"
-      stats={<StatCards items={statItems} loading={loading && !stats} columns={4} />}
+      stats={<StatCards items={statItems} loading={loading && !stats} columns={5} />}
     >
       <ListToolbar
-        searchPlaceholder="Tìm theo tên shop, chủ shop..."
+        searchPlaceholder="Tìm theo tên shop, CCCD, họ tên CCCD, chủ gian hàng..."
         searchValue={search}
         onSearchChange={setSearch}
         onSearch={setSearch}
         filters={[
           {
             key: 'status',
-            placeholder: 'Trạng thái xác minh',
+            placeholder: 'Trạng thái',
             options: STATUS_OPTIONS,
             value: status,
             onChange: (v) => {
@@ -193,7 +219,7 @@ export default function SellersPage() {
         ]}
         onReset={() => {
           setSearch('');
-          setStatus(undefined);
+          setStatus(PENDING_STATUS);
           setPage(1);
         }}
       />

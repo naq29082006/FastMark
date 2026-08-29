@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Select, Table, Tag, message } from 'antd';
+import { SendOutlined } from '@ant-design/icons';
 
 import { getBroadcastHistory, sendSystemNotification } from '../../api/notificationApi';
 import PageContainer, { PanelCard } from '../components/PageContainer';
@@ -31,26 +32,28 @@ export default function NotificationsPage() {
       message.success('Đã gửi thông báo');
       setOpen(false);
       form.resetFields();
-      reload();
+      await reload({ page: 1 });
     } catch (err) {
+      if (err?.errorFields) {
+        return;
+      }
       message.error(err.message || 'Gửi thông báo thất bại');
     }
   }
 
   return (
-    <PageContainer
-      title="Thông báo"
-      subtitle="Model: Notification"
-      extra={
-        <Button type="primary" onClick={() => setOpen(true)}>
-          Gửi thông báo
-        </Button>
-      }
-    >
+    <PageContainer title="Thông báo" subtitle="Model: Notification">
       {error ? <Alert type="error" message={error} showIcon style={{ marginBottom: 16 }} /> : null}
-      <PanelCard title="Lịch sử gửi">
+      <PanelCard
+        title="Lịch sử gửi"
+        extra={
+          <Button type="primary" icon={<SendOutlined />} onClick={() => setOpen(true)}>
+            Gửi thông báo
+          </Button>
+        }
+      >
         <Table
-          rowKey={(r) => r.id || r._id || `notice-${r.title}-${r.CreatedAt}`}
+          rowKey="id"
           loading={loading}
           dataSource={items}
           pagination={{ current: page, pageSize: limit, total: pagination.total, onChange: setPage }}

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import {
@@ -10,7 +10,8 @@ import { loadNotificationSettings } from '../core/storage/notificationSettingsSt
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
@@ -83,8 +84,16 @@ async function fetchNativeDevicePushToken() {
   }
 }
 
+async function registerTokenOnBackend(token) {
+  await registerDevicePushTokenOnBackend({
+    token,
+    platform: resolvePlatform(),
+  });
+}
+
 export function usePushNotifications({ enabled = true } = {}) {
   const activeTokenRef = useRef('');
+  const syncInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
@@ -92,21 +101,40 @@ export function usePushNotifications({ enabled = true } = {}) {
     }
 
     let disposed = false;
+    let retryTimer = null;
 
-    async function syncToken() {
-      const token = await fetchNativeDevicePushToken();
-      if (!token || disposed) {
+    async function syncToken(attempt = 0) {
+      if (disposed || syncInFlightRef.current) {
         return;
       }
 
-      activeTokenRef.current = token;
-      await registerDevicePushTokenOnBackend({
-        token,
-        platform: resolvePlatform(),
-      });
+      syncInFlightRef.current = true;
+      try {
+        const token = await fetchNativeDevicePushToken();
+        if (!token || disposed) {
+          if (!disposed && attempt < 6) {
+            retryTimer = setTimeout(() => syncToken(attempt + 1), 2000 * (attempt + 1));
+          }
+          return;
+        }
+
+        if (token === activeTokenRef.current) {
+          return;
+        }
+
+        await registerTokenOnBackend(token);
+        activeTokenRef.current = token;
+      } catch (error) {
+        console.warn('[push] register token failed:', error?.message || error);
+        if (!disposed && attempt < 6) {
+          retryTimer = setTimeout(() => syncToken(attempt + 1), 2000 * (attempt + 1));
+        }
+      } finally {
+        syncInFlightRef.current = false;
+      }
     }
 
-    syncToken().catch(() => {});
+    syncToken();
 
     const tokenSubscription = Notifications.addPushTokenListener((tokenResult) => {
       const nextToken = extractDevicePushToken(tokenResult);
@@ -115,15 +143,24 @@ export function usePushNotifications({ enabled = true } = {}) {
       }
 
       activeTokenRef.current = nextToken;
-      registerDevicePushTokenOnBackend({
-        token: nextToken,
-        platform: resolvePlatform(),
-      }).catch(() => {});
+      registerTokenOnBackend(nextToken).catch((error) => {
+        console.warn('[push] refresh token failed:', error?.message || error);
+      });
+    });
+
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        syncToken().catch(() => {});
+      }
     });
 
     return () => {
       disposed = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+      }
       tokenSubscription.remove();
+      appStateSubscription.remove();
       const token = activeTokenRef.current;
       activeTokenRef.current = '';
       if (token) {

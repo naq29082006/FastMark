@@ -134,10 +134,9 @@ function toClientFavorite({
     categoryId: product?.CategoryId ? String(product.CategoryId) : "",
     categoryName:
       pickString(category?.name) ||
-      pickString(category?.categoryName) ||
       pickString(category?.Name) ||
       "",
-    rating: Number(shop?.averageRating) || 0,
+    rating: Number(shop?.diemTB) || 0,
     likeCount: Number(product?.LikeCount) || 0,
     soldCount: Number(product?.soldCount ?? product?.SoldCount) || 0,
     distanceMeters: roundedDistance,

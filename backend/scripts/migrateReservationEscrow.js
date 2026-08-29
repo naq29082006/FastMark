@@ -3,13 +3,13 @@
  *
  * Chạy: node backend/scripts/migrateReservationEscrow.js
  *
- * 1) Thêm field mặc định: disputed, escrowReleaseAt, pickup-expire fields
+ * 1) Thêm field mặc định: disputed, hanGiaiCoc, pickup-expire fields
  * 2) Map status legacy:
- *    - status 7 (DISPUTE_RESOLVED) → 5 hoặc 6 theo depositSettleTo
+ *    - status 7 (DISPUTE_RESOLVED) → 5 hoặc 6 theo cocChuyenDen
  *    - status 3 đã settle seller → 5 Completed (nếu chưa disputed)
- *    - status 3 chưa settle + completedAt → 3 Received + escrowReleaseAt
+ *    - status 3 chưa settle + completedAt → 3 Received + hanGiaiCoc
  * 3) disputed = true nếu có disputeByBuyer/disputeBySeller legacy hoặc status=4
- * 4) $unset paymentStatus (dùng depositSettleTo)
+ * 4) $unset paymentStatus (dùng cocChuyenDen)
  */
 require("dotenv").config();
 const mongoose = require("mongoose");
@@ -34,7 +34,7 @@ function mapLegacyStatus(doc) {
   const disputedLegacy = Boolean(doc.disputeByBuyer || doc.disputeBySeller);
 
   if (status === 7) {
-    const settleTo = Number(doc.depositSettleTo);
+    const settleTo = Number(doc.cocChuyenDen);
     status =
       settleTo === DEPOSIT_SETTLE_TO.BUYER
         ? RESERVATION_STATUS.REFUNDED
@@ -42,7 +42,7 @@ function mapLegacyStatus(doc) {
   }
 
   if (status === 3 && !disputedLegacy) {
-    const settleTo = Number(doc.depositSettleTo);
+    const settleTo = Number(doc.cocChuyenDen);
     if (settleTo === DEPOSIT_SETTLE_TO.SELLER || doc.depositReleasedAt) {
       status = RESERVATION_STATUS.COMPLETED;
     } else if (settleTo === DEPOSIT_SETTLE_TO.BUYER || doc.depositRefundedAt) {
@@ -52,7 +52,7 @@ function mapLegacyStatus(doc) {
     }
   }
 
-  if (status === 5 && disputedLegacy && Number(doc.depositSettleTo) === DEPOSIT_SETTLE_TO.BUYER) {
+  if (status === 5 && disputedLegacy && Number(doc.cocChuyenDen) === DEPOSIT_SETTLE_TO.BUYER) {
     status = RESERVATION_STATUS.REFUNDED;
   }
 
@@ -80,17 +80,17 @@ async function migrate() {
       $set.disputed = disputed;
     }
 
-    if (status === RESERVATION_STATUS.RECEIVED && doc.completedAt && !doc.escrowReleaseAt) {
+    if (status === RESERVATION_STATUS.RECEIVED && doc.completedAt && !doc.hanGiaiCoc) {
       const completedAt = new Date(doc.completedAt);
-      $set.escrowReleaseAt = new Date(completedAt.getTime() + ESCROW_PROTECTION_MS);
-      $set.reviewDeadlineAt = $set.escrowReleaseAt;
+      $set.hanGiaiCoc = new Date(completedAt.getTime() + ESCROW_PROTECTION_MS);
+      $set.reviewDeadlineAt = $set.hanGiaiCoc;
     }
 
-    if (!doc.escrowReleaseAt && doc.reviewDeadlineAt) {
-      $set.escrowReleaseAt = doc.reviewDeadlineAt;
+    if (!doc.hanGiaiCoc && doc.reviewDeadlineAt) {
+      $set.hanGiaiCoc = doc.reviewDeadlineAt;
     }
-    if (!doc.escrowReleaseAt && doc.autoReleaseAt && status === RESERVATION_STATUS.RECEIVED) {
-      $set.escrowReleaseAt = doc.autoReleaseAt;
+    if (!doc.hanGiaiCoc && doc.autoReleaseAt && status === RESERVATION_STATUS.RECEIVED) {
+      $set.hanGiaiCoc = doc.autoReleaseAt;
     }
 
     if (Object.keys($set).length || Object.keys($unset).length) {

@@ -23,10 +23,10 @@ export function normalizeDashboard(raw) {
       totalUsers: cards.totalUsers ?? metrics.totalUsers ?? 0,
       totalShops: cards.totalShops ?? cards.totalActiveShops ?? 0,
       totalSellers: cards.totalSellers ?? 0,
-      totalProducts: cards.totalProducts ?? cards.totalActiveProducts ?? 0,
+      tongSP: cards.tongSP ?? cards.totalActiveProducts ?? 0,
       totalReservations: cards.totalReservations ?? metrics.totalReservations ?? 0,
       totalDisputes: cards.disputedReservations ?? metrics.disputedReservations ?? 0,
-      totalReviews: cards.totalReviews ?? metrics.totalReviews ?? 0,
+      tongDG: cards.tongDG ?? metrics.tongDG ?? 0,
       totalReports: cards.totalReports ?? metrics.totalReports ?? 0,
       totalRevenue: cards.periodRevenue ?? metrics.periodRevenue ?? 0,
       platformRevenue: cards.periodRevenue ?? metrics.periodRevenue ?? 0,
@@ -81,21 +81,42 @@ export function normalizeFinanceOverview(raw) {
   const balances = raw.balances || {};
 
   const platformRevenueTotal = inRange.platformRevenue?.total ?? 0;
+  const walletTotal =
+    raw.summary?.walletTotal ??
+    (Number(balances.buyerWalletTotal) || 0) + (Number(balances.sellerWalletTotal) || 0);
+  const walletCount =
+    raw.summary?.walletCount ??
+    (Number(balances.buyerWalletCount) || 0) + (Number(balances.sellerWalletCount) || 0);
 
   return {
     ...raw,
-    balances,
+    balances: {
+      ...balances,
+      walletTotal,
+      walletCount,
+    },
     inRange,
     series,
     summary: {
+      walletTotal,
+      walletCount,
       subscriptionRevenue: platformRevenueTotal,
-      bannerRevenue: 0,
+      bannerRevenue: inRange.bannerSales?.total ?? 0,
       depositHoldTotal: inRange.depositHold?.total ?? 0,
       depositRefundTotal: inRange.depositRefund?.total ?? 0,
-      withdrawTotal: inRange.withdrawal?.total ?? 0,
-      topupTotal: inRange.topup?.total ?? 0,
+      withdrawTotal: raw.summary?.withdrawTotal ?? inRange.withdrawal?.total ?? 0,
+      withdrawCount: raw.summary?.withdrawCount ?? inRange.withdrawal?.count ?? 0,
+      topupTotal: raw.summary?.topupTotal ?? inRange.topup?.total ?? 0,
+      topupCount: raw.summary?.topupCount ?? inRange.topup?.count ?? 0,
       platformRevenue: platformRevenueTotal,
       depositReleaseTotal: inRange.depositRelease?.total ?? 0,
+      gmvTotal: inRange.gmv?.total ?? 0,
+      disputedTotal: inRange.disputed?.total ?? 0,
+      escrowHeldTotal: raw.summary?.escrowHeldTotal ?? balances.escrowHeldTotal ?? 0,
+      escrowHeldCount: raw.summary?.escrowHeldCount ?? balances.escrowHeldCount ?? 0,
+      totalRevenue:
+        platformRevenueTotal +
+        (Number(inRange.bannerSales?.total) || 0),
     },
     charts: {
       topupSeries: series.topup || [],

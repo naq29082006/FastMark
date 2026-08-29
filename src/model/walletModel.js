@@ -78,7 +78,12 @@ export function normalizeWalletTransaction(row) {
     paymentLinkId: row?.paymentLinkId || '',
     description: row?.description || '',
     balanceAfter: row?.balanceAfter == null ? null : Number(row.balanceAfter),
-    reservationId: row?.reservationId ? String(row.reservationId) : null,
+    reservationId:
+      row?.reservationId != null
+        ? String(row.reservationId)
+        : String(row?.referenceType || '') === 'Reservation' && row?.referenceId
+          ? String(row.referenceId)
+          : null,
     bankName: row?.bankName || '',
     bankCode: row?.bankCode || '',
     accountNumber: row?.accountNumber || '',

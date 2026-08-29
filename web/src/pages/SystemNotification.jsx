@@ -44,12 +44,13 @@ export default function SystemNotification() {
     queryParams: historyQueryParams,
   } = useAdminDateFilter();
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (overrides = {}) => {
+    const pageToLoad = overrides.page ?? historyPage;
     setHistoryLoading(true);
     try {
       const token = await getIdToken();
       const payload = await getBroadcastHistory(token, {
-        page: historyPage,
+        page: pageToLoad,
         limit: historyLimit,
         ...historyQueryParams,
       });
@@ -57,6 +58,9 @@ export default function SystemNotification() {
         items: payload.data?.items || [],
         pagination: payload.data?.pagination || null,
       });
+      if (overrides.page != null && overrides.page !== historyPage) {
+        setHistoryPage(overrides.page);
+      }
     } catch {
       // Lịch sử là phụ trợ; lỗi tải không chặn form gửi.
     } finally {
@@ -93,7 +97,7 @@ export default function SystemNotification() {
       setSnackbar(payload.message || 'Đã gửi thông báo hệ thống thành công.');
       setLastResult(payload.data || null);
       setForm(EMPTY_FORM);
-      loadHistory();
+      await loadHistory({ page: 1 });
     } catch (submitError) {
       setError(submitError.message || 'Không gửi được thông báo hệ thống.');
     } finally {
@@ -203,8 +207,8 @@ export default function SystemNotification() {
                 </tr>
               </thead>
               <tbody>
-                {history.items.map((item, index) => (
-                  <tr key={`${item.sentAt}-${index}`}>
+                {history.items.map((item) => (
+                  <tr key={item.id || `${item.audience}-${item.sentAt}-${item.title}-${item.content}`}>
                     <td>{item.sentAt ? new Date(item.sentAt).toLocaleString('vi-VN') : ''}</td>
                     <td>{item.title || ''}</td>
                     <td className="category-desc-cell">{item.content || ''}</td>

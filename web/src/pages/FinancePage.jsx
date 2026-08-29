@@ -250,9 +250,9 @@ const DETAIL_META = {
         render: (row) => formatCurrency(row.depositAmount),
       },
       {
-        key: 'depositPaidAt',
+        key: 'createdAt',
         label: 'Đặt cọc',
-        render: (row) => formatDate(row.depositPaidAt),
+        render: (row) => formatDate(row.createdAt),
       },
     ],
   },
@@ -404,7 +404,7 @@ function buildDetailFields(selectedKey, row) {
       { label: 'Số lượng', value: row.quantity ?? '' },
       { label: 'Đơn giá', value: row.reservedPrice != null ? formatCurrency(row.reservedPrice) : '' },
       { label: 'Tiền cọc', value: formatCurrency(row.depositAmount) },
-      { label: 'Đặt cọc lúc', value: formatDate(row.depositPaidAt) },
+      { label: 'Đặt cọc lúc', value: formatDate(row.createdAt) },
       { label: 'Giờ nhận', value: formatDate(row.pickupTime) },
     ];
   }

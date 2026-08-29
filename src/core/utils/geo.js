@@ -60,8 +60,35 @@ export function estimateTravelDurationSeconds(distanceMeters, speedKmh = 30) {
   if (!Number.isFinite(meters) || meters <= 0) {
     return 0;
   }
-  const metersPerSecond = (speedKmh * 1000) / 3600;
+  const speed = Number(speedKmh) > 0 ? Number(speedKmh) : 30;
+  const metersPerSecond = (speed * 1000) / 3600;
   return Math.max(60, Math.ceil(meters / metersPerSecond));
+}
+
+export function computeBearingDegrees(from, to) {
+  if (!hasValidLocation(from) || !hasValidLocation(to)) {
+    return null;
+  }
+
+  const lat1 = (Number(from.latitude) * Math.PI) / 180;
+  const lat2 = (Number(to.latitude) * Math.PI) / 180;
+  const deltaLng = ((Number(to.longitude) - Number(from.longitude)) * Math.PI) / 180;
+  const y = Math.sin(deltaLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
+  const bearing = (Math.atan2(y, x) * 180) / Math.PI;
+  return (bearing + 360) % 360;
+}
+
+export function resolveNavigationHeading(location, previousLocation) {
+  const heading = Number(location?.heading);
+  if (Number.isFinite(heading) && heading >= 0 && heading <= 360) {
+    return heading;
+  }
+
+  const bearing = computeBearingDegrees(previousLocation, location);
+  return Number.isFinite(bearing) ? bearing : null;
 }
 
 export function formatDistanceLabel(distanceMeters) {

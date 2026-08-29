@@ -33,14 +33,11 @@ const ReportSchema = new mongoose.Schema({
   status: { type: Number, default: 0, index: true },
 
   // Mốc lượt khóa khi tạo khiếu nại (đối chiếu user.lockedAt / shop.lockedAt).
-  lockSessionAt: { type: Date, default: null },
+  phienKhoa: { type: Date, default: null },
 
-  // Admin xử lý (ref User).
-  processedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  // Thời điểm admin xử lý.
-  processedAt: Date,
-  // Ghi chú / quyết định admin (approve-buyer | approve-seller | reject).
-  adminDecision: { type: String, default: "" },
+  xuLyBoi: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  tgXuLy: Date,
+  qdAdmin: { type: String, default: "" },
   // Ghi chú xử lý của admin.
   adminNote: { type: String, default: "" },
 

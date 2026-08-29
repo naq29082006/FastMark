@@ -61,18 +61,18 @@ function flatComplaintPatch(party, complaint) {
   if (party === "seller") {
     return {
       sellerShopId: complaint.shopId || null,
-      sellerReasonType: complaint.reasonType ?? 99,
+      maLyDoShop: complaint.reasonType ?? 99,
       sellerContent: pickString(complaint.content),
       sellerImages: normalizeEmbeddedImages(complaint.images || []),
-      sellerComplaintAt: complaint.createdAt || new Date(),
+      tgKnShop: complaint.createdAt || new Date(),
     };
   }
   return {
     buyerUserId: complaint.userId || null,
-    buyerReasonType: complaint.reasonType ?? 99,
+    maLyDoBuyer: complaint.reasonType ?? 99,
     buyerContent: pickString(complaint.content),
     buyerImages: normalizeEmbeddedImages(complaint.images || []),
-    buyerComplaintAt: complaint.createdAt || new Date(),
+    tgKnBuyer: complaint.createdAt || new Date(),
   };
 }
 
@@ -82,8 +82,8 @@ async function migratePartyComplaints() {
 
   for (const row of rows) {
     if (
-      row.buyerReasonType != null ||
-      row.sellerReasonType != null ||
+      row.maLyDoBuyer != null ||
+      row.maLyDoShop != null ||
       row.buyerContent ||
       row.sellerContent
     ) {

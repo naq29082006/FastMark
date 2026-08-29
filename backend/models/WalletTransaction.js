@@ -3,7 +3,7 @@ const { WALLET_TX_TYPE, WALLET_TX_STATUS } = require("../constants");
 
 /**
  * WalletTransaction — lịch sử ví user (nạp / thanh toán / cọc / hoàn / rút).
- * Giao dịch cọc escrow liên kết reservationId + referenceId/referenceType.
+ * Liên kết nghiệp vụ qua referenceId + referenceType.
  */
 const WalletTransactionSchema = new mongoose.Schema({
   // Chủ giao dịch (ref User).
@@ -41,7 +41,7 @@ const WalletTransactionSchema = new mongoose.Schema({
   balanceBefore: { type: Number, default: null },
   // Số dư ví sau giao dịch (VND; null nếu chưa áp dụng).
   balanceAfter: { type: Number, default: null },
-  // Đơn giữ hàng liên quan khi là cọc escrow (ref Reservation) — legacy + index.
+  // Đơn giữ hàng liên quan (cọc / hoàn / giải phóng) — denormalize để query nhanh.
   reservationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Reservation",
@@ -54,7 +54,7 @@ const WalletTransactionSchema = new mongoose.Schema({
     default: null,
     index: true,
   },
-  // Loại tham chiếu: Reservation | Report | WithdrawRequest | Topup.
+  // Loại tham chiếu: Reservation | Report | WithdrawRequest | Topup | …
   referenceType: { type: String, default: "", index: true },
   // Thời điểm tạo giao dịch.
   CreatedAt: { type: Date, default: Date.now },
@@ -64,13 +64,6 @@ const WalletTransactionSchema = new mongoose.Schema({
 
 WalletTransactionSchema.pre("save", function saveHook() {
   this.UpdatedAt = new Date();
-  // Đồng bộ reservationId → reference khi thiếu.
-  if (this.reservationId && !this.referenceId) {
-    this.referenceId = this.reservationId;
-    if (!this.referenceType) {
-      this.referenceType = "Reservation";
-    }
-  }
 });
 
 module.exports = mongoose.model("WalletTransaction", WalletTransactionSchema);

@@ -1,7 +1,7 @@
 const SellerVerification = require("../models/SellerVerification");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
-const { SELLER_VERIFICATION_STATUS, USER_ROLE } = require("../constants");
+const { SELLER_VERIFICATION_STATUS, USER_ROLE, SHOP_STATUS } = require("../constants");
 const { assertCategoryExists } = require("./categoryService");
 const { normalizeCategoryId } = require("../utils/categoryId");
 const { buildSearchRegex } = require("../utils/searchText");
@@ -37,7 +37,7 @@ function resolveBusinessImage(source) {
     return "";
   }
   return pickString(
-    source.businessImage ??
+    source.anhKD ??
       source.businessDocImage ??
       source.businessDoc?.imageUrl
   );
@@ -65,16 +65,43 @@ function normalizeSellerRegistrationPayload(body = {}) {
     "DiaChiHeThong",
     "DiachiHethong",
   ]);
+  const fullName = pickPayloadValue(body, ["fullName", "cccdFullName", "hoTen", "HoTen"]);
+  const cccdNumber = pickPayloadValue(body, ["cccdNumber", "cccd", "soCccd", "SoCccd"]);
 
   return {
     ...body,
     shopName: shopName ?? body.shopName,
     shopUsername: shopUsername ?? body.shopUsername,
     categoryId: normalizeCategoryId(categoryId ?? body.categoryId),
+    fullName: fullName ?? body.fullName,
+    cccdNumber: cccdNumber ?? body.cccdNumber,
     systemAddress:
       systemAddress ?? body.systemAddress ?? body.addressHeThong ?? body.DiaChiHeThong ?? address ?? body.address,
     latlong: resolveVerificationLatlong(body),
   };
+}
+
+function normalizeCccdDigits(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function parseCccdIdentityFields(cccdNumber, fullName) {
+  const digits = normalizeCccdDigits(cccdNumber);
+  if (!digits || (digits.length !== 9 && digits.length !== 12)) {
+    throw createServiceError("Số CCCD/CMND phải gồm 9 hoặc 12 chữ số.");
+  }
+
+  const name = String(fullName || "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (name.length < 2) {
+    throw createServiceError("Vui lòng nhập họ tên trên CCCD.");
+  }
+  if (name.length > 100) {
+    throw createServiceError("Họ tên không được quá 100 ký tự.");
+  }
+
+  return { cccdNumber: digits, fullName: name };
 }
 
 function resolveVerificationLatlong(source = {}) {
@@ -522,21 +549,26 @@ async function submitSellerVerification(user, payload) {
 
   const category = await assertCategoryExists(normalizedPayload.categoryId);
 
-  const [cccdFrontImage, cccdBackImage, selfieImage, businessImage] = await Promise.all([
+  const { cccdNumber, fullName } = parseCccdIdentityFields(
+    normalizedPayload.cccdNumber,
+    normalizedPayload.fullName
+  );
+
+  const [anhCccdTruoc, anhCccdSau, selfieImage, anhKD] = await Promise.all([
     resolveVerificationImage({
       user,
-      imageBase64: normalizedPayload.cccdFrontImageBase64,
+      imageBase64: normalizedPayload.anhCccdTruocBase64,
       mimeType: normalizedPayload.cccdFrontMimeType,
       existingUrl:
-        existing?.cccdFrontImage || normalizedPayload.cccdFrontImageUrl || null,
+        existing?.anhCccdTruoc || normalizedPayload.anhCccdTruocUrl || null,
       folder: "seller-verification",
       label: "cccd-front",
     }),
     resolveVerificationImage({
       user,
-      imageBase64: normalizedPayload.cccdBackImageBase64,
+      imageBase64: normalizedPayload.anhCccdSauBase64,
       mimeType: normalizedPayload.cccdBackMimeType,
-      existingUrl: existing?.cccdBackImage || normalizedPayload.cccdBackImageUrl || null,
+      existingUrl: existing?.anhCccdSau || normalizedPayload.anhCccdSauUrl || null,
       folder: "seller-verification",
       label: "cccd-back",
     }),
@@ -551,11 +583,11 @@ async function submitSellerVerification(user, payload) {
     resolveVerificationImage({
       user,
       imageBase64:
-        normalizedPayload.businessImageBase64 ?? normalizedPayload.businessDocImageBase64,
-      mimeType: normalizedPayload.businessImageMimeType ?? normalizedPayload.businessDocMimeType,
+        normalizedPayload.anhKDBase64 ?? normalizedPayload.businessDocImageBase64,
+      mimeType: normalizedPayload.anhKDMimeType ?? normalizedPayload.businessDocMimeType,
       existingUrl:
         resolveBusinessImage(existing) ||
-        normalizedPayload.businessImageUrl ||
+        normalizedPayload.anhKDUrl ||
         normalizedPayload.businessDocImageUrl ||
         null,
       folder: "seller-verification",
@@ -563,17 +595,19 @@ async function submitSellerVerification(user, payload) {
     }),
   ]);
 
-  if (!businessImage) {
+  if (!anhKD) {
     throw createServiceError(
       "Vui lòng tải ảnh giấy phép kinh doanh hoặc giấy chứng nhận ATTP."
     );
   }
 
   const sharedFields = {
-    cccdFrontImage,
-    cccdBackImage,
+    anhCccdTruoc,
+    anhCccdSau,
     selfieImage,
-    businessImage,
+    anhKD,
+    fullName,
+    cccdNumber,
     shopName,
     shopUsername,
     categoryId: category._id,
@@ -621,17 +655,67 @@ async function listPendingSellerVerifications() {
 
 const ADMIN_VERIFICATION_STATUS_LABELS = {
   [SELLER_VERIFICATION_STATUS.PENDING]: "Chờ duyệt",
-  [SELLER_VERIFICATION_STATUS.APPROVED]: "Đã duyệt",
+  [SELLER_VERIFICATION_STATUS.APPROVED]: "Đang hoạt động",
   [SELLER_VERIFICATION_STATUS.REJECTED]: "Từ chối",
 };
 
+const SHOP_LOCKED_FILTER = "shop_locked";
+
+async function findBlockedShopUserIds() {
+  return ShopProfile.find({ status: SHOP_STATUS.BLOCKED }).distinct("userId");
+}
+
+async function loadShopsByUserIds(userIds = []) {
+  const normalizedIds = [...new Set(userIds.map((id) => String(id)).filter(Boolean))];
+  if (!normalizedIds.length) {
+    return new Map();
+  }
+
+  const shops = await ShopProfile.find({ userId: { $in: normalizedIds } })
+    .select("_id userId status shopName")
+    .lean();
+
+  const byUserId = new Map();
+  shops.forEach((shop) => {
+    byUserId.set(String(shop.userId), shop);
+  });
+  return byUserId;
+}
+
+function resolveShopStatusLabel(shop) {
+  if (!shop) {
+    return "";
+  }
+  return Number(shop.status) === SHOP_STATUS.BLOCKED ? "Đã khóa" : "Đang hoạt động";
+}
+
+function resolveAdminDisplayStatusLabel(verification, shop) {
+  if (verification.status === SELLER_VERIFICATION_STATUS.APPROVED) {
+    if (shop && Number(shop.status) === SHOP_STATUS.BLOCKED) {
+      return "Đã khóa";
+    }
+    return "Đang hoạt động";
+  }
+  return ADMIN_VERIFICATION_STATUS_LABELS[verification.status] || "Không rõ";
+}
+
 async function buildAdminVerificationFilter(query = {}) {
   const filter = {};
-  const statusRaw = query.status;
-  if (statusRaw !== undefined && statusRaw !== null && String(statusRaw).trim() !== "") {
+  const statusRaw = String(query.status ?? "").trim();
+  if (statusRaw === SHOP_LOCKED_FILTER) {
+    const blockedUserIds = await findBlockedShopUserIds();
+    filter.userId = { $in: blockedUserIds };
+    filter.status = SELLER_VERIFICATION_STATUS.APPROVED;
+  } else if (statusRaw !== "") {
     const status = Number(statusRaw);
     if (!Number.isNaN(status)) {
       filter.status = status;
+      if (status === SELLER_VERIFICATION_STATUS.APPROVED) {
+        const blockedUserIds = await findBlockedShopUserIds();
+        if (blockedUserIds.length) {
+          filter.userId = { $nin: blockedUserIds };
+        }
+      }
     }
   }
 
@@ -651,17 +735,29 @@ async function buildAdminVerificationFilter(query = {}) {
       orConditions.push(
         { shopName: regex },
         { shopUsername: regex },
+        { fullName: regex },
+        { cccdNumber: regex },
         ...(userIds.length ? [{ userId: { $in: userIds } }] : [])
       );
     }
 
     const matchedVerificationStatuses = resolveStatusesFromLabelSearch(search, [
       { label: "Chờ duyệt", statuses: [SELLER_VERIFICATION_STATUS.PENDING] },
+      { label: "Đang hoạt động", statuses: [SELLER_VERIFICATION_STATUS.APPROVED] },
       { label: "Đã duyệt", statuses: [SELLER_VERIFICATION_STATUS.APPROVED] },
       { label: "Đã từ chối", statuses: [SELLER_VERIFICATION_STATUS.REJECTED] },
+      { label: "Từ chối", statuses: [SELLER_VERIFICATION_STATUS.REJECTED] },
     ]);
     if (matchedVerificationStatuses.length) {
       orConditions.push({ status: { $in: matchedVerificationStatuses } });
+    }
+
+    const shopLockSearch = /khóa|khoa|locked/i.test(search);
+    if (shopLockSearch) {
+      const blockedUserIds = await findBlockedShopUserIds();
+      if (blockedUserIds.length) {
+        orConditions.push({ userId: { $in: blockedUserIds } });
+      }
     }
 
     orConditions.push(...buildObjectIdSearchConditions(search));
@@ -682,6 +778,21 @@ function resolveAdminVerificationSort(sortKey) {
   return { CreatedAt: -1 };
 }
 
+function buildAdminVerificationStats(statusRows = [], shopsLocked = 0) {
+  const countsByStatus = new Map(
+    statusRows.map((row) => [Number(row._id), Number(row.count) || 0])
+  );
+
+  const pending = countsByStatus.get(SELLER_VERIFICATION_STATUS.PENDING) || 0;
+  const approved = countsByStatus.get(SELLER_VERIFICATION_STATUS.APPROVED) || 0;
+  const rejected = countsByStatus.get(SELLER_VERIFICATION_STATUS.REJECTED) || 0;
+  const locked = Number(shopsLocked) || 0;
+  const total = statusRows.reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+  const active = Math.max(0, approved - locked);
+
+  return { total, pending, active, rejected, shopsLocked: locked, approved };
+}
+
 async function listAdminSellerVerifications(query = {}) {
   const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
   const pageSize = Math.min(
@@ -691,36 +802,36 @@ async function listAdminSellerVerifications(query = {}) {
   const filter = await buildAdminVerificationFilter(query);
   const sort = resolveAdminVerificationSort(query.sort);
 
-  const [total, verifications, totalAll, pendingCount, approvedCount, rejectedCount] =
-    await Promise.all([
-      SellerVerification.countDocuments(filter),
-      SellerVerification.find(filter)
-        .sort(sort)
-        .skip((page - 1) * pageSize)
-        .limit(pageSize)
-        .populate("userId", "FullName Email Phone UserName Avatar")
-        .populate("categoryId", "name")
-        .populate("approvedBy", "FullName UserName"),
-      SellerVerification.countDocuments({}),
-      SellerVerification.countDocuments({ status: SELLER_VERIFICATION_STATUS.PENDING }),
-      SellerVerification.countDocuments({ status: SELLER_VERIFICATION_STATUS.APPROVED }),
-      SellerVerification.countDocuments({ status: SELLER_VERIFICATION_STATUS.REJECTED }),
-    ]);
+  const [total, verifications, statusRows, shopsLocked] = await Promise.all([
+    SellerVerification.countDocuments(filter),
+    SellerVerification.find(filter)
+      .sort(sort)
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .populate("userId", "FullName Email Phone UserName Avatar")
+      .populate("categoryId", "name")
+      .populate("approvedBy", "FullName UserName"),
+    SellerVerification.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    ShopProfile.countDocuments({ status: SHOP_STATUS.BLOCKED }),
+  ]);
+
+  const shopByUserId = await loadShopsByUserIds(
+    verifications.map((row) => row.userId?._id || row.userId)
+  );
 
   return {
-    items: verifications,
+    items: verifications.map((verification) => ({
+      verification,
+      shop:
+        shopByUserId.get(String(verification.userId?._id || verification.userId)) || null,
+    })),
     pagination: {
       page,
       limit: pageSize,
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
     },
-    stats: {
-      total: totalAll,
-      pending: pendingCount,
-      approved: approvedCount,
-      rejected: rejectedCount,
-    },
+    stats: buildAdminVerificationStats(statusRows, shopsLocked),
   };
 }
 
@@ -769,6 +880,27 @@ async function rejectSellerVerificationByAdmin(adminUser, verificationId, reason
   return verification;
 }
 
+async function updateSellerVerificationByAdmin(adminUser, verificationId, payload = {}) {
+  const verification = await SellerVerification.findById(verificationId);
+  if (!verification) {
+    throw createServiceError("Không tìm thấy hồ sơ đăng ký.", 404);
+  }
+
+  const { cccdNumber, fullName } = parseCccdIdentityFields(
+    payload.cccdNumber ?? verification.cccdNumber,
+    payload.fullName ?? verification.fullName
+  );
+
+  verification.fullName = fullName;
+  verification.cccdNumber = cccdNumber;
+  verification.UpdatedAt = new Date();
+  await verification.save();
+
+  const saved = await reloadVerificationById(verification._id);
+  emitSellerVerificationUpdated(saved, "updated");
+  return saved;
+}
+
 function toPublicVerification(verification) {
   if (!verification) {
     return null;
@@ -780,10 +912,12 @@ function toPublicVerification(verification) {
   return {
     id: verification._id,
     userId: verification.userId,
-    cccdFrontImage: verification.cccdFrontImage || "",
-    cccdBackImage: verification.cccdBackImage || "",
+    anhCccdTruoc: verification.anhCccdTruoc || "",
+    anhCccdSau: verification.anhCccdSau || "",
     selfieImage: verification.selfieImage || "",
-    businessImage: resolveBusinessImage(verification),
+    fullName: verification.fullName || "",
+    cccdNumber: verification.cccdNumber || "",
+    anhKD: resolveBusinessImage(verification),
     address:
       verification.addressHeThong ||
       verification.DiaChiHeThong ||
@@ -824,7 +958,7 @@ function toPublicVerification(verification) {
   };
 }
 
-function toAdminVerification(verification) {
+function toAdminVerification(verification, shop = null) {
   const publicData = toPublicVerification(verification);
   if (!publicData) {
     return null;
@@ -832,8 +966,13 @@ function toAdminVerification(verification) {
 
   const user = verification.userId;
   const approver = verification.approvedBy;
+  const shopStatus = shop != null ? Number(shop.status) : null;
   return {
     ...publicData,
+    shopId: shop?._id ? String(shop._id) : publicData.shopId || "",
+    shopStatus,
+    shopStatusLabel: resolveShopStatusLabel(shop),
+    statusLabel: resolveAdminDisplayStatusLabel(verification, shop),
     user: user && typeof user === "object"
       ? {
           id: user._id,
@@ -867,6 +1006,7 @@ module.exports = {
   listAdminSellerVerifications,
   approveSellerVerificationByAdmin,
   rejectSellerVerificationByAdmin,
+  updateSellerVerificationByAdmin,
   toPublicVerification,
   toAdminVerification,
 };
