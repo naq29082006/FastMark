@@ -4,23 +4,22 @@ import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
+  Clock,
   Eye,
-  Mail,
-  Phone,
   Scale,
   ShoppingBag,
   Star,
   Trash2,
   UserPlus,
-  Users,
   XCircle,
+  Lock,
+  LockOpen,
 } from 'lucide-react';
 
 import {
   blockAccount,
   getAccountDetail,
   getAccountFinance,
-  getAccountFollowers,
   getAccountFollowing,
   getAccountHistory,
   unblockAccount,
@@ -39,6 +38,7 @@ import {
   ProductPriceStack,
 } from '../components/admin/ProductAdminPriceCells';
 import FollowListDialog, { FollowStatButton } from '../components/admin/FollowListDialog';
+import { useAdminTopbar } from '../admin/context/AdminTopbarContext';
 import TableIconActions from '../components/ui/TableIconActions';
 import { EmptyState } from '../components/ui/Feedback';
 import { useAuth } from '../context/AuthContext';
@@ -48,18 +48,14 @@ import {
   HISTORY_STATUS_FILTER_ALL,
 } from '../config/historyStatusFilters';
 import { REALTIME_COALESCE_MS } from '../constants/realtime';
-import { formatDate, formatMoney, formatPrice } from '../utils/format';
+import { formatDate, formatDateTimeDetail, formatMoney, formatPrice } from '../utils/format';
 import { goBackOr } from '../utils/navigation';
 import { keepIfSame, mergeListById } from '../utils/realtimeList';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import PreviewableImage, { PreviewableImageGrid } from '../components/PreviewableImage';
 
 function statusBadgeClass(status) {
   return status === 1 ? 'badge badge-success' : 'badge badge-danger';
-}
-
-function formatJoinDate(value) {
-  if (!value) return '';
-  return new Date(value).toLocaleDateString('vi-VN');
 }
 
 function DetailSkeleton() {
@@ -141,7 +137,7 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
     wallet: 'Chi tiết giao dịch ví',
     withdrawals: 'Chi tiết rút tiền',
     products: 'Chi tiết sản phẩm',
-    reservations: 'Chi tiết đơn giữ hàng',
+    reservations: 'Chi tiết đơn hàng',
     'shop-reservations': 'Chi tiết đơn của shop',
     'reports-filed': 'Chi tiết báo cáo đã gửi',
     'reports-received': 'Chi tiết báo cáo bị nhận',
@@ -217,7 +213,7 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
             <DetailField label="Số tài khoản">{item.accountNumber || ''}</DetailField>
             <DetailField label="Chủ tài khoản">{item.accountName || ''}</DetailField>
             <DetailField label="Ghi chú admin">{item.adminNote || ''}</DetailField>
-            <DetailField label="Xử lý lúc">{formatDate(item.processedAt)}</DetailField>
+            <DetailField label="Xử lý lúc">{formatDate(item.tgXuLy)}</DetailField>
             <DetailField label="Tạo lúc">{formatDate(item.createdAt)}</DetailField>
           </dl>
         ) : null}
@@ -249,14 +245,14 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
               </DetailField>
               {(product.isAdminRemoved ?? item.isAdminRemoved) ? (
                 <DetailField label="Lý do gỡ">
-                  {product.adminRemovalReason || item.adminRemovalReason || '—'}
+                  {product.lyDoGo || item.lyDoGo || '—'}
                 </DetailField>
               ) : null}
               <DetailField label="Đã bán">{product.soldCount ?? item.soldCount ?? 0}</DetailField>
               <DetailField label="Lượt xem">{product.viewCount ?? item.viewCount ?? 0}</DetailField>
               <DetailField label="Lượt thích">{product.likeCount ?? item.likeCount ?? 0}</DetailField>
               <DetailField label="Yêu thích">{product.favoriteCount ?? ''}</DetailField>
-              <DetailField label="Đơn giữ hàng">
+              <DetailField label="Đơn hàng">
                 {product.reservationCount ?? 0} (hoàn thành {product.completedReservations ?? 0})
               </DetailField>
               <DetailField label="Gian hàng">
@@ -294,16 +290,17 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
               product.images || product.thumbnails || [],
               product.thumbnail || item.thumbnail
             ).length ? (
-              <div className="image-grid account-verify-images">
-                {resolveMediaUrls(
+              <PreviewableImageGrid
+                className="image-grid account-verify-images"
+                items={resolveMediaUrls(
                   product.images || product.thumbnails || [],
                   product.thumbnail || item.thumbnail
-                ).map((url) => (
-                  <a key={url} href={url} target="_blank" rel="noreferrer">
-                    <img src={url} alt="Ảnh sản phẩm" />
-                  </a>
-                ))}
-              </div>
+                )}
+                width={120}
+                height={120}
+                getSrc={(url) => url}
+                getAlt={() => 'Ảnh sản phẩm'}
+              />
             ) : null}
           </>
         ) : null}
@@ -367,7 +364,7 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
                 {formatMoney(reservation.depositAmount ?? item.depositAmount)}
               </DetailField>
               <DetailField label="Ghi chú">{reservation.note || ''}</DetailField>
-              <DetailField label="Lý do hủy">{reservation.cancelReason || ''}</DetailField>
+              <DetailField label="Lý do hủy">{reservation.cancelNote || ''}</DetailField>
               <DetailField label="Lý do tranh chấp">
                 {reservation.disputeReasonLabel || reservation.disputeReason || ''}
               </DetailField>
@@ -417,18 +414,19 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
                 {formatDate(report.createdAt || item.createdAt)}
               </DetailField>
               <DetailField label="Xử lý lúc">
-                {formatDate(report.processedAt || item.processedAt)}
+                {formatDate(report.tgXuLy || item.tgXuLy)}
               </DetailField>
             </dl>
             <p className="history-detail-desc">{report.content || item.content || ''}</p>
             {resolveMediaUrls(report.evidenceImages || []).length ? (
-              <div className="image-grid account-verify-images">
-                {resolveMediaUrls(report.evidenceImages || []).map((url) => (
-                  <a key={url} href={url} target="_blank" rel="noreferrer">
-                    <img src={url} alt="Bằng chứng" />
-                  </a>
-                ))}
-              </div>
+              <PreviewableImageGrid
+                className="image-grid account-verify-images"
+                items={resolveMediaUrls(report.evidenceImages || [])}
+                width={120}
+                height={120}
+                getSrc={(url) => url}
+                getAlt={() => 'Bằng chứng'}
+              />
             ) : null}
           </>
         ) : null}
@@ -483,14 +481,18 @@ function HistoryDetailDialog({ tab, item, detail, loading, error, onClose }) {
               <DetailField label="Bắt đầu">{formatDate(item.startDate) || '—'}</DetailField>
               <DetailField label="Kết thúc">{formatDate(item.endDate) || '—'}</DetailField>
               <DetailField label="Số click">{item.clickCount ?? 0}</DetailField>
-              <DetailField label="Lý do">{item.violationReason || '—'}</DetailField>
+              <DetailField label="Lý do">{item.lyDoVP || '—'}</DetailField>
             </dl>
             {item.image ? (
-              <div className="image-grid account-verify-images">
-                <a href={item.image} target="_blank" rel="noreferrer">
-                  <img src={item.image} alt="Banner" />
-                </a>
-              </div>
+              <PreviewableImageGrid
+                className="image-grid account-verify-images"
+                items={[item.image]}
+                width={160}
+                height={96}
+                shape="rounded"
+                getSrc={(url) => url}
+                getAlt={() => 'Banner'}
+              />
             ) : null}
           </>
         ) : null}
@@ -611,7 +613,15 @@ function HistoryTable({
               <TableSttCell page={page} limit={limit} index={index} />
               <td className="col-thumb">
                 {row.thumbnail ? (
-                  <img src={row.thumbnail} alt="" className="thumb-sm" />
+                  <PreviewableImage
+                    src={row.thumbnail}
+                    alt={row.productName || 'Sản phẩm'}
+                    width={40}
+                    height={40}
+                    shape="rounded"
+                    fallbackLetter={row.productName || 'S'}
+                    className="thumb-sm"
+                  />
                 ) : (
                   <div className="thumb-sm thumb-fallback">SP</div>
                 )}
@@ -806,7 +816,15 @@ function HistoryTable({
               <TableSttCell page={page} limit={limit} index={index} />
               <td className="col-thumb">
                 {row.image ? (
-                  <img src={row.image} alt="" className="thumb-sm" />
+                  <PreviewableImage
+                    src={row.image}
+                    alt={row.planName || 'Banner'}
+                    width={40}
+                    height={40}
+                    shape="rounded"
+                    fallbackLetter={row.planName || 'B'}
+                    className="thumb-sm"
+                  />
                 ) : (
                   <div className="thumb-sm thumb-fallback">BN</div>
                 )}
@@ -1364,15 +1382,9 @@ export default function AccountDetailPage() {
   const loadFollowPage = useCallback(
     async (params) => {
       const token = await getIdToken();
-      if (followDialog === 'following') {
-        return getAccountFollowing(token, accountId, params);
-      }
-      if (followDialog === 'followers') {
-        return getAccountFollowers(token, accountId, params);
-      }
-      return { data: { items: [], pagination: null } };
+      return getAccountFollowing(token, accountId, params);
     },
-    [accountId, followDialog, getIdToken]
+    [accountId, getIdToken]
   );
 
   const statCards = useMemo(
@@ -1403,7 +1415,7 @@ export default function AccountDetailPage() {
       },
       {
         label: 'Đánh giá shop',
-        value: stats?.totalReviewsWritten || 0,
+        value: stats?.tongDGWritten || 0,
         icon: Star,
         tone: 'green',
       },
@@ -1427,45 +1439,21 @@ export default function AccountDetailPage() {
     setHistoryTab('wallet');
   }
 
+  const { setTrail, clearTrail } = useAdminTopbar();
+
+  const userDisplayName =
+    user?.fullName || user?.userName || (loading ? '…' : 'Chi tiết');
+
+  useEffect(() => {
+    setTrail([
+      { label: 'Người dùng', to: '/users' },
+      { label: userDisplayName },
+    ]);
+    return () => clearTrail();
+  }, [userDisplayName, setTrail, clearTrail]);
+
   return (
     <div className="admin-detail-page account-detail-page account-detail-page-v2 shop-detail-page-v2">
-      <header className="admin-detail-toolbar">
-        <button type="button" className="ghost-btn" onClick={() => goBackOr(navigate, '/accounts')}>
-          ← Quay lại
-        </button>
-        <div className="header-actions">
-          <button
-            type="button"
-            className="ghost-btn"
-            onClick={loadAccount}
-            disabled={loading || actionLoading}
-          >
-            Làm mới
-          </button>
-          {user ? (
-            isAccountActive ? (
-              <button
-                type="button"
-                className="danger-btn"
-                disabled={actionLoading}
-                onClick={() => setConfirmAction('block-account')}
-              >
-                Khóa tài khoản
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="approve-btn"
-                disabled={actionLoading}
-                onClick={() => setConfirmAction('unblock-account')}
-              >
-                Mở khóa tài khoản
-              </button>
-            )
-          ) : null}
-        </div>
-      </header>
-
       {error ? <p className="error-banner">{error}</p> : null}
       {snackbar ? <div className="snackbar">{snackbar}</div> : null}
 
@@ -1474,30 +1462,51 @@ export default function AccountDetailPage() {
       {!loading && user ? (
         <>
           <section className="shop-detail-hero">
-            <span className={`shop-detail-hero-status ${statusBadgeClass(user.status)}`}>
-              {user.statusLabel || (isAccountActive ? 'Hoạt động' : 'Đã khóa')}
-            </span>
-            <div className="shop-detail-hero-content">
-              {user.avatar ? (
-                <img src={user.avatar} alt="" className="shop-detail-hero-avatar" />
+            <button
+              type="button"
+              className={
+                isAccountActive
+                  ? 'account-hero-lock-btn account-hero-lock-btn--corner account-hero-lock-btn--lock'
+                  : 'account-hero-lock-btn account-hero-lock-btn--corner account-hero-lock-btn--unlock'
+              }
+              title={isAccountActive ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+              aria-label={isAccountActive ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}
+              disabled={actionLoading}
+              onClick={() => {
+                if (isAccountActive) {
+                  setConfirmAction('block-account');
+                } else {
+                  setConfirmAction('unblock-account');
+                }
+              }}
+            >
+              {isAccountActive ? (
+                <Lock size={18} aria-hidden="true" />
               ) : (
-                <div className="shop-detail-hero-avatar placeholder">
-                  {(user.fullName || user.userName || 'U').charAt(0).toUpperCase()}
-                </div>
+                <LockOpen size={18} aria-hidden="true" />
               )}
+            </button>
+            <div className="shop-detail-hero-content account-detail-hero-content">
+              <div className="account-detail-hero-aside">
+                <PreviewableImage
+                  src={user.avatar}
+                  alt={user.fullName || user.userName || 'Người dùng'}
+                  width={160}
+                  height={160}
+                  shape="circle"
+                  fallbackLetter={user.fullName || user.userName || 'U'}
+                  wrapperClassName="shop-detail-hero-avatar-wrap"
+                  className="shop-detail-hero-avatar"
+                />
+              </div>
               <div className="shop-detail-hero-main">
-                <h1>{user.fullName || user.userName || 'Người dùng'}</h1>
-                <p className="shop-detail-hero-handle">@{user.userName || ''}</p>
-                <p className="shop-detail-hero-meta">
-                  <Mail size={14} aria-hidden="true" />
-                  {user.email || 'Chưa có email'}
-                  <span className="shop-detail-hero-meta-sep">|</span>
-                  <Phone size={14} aria-hidden="true" />
-                  {user.phone || 'Chưa có SĐT'}
-                  <span className="shop-detail-hero-meta-sep">|</span>
-                  <CalendarDays size={14} aria-hidden="true" />
-                  Tham gia từ {formatJoinDate(user.createdAt)}
-                </p>
+                <div className="shop-detail-hero-title-row">
+                  <h1>{user.fullName || user.userName || 'Người dùng'}</h1>
+                  <span className={statusBadgeClass(user.status)}>
+                    {user.statusLabel || (isAccountActive ? 'Hoạt động' : 'Đã khóa')}
+                  </span>
+                </div>
+                <p className="shop-detail-hero-handle">@{user.userName || '—'}</p>
                 <div className="shop-detail-hero-extra shop-detail-hero-follow-row">
                   <FollowStatButton
                     icon={UserPlus}
@@ -1505,19 +1514,22 @@ export default function AccountDetailPage() {
                     count={user.followingCount ?? 0}
                     onClick={() => setFollowDialog('following')}
                   />
-                  <FollowStatButton
-                    icon={Users}
-                    label="Đã theo dõi"
-                    count={user.followersCount ?? 0}
-                    onClick={() => setFollowDialog('followers')}
-                  />
                 </div>
-                <div className="shop-detail-hero-extra">
-                  <span className="shop-detail-hero-extra-item">
+                <div className="account-detail-hero-meta-lines">
+                  <p className="account-detail-hero-meta-line">
                     <CalendarDays size={14} aria-hidden="true" />
-                    <span>Hoạt động gần nhất:</span>
-                    <strong>{formatDate(user.lastActiveAt) || '—'}</strong>
-                  </span>
+                    <span>
+                      Tham gia từ:{' '}
+                      <strong>{formatDateTimeDetail(user.createdAt) || '—'}</strong>
+                    </span>
+                  </p>
+                  <p className="account-detail-hero-meta-line">
+                    <Clock size={14} aria-hidden="true" />
+                    <span>
+                      Lần hoạt động cuối:{' '}
+                      <strong>{formatDateTimeDetail(user.lastActiveAt) || '—'}</strong>
+                    </span>
+                  </p>
                 </div>
               </div>
             </div>
@@ -1585,10 +1597,6 @@ export default function AccountDetailPage() {
                         <div>
                           <dt>Cập nhật</dt>
                           <dd>{formatDate(user.updatedAt)}</dd>
-                        </div>
-                        <div>
-                          <dt>Hoạt động gần nhất</dt>
-                          <dd>{formatDate(user.lastActiveAt) || '—'}</dd>
                         </div>
                       </dl>
                     </article>
@@ -1665,12 +1673,12 @@ export default function AccountDetailPage() {
                           <div>
                             <dt>Thống kê</dt>
                             <dd>
-                              ★ {shop.averageRating?.toFixed?.(1) || '0.0'} · {shop.totalProducts || 0} SP ·{' '}
-                              {shop.followersCount || 0} theo dõi · {shop.soldCount || 0} đã bán
+                              ★ {shop.diemTB?.toFixed?.(1) || '0.0'} · {shop.tongSP || 0} SP ·{' '}
+                              {shop.soNguoiTheo || 0} theo dõi · {shop.soldCount || 0} đã bán
                             </dd>
                           </div>
                         </dl>
-                        <Link className="detail-btn shop-detail-side-actions" to={`/shops/${shop.id}`}>
+                        <Link className="detail-btn shop-detail-side-actions" to={`/sellers/shops/${shop.id}`}>
                           Xem gian hàng
                         </Link>
                       </article>
@@ -1704,7 +1712,7 @@ export default function AccountDetailPage() {
       {!loading && !user ? (
         <div className="empty-card">
           Không tìm thấy người dùng.{' '}
-          <button type="button" className="link-btn" onClick={() => goBackOr(navigate, '/accounts')}>
+          <button type="button" className="link-btn" onClick={() => goBackOr(navigate, '/users')}>
             Quay lại
           </button>
         </div>
@@ -1718,26 +1726,76 @@ export default function AccountDetailPage() {
         onClose={() => setFollowDialog('')}
       />
 
-      {confirmAction ? (
+      {confirmAction === 'block-account' ? (
+        <div className="dialog-overlay" role="presentation" onClick={() => !actionLoading && setConfirmAction('')}>
+          <div className="dialog-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <h3>Khóa tài khoản</h3>
+            <p>
+              Người dùng chỉ còn màn bị khóa trên app (rút tiền, khiếu nại, đăng xuất). Gian hàng cũng bị khóa và
+              mọi đơn treo sẽ hủy hoàn cọc.
+            </p>
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="ghost-btn"
+                disabled={actionLoading}
+                onClick={() => setConfirmAction('')}
+              >
+                Huỷ
+              </button>
+              <button
+                type="button"
+                className="danger-btn"
+                disabled={actionLoading}
+                onClick={() => handleStatusChange('block-account')}
+              >
+                {actionLoading ? 'Đang xử lý...' : 'Xác nhận khóa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmAction === 'unblock-account' ? (
+        <div className="dialog-overlay" role="presentation" onClick={() => !actionLoading && setConfirmAction('')}>
+          <div className="dialog-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <h3>Mở khóa tài khoản</h3>
+            <p>
+              Người dùng sẽ đăng nhập và dùng FastMark bình thường. Gian hàng liên kết (nếu có) cũng
+              được mở khóa. Bạn có chắc muốn mở khóa?
+            </p>
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="ghost-btn"
+                disabled={actionLoading}
+                onClick={() => setConfirmAction('')}
+              >
+                Huỷ
+              </button>
+              <button
+                type="button"
+                className="unlock-confirm-btn"
+                disabled={actionLoading}
+                onClick={() => handleStatusChange('unblock-account')}
+              >
+                {actionLoading ? 'Đang xử lý...' : 'Xác nhận mở khóa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmAction === 'block-shop' || confirmAction === 'unblock-shop' ? (
         <div className="dialog-overlay" role="presentation" onClick={() => !actionLoading && setConfirmAction('')}>
           <div className="dialog-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <h3>
-              {confirmAction === 'block-account'
-                ? 'Khóa tài khoản'
-                : confirmAction === 'unblock-account'
-                  ? 'Mở khóa tài khoản'
-                  : confirmAction === 'block-shop'
-                    ? 'Khóa gian hàng'
-                    : 'Mở khóa gian hàng'}
+              {confirmAction === 'block-shop' ? 'Khóa gian hàng' : 'Mở khóa gian hàng'}
             </h3>
             <p>
-              {confirmAction === 'block-account'
-                ? 'Người dùng chỉ còn màn bị khóa trên app (rút tiền, khiếu nại, đăng xuất). Gian hàng cũng bị khóa và mọi đơn treo sẽ hủy hoàn cọc.'
-                : confirmAction === 'unblock-account'
-                  ? 'Tài khoản và gian hàng liên kết sẽ được mở khóa.'
-                  : confirmAction === 'block-shop'
-                    ? 'Gian hàng sẽ bị khóa: ẩn bài đăng, hủy đơn treo hoàn cọc. Tài khoản vẫn dùng được các tính năng khác trên app.'
-                    : 'Gian hàng sẽ hoạt động lại và hiển thị sản phẩm đã ẩn.'}
+              {confirmAction === 'block-shop'
+                ? 'Gian hàng sẽ bị khóa: ẩn bài đăng, hủy đơn treo hoàn cọc. Tài khoản vẫn dùng được các tính năng khác trên app.'
+                : 'Gian hàng sẽ hoạt động lại và hiển thị sản phẩm đã ẩn.'}
             </p>
             <div className="dialog-actions">
               <button
@@ -1751,14 +1809,12 @@ export default function AccountDetailPage() {
               <button
                 type="button"
                 className={
-                  confirmAction === 'block-account' || confirmAction === 'block-shop'
-                    ? 'danger-btn'
-                    : 'approve-btn'
+                  confirmAction === 'block-shop' ? 'danger-btn' : 'unlock-confirm-btn'
                 }
                 disabled={actionLoading}
                 onClick={handleConfirmAction}
               >
-                {actionLoading ? 'Đang xử lý...' : 'Xác nhận'}
+                {actionLoading ? 'Đang xử lý...' : confirmAction === 'block-shop' ? 'Xác nhận khóa' : 'Xác nhận mở khóa'}
               </button>
             </div>
           </div>

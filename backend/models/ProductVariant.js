@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 /**
  * ProductVariant — biến thể (size/loại/giá/tồn) của sản phẩm.
  * Chi tiết biến thể chỉ có đúng 1 ảnh: ImageUrl.
- * Ảnh đại diện / gallery sản phẩm nằm ở collection ProductImage (theo Stt).
+ * Gallery ảnh sản phẩm nằm trên Product.images (phần tử đầu = cover).
  */
 const ProductVariantSchema = new mongoose.Schema({
   // Sản phẩm cha (ref Product).

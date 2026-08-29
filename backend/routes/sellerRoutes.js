@@ -2,8 +2,14 @@ const express = require("express");
 
 const sellerController = require("../controllers/sellerController");
 const sellerOpsController = require("../controllers/sellerOpsController");
-const verifyFirebaseToken = require("../middleware/authMiddleware");
+const {
+  verifyFirebaseToken,
+  verifyFirebaseTokenAllowBlocked,
+} = require("../middleware/authMiddleware");
 const requireSeller = require("../middleware/sellerMiddleware");
+
+/** Tài khoản bị khóa vẫn quản lý đơn gian hàng (tranh chấp, giam tiền…). */
+const verifySellerOrdersAuth = verifyFirebaseTokenAllowBlocked;
 const requireAdmin = require("../middleware/adminMiddleware");
 const asyncHandler = require("../utils/asyncHandler");
 const { singleImage } = require("../config/commom/upload");
@@ -30,7 +36,7 @@ router.post(
 );
 router.get(
   "/verification/me",
-  verifyFirebaseToken,
+  verifyFirebaseTokenAllowBlocked,
   asyncHandler(sellerController.getMyVerification)
 );
 router.post(
@@ -56,6 +62,12 @@ router.get(
   requireAdmin,
   asyncHandler(sellerController.listAdminVerifications)
 );
+router.patch(
+  "/verification/:id",
+  verifyFirebaseToken,
+  requireAdmin,
+  asyncHandler(sellerController.updateAdminVerification)
+);
 router.post(
   "/verification/:id/approve",
   verifyFirebaseToken,
@@ -69,7 +81,12 @@ router.post(
   asyncHandler(sellerController.rejectVerification)
 );
 
-router.get("/shop", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.getShopSettings));
+router.get(
+  "/shop",
+  verifyFirebaseTokenAllowBlocked,
+  requireSeller,
+  asyncHandler(sellerOpsController.getShopSettings)
+);
 router.put("/shop", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.updateShopSettings));
 router.post(
   "/shop/avatar",
@@ -79,34 +96,41 @@ router.post(
   asyncHandler(sellerOpsController.uploadShopAvatar)
 );
 
-router.get("/orders", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.listOrders));
+router.get("/orders", verifySellerOrdersAuth, requireSeller, asyncHandler(sellerOpsController.listOrders));
+router.get("/reviews", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.listReviews));
+router.get(
+  "/reviews/:id",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerOpsController.getReviewDetail)
+);
 router.get(
   "/reservations/:id",
-  verifyFirebaseToken,
+  verifySellerOrdersAuth,
   requireSeller,
   asyncHandler(sellerOpsController.getReservationDetail)
 );
 router.post(
   "/reservations/:id/confirm",
-  verifyFirebaseToken,
+  verifySellerOrdersAuth,
   requireSeller,
   asyncHandler(sellerOpsController.confirmReservation)
 );
 router.post(
   "/reservations/:id/reject",
-  verifyFirebaseToken,
+  verifySellerOrdersAuth,
   requireSeller,
   asyncHandler(sellerOpsController.rejectReservation)
 );
 router.post(
   "/reservations/:id/cancel",
-  verifyFirebaseToken,
+  verifySellerOrdersAuth,
   requireSeller,
   asyncHandler(sellerOpsController.cancelReservation)
 );
 router.post(
   "/reservations/:id/refund-dispute",
-  verifyFirebaseToken,
+  verifySellerOrdersAuth,
   requireSeller,
   asyncHandler(sellerOpsController.refundDisputeDeposit)
 );
@@ -114,13 +138,38 @@ router.post(
 /** Alias: seller báo buyer no-show (cùng API /api/reports/seller-report-buyer). */
 router.post(
   "/reservations/:id/report-buyer",
-  verifyFirebaseToken,
+  verifySellerOrdersAuth,
   requireSeller,
   asyncHandler(async (req, res) => {
     const reservationReportController = require("../controllers/reservationReportController");
     req.body = { ...req.body, reservationId: req.params.id };
     return reservationReportController.sellerReportBuyer(req, res);
   })
+);
+
+router.post(
+  "/reservations/validate-pickup-qr",
+  verifySellerOrdersAuth,
+  requireSeller,
+  asyncHandler(sellerOpsController.validatePickupQr)
+);
+router.post(
+  "/reservations/:id/confirm-delivered",
+  verifySellerOrdersAuth,
+  requireSeller,
+  asyncHandler(sellerOpsController.confirmDelivered)
+);
+router.post(
+  "/reservations/:id/adjust-at-pickup",
+  verifySellerOrdersAuth,
+  requireSeller,
+  asyncHandler(sellerOpsController.adjustReservationAtPickup)
+);
+router.post(
+  "/reservations/:id/dispute-response",
+  verifySellerOrdersAuth,
+  requireSeller,
+  asyncHandler(sellerOpsController.respondToPostDeliveryComplaint)
 );
 
 router.get("/stats", verifyFirebaseToken, requireSeller, asyncHandler(sellerOpsController.getStats));

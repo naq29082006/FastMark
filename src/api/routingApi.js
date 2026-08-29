@@ -4,6 +4,11 @@ import {
   getDistanceFromCurrentLocation,
   hasValidLocation,
 } from '../core/utils/geo';
+import {
+  normalizeRoutingProfile,
+  ROUTING_PROFILE,
+  ROUTING_PROFILE_SPEED_KMH,
+} from '../constants/routingProfile';
 
 const OSRM_BASE_URL = 'https://router.project-osrm.org';
 const ROUTE_CACHE_TTL_MS = 60 * 1000;
@@ -14,8 +19,9 @@ function formatCoordinate(point) {
   return `${Number(point.longitude)},${Number(point.latitude)}`;
 }
 
-function buildCacheKey(origin, destination) {
+function buildCacheKey(origin, destination, profile = ROUTING_PROFILE.MOTORBIKE) {
   return [
+    normalizeRoutingProfile(profile),
     Number(origin.longitude).toFixed(4),
     Number(origin.latitude).toFixed(4),
     Number(destination.longitude).toFixed(4),
@@ -73,8 +79,9 @@ function writeCachedGeometry(cacheKey, geometry) {
   });
 }
 
-function buildStraightLineGeometry(origin, destination) {
+function buildStraightLineGeometry(origin, destination, profile = ROUTING_PROFILE.MOTORBIKE) {
   const distanceMeters = getDistanceFromCurrentLocation(origin, destination) || 0;
+  const speedKmh = ROUTING_PROFILE_SPEED_KMH[normalizeRoutingProfile(profile)];
 
   return {
     coordinates: [
@@ -82,7 +89,8 @@ function buildStraightLineGeometry(origin, destination) {
       [Number(destination.latitude), Number(destination.longitude)],
     ],
     distanceMeters,
-    durationSeconds: estimateTravelDurationSeconds(distanceMeters),
+    durationSeconds: estimateTravelDurationSeconds(distanceMeters, speedKmh),
+    profile: normalizeRoutingProfile(profile),
     isFallback: true,
   };
 }
@@ -108,12 +116,13 @@ async function parseApiPayload(response) {
   return payload?.data || null;
 }
 
-async function fetchRouteGeometryFromBackend(origin, destination) {
+async function fetchRouteGeometryFromBackend(origin, destination, profile) {
   const params = new URLSearchParams({
     fromLat: String(origin.latitude),
     fromLng: String(origin.longitude),
     toLat: String(destination.latitude),
     toLng: String(destination.longitude),
+    profile: normalizeRoutingProfile(profile),
   });
 
   const response = await apiRequest(`/api/routing/route?${params.toString()}`, { method: 'GET' });
@@ -121,9 +130,10 @@ async function fetchRouteGeometryFromBackend(origin, destination) {
   return normalizeGeometry(data);
 }
 
-async function fetchRouteGeometryFromOsrm(origin, destination) {
+async function fetchRouteGeometryFromOsrm(origin, destination, profile) {
+  const osrmProfile = normalizeRoutingProfile(profile) === ROUTING_PROFILE.CAR ? 'driving' : 'driving';
   const url =
-    `${OSRM_BASE_URL}/route/v1/driving/` +
+    `${OSRM_BASE_URL}/route/v1/${osrmProfile}/` +
     `${formatCoordinate(origin)};${formatCoordinate(destination)}?overview=full&geometries=geojson`;
 
   const response = await fetch(url);
@@ -146,15 +156,31 @@ async function fetchRouteGeometryFromOsrm(origin, destination) {
     coordinates,
     distanceMeters: Number(route.distance) || 0,
     durationSeconds: Number(route.duration) || 0,
+    profile: normalizeRoutingProfile(profile),
   });
 }
 
-export async function fetchRouteGeometry(origin, destination) {
+function applyMotorbikeDuration(geometry, profile) {
+  if (!geometry || normalizeRoutingProfile(profile) !== ROUTING_PROFILE.MOTORBIKE) {
+    return geometry;
+  }
+  const durationSeconds = Number(geometry.durationSeconds);
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return geometry;
+  }
+  return {
+    ...geometry,
+    durationSeconds: Math.max(60, Math.round(durationSeconds * 0.76)),
+  };
+}
+
+export async function fetchRouteGeometry(origin, destination, options = {}) {
   if (!hasValidLocation(origin) || !hasValidLocation(destination)) {
     return null;
   }
 
-  const cacheKey = buildCacheKey(origin, destination);
+  const profile = normalizeRoutingProfile(options.profile);
+  const cacheKey = buildCacheKey(origin, destination, profile);
   const cachedGeometry = readCachedGeometry(cacheKey);
   if (cachedGeometry) {
     return cachedGeometry;
@@ -163,21 +189,24 @@ export async function fetchRouteGeometry(origin, destination) {
   let geometry = null;
 
   try {
-    geometry = await fetchRouteGeometryFromBackend(origin, destination);
+    geometry = await fetchRouteGeometryFromBackend(origin, destination, profile);
   } catch {
     geometry = null;
   }
 
   if (!geometry) {
     try {
-      geometry = await fetchRouteGeometryFromOsrm(origin, destination);
+      geometry = applyMotorbikeDuration(
+        await fetchRouteGeometryFromOsrm(origin, destination, profile),
+        profile
+      );
     } catch {
       geometry = null;
     }
   }
 
   if (!geometry) {
-    geometry = buildStraightLineGeometry(origin, destination);
+    geometry = buildStraightLineGeometry(origin, destination, profile);
   }
 
   writeCachedGeometry(cacheKey, geometry);

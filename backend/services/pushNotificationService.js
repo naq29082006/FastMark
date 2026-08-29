@@ -1,6 +1,21 @@
 const { getMessaging } = require("firebase-admin/messaging");
+const mongoose = require("mongoose");
 
 const { listTokensForUser, removeTokenByValue } = require("./pushDeviceTokenService");
+
+function normalizeUserId(userId) {
+  if (!userId) {
+    return null;
+  }
+  if (userId instanceof mongoose.Types.ObjectId) {
+    return userId;
+  }
+  const text = String(userId).trim();
+  if (!text || !mongoose.Types.ObjectId.isValid(text)) {
+    return null;
+  }
+  return new mongoose.Types.ObjectId(text);
+}
 
 function pickString(value) {
   return String(value || "").trim();
@@ -27,7 +42,12 @@ function buildDataPayload(data = {}) {
 }
 
 async function sendPushToUser(userId, { title, content, data } = {}) {
-  const tokens = await listTokensForUser(userId);
+  const normalizedUserId = normalizeUserId(userId);
+  if (!normalizedUserId) {
+    return { sent: 0, failed: 0, skipped: true };
+  }
+
+  const tokens = await listTokensForUser(normalizedUserId);
   if (!tokens.length) {
     return { sent: 0, failed: 0, skipped: true };
   }

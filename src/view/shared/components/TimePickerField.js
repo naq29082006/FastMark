@@ -1,23 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 
-import { formatTimeString, parseTimeString } from '../../../core/utils/timeFormat';
-import {
-  BOTTOM_SHEET_BORDER,
-  BottomSheetDismissOverlay,
-  BottomSheetHandle,
-  BottomSheetPanel,
-} from './bottomSheetChrome';
+import { formatTimeString, parseTimeString, snapTimeToMinuteInterval } from '../../../core/utils/timeFormat';
+import { usePickerDismissGuard } from './pickerDismissGuard';
+import MaterialTimePickerDialog from './MaterialTimePickerDialog';
 
 export default function TimePickerField({
   label,
@@ -25,51 +13,61 @@ export default function TimePickerField({
   onChange,
   placeholder = '08:00',
   compact = false,
+  minuteInterval = 1,
   style,
+  confirmLabel = 'OK',
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [draftDate, setDraftDate] = useState(() => parseTimeString(value, placeholder));
   const draftRef = useRef(draftDate);
+  const { guardOpen, closeWithGuard } = usePickerDismissGuard();
   const hasValue = Boolean(String(value || '').trim());
   const displayValue = hasValue ? String(value).trim() : placeholder;
+  const useCustomWheel = minuteInterval > 1;
+  const pickerDate = useMemo(
+    () => snapTimeToMinuteInterval(parseTimeString(value, placeholder), minuteInterval),
+    [minuteInterval, placeholder, value]
+  );
 
   useEffect(() => {
     if (!showPicker) {
-      const next = parseTimeString(value, placeholder);
+      const next = snapTimeToMinuteInterval(parseTimeString(value, placeholder), minuteInterval);
       draftRef.current = next;
       setDraftDate(next);
     }
-  }, [placeholder, showPicker, value]);
+  }, [minuteInterval, placeholder, showPicker, value]);
 
   function openPicker() {
-    const next = parseTimeString(value, placeholder);
-    draftRef.current = next;
-    setDraftDate(next);
-    setShowPicker(true);
+    guardOpen(() => {
+      const next = snapTimeToMinuteInterval(parseTimeString(value, placeholder), minuteInterval);
+      draftRef.current = next;
+      setDraftDate(next);
+      setShowPicker(true);
+    });
   }
 
   function closePicker() {
-    setShowPicker(false);
+    closeWithGuard(() => setShowPicker(false));
   }
 
   function confirmPicker() {
-    onChange?.(formatTimeString(draftRef.current));
+    const snapped = snapTimeToMinuteInterval(draftRef.current, minuteInterval);
+    onChange?.(formatTimeString(snapped));
     closePicker();
   }
 
-  function handleIosPickerChange(_event, selectedDate) {
-    if (selectedDate) {
-      draftRef.current = selectedDate;
-      setDraftDate(selectedDate);
-    }
+  function handlePickerChange(nextDate) {
+    draftRef.current = nextDate;
+    setDraftDate(nextDate);
   }
 
-  function handleAndroidChange(event, selectedDate) {
-    setShowPicker(false);
+  function handleAndroidNativeChange(event, selectedDate) {
+    closePicker();
     if (event?.type === 'dismissed' || !selectedDate) {
       return;
     }
-    onChange?.(formatTimeString(selectedDate));
+    const snapped = snapTimeToMinuteInterval(selectedDate, minuteInterval);
+    onChange?.(formatTimeString(snapped));
   }
 
   if (Platform.OS === 'web') {
@@ -112,41 +110,29 @@ export default function TimePickerField({
         </View>
       </Pressable>
 
-      {Platform.OS === 'android' && showPicker ? (
+      {Platform.OS === 'android' && showPicker && !useCustomWheel ? (
         <DateTimePicker
-          value={draftDate}
+          value={pickerDate}
           mode="time"
           is24Hour
           display="spinner"
-          onChange={handleAndroidChange}
+          onChange={handleAndroidNativeChange}
         />
       ) : null}
 
-      {Platform.OS === 'ios' ? (
-        <Modal visible={showPicker} transparent animationType="slide" onRequestClose={closePicker}>
-          <BottomSheetDismissOverlay onClose={closePicker}>
-            <BottomSheetPanel style={styles.modalSheet}>
-              <BottomSheetHandle compact />
-              <View style={styles.modalHeader}>
-                <Pressable onPress={closePicker} hitSlop={8}>
-                  <Text style={styles.modalActionText}>Hủy</Text>
-                </Pressable>
-                <Text style={styles.modalTitle}>{label || 'Chọn giờ'}</Text>
-                <Pressable onPress={confirmPicker} hitSlop={8}>
-                  <Text style={[styles.modalActionText, styles.modalActionPrimary]}>Xong</Text>
-                </Pressable>
-              </View>
-              <DateTimePicker
-                value={draftDate}
-                mode="time"
-                is24Hour
-                display="spinner"
-                onChange={handleIosPickerChange}
-                style={styles.picker}
-              />
-            </BottomSheetPanel>
-          </BottomSheetDismissOverlay>
-        </Modal>
+      {Platform.OS === 'ios' || useCustomWheel ? (
+        <MaterialTimePickerDialog
+          visible={showPicker}
+          title={label || 'Chọn giờ'}
+          subtitle={label || 'Chọn giờ'}
+          value={draftDate}
+          onChange={handlePickerChange}
+          onCancel={closePicker}
+          onConfirm={confirmPicker}
+          minuteInterval={minuteInterval}
+          confirmLabel={confirmLabel}
+          useNativePicker={!useCustomWheel}
+        />
       ) : null}
     </View>
   );
@@ -168,7 +154,9 @@ const styles = StyleSheet.create({
   },
   labelCompact: {
     fontSize: 11,
+    fontWeight: '700',
     color: '#64748b',
+    marginBottom: 6,
   },
   timeButton: {
     minHeight: 52,
@@ -228,38 +216,5 @@ const styles = StyleSheet.create({
   webInputCompact: {
     minHeight: 48,
     borderWidth: 1,
-  },
-  modalSheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    ...BOTTOM_SHEET_BORDER,
-    paddingTop: 10,
-    paddingBottom: 24,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  modalTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  modalActionText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  modalActionPrimary: {
-    color: '#076F32',
-  },
-  picker: {
-    alignSelf: 'center',
   },
 });

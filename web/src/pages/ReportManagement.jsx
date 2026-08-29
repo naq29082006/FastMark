@@ -21,19 +21,19 @@ import { useAuth } from '../context/AuthContext';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { REALTIME_COALESCE_MS } from '../constants/realtime';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import PreviewableImage, { PreviewableImageGrid } from '../components/PreviewableImage';
 import { formatDate } from '../utils/format';
 import { keepIfSame, mergeListById } from '../utils/realtimeList';
 
 const REPORT_TYPE_OPTIONS = [
   { value: '', label: 'Tất cả' },
   { value: '1', label: 'Đánh giá' },
-  { value: '2', label: 'Người dùng' },
-  { value: '3', label: 'Gian hàng' },
-  { value: '4', label: 'Sản phẩm' },
-  { value: '8', label: 'Hệ thống lỗi' },
-  { value: '9', label: 'Khác' },
-  { value: '10', label: 'Khiếu nại khóa tài khoản' },
-  { value: '11', label: 'Khiếu nại khóa gian hàng' },
+  { value: '2', label: 'Gian hàng' },
+  { value: '3', label: 'Sản phẩm' },
+  { value: '4', label: 'Hệ thống lỗi' },
+  { value: '5', label: 'Khác' },
+  { value: '6', label: 'Khiếu nại khóa tài khoản' },
+  { value: '7', label: 'Khiếu nại khóa gian hàng' },
 ];
 
 const STATUS_FILTER_OPTIONS = [
@@ -43,13 +43,12 @@ const STATUS_FILTER_OPTIONS = [
 
 const REPORT_TYPE = {
   REVIEW: 1,
-  USER: 2,
-  SHOP: 3,
-  PRODUCT: 4,
-  SYSTEM: 8,
-  OTHER: 9,
-  ACCOUNT_LOCK_APPEAL: 10,
-  SHOP_LOCK_APPEAL: 11,
+  SHOP: 2,
+  PRODUCT: 3,
+  SYSTEM: 4,
+  OTHER: 5,
+  ACCOUNT_LOCK_APPEAL: 6,
+  SHOP_LOCK_APPEAL: 7,
 };
 
 const SHOP_LOCK_APPEAL_TITLE_PATTERN = /khóa gian hàng|khiếu nại.*gian hàng|yêu cầu xem xét lại.*gian/i;
@@ -106,23 +105,20 @@ const SHOP_LOCK_APPEAL_DISMISS_TEMPLATES = [
 ];
 
 const MEMBER_REPORT_TYPE_OPTIONS = [
-  { value: '', label: 'Tất cả (người dùng & gian hàng)' },
-  { value: '2', label: 'Người dùng' },
-  { value: '3', label: 'Gian hàng' },
-  { value: '10', label: 'Khiếu nại khóa tài khoản' },
-  { value: '11', label: 'Khiếu nại khóa gian hàng' },
+  { value: '', label: 'Tất cả (gian hàng & khiếu nại khóa)' },
+  { value: '2', label: 'Gian hàng' },
+  { value: '6', label: 'Khiếu nại khóa tài khoản' },
+  { value: '7', label: 'Khiếu nại khóa gian hàng' },
 ];
 
 const SCOPE_TO_REPORT_TYPE = {
-  user: '2',
-  shop: '3',
-  product: '4',
+  shop: '2',
+  product: '3',
 };
 
 const REPORT_TYPE_TO_SCOPE = {
-  2: 'user',
-  3: 'shop',
-  4: 'product',
+  2: 'shop',
+  3: 'product',
 };
 
 function syncReportQueryParams(searchParams, patch) {
@@ -198,12 +194,20 @@ function getAvatarInitial(person) {
 }
 
 function PartyAvatar({ person, name }) {
-  const avatarUrl = resolveMediaUrl(person?.avatar || '');
   const initial = getAvatarInitial(person || { fullName: name });
-  if (avatarUrl) {
-    return <img src={avatarUrl} alt="" className="report-party-avatar" />;
-  }
-  return <div className="report-party-avatar placeholder">{initial}</div>;
+  return (
+    <PreviewableImage
+      src={person?.avatar || ''}
+      alt={person?.fullName || person?.userName || name || ''}
+      width={48}
+      height={48}
+      shape="rounded"
+      className="report-party-avatar"
+      style={{ borderRadius: 14 }}
+      fallbackLetter={initial}
+      fallbackClassName="report-party-avatar placeholder"
+    />
+  );
 }
 
 function getReportedAccountId(detail) {
@@ -220,8 +224,6 @@ function getReportedSubjectFieldLabel(reportType) {
   switch (reportType) {
     case REPORT_TYPE.SHOP:
       return 'Gian hàng bị báo cáo';
-    case REPORT_TYPE.USER:
-      return 'Người dùng bị báo cáo';
     case REPORT_TYPE.PRODUCT:
       return 'Sản phẩm bị báo cáo';
     case REPORT_TYPE.REVIEW:
@@ -251,10 +253,6 @@ function getReportedSubjectValue(detail) {
       detail?.targetUser?.userName ||
       ''
     );
-  }
-
-  if (reportType === REPORT_TYPE.USER) {
-    return formatTargetUserLine(detail?.targetUser);
   }
 
   if (reportType === REPORT_TYPE.PRODUCT) {
@@ -336,10 +334,6 @@ function getReportedOwnerLines(detail) {
     return lines;
   }
 
-  if (detail?.reportType === REPORT_TYPE.USER && targetUser?.email) {
-    lines.push(targetUser.email);
-  }
-
   if (shouldShowRelatedTargetField(detail?.reportType) && getRelatedTargetValue(detail)) {
     lines.push(getRelatedTargetValue(detail));
   }
@@ -386,50 +380,30 @@ function SkeletonRows() {
   );
 }
 
-function EvidenceImagesSection({ images, onPreview }) {
+function EvidenceImagesSection({ images }) {
+  const urls = (images || [])
+    .map((image) => resolveMediaUrl(image?.url))
+    .filter(Boolean);
+
   return (
     <div className="evidence-section">
       <div className="evidence-section-header">
         <h4>Hình ảnh bằng chứng</h4>
-        {images.length > 0 ? <span className="badge badge-info">{images.length} ảnh</span> : null}
+        {urls.length > 0 ? <span className="badge badge-info">{urls.length} ảnh</span> : null}
       </div>
-      {images.length > 0 ? (
-        <div className="evidence-thumbnail-grid">
-          {images.map((image, index) => {
-            const imageSrc = resolveMediaUrl(image.url);
-            return (
-            <button
-              key={image.id}
-              type="button"
-              className="evidence-thumbnail"
-              onClick={() => onPreview(imageSrc, index)}
-              aria-label={`Xem bằng chứng ${index + 1}`}
-            >
-              <img src={imageSrc} alt={`Bằng chứng ${index + 1}`} loading="lazy" />
-            </button>
-            );
-          })}
-        </div>
+      {urls.length > 0 ? (
+        <PreviewableImageGrid
+          items={urls}
+          width={120}
+          height={120}
+          shape="rounded"
+          className="evidence-thumbnail-grid previewable-image-grid"
+          getKey={(url, index) => images[index]?.id || `${url}-${index}`}
+          getAlt={(_, index) => `Bằng chứng ${index + 1}`}
+        />
       ) : (
         <div className="evidence-empty-box">Không có hình ảnh bằng chứng</div>
       )}
-    </div>
-  );
-}
-
-function ImagePreviewModal({ imageUrl, onClose }) {
-  if (!imageUrl) {
-    return null;
-  }
-
-  return (
-    <div className="image-preview-overlay" role="presentation" onClick={onClose}>
-      <div className="image-preview-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-        <button type="button" className="ghost-btn image-preview-close" onClick={onClose}>
-          Đóng
-        </button>
-        <img src={imageUrl} alt="Hình ảnh bằng chứng phóng to" className="image-preview-full" />
-      </div>
     </div>
   );
 }
@@ -458,7 +432,6 @@ function ReportDetailModal({
   const shop = detail?.shop;
   const product = detail?.product;
   const evidenceImages = detail?.evidenceImages || [];
-  const [previewImage, setPreviewImage] = useState('');
   const replyTemplates = showDismissOptions
     ? isAccountLockAppeal
       ? LOCK_APPEAL_DISMISS_TEMPLATES
@@ -471,14 +444,6 @@ function ReportDetailModal({
         ? SHOP_LOCK_APPEAL_APPROVE_TEMPLATES
         : APPROVE_REPLY_TEMPLATES;
   const composingReply = showApproveOptions || showDismissOptions;
-
-  function handlePreview(url) {
-    setPreviewImage(url);
-  }
-
-  function closePreview() {
-    setPreviewImage('');
-  }
 
   return (
     <div className="dialog-overlay" role="presentation" onClick={() => !actionLoading && onClose()}>
@@ -600,20 +565,20 @@ function ReportDetailModal({
                 </div>
 
                 <div className="report-evidence-block">
-                  <EvidenceImagesSection images={evidenceImages} onPreview={handlePreview} />
+                  <EvidenceImagesSection images={evidenceImages} />
                 </div>
 
-                {detail?.processedBy || detail?.processedAt ? (
+                {detail?.xuLyBoi || detail?.tgXuLy ? (
                   <dl className="detail-list report-process-meta">
-                    {detail?.processedBy ? (
+                    {detail?.xuLyBoi ? (
                       <div>
                         <dt>Người xử lý</dt>
-                        <dd>{detail.processedBy.fullName || detail.processedBy.userName || ''}</dd>
+                        <dd>{detail.xuLyBoi.fullName || detail.xuLyBoi.userName || ''}</dd>
                       </div>
                     ) : null}
                     <div>
                       <dt>Thời gian xử lý</dt>
-                      <dd>{formatDate(detail?.processedAt)}</dd>
+                      <dd>{formatDate(detail?.tgXuLy)}</dd>
                     </div>
                   </dl>
                 ) : null}
@@ -802,8 +767,6 @@ function ReportDetailModal({
           </div>
         )}
       </div>
-
-      <ImagePreviewModal imageUrl={previewImage} onClose={closePreview} />
     </div>
   );
 }
@@ -881,7 +844,7 @@ export default function ReportManagement() {
       return MEMBER_REPORT_TYPE_OPTIONS;
     }
     if (scopeFromUrl === 'product') {
-      return REPORT_TYPE_OPTIONS.filter((option) => !option.value || option.value === '4');
+      return REPORT_TYPE_OPTIONS.filter((option) => !option.value || option.value === '3');
     }
     return REPORT_TYPE_OPTIONS;
   }, [scopeFromUrl]);
@@ -1235,7 +1198,7 @@ export default function ReportManagement() {
                     </td>
                     <td>
                       <div className="account-secondary">Gửi: {formatDate(item.createdAt)}</div>
-                      <div className="account-secondary">Xử lý: {formatDate(item.processedAt)}</div>
+                      <div className="account-secondary">Xử lý: {formatDate(item.tgXuLy)}</div>
                     </td>
                     <td>
                       <TableIconActions

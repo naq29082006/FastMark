@@ -1,6 +1,5 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
   ActivityIndicator,
   Pressable,
   RefreshControl,
@@ -15,90 +14,20 @@ import { formatPrice } from '../../core/utils/productFormat';
 import { buyerTheme as t } from '../../core/theme/buyerTheme';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import SubScreenHeader from '../shared/components/SubScreenHeader';
-import { WALLET_TX_STATUS } from '../../model/walletModel';
 import { loadWalletViewModel } from '../../viewmodel/wallet/walletViewModel';
-import { useResourceSocket } from '../../hooks/useResourceSocket';
 import { isSameData, mergeListById } from '../../core/utils/realtimeList';
 import { showErrorAlert } from '../../core/utils/appAlert';
 import WalletTransactionDetailScreen from './WalletTransactionDetailScreen';
+import WalletTransactionRow from './WalletTransactionRow';
 
-function formatTxTime(value) {
-  if (!value) {
-    return '';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return date.toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
-}
-
-const TransactionRow = memo(function TransactionRow({ item, onPress }) {
-  const isCredit = item.isCredit;
-  const status = item.status;
-  const pending = status === WALLET_TX_STATUS.PENDING;
-  const success = status === WALLET_TX_STATUS.SUCCESS;
-  const cancelled = status === WALLET_TX_STATUS.CANCELLED;
-  const failed = status === WALLET_TX_STATUS.FAILED;
-  const statusText =
-    item.statusLabel ||
-    (pending
-      ? 'Đang chờ'
-      : success
-        ? 'Thành công'
-        : cancelled
-          ? 'Đã hủy'
-          : failed
-            ? 'Thất bại'
-            : '');
-
-  return (
-    <Pressable
-      onPress={() => onPress?.(item)}
-      style={({ pressed }) => [styles.txRow, pressed && styles.txRowPressed]}
-    >
-      <View style={[styles.txIcon, isCredit ? styles.txIconCredit : styles.txIconDebit]}>
-        <Ionicons
-          name={isCredit ? 'add' : 'remove'}
-          size={20}
-          color={isCredit ? t.primaryDark : t.danger}
-        />
-      </View>
-      <View style={styles.txBody}>
-        <Text style={styles.txTitle} numberOfLines={1}>
-          {item.description || item.typeLabel}
-        </Text>
-        <Text style={styles.txMeta}>{formatTxTime(item.createdAt)}</Text>
-        {statusText ? (
-          <Text
-            style={[
-              styles.txStatus,
-              pending && styles.txPending,
-              success && styles.txSuccess,
-              cancelled && styles.txCancelled,
-              failed && styles.txFailed,
-            ]}
-          >
-            {statusText}
-          </Text>
-        ) : null}
-      </View>
-      <Text style={[styles.txAmount, isCredit ? styles.txAmountPlus : styles.txAmountMinus]}>
-        {isCredit ? '+' : '-'}
-        {formatPrice(item.amount)}
-      </Text>
-      <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
-    </Pressable>
-  );
-});
-
-export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTransactions }) {
+export default function WalletScreen({
+  onBack,
+  onTopUp,
+  onWithdraw,
+  onSeeAllTransactions,
+  canWithdraw = true,
+  canTopUp = true,
+}) {
   const insets = useScreenInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,8 +38,16 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
   const load = useCallback(async ({ silent = false } = {}) => {
     try {
       const data = await loadWalletViewModel();
-      // Chỉ đổi state khi số dư/giao dịch thật sự khác → không nháy danh sách.
-      setWallet((current) => (isSameData(current, data.wallet) ? current : data.wallet));
+      const nextWallet = data.wallet;
+      setWallet((current) => {
+        if (
+          Number(current?.balance) === Number(nextWallet?.balance) &&
+          isSameData(current, nextWallet)
+        ) {
+          return current;
+        }
+        return nextWallet;
+      });
       setTransactions((current) => mergeListById(current, data.transactions || []));
     } catch (err) {
       if (!silent) {
@@ -128,23 +65,6 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
     load();
   }, [load]);
 
-  const handleWalletRealtime = useCallback(
-    (payload) => {
-      const type = String(payload?.type || '').trim();
-      if (type !== 'wallet' && type !== 'withdraw') {
-        return;
-      }
-      // Đồng bộ im lặng: giữ nguyên vị trí cuộn, chỉ dòng nào đổi mới render lại.
-      load({ silent: true });
-    },
-    [load]
-  );
-
-  useResourceSocket({
-    enabled: true,
-    onResourceUpdated: handleWalletRealtime,
-  });
-
   if (selectedTransaction) {
     return (
       <WalletTransactionDetailScreen
@@ -154,6 +74,9 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
       />
     );
   }
+
+  const showTopUp = canTopUp && Boolean(onTopUp);
+  const showWithdraw = canWithdraw && Boolean(onWithdraw);
 
   return (
     <View style={styles.screen}>
@@ -183,21 +106,25 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Tổng số dư</Text>
             <Text style={styles.balanceValue}>{formatPrice(wallet.balance)}</Text>
-            <View style={styles.actionRow}>
+            <View
+              style={[
+                styles.actionRow,
+                showTopUp && showWithdraw ? styles.actionRowSpread : styles.actionRowStart,
+              ]}
+            >
+              {showTopUp ? (
               <Pressable style={styles.actionItem} onPress={onTopUp}>
                 <View style={styles.actionBtn}>
                   <Ionicons name="add" size={22} color={t.primaryDark} />
                 </View>
                 <Text style={styles.actionLabel}>Nạp tiền</Text>
               </Pressable>
+              ) : null}
+              {showWithdraw ? (
               <Pressable
                 style={styles.actionItem}
                 onPress={() => {
-                  if (onWithdraw) {
-                    onWithdraw();
-                    return;
-                  }
-                  Alert.alert('Thông báo', 'Không mở được màn rút tiền.');
+                  onWithdraw();
                 }}
               >
                 <View style={styles.actionBtn}>
@@ -205,6 +132,7 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
                 </View>
                 <Text style={styles.actionLabel}>Rút tiền</Text>
               </Pressable>
+              ) : null}
             </View>
           </View>
 
@@ -222,7 +150,7 @@ export default function WalletScreen({ onBack, onTopUp, onWithdraw, onSeeAllTran
               transactions
                 .slice(0, 8)
                 .map((item) => (
-                  <TransactionRow
+                  <WalletTransactionRow
                     key={item.id}
                     item={item}
                     onPress={setSelectedTransaction}
@@ -254,7 +182,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 20,
   },
-  actionRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  actionRow: { flexDirection: 'row' },
+  actionRowSpread: { justifyContent: 'space-around' },
+  actionRowStart: { justifyContent: 'flex-start', gap: 28 },
   actionItem: { alignItems: 'center', gap: 8 },
   actionBtn: {
     width: 48,
@@ -285,34 +215,4 @@ const styles = StyleSheet.create({
     color: t.textMuted,
     fontWeight: '600',
   },
-  txRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: t.border,
-  },
-  txRowPressed: { backgroundColor: '#f8fafc' },
-  txIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  txIconCredit: { backgroundColor: t.primarySoft },
-  txIconDebit: { backgroundColor: t.dangerSoft },
-  txBody: { flex: 1, gap: 2 },
-  txTitle: { fontSize: 14, fontWeight: '700', color: t.text },
-  txMeta: { fontSize: 12, color: t.textMuted, fontWeight: '500' },
-  txStatus: { fontSize: 11, fontWeight: '700' },
-  txPending: { color: '#0284c7' },
-  txSuccess: { color: '#16a34a' },
-  txCancelled: { color: '#dc2626' },
-  txFailed: { color: '#dc2626' },
-  txAmount: { fontSize: 14, fontWeight: '800' },
-  txAmountPlus: { color: t.primary },
-  txAmountMinus: { color: t.danger },
 });

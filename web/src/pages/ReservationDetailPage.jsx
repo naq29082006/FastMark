@@ -5,24 +5,26 @@ import {
   getReservationDetail,
   refundReservation,
   releaseReservation,
+  cancelReservation,
 } from '../api/reservationAdminApi';
 import ReservationOrderProgress from '../components/admin/ReservationOrderProgress';
+import { useAdminTopbar } from '../admin/context/AdminTopbarContext';
 import { useAuth } from '../context/AuthContext';
 import { useAdminOrderSocket } from '../hooks/useAdminOrderSocket';
-import { goBackOr } from '../utils/navigation';
 import { formatDate, formatDateActivity, formatDateTimeDetail, formatPrice } from '../utils/format';
 import { formatReservationOrderCode } from '../utils/reservationOrderCode';
 import { keepIfSame } from '../utils/realtimeList';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import PreviewableImage, { PreviewableImageGrid } from '../components/PreviewableImage';
 import { resolveAdminListStatusMeta } from '../utils/reservationOrderTimeline';
-import { reverseGeocode } from '../utils/reverseGeocode';
+import { isActiveDisputeReservation, canAdminProcessReservationDispute } from '../utils/reservationDisputeState';
+import { getAdminDisputeNoteTemplates } from '../constants/adminDisputeTemplates';
 
 const AUDIT_ACTION_LABELS = {
   ADMIN_REFUND_BUYER: 'Hoàn cọc cho người mua',
   ADMIN_RELEASE_SELLER: 'Giải phóng cọc cho người bán',
+  ADMIN_REJECT_REPORT: 'Bác bỏ tranh chấp',
 };
-
-const DISPUTED_STATUS = 4;
 
 function resolveListStatusMeta(reservation) {
   return resolveAdminListStatusMeta(reservation);
@@ -31,84 +33,23 @@ function resolveListStatusMeta(reservation) {
 function DetailSkeleton() {
   return (
     <div className="reservation-order-layout">
-      <div className="skeleton skeleton-card reservation-order-header-card" />
-      <div className="reservation-order-cards">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="skeleton skeleton-card reservation-order-info-card" />
-        ))}
-      </div>
+      <div className="skeleton skeleton-card reservation-order-shell" />
     </div>
-  );
-}
-
-function DisputeGpsBlock({ latitude, longitude, storedAddress }) {
-  const [resolvedAddress, setResolvedAddress] = useState(storedAddress || '');
-
-  useEffect(() => {
-    setResolvedAddress(storedAddress || '');
-    if (storedAddress || latitude == null || longitude == null) {
-      return undefined;
-    }
-    let cancelled = false;
-    (async () => {
-      const label = await reverseGeocode(latitude, longitude);
-      if (!cancelled && label) {
-        setResolvedAddress(label);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [latitude, longitude, storedAddress]);
-
-  return (
-    <>
-      <p className="cell-sub">
-        GPS:{' '}
-        {latitude != null && longitude != null ? (
-          <a
-            className="link-btn"
-            href={`https://www.google.com/maps?q=${latitude},${longitude}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}
-          </a>
-        ) : (
-          ''
-        )}
-      </p>
-      {resolvedAddress ? (
-        <p className="cell-sub dispute-report-address">
-          Địa chỉ:{' '}
-          {latitude != null && longitude != null ? (
-            <a
-              className="link-btn"
-              href={`https://www.google.com/maps?q=${latitude},${longitude}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {resolvedAddress}
-            </a>
-          ) : (
-            resolvedAddress
-          )}
-        </p>
-      ) : latitude != null && longitude != null ? (
-        <p className="cell-sub muted">Đang lấy địa chỉ…</p>
-      ) : null}
-    </>
   );
 }
 
 function PartyAvatar({ src, fallback }) {
-  if (src) {
-    return <img src={src} alt="" className="reservation-party-avatar" />;
-  }
   return (
-    <div className="reservation-party-avatar reservation-party-avatar--fallback">
-      {String(fallback || '?').charAt(0).toUpperCase()}
-    </div>
+    <PreviewableImage
+      src={src}
+      alt={fallback || ''}
+      width={48}
+      height={48}
+      shape="circle"
+      className="reservation-party-avatar"
+      fallbackLetter={fallback || '?'}
+      fallbackClassName="reservation-party-avatar reservation-party-avatar--fallback"
+    />
   );
 }
 
@@ -134,7 +75,7 @@ function resolveOriginalUnitPrice(reservation) {
   return 0;
 }
 
-function resolveDiscountPercent(originalPrice, unitPrice) {
+function resolvePtGiam(originalPrice, unitPrice) {
   if (!originalPrice || originalPrice <= unitPrice) {
     return 0;
   }
@@ -166,7 +107,14 @@ function OrderProductLine({ product, variant, quantity, unitPrice, originalUnitP
   return (
     <div className="reservation-order-product-line">
       {thumb ? (
-        <img src={thumb} alt="" className="reservation-order-product-thumb" />
+        <PreviewableImage
+          src={thumb}
+          alt={productName}
+          width={40}
+          height={40}
+          shape="rounded"
+          className="reservation-order-product-thumb"
+        />
       ) : (
         <span className="reservation-order-product-thumb reservation-order-product-thumb--placeholder">SP</span>
       )}
@@ -200,38 +148,132 @@ function OrderProductLine({ product, variant, quantity, unitPrice, originalUnitP
   );
 }
 
-function DisputeResolutionModal({ mode, note, loading, onChangeNote, onClose, onConfirm }) {
-  const isRefund = mode === 'refund';
-  const title = isRefund ? 'Hoàn cọc cho người mua' : 'Giải phóng cọc cho người bán';
-  const description = isRefund
-    ? 'Tiền cọc sẽ hoàn về ví người mua. Nội dung bên dưới sẽ được gửi thông báo cho cả buyer và seller.'
-    : 'Tiền cọc sẽ chuyển vào ví người bán. Nội dung bên dưới sẽ được gửi thông báo cho cả buyer và seller.';
+function DisputeResolutionModal({
+  mode,
+  outcome = 'refund',
+  note,
+  loading,
+  onChangeOutcome,
+  onChangeNote,
+  onClose,
+  onConfirm,
+}) {
+  const isDispute = mode === 'dispute';
+  const effectiveMode = isDispute ? outcome : mode;
+  const configByMode = {
+    dispute: {
+      title: 'Xử lý tranh chấp',
+      description: null,
+    },
+    cancel: {
+      title: 'Admin hủy đơn',
+      description:
+        'Đơn sẽ chuyển sang đã hủy và tiền cọc (nếu có) sẽ được hoàn về ví người mua.',
+    },
+  };
+  const outcomeDescriptions = {
+    refund:
+      'Tiền cọc sẽ hoàn về ví người mua. Nội dung bên dưới sẽ được gửi thông báo cho cả buyer và seller.',
+    release:
+      'Tiền cọc sẽ chuyển vào ví người bán. Nội dung bên dưới sẽ được gửi thông báo cho cả buyer và seller.',
+  };
+  const config = configByMode[mode] || configByMode.dispute;
+  const description = isDispute ? outcomeDescriptions[outcome] : config.description;
+  const templates = getAdminDisputeNoteTemplates(effectiveMode);
   const trimmed = String(note || '').trim();
   const canSubmit = trimmed.length >= 5 && !loading;
 
+  function handleOutcomeChange(next) {
+    if (next === outcome) return;
+    onChangeOutcome(next);
+    onChangeNote('');
+  }
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+      <div className="modal-card dispute-resolution-modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
-          <h2>{title}</h2>
-          <p>{description}</p>
+          <h2>{config.title}</h2>
+          {description ? <p>{description}</p> : null}
         </div>
+        {isDispute ? (
+          <fieldset className="dispute-outcome-fieldset">
+            <legend>Quyết định xử lý cọc</legend>
+            <div className="dispute-outcome-options">
+              <label
+                className={`dispute-outcome-option dispute-outcome-option--refund${
+                  outcome === 'refund' ? ' is-active' : ''
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="dispute-outcome"
+                  value="refund"
+                  checked={outcome === 'refund'}
+                  disabled={loading}
+                  onChange={() => handleOutcomeChange('refund')}
+                />
+                <span className="dispute-outcome-option-body">
+                  <strong>Hoàn cọc cho người mua</strong>
+                  <span>Chuyển tiền cọc về ví buyer</span>
+                </span>
+              </label>
+              <label
+                className={`dispute-outcome-option dispute-outcome-option--release${
+                  outcome === 'release' ? ' is-active' : ''
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="dispute-outcome"
+                  value="release"
+                  checked={outcome === 'release'}
+                  disabled={loading}
+                  onChange={() => handleOutcomeChange('release')}
+                />
+                <span className="dispute-outcome-option-body">
+                  <strong>Giải phóng cọc cho người bán</strong>
+                  <span>Chuyển tiền cọc vào ví seller</span>
+                </span>
+              </label>
+            </div>
+            {description ? <p className="dispute-outcome-description">{description}</p> : null}
+          </fieldset>
+        ) : null}
+        {templates.length ? (
+          <div className="report-template-list">
+            <strong>Mẫu nội dung (chọn hoặc tự nhập)</strong>
+            <div className="report-template-chips">
+              {templates.map((template) => (
+                <button
+                  key={template}
+                  type="button"
+                  className={`report-template-chip${note === template ? ' is-active' : ''}`}
+                  disabled={loading}
+                  onClick={() => onChangeNote(template)}
+                >
+                  {template}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <label className="report-reply-field">
           <strong>Nội dung xử lý (bắt buộc)</strong>
           <textarea
             rows={5}
             value={note}
             onChange={(event) => onChangeNote(event.target.value)}
-            placeholder="Nhập nội dung gửi thông báo cho cả hai bên..."
+            placeholder="Chọn mẫu ở trên hoặc nhập nội dung gửi thông báo..."
           />
         </label>
-        <div className="report-action-row">
-          <button type="button" className="ghost-btn" disabled={loading} onClick={onClose}>
+        <div className="report-action-row dispute-modal-actions">
+          <button type="button" className="dispute-cancel-btn" disabled={loading} onClick={onClose}>
             Hủy
           </button>
           <button
             type="button"
-            className={isRefund ? 'danger-btn' : 'approve-btn'}
+            className="dispute-confirm-btn"
             disabled={!canSubmit}
             onClick={onConfirm}
           >
@@ -254,7 +296,18 @@ export default function ReservationDetailPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [resolutionModal, setResolutionModal] = useState('');
+  const [resolutionOutcome, setResolutionOutcome] = useState('refund');
   const [resolutionNote, setResolutionNote] = useState('');
+
+  const { setTrail, clearTrail } = useAdminTopbar();
+
+  const orderCode = formatReservationOrderCode(reservation);
+  const orderTrailLabel = reservation ? orderCode : loading ? '…' : 'Chi tiết';
+
+  useEffect(() => {
+    setTrail([{ label: 'Đơn hàng', to: '/reservations' }, { label: orderTrailLabel }]);
+    return () => clearTrail();
+  }, [orderTrailLabel, setTrail, clearTrail]);
 
   const loadDetail = useCallback(
     async ({ silent = false } = {}) => {
@@ -272,7 +325,7 @@ export default function ReservationDetailPage() {
         if (silent) {
           return;
         }
-        setError(loadError.message || 'Không tải được chi tiết đơn giữ hàng.');
+        setError(loadError.message || 'Không tải được chi tiết đơn hàng.');
         setReservation(null);
       } finally {
         if (!silent) {
@@ -312,6 +365,7 @@ export default function ReservationDetailPage() {
 
   function openResolutionModal(mode) {
     setResolutionModal(mode);
+    setResolutionOutcome('refund');
     setResolutionNote('');
     setError('');
   }
@@ -319,6 +373,7 @@ export default function ReservationDetailPage() {
   function closeResolutionModal() {
     if (actionLoading) return;
     setResolutionModal('');
+    setResolutionOutcome('refund');
     setResolutionNote('');
   }
 
@@ -330,20 +385,30 @@ export default function ReservationDetailPage() {
     }
 
     const mode = resolutionModal;
-    setActionLoading(mode);
+    const actionMode = mode === 'dispute' ? resolutionOutcome : mode;
+    setActionLoading(actionMode);
     setError('');
     try {
       const token = await getIdToken();
-      const payload =
-        mode === 'refund'
-          ? await refundReservation(token, reservationId, note)
-          : await releaseReservation(token, reservationId, note);
+      let payload;
+      if (actionMode === 'refund') {
+        payload = await refundReservation(token, reservationId, note);
+      } else if (actionMode === 'release') {
+        payload = await releaseReservation(token, reservationId, note);
+      } else if (actionMode === 'cancel') {
+        payload = await cancelReservation(token, reservationId, note);
+      }
       setReservation(payload.data?.reservation || null);
       setMessage(
         payload.message ||
-          (mode === 'refund' ? 'Đã hoàn cọc cho người mua.' : 'Đã giải phóng cọc cho người bán.')
+          (actionMode === 'refund'
+            ? 'Đã hoàn cọc cho người mua.'
+            : actionMode === 'release'
+              ? 'Đã giải phóng cọc cho người bán.'
+              : 'Đã hủy đơn giữ hàng.')
       );
       setResolutionModal('');
+      setResolutionOutcome('refund');
       setResolutionNote('');
     } catch (actionError) {
       setError(actionError.message || 'Không xử lý được tranh chấp.');
@@ -359,17 +424,18 @@ export default function ReservationDetailPage() {
   const buyerStats = reservation?.buyerStats;
   const sellerStats = reservation?.sellerStats || reservation?.shopStats;
   const auditLogs = reservation?.auditLogs || [];
-  const isDisputed = Number(reservation?.status) === DISPUTED_STATUS;
+  const isDisputed = isActiveDisputeReservation(reservation);
   const bothReported = Boolean(reservation?.disputeByBuyer) && Boolean(reservation?.disputeBySeller);
-  const canAdminProcessDispute = isDisputed && bothReported;
-  const singleSideDispute = isDisputed && !bothReported;
+  const isPostDeliveryDispute = Boolean(reservation?.isPostDeliveryDispute);
+  const canAdminProcessDispute = canAdminProcessReservationDispute(reservation);
+  const singleSideDispute = isDisputed && !bothReported && !canAdminProcessDispute;
+  const sellerResponse = reservation?.sellerResponse;
 
-  const orderCode = formatReservationOrderCode(reservation);
   const statusMeta = resolveListStatusMeta(reservation);
   const quantity = Number(reservation?.quantity) || 0;
   const unitPrice = resolveUnitPrice(reservation);
   const originalUnitPrice = resolveOriginalUnitPrice(reservation);
-  const discountPercent = resolveDiscountPercent(originalUnitPrice, unitPrice);
+  const discountPercent = resolvePtGiam(originalUnitPrice, unitPrice);
   const subtotal = unitPrice * quantity;
   const depositAmount = Number(reservation?.depositAmount) || 0;
   const cashDueOnPickup = Math.max(0, subtotal - depositAmount);
@@ -388,48 +454,17 @@ export default function ReservationDetailPage() {
     reservation?.disputedAt ||
     (Array.isArray(reservation?.disputeReports) && reservation.disputeReports.length > 0);
 
+  const showDisputeAuditSection = bothReported;
+  const showDisputeProcessAction = canAdminProcessDispute && bothReported;
+  const showPostDeliveryProcessAction = canAdminProcessDispute && !bothReported;
+  const orderStatus = Number(reservation?.status);
+  const canAdminCancelOrder =
+    reservation &&
+    !canAdminProcessDispute &&
+    (orderStatus === 0 || orderStatus === 1);
+
   return (
     <div className="admin-detail-page reservation-detail-page reservation-order-page">
-      <header className="admin-detail-toolbar reservation-order-toolbar no-print">
-        <button
-          type="button"
-          className="ghost-btn"
-          onClick={() => goBackOr(navigate, '/reservations')}
-        >
-          ← Quay lại
-        </button>
-        <div className="header-actions">
-          <button
-            type="button"
-            className="ghost-btn"
-            onClick={loadDetail}
-            disabled={loading || Boolean(actionLoading)}
-          >
-            Làm mới
-          </button>
-          {canAdminProcessDispute ? (
-            <>
-              <button
-                type="button"
-                className="danger-btn"
-                disabled={Boolean(actionLoading)}
-                onClick={() => openResolutionModal('refund')}
-              >
-                {actionLoading === 'refund' ? '...' : 'Hoàn cọc buyer'}
-              </button>
-              <button
-                type="button"
-                className="approve-btn"
-                disabled={Boolean(actionLoading)}
-                onClick={() => openResolutionModal('release')}
-              >
-                {actionLoading === 'release' ? '...' : 'Giải phóng seller'}
-              </button>
-            </>
-          ) : null}
-        </div>
-      </header>
-
       {error ? <p className="error-banner">{error}</p> : null}
       {message ? <div className="snackbar">{message}</div> : null}
 
@@ -437,23 +472,19 @@ export default function ReservationDetailPage() {
 
       {!loading && !reservation ? (
         <section className="table-card">
-          <p>Không tìm thấy đơn giữ hàng.</p>
-          <button
-            type="button"
-            className="ghost-btn"
-            onClick={() => goBackOr(navigate, '/reservations')}
-          >
-            Quay lại
-          </button>
+          <p>Không tìm thấy đơn hàng.</p>
+          <Link to="/reservations" className="link-btn">
+            Về danh sách đơn hàng
+          </Link>
         </section>
       ) : null}
 
       {!loading && reservation ? (
         <div className="reservation-order-layout">
-          <section className="reservation-order-header-card">
+          <section className="reservation-order-shell">
             <div className="reservation-order-header-main">
               <div className="reservation-order-header-copy">
-                <h1>Đơn hàng #{orderCode}</h1>
+                <h1>Đơn hàng: {orderCode}</h1>
                 <div className="reservation-order-header-meta">
                   <span>
                     <strong>Đặt lúc:</strong> {formatDateTimeDetail(reservation.createdAt)}
@@ -463,16 +494,30 @@ export default function ReservationDetailPage() {
                   </span>
                 </div>
               </div>
-              <span className={`reservation-order-header-status ${statusMeta.className}`}>
-                {statusMeta.label}
-              </span>
+              <div className="reservation-order-header-aside">
+                {canAdminCancelOrder ? (
+                  <div className="reservation-order-dispute-actions no-print">
+                    <button
+                      type="button"
+                      className="dispute-action-btn dispute-action-btn--refund"
+                      disabled={Boolean(actionLoading)}
+                      onClick={() => openResolutionModal('cancel')}
+                    >
+                      {actionLoading === 'cancel' ? '...' : 'Hủy đơn'}
+                    </button>
+                  </div>
+                ) : null}
+                <span className={`reservation-order-header-status ${statusMeta.className}`}>
+                  {statusMeta.label}
+                </span>
+              </div>
             </div>
             <ReservationOrderProgress reservation={reservation} />
-          </section>
 
-          <div className="reservation-order-cards">
-            <article className="reservation-order-info-card">
-              <h2>Thông tin đơn hàng</h2>
+            <div className="reservation-order-body">
+              <div className="reservation-order-overview">
+                <article className="reservation-order-panel reservation-order-panel--order">
+                  <h3 className="reservation-order-panel-title">Thông tin đơn hàng</h3>
 
               <OrderProductLine
                 product={product}
@@ -481,9 +526,11 @@ export default function ReservationDetailPage() {
                 unitPrice={unitPrice}
                 originalUnitPrice={originalUnitPrice}
                 discountPercent={discountPercent}
-                onOpenProduct={() =>
-                  navigate(`/products?search=${encodeURIComponent(product?.productName || '')}`)
-                }
+                onOpenProduct={() => {
+                  if (product?.id) {
+                    navigate(`/products/${product.id}`);
+                  }
+                }}
               />
 
               <div className="reservation-order-summary">
@@ -501,15 +548,70 @@ export default function ReservationDetailPage() {
                 ) : null}
               </div>
 
+              {Array.isArray(reservation.adjustments) && reservation.adjustments.length ? (
+                <div className="reservation-order-adjustments">
+                  <h3>Lịch sử thay đổi số lượng</h3>
+                  {(() => {
+                    const chronological = [...reservation.adjustments].sort(
+                      (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+                    );
+                    const first = chronological[0];
+                    const initialQty = Number(first?.oldQuantity) || 0;
+                    const initialUnit = Number(first?.giaCu) || 0;
+                    const initialTotal = Math.round(initialUnit * initialQty);
+                    const initialDeposit = Number(first?.cocCu) || 0;
+                    return (
+                      <>
+                        <div className="reservation-order-adjustment-item reservation-order-adjustment-initial">
+                          <strong>Ban đầu</strong>
+                          <span>Số lượng: {initialQty}</span>
+                          <span>Tổng tiền: {formatPrice(initialTotal)}</span>
+                          <span>Tiền cọc: {formatPrice(initialDeposit)}</span>
+                        </div>
+                        <div className="reservation-order-adjustments-list">
+                          {chronological.map((item, index) => {
+                            const depositRefund = Math.max(
+                              0,
+                              Math.round(Number(item.cocCu) || 0) -
+                                Math.round(Number(item.cocMoi) || 0)
+                            );
+                            return (
+                              <div
+                                key={item.id || item.createdAt}
+                                className="reservation-order-adjustment-item"
+                              >
+                                <strong>
+                                  Lần điều chỉnh
+                                  {chronological.length > 1 ? ` ${index + 1}` : ''}
+                                </strong>
+                                <span>
+                                  Số lượng: {item.oldQuantity} → {item.newQuantity}
+                                </span>
+                                {depositRefund > 0 ? (
+                                  <span className="reservation-order-adjustment-refund">
+                                    Hoàn cọc cho người mua: {formatPrice(depositRefund)}
+                                  </span>
+                                ) : null}
+                                <time>{formatDateTimeDetail(item.createdAt)}</time>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : null}
+
               <div className="reservation-order-total-row">
                 <span>Thanh toán khi nhận hàng</span>
                 <strong>{formatPrice(cashDueOnPickup)}</strong>
               </div>
-            </article>
+                </article>
 
-            <article className="reservation-order-info-card reservation-order-party-card">
-              <h2>Người mua</h2>
-              <div className="reservation-party-head">
+                <article className="reservation-order-panel reservation-order-panel--party">
+                  <h3 className="reservation-order-panel-title">Người mua</h3>
+                  <div className="reservation-party-head">
                 <PartyAvatar
                   src={buyer?.avatar}
                   fallback={buyer?.fullName || buyer?.userName || 'B'}
@@ -552,11 +654,11 @@ export default function ReservationDetailPage() {
                   <span>Đơn tranh chấp</span>
                 </div>
               </div>
-            </article>
+                </article>
 
-            <article className="reservation-order-info-card reservation-order-party-card">
-              <h2>Người bán</h2>
-              <div className="reservation-party-head">
+                <article className="reservation-order-panel reservation-order-panel--party">
+                  <h3 className="reservation-order-panel-title">Người bán</h3>
+                  <div className="reservation-party-head">
                 <PartyAvatar src={sellerAvatar} fallback={sellerNick || sellerName || 'S'} />
                 <div className="reservation-party-head-text">
                   <div className="reservation-party-name-row">
@@ -599,45 +701,68 @@ export default function ReservationDetailPage() {
                   <span>Đơn tranh chấp</span>
                 </div>
               </div>
-            </article>
-          </div>
+                </article>
+              </div>
 
-          {hasDisputeSection ? (
-            <section className="reservation-order-info-card reservation-order-dispute-card">
-              <h2>Tranh chấp</h2>
+              {hasDisputeSection ? (
+                <div className="reservation-order-body-block">
+                  <article className="reservation-order-panel reservation-order-panel--dispute">
+                    <h3 className="reservation-order-panel-title">Tranh chấp</h3>
 
-              {singleSideDispute ? (
+              {singleSideDispute && !isPostDeliveryDispute ? (
                 <p className="cell-sub reservation-dispute-hint">
                   Chỉ một bên đã báo cáo. Admin chỉ xử lý khi cả buyer và seller đều gửi báo cáo.
-                  Nếu sau 24 giờ kể từ giờ nhận hàng vẫn chỉ một bên báo cáo, hệ thống tự hoàn
+                  Nếu sau 48 giờ kể từ giờ nhận hàng vẫn chỉ một bên báo cáo, hệ thống tự hoàn
                   cọc cho bên đã báo cáo.
+                </p>
+              ) : null}
+
+              {singleSideDispute && isPostDeliveryDispute ? (
+                <p className="cell-sub reservation-dispute-hint">
+                  Khiếu nại sau khi nhận hàng. Shop có 2 ngày để phản hồi. Admin chỉ xử lý sau khi
+                  shop phản hồi hoặc hết thời hạn phản hồi.
                 </p>
               ) : null}
 
               {canAdminProcessDispute ? (
                 <p className="cell-sub reservation-dispute-hint">
-                  Cả hai bên đã báo cáo. Bạn có thể xử lý tranh chấp — bắt buộc nhập nội dung gửi
-                  thông báo cho buyer và seller.
+                  {isPostDeliveryDispute
+                    ? 'Shop đã phản hồi hoặc hết thời hạn phản hồi. Bạn có thể xử lý tranh chấp — bắt buộc nhập nội dung gửi thông báo cho buyer và seller.'
+                    : 'Cả hai bên đã báo cáo. Bạn có thể xử lý tranh chấp — bắt buộc nhập nội dung gửi thông báo cho buyer và seller.'}
                 </p>
+              ) : null}
+
+              {sellerResponse?.content ? (
+                <div className="dispute-report-card seller">
+                  <strong>Seller: Phản hồi khiếu nại</strong>
+                  <p>{sellerResponse.content}</p>
+                  <p className="cell-sub">
+                    {reservation.tgPhShop
+                      ? formatDate(reservation.tgPhShop)
+                      : ''}
+                  </p>
+                  {Array.isArray(sellerResponse.images) && sellerResponse.images.length ? (
+                    <PreviewableImageGrid
+                      className="dispute-report-images"
+                      items={sellerResponse.images}
+                      width={88}
+                      height={88}
+                      getSrc={(image) => image.imageUrl}
+                      getKey={(image) => image.id || image.imageUrl}
+                      getAlt={() => 'Phản hồi seller'}
+                    />
+                  ) : null}
+                </div>
               ) : null}
 
               {(reservation.disputeReports || []).map((report) => {
                 const isSellerReport = report.reporterSide === 'seller';
                 const title = isSellerReport
-                  ? report.sellerTitle || report.title || 'Báo cáo seller'
+                  ? report.title || report.reasonLabel || 'Báo cáo seller'
                   : report.title || report.reasonLabel || 'Báo cáo buyer';
                 const content = isSellerReport
                   ? report.sellerContent || report.content
                   : report.content;
-                const lat = isSellerReport
-                  ? report.sellerLatitude ?? report.latitude
-                  : report.latitude;
-                const lng = isSellerReport
-                  ? report.sellerLongitude ?? report.longitude
-                  : report.longitude;
-                const address = isSellerReport
-                  ? report.sellerAddress || report.address || ''
-                  : report.address || '';
                 return (
                   <div
                     key={report.id}
@@ -647,62 +772,87 @@ export default function ReservationDetailPage() {
                       {isSellerReport ? 'Seller' : 'Buyer'}: {title}
                     </strong>
                     <p>{content || ''}</p>
-                    <DisputeGpsBlock
-                      latitude={lat}
-                      longitude={lng}
-                      storedAddress={address}
-                    />
                     <p className="cell-sub">{formatDate(report.createdAt)}</p>
                     {Array.isArray(report.images) && report.images.length ? (
-                      <div className="dispute-report-images">
-                        {report.images.map((image) => (
-                          <a
-                            key={image.id || image.imageUrl}
-                            href={image.imageUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <img src={image.imageUrl} alt="evidence" />
-                          </a>
-                        ))}
-                      </div>
+                      <PreviewableImageGrid
+                        className="dispute-report-images"
+                        items={report.images}
+                        width={88}
+                        height={88}
+                        getSrc={(image) => image.imageUrl}
+                        getKey={(image) => image.id || image.imageUrl}
+                        getAlt={() => 'Bằng chứng'}
+                      />
                     ) : null}
                   </div>
                 );
               })}
-            </section>
-          ) : null}
 
-          <section className="table-card reservation-audit-card">
-            <h3>Nhật ký xử lý</h3>
-            {auditLogs.length === 0 ? (
-              <p className="cell-sub">Chưa có nhật ký xử lý.</p>
-            ) : (
-              <div className="table-scroll">
-                <table className="data-table catalog-table">
-                  <thead>
-                    <tr>
-                      <th>Thời gian</th>
-                      <th>Hành động</th>
-                      <th>Quyết định</th>
-                      <th>Ghi chú</th>
-                      <th>Admin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {auditLogs.map((log) => (
-                      <tr key={log.id}>
-                        <td>{formatDate(log.createdAt)}</td>
-                        <td>{AUDIT_ACTION_LABELS[log.action] || log.action || ''}</td>
-                        <td>{log.decision || ''}</td>
-                        <td>{log.note || ''}</td>
-                        <td>{log.adminId ? String(log.adminId).slice(-6) : ''}</td>
+              {showPostDeliveryProcessAction ? (
+                <div className="reservation-dispute-process-row no-print">
+                  <button
+                    type="button"
+                    className="dispute-action-btn dispute-action-btn--process"
+                    disabled={Boolean(actionLoading)}
+                    onClick={() => openResolutionModal('dispute')}
+                  >
+                    {actionLoading ? '...' : 'Xử lý'}
+                  </button>
+                </div>
+              ) : null}
+                  </article>
+                </div>
+              ) : null}
+
+              {showDisputeAuditSection ? (
+                <div className="reservation-order-body-block">
+                  <article className="reservation-order-panel reservation-order-panel--audit">
+                    <h3 className="reservation-order-panel-title">Nhật ký xử lý</h3>
+              {auditLogs.length === 0 ? (
+                <p className="cell-sub">Chưa có nhật ký xử lý.</p>
+              ) : (
+                <div className="table-scroll">
+                  <table className="data-table catalog-table">
+                    <thead>
+                      <tr>
+                        <th>Thời gian</th>
+                        <th>Hành động</th>
+                        <th>Quyết định</th>
+                        <th>Ghi chú</th>
+                        <th>Admin</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {auditLogs.map((log) => (
+                        <tr key={log.id}>
+                          <td>{formatDate(log.createdAt)}</td>
+                          <td>{AUDIT_ACTION_LABELS[log.action] || log.action || ''}</td>
+                          <td>{log.decision || ''}</td>
+                          <td>{log.note || ''}</td>
+                          <td>{log.adminId ? String(log.adminId).slice(-6) : ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {showDisputeProcessAction ? (
+                <div className="reservation-dispute-process-row no-print">
+                  <button
+                    type="button"
+                    className="dispute-action-btn dispute-action-btn--process"
+                    disabled={Boolean(actionLoading)}
+                    onClick={() => openResolutionModal('dispute')}
+                  >
+                    {actionLoading ? '...' : 'Xử lý'}
+                  </button>
+                </div>
+              ) : null}
+                  </article>
+                </div>
+              ) : null}
+            </div>
           </section>
         </div>
       ) : null}
@@ -710,8 +860,10 @@ export default function ReservationDetailPage() {
       {resolutionModal ? (
         <DisputeResolutionModal
           mode={resolutionModal}
+          outcome={resolutionOutcome}
           note={resolutionNote}
           loading={Boolean(actionLoading)}
+          onChangeOutcome={setResolutionOutcome}
           onChangeNote={setResolutionNote}
           onClose={closeResolutionModal}
           onConfirm={handleConfirmResolution}

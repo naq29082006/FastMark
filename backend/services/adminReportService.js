@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Report = require("../models/Report");
-const ReportImage = require("../models/ReportImage");
 const Review = require("../models/Review");
 const Product = require("../models/Product");
 const ShopProfile = require("../models/ShopProfile");
@@ -10,7 +9,6 @@ const {
   REPORT_STATUS_LABELS,
   REPORT_TYPE,
   REPORT_TYPE_LABELS,
-  RESERVATION_REPORT_TYPES,
   CONTENT_REPORT_TYPES,
   PRODUCT_STATUS,
   SHOP_STATUS,
@@ -20,15 +18,24 @@ const {
   USER_ROLE,
 } = require("../constants");
 const { resolveMediaUrl } = require("../utils/resolveMediaUrl");
+const { normalizeEmbeddedImages } = require("../utils/embeddedImages");
 const { createNotification } = require("./notificationService");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
 const { notifyReviewerReviewModerated } = require("./adminReviewService");
+const {
+  isReviewSoftDeleted,
+  isReviewHidden,
+  markReviewAdminHidden,
+  markReviewAdminDeleted,
+  toAdminReviewRemovalFields,
+} = require("../utils/reviewRemoval");
 const { blockAccount, unblockAccount } = require("./adminAccountService");
 const { setShopStatus } = require("./adminCatalogService");
-const { isLegacyShopLockAppealReport } = require("./reportService");
+const { isLegacyShopLockAppealReport } = require("./lockAppealService");
 const {
   resolveShopDisplayName,
   resolveShopUsername,
+  resolveShopAvatar,
 } = require("../utils/shopIdentity");
 const { buildSearchRegex } = require("../utils/searchText");
 const {
@@ -38,44 +45,54 @@ const {
   appendUniqueOrConditions,
 } = require("../utils/adminSearchHelpers");
 const { applyCreatedAtRange } = require("../utils/dateRangeFilter");
+const {
+  resolveReportTypeLabel,
+  resolveReportTypeLabelForReport,
+  resolveCanonicalReportType,
+  isReservationDisputeReportType,
+  isContentTargetReportType,
+  isOrderLinkedReport,
+  mongoExcludeOrderLinkedReportsCondition,
+  normalizeReportType,
+} = require("../utils/reportType");
 
 const SEED_DEMO_TAG = "seed-report-demo";
+const LEGACY_REPORT_TYPES = [8, 9, 10, 11];
+const ADMIN_REPORT_TYPES = [...CONTENT_REPORT_TYPES, ...LEGACY_REPORT_TYPES];
 
 const MEMBER_REPORT_TYPES = [
-  REPORT_TYPE.USER,
   REPORT_TYPE.SHOP,
   REPORT_TYPE.ACCOUNT_LOCK_APPEAL,
   REPORT_TYPE.SHOP_LOCK_APPEAL,
 ];
 
 function isAccountLockAppealReport(report) {
-  return Number(report?.reportType) === REPORT_TYPE.ACCOUNT_LOCK_APPEAL;
+  return normalizeReportType(report?.reportType) === REPORT_TYPE.ACCOUNT_LOCK_APPEAL;
 }
 
 function isShopLockAppealReport(report) {
-  if (Number(report?.reportType) === REPORT_TYPE.SHOP_LOCK_APPEAL) {
+  if (normalizeReportType(report?.reportType) === REPORT_TYPE.SHOP_LOCK_APPEAL) {
     return true;
   }
   return isLegacyShopLockAppealReport(report);
 }
 
 function isReservationDisputeReport(report) {
-  const type = Number(report?.reportType);
-  if (
-    [REPORT_TYPE.BUYER_NO_SHOW, REPORT_TYPE.SELLER_NO_SHOW, REPORT_TYPE.PRODUCT_ISSUE].includes(
-      type
-    )
-  ) {
-    return true;
-  }
-  return type === REPORT_TYPE.OTHER && Boolean(report?.reservationId);
+  return isReservationDisputeReportType(report);
 }
 
-function resolveReportTypeLabel(report) {
-  if (isShopLockAppealReport(report)) {
-    return REPORT_TYPE_LABELS[REPORT_TYPE.SHOP_LOCK_APPEAL];
+function resolveReportTargetIds(report, targetContext) {
+  const productId = report.productId ? String(report.productId) : "";
+  let shopId = report.shopId ? String(report.shopId) : "";
+
+  if (!shopId && productId && targetContext) {
+    const product = targetContext.productById.get(productId);
+    if (product?.ShopId) {
+      shopId = String(product.ShopId);
+    }
   }
-  return REPORT_TYPE_LABELS[report.reportType] || "Không rõ";
+
+  return { productId, shopId };
 }
 
 async function resolveShopIdForShopLockAppeal(report) {
@@ -118,16 +135,13 @@ async function loadReportTargetContext(reports) {
   const reviewIds = [
     ...new Set(reports.map((report) => pickString(report.reviewId)).filter(Boolean)),
   ];
-  const targetUserIds = [
-    ...new Set(reports.map((report) => report.targetUserId).filter(Boolean).map(String)),
-  ];
   const directShopIds = [
     ...new Set(reports.map((report) => report.shopId).filter(Boolean).map(String)),
   ];
 
-  const [products, reviews, sellerShops] = await Promise.all([
+  const [products, reviews] = await Promise.all([
     productIds.length
-      ? Product.find({ _id: { $in: productIds } }).select("ProductName ShopId").lean()
+      ? Product.find({ _id: { $in: productIds } }).select("ProductName ShopId images").lean()
       : [],
     reviewIds.length
       ? Review.find({
@@ -138,9 +152,6 @@ async function loadReportTargetContext(reports) {
               : []),
           ],
         }).lean()
-      : [],
-    targetUserIds.length
-      ? ShopProfile.find({ userId: { $in: targetUserIds } }).select("shopName description userId").lean()
       : [],
   ]);
 
@@ -160,6 +171,9 @@ async function loadReportTargetContext(reports) {
     }
   });
   reviews.forEach((review) => {
+    if (review.shopId) {
+      shopIdSet.add(String(review.shopId));
+    }
     if (review.storeId) {
       shopIdSet.add(String(review.storeId));
     }
@@ -178,52 +192,40 @@ async function loadReportTargetContext(reports) {
 
   const linkedShops = shopQuery.length
     ? await ShopProfile.find({ $or: shopQuery })
-        .select("shopName description externalRestaurantId userId")
+        .select("shopName shopUsername avatar description externalRestaurantId userId addressHeThong DiaChiHeThong address phone")
         .lean()
     : [];
 
-  const allShops = [...linkedShops, ...sellerShops];
   const ownerIds = [
-    ...new Set(
-      [
-        ...targetUserIds,
-        ...allShops.map((shop) => (shop.userId ? String(shop.userId) : "")),
-      ].filter(Boolean)
-    ),
+    ...new Set(linkedShops.map((shop) => (shop.userId ? String(shop.userId) : "")).filter(Boolean)),
   ];
   const owners = ownerIds.length
-    ? await User.find({ _id: { $in: ownerIds } }).select("FullName UserName").lean()
+    ? await User.find({ _id: { $in: ownerIds } }).select("FullName UserName Email Avatar").lean()
     : [];
   const ownerById = new Map(owners.map((owner) => [String(owner._id), owner]));
 
   const shopNameById = new Map();
   const shopNameByExternalId = new Map();
-  const shopNameByUserId = new Map();
+  const shopOwnerByShopId = new Map();
+  const shopById = new Map();
+  const shopByExternalId = new Map();
 
-  allShops.forEach((shop) => {
+  linkedShops.forEach((shop) => {
     const owner = shop.userId ? ownerById.get(String(shop.userId)) : null;
     const displayName = pickShopDisplayName(shop, owner);
-    if (!displayName) {
-      return;
-    }
-    shopNameById.set(String(shop._id), displayName);
+    const entry = { shop, owner };
+    shopById.set(String(shop._id), entry);
     if (shop.externalRestaurantId) {
-      shopNameByExternalId.set(String(shop.externalRestaurantId), displayName);
+      shopByExternalId.set(String(shop.externalRestaurantId), entry);
+    }
+    if (displayName) {
+      shopNameById.set(String(shop._id), displayName);
+      if (shop.externalRestaurantId) {
+        shopNameByExternalId.set(String(shop.externalRestaurantId), displayName);
+      }
     }
     if (shop.userId) {
-      shopNameByUserId.set(String(shop.userId), displayName);
-    }
-  });
-
-  // Báo cáo gắn targetUserId nhưng chưa có ShopProfile — vẫn dùng tên user.
-  targetUserIds.forEach((userId) => {
-    if (shopNameByUserId.has(userId)) {
-      return;
-    }
-    const owner = ownerById.get(userId);
-    const displayName = pickShopDisplayName(null, owner);
-    if (displayName) {
-      shopNameByUserId.set(userId, displayName);
+      shopOwnerByShopId.set(String(shop._id), String(shop.userId));
     }
   });
 
@@ -232,8 +234,51 @@ async function loadReportTargetContext(reports) {
     reviewByExternalId,
     shopNameById,
     shopNameByExternalId,
-    shopNameByUserId,
+    shopOwnerByShopId,
+    shopById,
+    shopByExternalId,
+    ownerById,
   };
+}
+
+function resolveShopEntryFromContext(storeId, context) {
+  if (!storeId || !context) {
+    return null;
+  }
+  const key = String(storeId);
+  return context.shopById.get(key) || context.shopByExternalId.get(key) || null;
+}
+
+function resolveTargetOwnerFromContext(report, context) {
+  if (report.shopId) {
+    const ownerId = context.shopOwnerByShopId.get(String(report.shopId));
+    if (ownerId) {
+      return context.ownerById.get(String(ownerId)) || null;
+    }
+  }
+
+  if (report.productId) {
+    const product = context.productById.get(String(report.productId));
+    if (product?.ShopId) {
+      const ownerId = context.shopOwnerByShopId.get(String(product.ShopId));
+      if (ownerId) {
+        return context.ownerById.get(String(ownerId)) || null;
+      }
+    }
+  }
+
+  if (report.reviewId) {
+    const review = context.reviewByExternalId.get(pickString(report.reviewId));
+    const shopId = review?.shopId || review?.storeId;
+    if (shopId) {
+      const ownerId = context.shopOwnerByShopId.get(String(shopId));
+      if (ownerId) {
+        return context.ownerById.get(String(ownerId)) || null;
+      }
+    }
+  }
+
+  return null;
 }
 
 function resolveShopNameFromStoreId(storeId, context) {
@@ -269,13 +314,10 @@ function resolveReportTargetNames(report, context) {
 
   if (!targetShopName && report.reviewId) {
     const review = context.reviewByExternalId.get(pickString(report.reviewId));
-    if (review?.storeId) {
-      targetShopName = resolveShopNameFromStoreId(review.storeId, context);
+    const shopId = review?.shopId || review?.storeId;
+    if (shopId) {
+      targetShopName = resolveShopNameFromStoreId(shopId, context);
     }
-  }
-
-  if (!targetShopName && report.targetUserId) {
-    targetShopName = context.shopNameByUserId.get(String(report.targetUserId)) || "";
   }
 
   return {
@@ -308,11 +350,21 @@ function toShopDetailSummary(shop, owner = null) {
   return {
     id: String(shop._id),
     name: pickShopDisplayName(shop, owner),
+    shopUsername: resolveShopUsername(shop, owner),
+    avatar: resolveShopAvatar(shop, owner),
     description: pickString(shop.description),
     address: pickString(shop.addressHeThong) || pickString(shop.DiaChiHeThong) || pickString(shop.address),
     phone: pickString(shop.phone),
     userId: shop.userId ? String(shop.userId) : "",
   };
+}
+
+function resolveProductImage(product) {
+  if (!product) {
+    return "";
+  }
+  const images = normalizeEmbeddedImages(product.images || []);
+  return images[0] ? String(images[0]) : "";
 }
 
 function toProductDetailSummary(product, shopName = "") {
@@ -323,24 +375,25 @@ function toProductDetailSummary(product, shopName = "") {
   return {
     id: String(product._id),
     name: pickString(product.ProductName),
+    image: resolveProductImage(product),
     description: pickString(product.Description),
     shopName,
   };
 }
 
 function buildTargetSubjectLabel({ report, targetNames, targetUser, shop, product }) {
-  if (report.reportType === REPORT_TYPE.PRODUCT) {
-    const productName = product?.name || targetNames.targetProductName;
-    if (productName) {
-      return `Sản phẩm: ${productName}`;
-    }
+  const type = resolveCanonicalReportType(report);
+  const productName = product?.name || targetNames.targetProductName;
+  if (productName && (type === REPORT_TYPE.PRODUCT || report.productId)) {
+    return `Sản phẩm: ${productName}`;
   }
 
-  if ([REPORT_TYPE.SHOP, REPORT_TYPE.REVIEW].includes(report.reportType) || shop?.name) {
-    const shopName = shop?.name || targetNames.targetShopName;
-    if (shopName) {
-      return `Gian hàng: ${shopName}`;
-    }
+  const shopName = shop?.name || targetNames.targetShopName;
+  if (
+    shopName &&
+    ([REPORT_TYPE.SHOP, REPORT_TYPE.REVIEW].includes(type) || report.shopId || shop?.id)
+  ) {
+    return `Gian hàng: ${shopName}`;
   }
 
   if (targetUser) {
@@ -365,8 +418,7 @@ function toReviewSummary(review) {
     rating: review.rating,
     comment: review.comment || "",
     imageUrl: review.imageUrl || "",
-    isHidden: Boolean(review.isHidden),
-    isDeleted: Boolean(review.isDeleted),
+    ...toAdminReviewRemovalFields(review),
     createdAt: review.CreatedAt || null,
   };
 }
@@ -383,18 +435,58 @@ async function findReviewForReport(report) {
     }
   }
 
-  if (report.reportType === REPORT_TYPE.REVIEW && report.content) {
+  if (normalizeReportType(report.reportType) === REPORT_TYPE.REVIEW && report.content) {
     return Review.findOne({ comment: report.content }).sort({ CreatedAt: -1 }).lean();
   }
 
   return null;
 }
 
-function toReportListItem(report, reporter, targetUser, targetNames = {}) {
+function toReportListItem(report, reporter, targetUser, targetNames = {}, targetContext = null) {
+  const { productId, shopId } = resolveReportTargetIds(report, targetContext);
+  const productDoc =
+    productId && targetContext ? targetContext.productById.get(productId) : null;
+  const shopEntry = shopId ? resolveShopEntryFromContext(shopId, targetContext) : null;
+  const productShopEntry =
+    productDoc?.ShopId && targetContext
+      ? resolveShopEntryFromContext(productDoc.ShopId, targetContext)
+      : shopEntry;
+  const productShopName = productShopEntry
+    ? pickShopDisplayName(productShopEntry.shop, productShopEntry.owner)
+    : targetNames.targetShopName;
+  const shop = shopEntry
+    ? toShopDetailSummary(shopEntry.shop, shopEntry.owner)
+    : targetNames.targetShopName
+      ? {
+          id: shopId,
+          name: targetNames.targetShopName,
+          shopUsername: "",
+          avatar: resolveShopAvatar(null, targetUser),
+        }
+      : null;
+  const product = productDoc
+    ? toProductDetailSummary(productDoc, productShopName)
+    : targetNames.targetProductName
+      ? {
+          id: productId,
+          name: targetNames.targetProductName,
+          image: "",
+          shopName: targetNames.targetShopName,
+        }
+      : null;
+  const targetSubjectLabel = buildTargetSubjectLabel({
+    report,
+    targetNames,
+    targetUser,
+    shop,
+    product,
+  });
+
   return {
     id: String(report._id),
-    reportType: report.reportType,
-    reportTypeLabel: resolveReportTypeLabel(report),
+    reportType: resolveCanonicalReportType(report),
+    reportTypeStored: report.reportType,
+    reportTypeLabel: resolveReportTypeLabelForReport(report),
     title: report.title || "",
     content: report.content || "",
     description: report.content || report.description || "",
@@ -406,12 +498,17 @@ function toReportListItem(report, reporter, targetUser, targetNames = {}) {
     reasonLabel: report.title || "Không rõ",
     reporter: toReporterSummary(reporter),
     targetUser: toReporterSummary(targetUser),
+    productId,
+    shopId,
+    product,
+    shop,
+    targetSubjectLabel,
     targetProductName: targetNames.targetProductName || "",
     targetShopName: targetNames.targetShopName || "",
     target_product_name: targetNames.target_product_name || "",
     target_shop_name: targetNames.target_shop_name || "",
     createdAt: report.CreatedAt || null,
-    processedAt: report.processedAt || null,
+    tgXuLy: report.tgXuLy || null,
   };
 }
 
@@ -440,10 +537,10 @@ async function buildReportFilter({ search, reportType, status, scope, productId,
       } else {
         filter.reportType = { $in: MEMBER_REPORT_TYPES };
       }
-    } else if (normalizedType !== "" && CONTENT_REPORT_TYPES.includes(Number(normalizedType))) {
+    } else if (normalizedType !== "" && ADMIN_REPORT_TYPES.includes(Number(normalizedType))) {
       filter.reportType = Number(normalizedType);
     } else {
-      filter.reportType = { $in: CONTENT_REPORT_TYPES };
+      filter.reportType = { $in: ADMIN_REPORT_TYPES };
     }
   } else if (normalizedType !== "" && Number.isFinite(Number(normalizedType))) {
     filter.reportType = Number(normalizedType);
@@ -469,11 +566,15 @@ async function buildReportFilter({ search, reportType, status, scope, productId,
     if (regex) {
       const matchedUsers = await findUsersBySearchRegex(User, regex);
       const userIds = matchedUsers.map((user) => user._id);
+      const matchedShopIds = userIds.length
+        ? await ShopProfile.find({ userId: { $in: userIds } }).distinct("_id")
+        : [];
 
       orConditions.push(
         { title: regex },
         { content: regex },
-        ...(userIds.length ? [{ userId: { $in: userIds } }, { targetUserId: { $in: userIds } }] : [])
+        ...(userIds.length ? [{ userId: { $in: userIds } }] : []),
+        ...(matchedShopIds.length ? [{ shopId: { $in: matchedShopIds } }] : [])
       );
     }
 
@@ -488,12 +589,47 @@ async function buildReportFilter({ search, reportType, status, scope, productId,
 
   applyCreatedAtRange(filter, { from, to });
 
+  if (!hasProductScope) {
+    return {
+      $and: [filter, mongoExcludeOrderLinkedReportsCondition()],
+    };
+  }
+
   return filter;
 }
 
 function buildDatabaseQuery(filter) {
   return {
     $and: [filter, { content: { $not: new RegExp(SEED_DEMO_TAG, "i") } }],
+  };
+}
+
+async function summarizeReportsByStatus(filter) {
+  const rows = await Report.aggregate([
+    { $match: filter },
+    { $group: { _id: "$status", count: { $sum: 1 } } },
+  ]);
+
+  let pending = 0;
+  let processed = 0;
+  let rejected = 0;
+
+  for (const row of rows) {
+    const count = Number(row.count) || 0;
+    if (row._id === REPORT_STATUS.PENDING) {
+      pending = count;
+    } else if (row._id === REPORT_STATUS.PROCESSED) {
+      processed = count;
+    } else if (row._id === REPORT_STATUS.REJECTED) {
+      rejected = count;
+    }
+  }
+
+  return {
+    total: pending + processed + rejected,
+    pending,
+    processed,
+    rejected,
   };
 }
 
@@ -511,39 +647,40 @@ async function listReports({
   const currentPage = Math.max(1, Number(page) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(limit) || 20));
   const skip = (currentPage - 1) * pageSize;
-  const filter = buildDatabaseQuery(
+  const listFilter = buildDatabaseQuery(
     await buildReportFilter({ search, reportType, status, scope, productId, from, to })
   );
+  const statsFilter = buildDatabaseQuery(
+    await buildReportFilter({ search, reportType, status: "", scope, productId, from, to })
+  );
 
-  const [reports, total] = await Promise.all([
-    Report.find(filter).sort({ CreatedAt: -1 }).skip(skip).limit(pageSize).lean(),
-    Report.countDocuments(filter),
+  const [reports, total, stats] = await Promise.all([
+    Report.find(listFilter).sort({ CreatedAt: -1 }).skip(skip).limit(pageSize).lean(),
+    Report.countDocuments(listFilter),
+    summarizeReportsByStatus(statsFilter),
   ]);
 
-  const userIds = [
-    ...new Set(
-      reports
-        .flatMap((report) => [report.userId, report.targetUserId])
-        .filter(Boolean)
-        .map(String)
-    ),
-  ];
-
-  const [users, targetContext] = await Promise.all([
-    userIds.length ? User.find({ _id: { $in: userIds } }).lean() : [],
+  const [targetContext, reporterUsers] = await Promise.all([
     loadReportTargetContext(reports),
+    User.find({
+      _id: {
+        $in: [...new Set(reports.map((report) => report.userId).filter(Boolean).map(String))],
+      },
+    }).lean(),
   ]);
-  const userById = new Map(users.map((user) => [String(user._id), user]));
+  const reporterById = new Map(reporterUsers.map((user) => [String(user._id), user]));
 
   return {
     items: reports.map((report) =>
       toReportListItem(
         report,
-        userById.get(String(report.userId)),
-        userById.get(String(report.targetUserId)),
-        resolveReportTargetNames(report, targetContext)
+        reporterById.get(String(report.userId)),
+        resolveTargetOwnerFromContext(report, targetContext),
+        resolveReportTargetNames(report, targetContext),
+        targetContext
       )
     ),
+    stats,
     pagination: {
       page: currentPage,
       limit: pageSize,
@@ -558,10 +695,6 @@ async function listReports({
 }
 
 async function resolveReportTargetUser(report) {
-  if (report.targetUserId) {
-    return User.findById(report.targetUserId);
-  }
-
   if (report.shopId) {
     const shop = await ShopProfile.findById(report.shopId).lean();
     if (shop?.userId) {
@@ -588,18 +721,26 @@ async function getReportDetail(reportId) {
     throw createServiceError("Không tìm thấy báo cáo.", 404);
   }
 
-  const [reporter, images, review, targetContext, shopDoc, productDoc, processedByUser] =
+  if (isOrderLinkedReport(report)) {
+    throw createServiceError(
+      "Đây là tranh chấp đơn hàng — xử lý tại chi tiết đơn hàng (Tranh chấp).",
+      404
+    );
+  }
+
+  const [reporter, review, targetContext, shopDoc, productDoc, xuLyBoiUser] =
     await Promise.all([
       report.userId ? User.findById(report.userId).lean() : null,
-      ReportImage.find({ reportId: report._id }).sort({ CreatedAt: 1 }).lean(),
-      report.reviewId || report.reportType === REPORT_TYPE.REVIEW
+      report.reviewId || normalizeReportType(report.reportType) === REPORT_TYPE.REVIEW
         ? findReviewForReport(report)
         : null,
       loadReportTargetContext([report]),
       report.shopId ? ShopProfile.findById(report.shopId).lean() : null,
       report.productId ? Product.findById(report.productId).lean() : null,
-      report.processedBy ? User.findById(report.processedBy).lean() : null,
+      report.xuLyBoi ? User.findById(report.xuLyBoi).lean() : null,
     ]);
+
+  const images = normalizeEmbeddedImages(report.images || []);
 
   let resolvedShopDoc = shopDoc;
   if (!resolvedShopDoc && productDoc?.ShopId) {
@@ -626,15 +767,16 @@ async function getReportDetail(reportId) {
 
   return {
     id: String(report._id),
-    reportType: report.reportType,
-    reportTypeLabel: resolveReportTypeLabel(report),
+    reportType: resolveCanonicalReportType(report),
+    reportTypeStored: report.reportType,
+    reportTypeLabel: resolveReportTypeLabelForReport(report),
     title: report.title || "",
     content: report.content || "",
     description: report.content || report.description || "",
     reservationId: report.reservationId ? String(report.reservationId) : "",
     latitude: report.latitude == null ? null : Number(report.latitude),
     longitude: report.longitude == null ? null : Number(report.longitude),
-    adminDecision: report.adminDecision || "",
+    qdAdmin: report.qdAdmin || "",
     adminNote: report.adminNote || "",
     status: report.status,
     statusLabel: REPORT_STATUS_LABELS[report.status] || "Không rõ",
@@ -649,14 +791,14 @@ async function getReportDetail(reportId) {
     shop,
     product,
     review: toReviewSummary(review),
-    evidenceImages: images.map((image) => ({
-      id: String(image._id),
-      url: resolveMediaUrl(image.imageUrl || ""),
-      createdAt: image.CreatedAt || null,
+    evidenceImages: images.map((url, index) => ({
+      id: String(index),
+      url: resolveMediaUrl(url || ""),
+      createdAt: null,
     })),
-    processedBy: toReporterSummary(processedByUser),
+    xuLyBoi: toReporterSummary(xuLyBoiUser),
     createdAt: report.CreatedAt || null,
-    processedAt: report.processedAt || null,
+    tgXuLy: report.tgXuLy || null,
     meta: {
       dataSource: "mongodb",
       collection: "reports",
@@ -710,6 +852,12 @@ const DEFAULT_SHOP_LOCK_APPEAL_DISMISS_REPLY =
 
 async function dismissReport(adminUser, reportId, { replyMessage } = {}) {
   const report = await assertPendingReport(reportId);
+  if (isOrderLinkedReport(report)) {
+    throw createServiceError(
+      "Tranh chấp đơn hàng — xử lý tại chi tiết đơn hàng, không qua tab Khiếu nại.",
+      400
+    );
+  }
   const now = new Date();
   const isAccountLockAppeal = isAccountLockAppealReport(report);
   const isShopLockAppeal = isShopLockAppealReport(report);
@@ -722,10 +870,10 @@ async function dismissReport(adminUser, reportId, { replyMessage } = {}) {
         : DEFAULT_DISMISS_REPLY);
 
   report.status = REPORT_STATUS.REJECTED;
-  report.processedBy = adminUser._id;
-  report.processedAt = now;
+  report.xuLyBoi = adminUser._id;
+  report.tgXuLy = now;
   report.adminNote = message;
-  report.adminDecision = isAccountLockAppeal
+  report.qdAdmin = isAccountLockAppeal
     ? "reject-lock-appeal"
     : isShopLockAppeal
       ? "reject-shop-lock-appeal"
@@ -751,7 +899,7 @@ async function dismissReport(adminUser, reportId, { replyMessage } = {}) {
 }
 
 async function applyReviewAction(report, action) {
-  if (report.reportType !== REPORT_TYPE.REVIEW) {
+  if (normalizeReportType(report.reportType) !== REPORT_TYPE.REVIEW) {
     return null;
   }
 
@@ -765,15 +913,14 @@ async function applyReviewAction(report, action) {
     throw createServiceError("Không tìm thấy đánh giá liên quan.", 404);
   }
 
-  const wasHidden = Boolean(review.isHidden);
-  const wasDeleted = Boolean(review.isDeleted);
+  const wasHidden = isReviewHidden(review);
+  const wasDeleted = isReviewSoftDeleted(review);
+  const reason = pickString(report.adminNote || report.note || report.content) || "Vi phạm nội dung";
 
   if (action === "hide") {
-    review.isHidden = true;
+    markReviewAdminHidden(review, reason);
   } else if (action === "delete") {
-    review.isDeleted = true;
-    review.isHidden = true;
-    review.deletedAt = new Date();
+    markReviewAdminDeleted(review, reason);
   } else {
     throw createServiceError("Hành động xử lý không hợp lệ.", 400);
   }
@@ -781,9 +928,9 @@ async function applyReviewAction(report, action) {
   review.UpdatedAt = new Date();
   await review.save();
   if (action === "hide" && !wasHidden) {
-    await notifyReviewerReviewModerated(review, "hidden");
+    await notifyReviewerReviewModerated(review, "hidden", reason);
   } else if (action === "delete" && !wasDeleted) {
-    await notifyReviewerReviewModerated(review, "deleted");
+    await notifyReviewerReviewModerated(review, "deleted", reason);
   }
   return review;
 }
@@ -801,10 +948,6 @@ async function resolveReportedShop(report) {
     if (product?.ShopId) {
       return ShopProfile.findById(product.ShopId);
     }
-  }
-
-  if (report.targetUserId) {
-    return ShopProfile.findOne({ userId: report.targetUserId });
   }
 
   return null;
@@ -888,26 +1031,14 @@ async function applyShopAction(report, action, adminUser) {
   throw createServiceError("Hành động xử lý gian hàng không hợp lệ.", 400);
 }
 
-function isUserLikeReportType(reportType) {
-  return [REPORT_TYPE.USER, REPORT_TYPE.SHOP, REPORT_TYPE.PRODUCT].includes(reportType);
-}
-
 async function applyUserAction(report, action, adminUser) {
-  if (!isUserLikeReportType(report.reportType)) {
+  if (!isContentTargetReportType(report.reportType)) {
     return null;
   }
 
-  if (!report.targetUserId) {
-    const targetUser = await resolveReportTargetUser(report);
-    if (!targetUser) {
-      throw createServiceError("Không xác định được người dùng bị báo cáo.", 400);
-    }
-    report.targetUserId = targetUser._id;
-  }
-
-  const targetUser = await User.findById(report.targetUserId);
+  const targetUser = await resolveReportTargetUser(report);
   if (!targetUser) {
-    throw createServiceError("Không tìm thấy người dùng bị báo cáo.", 404);
+    throw createServiceError("Không xác định được chủ sở hữu bị báo cáo.", 400);
   }
 
   if (targetUser.Role === USER_ROLE.ADMIN) {
@@ -932,13 +1063,80 @@ async function applyUserAction(report, action, adminUser) {
   throw createServiceError("Hành động xử lý không hợp lệ.", 400);
 }
 
+async function applyProductAction(report, action) {
+  if (normalizeReportType(report.reportType) !== REPORT_TYPE.PRODUCT) {
+    return null;
+  }
+
+  const productId = report.productId;
+  if (!productId) {
+    throw createServiceError("Không tìm thấy sản phẩm bị báo cáo.", 404);
+  }
+
+  const adminCatalogService = require("./adminCatalogService");
+  const normalizedAction = String(action || "").trim().toLowerCase();
+
+  if (normalizedAction === "hide" || normalizedAction === "approve" || normalizedAction === "resolve") {
+    await adminCatalogService.setProductStatus(productId, PRODUCT_STATUS.HIDDEN);
+    return { action: "hide", productId };
+  }
+
+  if (normalizedAction === "delete") {
+    await adminCatalogService.deleteProduct(
+      productId,
+      pickString(report.adminNote || report.content) || "Vi phạm nội dung"
+    );
+    return { action: "delete", productId };
+  }
+
+  throw createServiceError("Hành động xử lý sản phẩm không hợp lệ.", 400);
+}
+
+async function applyContentReportEnforcement(adminUser, report, action) {
+  const normalizedType = normalizeReportType(report.reportType);
+  const normalizedAction = String(action || "").trim().toLowerCase() || "resolve";
+
+  if (normalizedType === REPORT_TYPE.REVIEW) {
+    const reviewAction =
+      normalizedAction === "approve" || normalizedAction === "resolve"
+        ? "hide"
+        : normalizedAction;
+    await applyReviewAction(report, reviewAction);
+    return reviewAction;
+  }
+
+  if (normalizedType === REPORT_TYPE.SHOP) {
+    const shopAction =
+      normalizedAction === "approve" || normalizedAction === "resolve"
+        ? "warn_limit"
+        : normalizedAction;
+    await applyShopAction(report, shopAction, adminUser);
+    return shopAction;
+  }
+
+  if (normalizedType === REPORT_TYPE.PRODUCT) {
+    return applyProductAction(report, normalizedAction);
+  }
+
+  if (isContentTargetReportType(report.reportType)) {
+    const userAction =
+      normalizedAction === "approve" || normalizedAction === "resolve"
+        ? "warn"
+        : normalizedAction;
+    await applyUserAction(report, userAction, adminUser);
+    return userAction;
+  }
+
+  return null;
+}
+
 async function approveReport(adminUser, reportId, { action, replyMessage } = {}) {
   const report = await assertPendingReport(reportId);
 
-  // Báo cáo tranh chấp giữ hàng → dùng approve-buyer / approve-seller / reject.
-  if (isReservationDisputeReport(report)) {
+  // Báo cáo tranh chấp đơn → tab Đơn hàng / ReservationDispute.
+  if (isOrderLinkedReport(report) || isReservationDisputeReport(report)) {
     throw createServiceError(
-      "Báo cáo giữ hàng: dùng /admin/reports/:id/approve-buyer | approve-seller | reject.",
+      "Tranh chấp đơn hàng — xử lý tại chi tiết đơn hàng (duyệt buyer/seller hoặc bác).",
       400
     );
   }
@@ -984,14 +1182,16 @@ async function approveReport(adminUser, reportId, { action, replyMessage } = {})
         throw unlockError;
       }
     }
+  } else {
+    await applyContentReportEnforcement(adminUser, report, action);
   }
 
   const now = new Date();
   report.status = REPORT_STATUS.PROCESSED;
-  report.processedBy = adminUser._id;
-  report.processedAt = now;
+  report.xuLyBoi = adminUser._id;
+  report.tgXuLy = now;
   report.adminNote = message;
-  report.adminDecision = normalizedAction;
+  report.qdAdmin = normalizedAction;
   report.UpdatedAt = now;
   await report.save();
 
@@ -1017,7 +1217,24 @@ function getDefaultContentAction(_reportType) {
   return "resolve";
 }
 
-function getApproveMessage(_reportType, _action) {
+function getApproveMessage(reportType, action) {
+  const normalizedType = normalizeReportType(reportType);
+  const normalizedAction = String(action || "").trim().toLowerCase();
+
+  if (normalizedType === REPORT_TYPE.REVIEW) {
+    return "Đã ẩn đánh giá vi phạm và gửi thông báo cho người tố cáo.";
+  }
+  if (normalizedType === REPORT_TYPE.SHOP) {
+    return "Đã xử lý báo cáo gian hàng và gửi thông báo cho các bên liên quan.";
+  }
+  if (normalizedType === REPORT_TYPE.PRODUCT) {
+    return normalizedAction === "delete"
+      ? "Đã gỡ sản phẩm vi phạm và gửi thông báo cho người tố cáo."
+      : "Đã ẩn sản phẩm vi phạm và gửi thông báo cho người tố cáo.";
+  }
+  if (isContentTargetReportType(reportType)) {
+    return "Đã xử lý báo cáo và gửi thông báo cho người tố cáo.";
+  }
   return "Đã duyệt tố cáo và gửi thông báo cho người tố cáo.";
 }
 

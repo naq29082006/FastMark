@@ -23,11 +23,11 @@ import {
 import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
 import {
   hasItemId,
-  mergeListById,
   removeById,
   upsertById,
 } from '../../core/utils/realtimeList';
 import { useReviewedOrderCodes } from '../../hooks/useReviewedOrderCodes';
+import { coalesceReservationFetch } from '../../core/utils/coalesceReservationFetch';
 import { useOrderSocket } from '../../hooks/useOrderSocket';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
@@ -183,7 +183,7 @@ export default function ReservationHistoryScreen({
       });
       const rows = (data?.reservations || []).map(toHistoryRow);
       setReservations((current) =>
-        nextPage === 1 ? mergeListById(current, rows) : appendUniqueById(current, rows)
+        nextPage === 1 ? rows : appendUniqueById(current, rows)
       );
       setPage(Number(data?.page) || nextPage);
       setHasMore(
@@ -221,29 +221,42 @@ export default function ReservationHistoryScreen({
       return;
     }
 
-    const stillPending =
-      Number(payload?.status) === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION;
     const isInList = hasItemId(reservationsRef.current, reservationId);
+    const isPendingEvent =
+      Number(payload?.status) === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION;
 
-    if (!stillPending) {
-      if (isInList) {
-        setReservations((current) => removeById(current, reservationId));
-        setTotalCount((current) => Math.max(0, current - 1));
-      }
+    if (!isInList && !isPendingEvent) {
       return;
     }
 
     try {
-      const idToken = await getCurrentUserIdToken();
-      if (!idToken) {
-        return;
-      }
-      const reservation = await getBuyerReservationOnBackend(idToken, reservationId);
+      const reservation = await coalesceReservationFetch('buyer', reservationId, async () => {
+        const idToken = await getCurrentUserIdToken();
+        if (!idToken) {
+          return null;
+        }
+        return getBuyerReservationOnBackend(idToken, reservationId);
+      });
       if (!reservation?.id) {
         return;
       }
+
+      const stillPending =
+        Number(reservation.status) === RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION;
+
+      if (!stillPending) {
+        if (isInList) {
+          setReservations((current) => removeById(current, reservationId));
+          setTotalCount((current) => Math.max(0, current - 1));
+        }
+        return;
+      }
+
       setReservations((current) =>
-        upsertById(current, toHistoryRow(reservation), { position: 'start' })
+        upsertById(current, toHistoryRow(reservation), {
+          position: 'start',
+          moveToStartOnUpdate: true,
+        })
       );
       if (!isInList) {
         setTotalCount((current) => current + 1);

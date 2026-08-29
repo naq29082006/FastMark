@@ -11,6 +11,10 @@ const {
   BANNER_TARGET_TYPE,
   BANNER_TARGET_TYPE_LABEL,
   PRODUCT_STATUS,
+  RECORD_STATUS,
+  isRecordActive,
+  activeRecordFilter,
+  activeSubscriptionFilter,
 } = require("../constants");
 const { debitWallet, getWalletBalance } = require("./walletService");
 const { getShopForSeller } = require("./shopSettingsService");
@@ -95,7 +99,7 @@ function toBannerPlanDto(doc) {
     durationDays,
     durationMonths,
     price: Math.max(0, Number(doc.price) || 0),
-    isActive: Boolean(doc.isActive),
+    isActive: isRecordActive(doc.isActive),
     createdAt: doc.CreatedAt || null,
     updatedAt: doc.UpdatedAt || null,
   };
@@ -135,7 +139,7 @@ function toSellerBannerDto(doc, extras = {}) {
     lifecycle,
     lifecycleLabel: lifecycleLabel(lifecycle),
     canEditCreative,
-    violationReason: doc.violationReason || "",
+    lyDoVP: doc.lyDoVP || "",
     image: doc.image || "",
     targetType,
     targetTypeLabel: BANNER_TARGET_TYPE_LABEL[targetType] || "Gian hàng",
@@ -170,14 +174,14 @@ function emitBannerRealtime(banner, extra = {}) {
 }
 
 async function listAdminBannerPlans() {
-  const rows = await BannerPlan.find({ isActive: true })
+  const rows = await BannerPlan.find(activeRecordFilter())
     .sort({ price: 1, CreatedAt: 1 })
     .limit(100);
   return rows.map(toBannerPlanDto);
 }
 
 async function listActiveBannerPlans() {
-  const rows = await BannerPlan.find({ isActive: true })
+  const rows = await BannerPlan.find(activeRecordFilter())
     .sort({ price: 1, CreatedAt: 1 })
     .limit(50);
   return rows.map(toBannerPlanDto);
@@ -188,7 +192,7 @@ async function createBannerPlan(payload = {}) {
   const durationDays = resolveDurationDays(payload);
   const price = Number(payload.price);
   const isActive =
-    payload.isActive === undefined ? true : Boolean(payload.isActive);
+    payload.isActive === undefined ? true : isRecordActive(payload.isActive);
 
   if (!name) {
     throw createServiceError("Thiếu tên gói banner.");
@@ -202,11 +206,11 @@ async function createBannerPlan(payload = {}) {
 
   const existing = await BannerPlan.findOne({ name });
   if (existing) {
-    if (existing.isActive === false) {
+    if (!isRecordActive(existing.isActive)) {
       existing.description = pickString(payload.description);
       existing.durationDays = Math.round(durationDays);
       existing.price = price;
-      existing.isActive = true;
+      existing.isActive = RECORD_STATUS.ACTIVE;
       existing.UpdatedAt = new Date();
       await existing.save();
       return { plan: toBannerPlanDto(existing), restored: true };
@@ -219,7 +223,7 @@ async function createBannerPlan(payload = {}) {
     description: pickString(payload.description),
     durationDays: Math.round(durationDays),
     price,
-    isActive,
+    isActive: isActive ? RECORD_STATUS.ACTIVE : RECORD_STATUS.HIDDEN,
   });
   return { plan: toBannerPlanDto(plan), restored: false };
 }
@@ -255,6 +259,15 @@ async function updateBannerPlan(planId, payload = {}) {
     }
     plan.price = price;
   }
+
+  if (payload.isActive !== undefined || payload.status !== undefined) {
+    const nextActive =
+      payload.isActive !== undefined
+        ? isRecordActive(payload.isActive)
+        : Number(payload.status) === RECORD_STATUS.ACTIVE;
+    plan.isActive = nextActive ? RECORD_STATUS.ACTIVE : RECORD_STATUS.HIDDEN;
+  }
+
   await plan.save();
   return toBannerPlanDto(plan);
 }
@@ -264,7 +277,7 @@ async function deleteBannerPlan(planId) {
   if (!plan) {
     throw createServiceError("Không tìm thấy gói banner.", 404);
   }
-  plan.isActive = false;
+  plan.isActive = RECORD_STATUS.HIDDEN;
   await plan.save();
   return toBannerPlanDto(plan);
 }
@@ -274,10 +287,10 @@ async function restoreBannerPlan(planId) {
   if (!plan) {
     throw createServiceError("Không tìm thấy gói banner.", 404);
   }
-  if (plan.isActive !== false) {
+  if (isRecordActive(plan.isActive)) {
     return toBannerPlanDto(plan);
   }
-  plan.isActive = true;
+  plan.isActive = RECORD_STATUS.ACTIVE;
   await plan.save();
   return toBannerPlanDto(plan);
 }
@@ -363,7 +376,7 @@ async function purchaseBannerPlan(user, payload = {}) {
     throw createServiceError("Thiếu planId.");
   }
 
-  const plan = await BannerPlan.findOne({ _id: planId, isActive: true });
+  const plan = await BannerPlan.findOne({ _id: planId, ...activeRecordFilter() });
   if (!plan) {
     throw createServiceError("Gói banner không hợp lệ hoặc đang tạm ẩn.");
   }
@@ -393,7 +406,7 @@ async function purchaseBannerPlan(user, payload = {}) {
           endDate: null,
           approvedAt: null,
           status: SELLER_BANNER_STATUS.PURCHASED,
-          violationReason: "",
+          lyDoVP: "",
           image: "",
           targetType: BANNER_TARGET_TYPE.SHOP,
           targetId: "",
@@ -504,7 +517,7 @@ async function requestBannerHang(user, payload = {}) {
   banner.targetType = target.targetType;
   banner.targetId = target.targetId;
   banner.status = SELLER_BANNER_STATUS.PENDING_REVIEW;
-  banner.violationReason = "";
+  banner.lyDoVP = "";
   banner.startDate = null;
   banner.endDate = null;
   banner.approvedAt = null;
@@ -565,6 +578,15 @@ async function listAdminSellerBanners({
     query.status = SELLER_BANNER_STATUS.PURCHASED;
   } else if (lifecycle === "pending" || lifecycle === "4") {
     query.status = SELLER_BANNER_STATUS.PENDING_REVIEW;
+  } else if (lifecycle === "manage" || lifecycle === "queue") {
+    query.$or = [
+      { status: SELLER_BANNER_STATUS.PENDING_REVIEW },
+      {
+        status: SELLER_BANNER_STATUS.ACTIVE,
+        approvedAt: { $ne: null },
+        endDate: { $gte: now },
+      },
+    ];
   } else if (lifecycle === "active" || lifecycle === "dang-hoat-dong") {
     query.status = SELLER_BANNER_STATUS.ACTIVE;
     query.approvedAt = { $ne: null };
@@ -604,7 +626,7 @@ async function listAdminSellerBanners({
 
       orConditions.push(
         { planName: regex },
-        { violationReason: regex },
+        { lyDoVP: regex },
         ...(matchedUsers.length ? [{ sellerId: { $in: matchedUsers.map((user) => user._id) } }] : []),
         ...(matchedShops.length ? [{ shopId: { $in: matchedShops.map((shop) => shop._id) } }] : [])
       );
@@ -620,13 +642,44 @@ async function listAdminSellerBanners({
 
   applyCreatedAtRange(query, { from, to });
 
-  const [rows, total] = await Promise.all([
+  const paidBannerStatuses = [
+    SELLER_BANNER_STATUS.PURCHASED,
+    SELLER_BANNER_STATUS.PENDING_REVIEW,
+    SELLER_BANNER_STATUS.ACTIVE,
+    SELLER_BANNER_STATUS.CANCELLED,
+    SELLER_BANNER_STATUS.REJECTED,
+  ];
+
+  const [rows, total, summaryTotal, summaryActive, summaryPending, summaryExpired, summaryPurchased, summaryRevenue, summaryShops] =
+    await Promise.all([
     SellerBannerPlan.find(query)
       .sort({ ngayMua: -1, CreatedAt: -1, _id: -1 })
       .skip(skip)
       .limit(pageSize)
       .lean(),
     SellerBannerPlan.countDocuments(query),
+    SellerBannerPlan.countDocuments({ status: { $in: paidBannerStatuses } }),
+    SellerBannerPlan.countDocuments({
+      status: SELLER_BANNER_STATUS.ACTIVE,
+      approvedAt: { $ne: null },
+      endDate: { $gte: now },
+    }),
+    SellerBannerPlan.countDocuments({
+      status: SELLER_BANNER_STATUS.PENDING_REVIEW,
+    }),
+    SellerBannerPlan.countDocuments({
+      status: SELLER_BANNER_STATUS.ACTIVE,
+      approvedAt: { $ne: null },
+      endDate: { $lt: now },
+    }),
+    SellerBannerPlan.countDocuments({
+      status: SELLER_BANNER_STATUS.PURCHASED,
+    }),
+    SellerBannerPlan.aggregate([
+      { $match: { status: { $in: paidBannerStatuses } } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ["$amount", 0] } } } },
+    ]),
+    SellerBannerPlan.distinct("shopId", { status: { $in: paidBannerStatuses } }),
   ]);
 
   const sellerIds = rows.map((r) => r.sellerId).filter(Boolean);
@@ -676,6 +729,15 @@ async function listAdminSellerBanners({
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
     },
+    summary: {
+      total: summaryTotal,
+      active: summaryActive,
+      pending: summaryPending,
+      expired: summaryExpired,
+      purchased: summaryPurchased,
+      totalRevenue: Number(summaryRevenue[0]?.total) || 0,
+      uniqueShops: summaryShops.length,
+    },
   };
 }
 
@@ -697,7 +759,7 @@ async function listActiveSellerBannersForHome({ limit = 10, seed = "" } = {}) {
   const shops = shopIds.length
     ? await ShopProfile.find({
         _id: { $in: shopIds },
-        isActive: true,
+        ...activeSubscriptionFilter(),
         status: { $ne: 0 },
       })
         .select("_id")
@@ -774,7 +836,7 @@ async function approveSellerBanner(bannerId) {
   banner.endDate = addDays(now, durationDays);
   banner.approvedAt = now;
   banner.status = SELLER_BANNER_STATUS.ACTIVE;
-  banner.violationReason = "";
+  banner.lyDoVP = "";
   await banner.save();
   emitBannerRealtime(banner);
   return toSellerBannerDto(banner);
@@ -788,14 +850,14 @@ async function rejectSellerBanner(bannerId, { reason } = {}) {
   if (Number(banner.status) !== SELLER_BANNER_STATUS.PENDING_REVIEW) {
     throw createServiceError("Chỉ từ chối được banner đang chờ duyệt treo.");
   }
-  const violationReason = pickString(reason);
-  if (!violationReason) {
+  const lyDoVP = pickString(reason);
+  if (!lyDoVP) {
     throw createServiceError("Vui lòng nhập lý do từ chối.");
   }
 
   // Không hoàn tiền — seller sửa creative rồi gửi yêu cầu treo lại.
   banner.status = SELLER_BANNER_STATUS.REJECTED;
-  banner.violationReason = violationReason;
+  banner.lyDoVP = lyDoVP;
   banner.startDate = null;
   banner.endDate = null;
   banner.approvedAt = null;

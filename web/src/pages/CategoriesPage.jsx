@@ -7,20 +7,21 @@ import {
   deleteCategory,
   listCategories,
   updateCategory,
-  uploadCategoryIcon,
 } from '../api/categoryApi';
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 import TableIconActions from '../components/ui/TableIconActions';
 import { useAuth } from '../context/AuthContext';
-import { resolveMediaUrl } from '../utils/resolveMediaUrl';
 import { formatDate } from '../utils/format';
 
 const emptyForm = {
   name: '',
   description: '',
   icon: '',
+  disputeDays: '7',
 };
 
 function CategoryPanel({ type, showIcon = false }) {
+  const isProductCategory = type === 'products';
   const { getIdToken } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +31,6 @@ function CategoryPanel({ type, showIcon = false }) {
   const [editingId, setEditingId] = useState('');
   const [form, setForm] = useState(emptyForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [iconFile, setIconFile] = useState(null);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -54,7 +54,6 @@ function CategoryPanel({ type, showIcon = false }) {
   function resetForm() {
     setEditingId('');
     setForm(emptyForm);
-    setIconFile(null);
   }
 
   function startCreate() {
@@ -67,11 +66,11 @@ function CategoryPanel({ type, showIcon = false }) {
     setError('');
     setSuccessMessage('');
     setEditingId(category.id);
-    setIconFile(null);
     setForm({
       name: category.name || category.categoryName || '',
       description: category.description || '',
       icon: category.icon || '',
+      disputeDays: String(category.disputeDays ?? 7),
     });
   }
 
@@ -91,12 +90,11 @@ function CategoryPanel({ type, showIcon = false }) {
       const token = await getIdToken();
       const payload = {
         name,
-        categoryName: name,
         description: form.description.trim(),
       };
 
-      if (showIcon) {
-        payload.icon = form.icon.trim();
+      if (isProductCategory) {
+        payload.disputeDays = Number(form.disputeDays) || 7;
       }
 
       let savedCategory;
@@ -108,16 +106,6 @@ function CategoryPanel({ type, showIcon = false }) {
         const response = await createCategory(token, type, payload);
         savedCategory = response.data?.category;
         createMessage = response.message || 'Tạo danh mục thành công.';
-      }
-
-      if (showIcon && iconFile && savedCategory?.id) {
-        const uploaded = await uploadCategoryIcon(token, type, savedCategory.id, iconFile);
-        if (uploaded.data?.icon) {
-          await updateCategory(token, type, savedCategory.id, {
-            ...payload,
-            icon: uploaded.data.icon,
-          });
-        }
       }
 
       setSuccessMessage(editingId ? 'Cập nhật danh mục thành công.' : createMessage);
@@ -196,35 +184,25 @@ function CategoryPanel({ type, showIcon = false }) {
           </label>
 
           {showIcon ? (
-            <div className="category-form-row">
-              <label>
-                Icon (URL)
-                <input
-                  value={form.icon}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, icon: event.target.value }))
-                  }
-                  placeholder="https://..."
-                />
-              </label>
-              <label>
-                Upload icon
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => setIconFile(event.target.files?.[0] || null)}
-                />
-              </label>
-              {(form.icon || iconFile) && (
-                <div className="category-icon-preview">
-                  {iconFile ? (
-                    <img src={URL.createObjectURL(iconFile)} alt="Icon preview" />
-                  ) : (
-                    <img src={resolveMediaUrl(form.icon)} alt="Icon" />
-                  )}
-                </div>
-              )}
+            <div className="category-form-row admin-shop-category-pin-preview">
+              <FastMarkShopPinIcon size="card" />
+              <span>Ghim vị trí FastMark — đồng bộ bản đồ (#16A34A)</span>
             </div>
+          ) : null}
+
+          {isProductCategory ? (
+            <label>
+              Thời gian khiếu nại (ngày)
+              <input
+                type="number"
+                min="1"
+                max="30"
+                value={form.disputeDays}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, disputeDays: event.target.value }))
+                }
+              />
+            </label>
           ) : null}
 
           <div className="category-form-actions">
@@ -247,6 +225,7 @@ function CategoryPanel({ type, showIcon = false }) {
                 {showIcon ? <th>Icon</th> : null}
                 <th>Tên</th>
                 <th>Chi tiết</th>
+                {isProductCategory ? <th>Khiếu nại (ngày)</th> : null}
                 <th>Ngày thêm</th>
                 <th>Thao tác</th>
               </tr>
@@ -257,21 +236,16 @@ function CategoryPanel({ type, showIcon = false }) {
                   <td className="stt-cell">{index + 1}</td>
                   {showIcon ? (
                     <td>
-                      {item.icon ? (
-                        <img
-                          className="category-icon-thumb"
-                          src={resolveMediaUrl(item.icon)}
-                          alt=""
-                        />
-                      ) : (
-                        ''
-                      )}
+                      <FastMarkShopPinIcon size="card" />
                     </td>
                   ) : null}
                   <td>
                     <strong>{item.name || item.categoryName}</strong>
                   </td>
                   <td className="category-desc-cell">{item.description || ''}</td>
+                  {isProductCategory ? (
+                    <td>{item.disputeDays ?? '—'}</td>
+                  ) : null}
                   <td>{formatDate(item.createdAt)}</td>
                   <td className="col-actions">
                     <TableIconActions
@@ -307,7 +281,7 @@ export default function CategoriesPage() {
 
   return (
     <div className="page">
-      <CategoryPanel type={type} />
+      <CategoryPanel type={type} showIcon={type === 'shops'} />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 const shopSettingsService = require("../services/shopSettingsService");
 const reservationService = require("../services/reservationService");
+const sellerReviewService = require("../services/sellerReviewService");
 const sellerStatsService = require("../services/sellerStatsService");
+const { isCancelledBySellerAfterAccept } = require("../utils/reservationCompat");
 const { success, fail } = require("../utils/apiResponse");
 
 function pickBodyValue(body, keys) {
@@ -112,6 +114,7 @@ exports.listOrders = async (req, res) => {
   const tab = req.query.tab || "pending";
   const result = await reservationService.listSellerReservations(req.currentUser, {
     tab,
+    search: req.query.search || req.query.q,
     page: req.query.page,
     limit: req.query.limit,
   });
@@ -124,6 +127,19 @@ exports.getReservationDetail = async (req, res) => {
     req.params.id
   );
   return success(res, { data: { reservation } });
+};
+
+exports.listReviews = async (req, res) => {
+  const result = await sellerReviewService.listSellerReviews(req.currentUser, {
+    page: req.query.page,
+    limit: req.query.limit,
+  });
+  return success(res, { data: result });
+};
+
+exports.getReviewDetail = async (req, res) => {
+  const result = await sellerReviewService.getSellerReviewDetail(req.currentUser, req.params.id);
+  return success(res, { data: result });
 };
 
 exports.confirmReservation = async (req, res) => {
@@ -153,7 +169,7 @@ exports.cancelReservation = async (req, res) => {
     req.params.id,
     { reason, images }
   );
-  const afterAccept = Boolean(reservation?.cancelledBySellerAfterAccept);
+  const afterAccept = isCancelledBySellerAfterAccept(reservation);
   return success(res, {
     message: afterAccept
       ? "Đã hủy đơn sau xác nhận. Tiền cọc đã hoàn cho người mua."
@@ -168,8 +184,61 @@ exports.refundDisputeDeposit = async (req, res) => {
     req.params.id
   );
   return success(res, {
-    message: "Đã hoàn cọc cho người mua. Đơn đã kết thúc tranh chấp.",
+    message: "Đã hoàn cọc cho người mua.",
     data: { reservation },
+  });
+};
+
+exports.validatePickupQr = async (req, res) => {
+  const qrPayload =
+    pickBodyValue(req.body, ["qrPayload", "qr_payload", "payload", "data"]) ||
+    pickBodyValue(req.body, ["rawPayload", "raw_payload"]);
+  if (!qrPayload) {
+    return fail(res, { status: 400, message: "Thiếu mã QR (qrPayload)." });
+  }
+  const data = await reservationService.validateSellerPickupQr(req.currentUser, qrPayload);
+  return success(res, {
+    message: "Mã QR hợp lệ.",
+    data,
+  });
+};
+
+exports.confirmDelivered = async (req, res) => {
+  const reservation = await reservationService.confirmDeliveredBySeller(
+    req.currentUser,
+    req.params.id
+  );
+  return success(res, {
+    message: "Đã xác nhận giao hàng. Tiền cọc đang được giữ trong thời gian khiếu nại.",
+    data: { reservation },
+  });
+};
+
+exports.adjustReservationAtPickup = async (req, res) => {
+  const reservationAdjustmentService = require("../services/reservationAdjustmentService");
+  const reservation = await reservationAdjustmentService.adjustReservationAtPickup(
+    req.currentUser,
+    req.params.id,
+    req.body
+  );
+  return success(res, {
+    message: "Đã cập nhật đơn giữ hàng.",
+    data: { reservation },
+  });
+};
+
+exports.respondToPostDeliveryComplaint = async (req, res) => {
+  const reservationDisputeService = require("../services/reservationDisputeService");
+  const reservationId = req.params.id;
+  const description = pickBodyValue(req.body, ["description", "content", "note"]);
+  const images = req.body.images || req.body.imageUrls || [];
+  const data = await reservationDisputeService.sellerRespondToPostDeliveryComplaint(
+    req.currentUser,
+    { reservationId, description, images }
+  );
+  return success(res, {
+    message: "Đã gửi phản hồi khiếu nại. Admin sẽ xử lý tranh chấp.",
+    data,
   });
 };
 

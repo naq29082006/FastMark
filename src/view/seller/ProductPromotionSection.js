@@ -31,13 +31,7 @@ export default function ProductPromotionSection({
   const canPreview = percent >= 1 && percent <= 99 && originalMin > 0;
 
   function patch(partial) {
-    onChange?.({
-      enabled,
-      discountPercent,
-      startDate,
-      endDate,
-      ...partial,
-    });
+    onChange?.(partial);
   }
 
   return (
@@ -50,6 +44,7 @@ export default function ProductPromotionSection({
           disabled={disabled}
           trackColor={{ false: '#cbd5e1', true: '#86efac' }}
           thumbColor={enabled ? '#076F32' : '#f8fafc'}
+          accessibilityRole="switch"
         />
       </View>
       <Text style={styles.hint}>Bật và nhập % giảm giá hiển thị trên app người mua.</Text>
@@ -129,6 +124,7 @@ export function buildPromotionPayload(promo) {
 const styles = StyleSheet.create({
   wrap: {
     marginTop: 16,
+    marginBottom: 20,
     padding: 14,
     borderRadius: 12,
     borderWidth: 1,

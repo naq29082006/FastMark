@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const Reservation = require("../models/Reservation");
-const ReservationAuditLog = require("../models/ReservationAuditLog");
 const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
 const Product = require("../models/Product");
@@ -10,10 +9,11 @@ const {
   RESERVATION_STATUS_LABEL,
   RESERVATION_DISPUTE_REASON_LABEL,
   RESERVATION_AUDIT_ACTION,
-  REPORT_STATUS,
-  RESERVATION_REPORT_TYPES,
+  RESERVATION_DISPUTE_STATUS,
+  DISPUTE_STATUS,
+  DEPOSIT_SETTLE_TO,
 } = require("../constants");
-const { getReservationReasonLabels } = require("../constants/reservationOrderFlow");
+const { getReservationReasonLabels, RESERVATION_CANCEL_REASON } = require("../constants/reservationOrderFlow");
 const {
   toPublicReservation,
   refundDepositIfHeld,
@@ -25,6 +25,13 @@ const { emitOrderUpdated } = require("./orderRealtimeService");
 const reservationDisputeService = require("./reservationDisputeService");
 const Report = require("../models/Report");
 const Review = require("../models/Review");
+const ReservationDispute = require("../models/ReservationDispute");
+const {
+  disputeViewFromRecord,
+  loadDisputesByReservationIds,
+  appendDisputeAuditLog,
+} = require("../utils/reservationDisputeView");
+const { notDeletedReviewFilter } = require("../utils/reviewVisibility");
 const {
   buildSearchRegex,
   buildStatusLabelEntries,
@@ -33,6 +40,7 @@ const {
 } = require("../utils/searchText");
 const {
   findUsersBySearchRegex,
+  findUsersByTokenSearch,
   buildObjectIdSearchConditions,
 } = require("../utils/adminSearchHelpers");
 const {
@@ -40,6 +48,22 @@ const {
   resolveShopAvatar,
   resolveShopUsername,
 } = require("../utils/shopIdentity");
+const {
+  getReservationBuyerId,
+  buyerIdFilter,
+  getPickupConfirmedAt,
+  getReservationCancelNote,
+  getReservationCancelType,
+  isCancelledBySellerAfterAccept,
+  hasDisputeFilter,
+  reservationHasDispute,
+} = require("../utils/reservationCompat");
+const {
+  resolveAdminReservationStatusLabel,
+  buildActiveDisputeQuery,
+  buildDisputeResolvedQuery,
+  buildCancelledAdminQuery,
+} = require("../utils/adminReservationStatus");
 const {
   notifyAdminDisputeResolution,
   notifyReservationBoth,
@@ -93,7 +117,7 @@ function resolveTabStatusFilter(tab) {
     case "pending":
     case "pending_confirmation":
     case "waiting_confirmation":
-      return [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION];
+      return [RESERVATION_STATUS.PENDING];
     case "disputes":
     case "dispute":
       return [RESERVATION_STATUS.DISPUTED];
@@ -101,21 +125,25 @@ function resolveTabStatusFilter(tab) {
     case "waiting_pickup":
       return [RESERVATION_STATUS.WAITING_PICKUP];
     case "completed":
-      return [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED];
+      return [RESERVATION_STATUS.COMPLETED];
+    case "pickup_confirmed":
+    case "received":
+      return [RESERVATION_STATUS.PICKUP_CONFIRMED];
+    case "dispute_resolved":
+    case "dispute_resolved_history":
+      return null;
+    case "dispute_active":
+      return null;
     case "auto":
     case "auto_completed":
-      return [RESERVATION_STATUS.AUTO_COMPLETED];
+      return [RESERVATION_STATUS.COMPLETED];
     case "cancelled":
     case "canceled":
     case "cancelled_orders":
-      return [
-        RESERVATION_STATUS.REJECTED,
-        RESERVATION_STATUS.REFUNDED,
-        RESERVATION_STATUS.DISPUTE_RESOLVED,
-      ];
+      return [RESERVATION_STATUS.CANCELLED];
     case "seller_cancelled":
     case "seller_cancel_after_accept":
-      // Filter đặc biệt trong buildListFilter (flag cancelledBySellerAfterAccept).
+      // Filter đặc biệt trong buildListFilter (cancelType seller_after_accept).
       return null;
     default:
       return null;
@@ -153,11 +181,13 @@ async function buildProductReservationMatch(objectId) {
 
 const ADMIN_RESERVATION_STATUS_SEARCH = [
   ...buildStatusLabelEntries(RESERVATION_STATUS_LABEL),
-  { label: 'Hoàn thành', statuses: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
-  { label: 'Đã hủy', statuses: [RESERVATION_STATUS.REJECTED, RESERVATION_STATUS.REFUNDED, RESERVATION_STATUS.DISPUTE_RESOLVED] },
-  { label: 'Giữ hàng', statuses: [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION, RESERVATION_STATUS.WAITING_PICKUP] },
-  { label: 'Tranh chấp', statuses: [RESERVATION_STATUS.DISPUTED] },
-  { label: 'Chờ xác nhận', statuses: [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION] },
+  { label: "Đã nhận hàng", statuses: [RESERVATION_STATUS.PICKUP_CONFIRMED] },
+  { label: "Hoàn thành", statuses: [RESERVATION_STATUS.COMPLETED] },
+  { label: "Tranh chấp đã xử lý", statuses: [RESERVATION_STATUS.DISPUTED] },
+  { label: "Đã hủy", statuses: [RESERVATION_STATUS.CANCELLED] },
+  { label: "Giữ hàng", statuses: [RESERVATION_STATUS.WAITING_PICKUP] },
+  { label: "Tranh chấp", statuses: [RESERVATION_STATUS.DISPUTED] },
+  { label: "Chờ xác nhận", statuses: [RESERVATION_STATUS.PENDING] },
 ];
 
 function buildReservationCodeSearchConditions(search) {
@@ -175,7 +205,40 @@ async function buildListFilter(query = {}) {
   const tabNormalized = pickString(query.tab).toLowerCase();
 
   if (tabNormalized === "seller_cancelled" || tabNormalized === "seller_cancel_after_accept") {
-    filter.cancelledBySellerAfterAccept = true;
+    filter.cancelType = {
+      $in: [
+        RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING,
+        RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP,
+        "seller_after_accept",
+      ],
+    };
+  } else if (tabNormalized === "disputes" || tabNormalized === "dispute" || tabNormalized === "dispute_active") {
+    Object.assign(filter, buildActiveDisputeQuery());
+  } else if (tabNormalized === "dispute_resolved" || tabNormalized === "dispute_resolved_history") {
+    Object.assign(filter, buildDisputeResolvedQuery());
+  } else if (
+    tabNormalized === "cancelled" ||
+    tabNormalized === "canceled" ||
+    tabNormalized === "cancelled_orders"
+  ) {
+    Object.assign(filter, buildCancelledAdminQuery());
+  } else if (tabNormalized === "dispute_admin" || tabNormalized === "dispute_both") {
+    const {
+      collectAdminPendingDisputeReservationIds,
+    } = require("../utils/adminDisputeQueue");
+    const disputeReservationIds = await collectAdminPendingDisputeReservationIds();
+
+    filter.status = RESERVATION_STATUS.DISPUTED;
+    filter._id = {
+      $in: disputeReservationIds.length
+        ? disputeReservationIds
+        : [new mongoose.Types.ObjectId()],
+    };
+  } else if (
+    tabNormalized === "dispute_admin_history" ||
+    tabNormalized === "dispute_history_admin"
+  ) {
+    Object.assign(filter, buildDisputeResolvedQuery());
   } else {
     const tabStatuses = resolveTabStatusFilter(query.tab);
     const statusRaw = pickString(query.status);
@@ -187,7 +250,8 @@ async function buildListFilter(query = {}) {
   }
 
   if (buyerId) {
-    filter.userId = buyerId;
+    filter.$and = Array.isArray(filter.$and) ? filter.$and : [];
+    filter.$and.push(buyerIdFilter(buyerId));
   }
 
   if (productId) {
@@ -208,32 +272,34 @@ async function buildListFilter(query = {}) {
   }
 
   if (dateFrom || dateTo) {
-    filter.CreatedAt = {};
+    filter.createdAt = {};
     if (dateFrom) {
-      filter.CreatedAt.$gte = dateFrom;
+      filter.createdAt.$gte = dateFrom;
     }
     if (dateTo) {
-      filter.CreatedAt.$lte = dateTo;
+      filter.createdAt.$lte = dateTo;
     }
   }
 
   if (search) {
     const orConditions = [];
-    const regex = buildSearchRegex(search);
+    const { buildMongoTokenFieldFilter } = require("../utils/searchText");
+    const shopTokenFilter = buildMongoTokenFieldFilter(search, ["shopName", "shopUsername"], {
+      minTokenLength: 1,
+    });
+    const productTokenFilter = buildMongoTokenFieldFilter(search, ["ProductName"], {
+      minTokenLength: 1,
+    });
 
-    if (regex) {
-      const matchedUsers = await findUsersBySearchRegex(User, regex);
-
-      const matchedUserIds = matchedUsers.map((item) => item._id);
-      const [shopsByOwner, shopsByName, matchedProducts] = await Promise.all([
-        matchedUserIds.length
-          ? ShopProfile.find({ userId: { $in: matchedUserIds } }).select("_id").lean()
-          : [],
-        ShopProfile.find({ $or: [{ shopName: regex }, { shopUsername: regex }] })
-          .select("_id")
-          .lean(),
-        Product.find({ ProductName: regex }).select("_id").lean(),
-      ]);
+    const matchedUsers = await findUsersByTokenSearch(User, search);
+    const matchedUserIds = matchedUsers.map((item) => item._id);
+    const [shopsByOwner, shopsByName, matchedProducts] = await Promise.all([
+      matchedUserIds.length
+        ? ShopProfile.find({ userId: { $in: matchedUserIds } }).select("_id").lean()
+        : [],
+      shopTokenFilter ? ShopProfile.find(shopTokenFilter).select("_id").lean() : [],
+      productTokenFilter ? Product.find(productTokenFilter).select("_id").lean() : [],
+    ]);
 
       const shopIds = [
         ...new Set(
@@ -241,16 +307,30 @@ async function buildListFilter(query = {}) {
         ),
       ].map((id) => new mongoose.Types.ObjectId(id));
 
+    orConditions.push(
+      { userId: { $in: matchedUserIds } },
+      { shopId: { $in: shopIds } },
+      { productId: { $in: matchedProducts.map((item) => item._id) } }
+    );
+
+    const noteRegex = buildSearchRegex(search, { minLength: 1 });
+    if (noteRegex) {
       orConditions.push(
-        { userId: { $in: matchedUserIds } },
-        { shopId: { $in: shopIds } },
-        { productId: { $in: matchedProducts.map((item) => item._id) } },
-        { note: regex },
-        { cancelReason: regex },
-        { cancelNote: regex },
-        { disputeReason: regex },
-        { disputeDescription: regex }
+        { note: noteRegex },
+        { cancelNote: noteRegex },
+        { cancelNote: noteRegex },
       );
+
+      const matchedDisputes = await ReservationDispute.find({
+        $or: [{ reason: noteRegex }, { description: noteRegex }],
+      })
+        .select("reservationId")
+        .lean();
+      if (matchedDisputes.length) {
+        orConditions.push({
+          _id: { $in: matchedDisputes.map((row) => row.reservationId).filter(Boolean) },
+        });
+      }
     }
 
     orConditions.push(...buildReservationCodeSearchConditions(search));
@@ -280,48 +360,53 @@ async function getReservationStats(extraFilter = {}) {
   const [
     total,
     waitingPickup,
+    received,
     completed,
-    autoCompleted,
     disputed,
-    refunded,
-    pendingSellerConfirmation,
-    rejected,
     disputeResolved,
+    pendingSellerConfirmation,
+    cancelled,
     sellerCancelledAfterAccept,
   ] = await Promise.all([
     Reservation.countDocuments(base),
     Reservation.countDocuments({ ...base, status: RESERVATION_STATUS.WAITING_PICKUP }),
+    Reservation.countDocuments({ ...base, status: RESERVATION_STATUS.PICKUP_CONFIRMED }),
     Reservation.countDocuments({ ...base, status: RESERVATION_STATUS.COMPLETED }),
-    Reservation.countDocuments({ ...base, status: RESERVATION_STATUS.AUTO_COMPLETED }),
-    Reservation.countDocuments({ ...base, status: RESERVATION_STATUS.DISPUTED }),
-    Reservation.countDocuments({ ...base, status: RESERVATION_STATUS.REFUNDED }),
+    Reservation.countDocuments(buildActiveDisputeQuery(base)),
+    Reservation.countDocuments(buildDisputeResolvedQuery(base)),
     Reservation.countDocuments({
       ...base,
-      status: RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION,
+      status: RESERVATION_STATUS.PENDING,
     }),
-    Reservation.countDocuments({ ...base, status: RESERVATION_STATUS.REJECTED }),
+    Reservation.countDocuments(buildCancelledAdminQuery(base)),
     Reservation.countDocuments({
       ...base,
-      status: RESERVATION_STATUS.DISPUTE_RESOLVED,
+      cancelType: {
+        $in: [
+          RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING,
+          RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP,
+          "seller_after_accept",
+        ],
+      },
     }),
-    Reservation.countDocuments({ ...base, cancelledBySellerAfterAccept: true }),
   ]);
 
-  const cancelled = rejected + refunded + disputeResolved;
+  const completedAll = received + completed;
 
   return {
     total,
     waitingPickup,
+    received,
     completed,
-    autoCompleted,
-    completedAll: completed + autoCompleted,
+    autoCompleted: completed,
+    completedAll,
     disputed,
-    refunded,
     pendingSellerConfirmation,
-    rejected,
-    disputeResolved,
     cancelled,
     sellerCancelledAfterAccept,
+    refunded: cancelled,
+    rejected: cancelled,
+    disputeResolved,
   };
 }
 
@@ -340,43 +425,65 @@ function resolveProductThumbnail(product, imageDocs = []) {
   return thumbs[0] || resolveLegacyProductThumbnail(product) || "";
 }
 
-function mapListItem(reservation, { buyer, shop, shopOwner, product, productThumbnail = "" } = {}) {
+function mapListItem(
+  reservation,
+  { buyer, shop, shopOwner, product, productThumbnail = "", disputeRecord = null } = {}
+) {
   const shopName = resolveShopDisplayName(shop, shopOwner);
   const shopUsername = resolveShopUsername(shop, shopOwner);
   const shopAvatar = resolveShopAvatar(shop, shopOwner);
   const reasonLabels = getReservationReasonLabels(reservation);
+  const disputeView = disputeViewFromRecord(disputeRecord);
 
   return {
     id: String(reservation._id),
     code: String(reservation._id).slice(-8).toUpperCase(),
     status: reservation.status,
-    statusLabel: RESERVATION_STATUS_LABEL[reservation.status] || "Không rõ",
+    statusLabel: resolveAdminReservationStatusLabel(reservation),
     quantity: Number(reservation.quantity) || 0,
     reservedPrice: Number(reservation.reservedPrice) || 0,
     agreedPrice: Number(reservation.agreedPrice ?? reservation.reservedPrice) || 0,
     depositAmount: Number(reservation.depositAmount) || 0,
     pickupTime: reservation.pickupTime || null,
     note: reservation.note || "",
-    cancelReason: reservation.cancelReason || "",
-    cancelNote: reservation.cancelNote || "",
+    cancelNote: getReservationCancelNote(reservation),
     reasonCode: reasonLabels.reasonCode || "",
     reasonLabelBuyer: reasonLabels.buyer || "",
     reasonLabelSeller: reasonLabels.seller || "",
-    cancelledBy: reservation.cancelledBy || "",
-    cancelledBySellerAfterAccept: Boolean(reservation.cancelledBySellerAfterAccept),
-    sellerCancelImages: Array.isArray(reservation.sellerCancelImages)
-      ? reservation.sellerCancelImages.filter(Boolean)
+    cancelType: getReservationCancelType(reservation),
+    cancelledBySellerAfterAccept: isCancelledBySellerAfterAccept(reservation),
+    tgNhanHang: getPickupConfirmedAt(reservation),
+    completedAt: getPickupConfirmedAt(reservation),
+    anhHuyShop: Array.isArray(reservation.anhHuyShop)
+      ? reservation.anhHuyShop.filter(Boolean)
       : [],
-    disputeByBuyer: Boolean(reservation.disputeByBuyer),
-    disputeBySeller: Boolean(reservation.disputeBySeller),
-    disputedAt: reservation.disputedAt || null,
-    disputeReason: reservation.disputeReason || "",
-    disputeReasonLabel:
-      RESERVATION_DISPUTE_REASON_LABEL[reservation.disputeReason] ||
-      reservation.disputeReason ||
-      "",
-    disputeDescription: reservation.disputeDescription || "",
-    createdAt: reservation.CreatedAt || null,
+    disputeByBuyer: disputeView.disputeByBuyer,
+    disputeBySeller: disputeView.disputeBySeller,
+    disputedAt: disputeView.disputedAt,
+    disputeResolvedAt: disputeRecord?.resolvedAt || reservation.tgGiaiCoc || null,
+    tgGiaiCoc: reservation.tgGiaiCoc || null,
+    disputeReason: disputeView.disputeReason,
+    disputeReasonLabel: disputeView.disputeReasonLabel,
+    disputeDescription: disputeView.disputeDescription,
+    dispute: disputeView.hasDispute
+      ? {
+          reason: disputeView.disputeReason,
+          reasonLabel: disputeView.disputeReasonLabel,
+          reasonType: disputeView.disputeReason,
+          description: disputeView.disputeDescription,
+          status: disputeRecord?.status,
+        }
+      : null,
+    latestDispute: disputeView.hasDispute
+      ? {
+          reason: disputeView.disputeReason,
+          reasonLabel: disputeView.disputeReasonLabel,
+          reasonType: disputeView.disputeReason,
+          description: disputeView.disputeDescription,
+          status: disputeRecord?.status,
+        }
+      : null,
+    createdAt: reservation.CreatedAt || reservation.createdAt || null,
     productId: reservation.productId ? String(reservation.productId) : "",
     variantId: reservation.variantId ? String(reservation.variantId) : "",
     buyer: buyer
@@ -412,7 +519,9 @@ function mapListItem(reservation, { buyer, shop, shopOwner, product, productThum
 
 async function hydrateReservations(reservations) {
   const userIds = [
-    ...new Set(reservations.map((item) => String(item.userId || "")).filter(Boolean)),
+    ...new Set(
+      reservations.map((item) => String(getReservationBuyerId(item) || "")).filter(Boolean)
+    ),
   ];
   const shopIds = [
     ...new Set(reservations.map((item) => String(item.shopId || "")).filter(Boolean)),
@@ -456,6 +565,10 @@ async function hydrateReservations(reservations) {
     ? await loadProductImagesByProductIds(productIds)
     : new Map();
 
+  const disputesMap = await loadDisputesByReservationIds(
+    reservations.map((item) => item._id)
+  );
+
   return reservations.map((item) => {
     const shop = shopMap.get(String(item.shopId || ""));
     const product = productMap.get(String(item.productId || ""));
@@ -464,11 +577,12 @@ async function hydrateReservations(reservations) {
       imagesByProduct.get(String(item.productId || "")) || []
     );
     return mapListItem(item, {
-      buyer: userMap.get(String(item.userId || "")),
+      buyer: userMap.get(String(getReservationBuyerId(item) || "")),
       shop,
       shopOwner: shop ? ownerMap.get(String(shop.userId || "")) : null,
       product,
       productThumbnail,
+      disputeRecord: disputesMap.get(String(item._id)) || null,
     });
   });
 }
@@ -478,10 +592,12 @@ async function listReservations(query = {}) {
 
   const { page, limit, skip } = parsePagination(query);
   const filter = await buildListFilter(query);
+  const { reservationListSortForTab } = require("../utils/reservationListSort");
+  const sort = reservationListSortForTab(query.tab);
 
   const [total, reservations, stats] = await Promise.all([
     Reservation.countDocuments(filter),
-    Reservation.find(filter).sort({ CreatedAt: -1 }).skip(skip).limit(limit).lean(),
+    Reservation.find(filter).sort(sort).skip(skip).limit(limit).lean(),
     getReservationStats(),
   ]);
 
@@ -513,7 +629,7 @@ async function getBuyerStats(userId) {
       totalReservations: 0,
       successfulReservations: 0,
       previousDisputes: 0,
-      averageRating: 0,
+      diemTB: 0,
       reviewCount: 0,
     };
   }
@@ -529,23 +645,18 @@ async function getBuyerStats(userId) {
       }),
       Reservation.countDocuments({
         userId,
-        $or: [
-          { status: RESERVATION_STATUS.DISPUTED },
-          { disputeByBuyer: true },
-          { disputeBySeller: true },
-        ],
+        ...hasDisputeFilter(),
       }),
       Review.aggregate([
         {
           $match: {
-            userId,
-            isDeleted: { $ne: true },
+            $and: [{ userId }, notDeletedReviewFilter()],
           },
         },
         {
           $group: {
             _id: null,
-            averageRating: { $avg: "$rating" },
+            diemTB: { $avg: "$rating" },
             reviewCount: { $sum: 1 },
           },
         },
@@ -553,15 +664,15 @@ async function getBuyerStats(userId) {
     ]);
 
   const reviewSummary = reviewAgg[0] || {};
-  const averageRating = reviewSummary.averageRating
-    ? Math.round(Number(reviewSummary.averageRating) * 10) / 10
+  const diemTB = reviewSummary.diemTB
+    ? Math.round(Number(reviewSummary.diemTB) * 10) / 10
     : 0;
 
   return {
     totalReservations,
     successfulReservations,
     previousDisputes,
-    averageRating,
+    diemTB,
     reviewCount: Number(reviewSummary.reviewCount) || 0,
   };
 }
@@ -572,8 +683,8 @@ async function getShopStats(shopId) {
       totalReservations: 0,
       completedOrders: 0,
       previousDisputes: 0,
-      averageRating: 0,
-      followersCount: 0,
+      diemTB: 0,
+      soNguoiTheo: 0,
     };
   }
 
@@ -587,21 +698,17 @@ async function getShopStats(shopId) {
     }),
     Reservation.countDocuments({
       shopId,
-      $or: [
-        { status: RESERVATION_STATUS.DISPUTED },
-        { disputeByBuyer: true },
-        { disputeBySeller: true },
-      ],
+      ...hasDisputeFilter(),
     }),
-    ShopProfile.findById(shopId).select("averageRating followersCount").lean(),
+    ShopProfile.findById(shopId).select("diemTB soNguoiTheo").lean(),
   ]);
 
   return {
     totalReservations,
     completedOrders,
     previousDisputes,
-    averageRating: Number(shop?.averageRating) || 0,
-    followersCount: Number(shop?.followersCount) || 0,
+    diemTB: Number(shop?.diemTB) || 0,
+    soNguoiTheo: Number(shop?.soNguoiTheo) || 0,
   };
 }
 
@@ -618,16 +725,17 @@ async function getReservationDetail(reservationId) {
     throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
   }
 
-  const [publicReservation, shop, buyerStats, shopStats, auditLogs, disputeReports] =
+  const [publicReservation, shop, buyerStats, shopStats, disputeDoc, disputeReports, adjustments] =
     await Promise.all([
       toPublicReservation(reservation),
       reservation.shopId ? ShopProfile.findById(reservation.shopId).lean() : null,
       getBuyerStats(reservation.userId),
       getShopStats(reservation.shopId),
-      ReservationAuditLog.find({ reservationId: objectId }).sort({ CreatedAt: -1 }).lean(),
+      ReservationDispute.findOne({ reservationId: objectId }).lean(),
       reservationDisputeService
         .listReservationDisputeReports(null, objectId, { isAdmin: true })
         .catch(() => ({ reports: [] })),
+      require("./reservationAdjustmentService").loadAdjustmentsForReservation(objectId),
     ]);
 
   let shopOwner = null;
@@ -640,9 +748,14 @@ async function getReservationDetail(reservationId) {
   const shopName = resolveShopDisplayName(shop, shopOwner);
   const shopUsername = resolveShopUsername(shop, shopOwner);
   const shopAvatar = resolveShopAvatar(shop, shopOwner);
+  const adjustmentRows = (adjustments || []).map((row) => ({
+    ...row,
+    productName: row.productName || publicReservation?.product?.productName || "",
+  }));
 
   return {
     ...publicReservation,
+    adjustments: adjustmentRows,
     shopInfo: shop
       ? {
           id: String(shop._id),
@@ -672,15 +785,19 @@ async function getReservationDetail(reservationId) {
     sellerStats: shopStats,
     shopStats,
     disputeReports: disputeReports?.reports || [],
-    auditLogs: auditLogs.map((log) => ({
-      id: String(log._id),
-      adminId: log.adminId ? String(log.adminId) : "",
-      reservationId: log.reservationId ? String(log.reservationId) : "",
-      action: log.action || "",
-      decision: log.decision || "",
-      note: log.note || "",
-      createdAt: log.CreatedAt || null,
-    })),
+    dispute: disputeDoc ? reservationDisputeService.toPublicDispute(disputeDoc) : null,
+    auditLogs: (disputeDoc?.auditLogs || [])
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .map((log, index) => ({
+        id: String(log._id || index),
+        adminId: log.adminId ? String(log.adminId) : "",
+        reservationId: String(objectId),
+        action: log.action || "",
+        decision: log.decision || "",
+        note: log.note || "",
+        createdAt: log.createdAt || log.CreatedAt || null,
+      })),
   };
 }
 
@@ -689,9 +806,13 @@ async function writeAuditLog(adminUser, reservationId, { action, decision, note 
     throw createServiceError("Không xác định được admin.", 401);
   }
 
-  await ReservationAuditLog.create({
+  const dispute = await ReservationDispute.findOne({ reservationId });
+  if (!dispute) {
+    throw createServiceError("Không tìm thấy khiếu nại của đơn giữ hàng.", 404);
+  }
+
+  await appendDisputeAuditLog(dispute, {
     adminId: adminUser._id,
-    reservationId,
     action,
     decision: decision || "",
     note: pickString(note),
@@ -699,11 +820,24 @@ async function writeAuditLog(adminUser, reservationId, { action, decision, note 
 }
 
 function canAdminProcessDispute(reservation) {
-  return (
-    Number(reservation.status) === RESERVATION_STATUS.DISPUTED &&
-    Boolean(reservation.disputeByBuyer) &&
-    Boolean(reservation.disputeBySeller)
-  );
+  const { isActiveDispute } = require("../utils/reservationStatus");
+  return isActiveDispute(reservation);
+}
+
+async function assertAdminCanProcessReservationDispute(reservation) {
+  if (!canAdminProcessDispute(reservation)) {
+    throw createServiceError(
+      "Chỉ xử lý tranh chấp khi đơn đang ở trạng thái tranh chấp và cọc chưa được giải ngân.",
+      400
+    );
+  }
+
+  const dispute = await ReservationDispute.findOne({ reservationId: reservation._id });
+  if (!dispute) {
+    throw createServiceError("Không tìm thấy khiếu nại của đơn giữ hàng.", 404);
+  }
+
+  reservationDisputeService.assertAdminCanResolveDispute(dispute, reservation);
 }
 
 function requireAdminResolutionNote(note) {
@@ -720,23 +854,20 @@ function canRefundReservation(reservation) {
 
 async function closePendingDisputeReports(adminUser, reservationId, decision, note) {
   const now = new Date();
-  await Report.updateMany(
-    {
-      reservationId,
-      reportType: { $in: RESERVATION_REPORT_TYPES },
-      status: REPORT_STATUS.PENDING,
-    },
-    {
-      $set: {
-        status: REPORT_STATUS.APPROVED,
-        processedBy: adminUser?._id || null,
-        processedAt: now,
-        adminDecision: decision,
-        adminNote: pickString(note),
-        UpdatedAt: now,
-      },
-    }
-  );
+  const dispute = await ReservationDispute.findOne({ reservationId });
+  if (!dispute) {
+    return;
+  }
+  dispute.adminNote = pickString(note) || dispute.adminNote;
+  dispute.resolvedBy = adminUser?._id || dispute.resolvedBy;
+  dispute.resolvedAt = now;
+  if (decision === "approve_buyer") {
+    dispute.status = RESERVATION_DISPUTE_STATUS.BUYER_WIN;
+  } else if (decision === "approve_seller") {
+    dispute.status = RESERVATION_DISPUTE_STATUS.SELLER_WIN;
+  }
+  dispute.updatedAt = now;
+  await dispute.save();
 }
 
 async function refundToBuyer(adminUser, reservationId, { note } = {}) {
@@ -750,22 +881,20 @@ async function refundToBuyer(adminUser, reservationId, { note } = {}) {
     throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
   }
 
-  if (!canRefundReservation(reservation)) {
-    throw createServiceError(
-      "Chỉ xử lý tranh chấp khi cả buyer và seller đã gửi báo cáo. Nếu mới một bên báo cáo, hệ thống tự xử lý sau 24 giờ.",
-      400
-    );
-  }
+  await assertAdminCanProcessReservationDispute(reservation);
 
   const resolutionNote = requireAdminResolutionNote(note);
 
   await refundDepositIfHeld(reservation);
   await releaseVariantInventory(reservation);
 
-  reservation.status = RESERVATION_STATUS.REFUNDED;
-  reservation.cancelledAt = reservation.cancelledAt || new Date();
-  reservation.cancelReason = resolutionNote || "Admin hoàn cọc cho người mua.";
-  reservation.UpdatedAt = new Date();
+  const { applyDisputeResolution } = require("./reservationService");
+  applyDisputeResolution(reservation, {
+    cocChuyenDen: DEPOSIT_SETTLE_TO.BUYER,
+    cancelType: RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN,
+    cancelNote: resolutionNote,
+    at: new Date(),
+  });
   await reservation.save();
 
   await closePendingDisputeReports(adminUser, reservation._id, "approve_buyer", resolutionNote);
@@ -797,12 +926,7 @@ async function releaseToSeller(adminUser, reservationId, { note } = {}) {
     throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
   }
 
-  if (!canAdminProcessDispute(reservation)) {
-    throw createServiceError(
-      "Chỉ xử lý tranh chấp khi cả buyer và seller đã gửi báo cáo. Nếu mới một bên báo cáo, hệ thống tự xử lý sau 24 giờ.",
-      400
-    );
-  }
+  await assertAdminCanProcessReservationDispute(reservation);
 
   const resolutionNote = requireAdminResolutionNote(note);
 
@@ -812,18 +936,16 @@ async function releaseToSeller(adminUser, reservationId, { note } = {}) {
   }
 
   const now = new Date();
-  // Đền cọc cho seller nhưng KHÔNG tính là bán thành công: trả hàng về kho, đơn vào "Đã hủy".
   await releaseDepositIfHeld(reservation, shop);
   await releaseVariantInventory(reservation);
 
-  reservation.status = RESERVATION_STATUS.DISPUTE_RESOLVED;
-  reservation.cancelledAt = now;
-  reservation.cancelReason =
-    resolutionNote || "Admin xử lý tranh chấp: đền cọc cho người bán.";
-  reservation.UpdatedAt = now;
-  if (resolutionNote) {
-    reservation.note = [reservation.note, resolutionNote].filter(Boolean).join(" | ");
-  }
+  const { applyDisputeResolution } = require("./reservationService");
+  applyDisputeResolution(reservation, {
+    cocChuyenDen: DEPOSIT_SETTLE_TO.SELLER,
+    cancelType: RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN,
+    cancelNote: resolutionNote,
+    at: now,
+  });
   await reservation.save();
 
   await closePendingDisputeReports(adminUser, reservation._id, "approve_seller", resolutionNote);
@@ -844,6 +966,34 @@ async function releaseToSeller(adminUser, reservationId, { note } = {}) {
   return getReservationDetail(reservation._id);
 }
 
+async function rejectDispute(adminUser, reservationId, { note } = {}) {
+  const objectId = toObjectId(reservationId);
+  if (!objectId) {
+    throw createServiceError("ID đơn giữ hàng không hợp lệ.", 400);
+  }
+
+  const reservation = await Reservation.findById(objectId);
+  if (!reservation) {
+    throw createServiceError("Không tìm thấy đơn giữ hàng.", 404);
+  }
+
+  await assertAdminCanProcessReservationDispute(reservation);
+
+  const resolutionNote = requireAdminResolutionNote(note);
+  const dispute = await ReservationDispute.findOne({ reservationId: objectId });
+  if (!dispute) {
+    throw createServiceError("Không tìm thấy khiếu nại của đơn giữ hàng.", 404);
+  }
+
+  const reservationDisputeService = require("./reservationDisputeService");
+  await reservationDisputeService.adminRejectReport(adminUser, dispute._id, {
+    note: resolutionNote,
+  });
+
+  await emitOrderUpdated(reservation, { action: "admin_reject_dispute" });
+  return getReservationDetail(objectId);
+}
+
 async function cancelReservation(adminUser, reservationId, reason = "") {
   const objectId = toObjectId(reservationId);
   if (!objectId) {
@@ -862,20 +1012,26 @@ async function cancelReservation(adminUser, reservationId, reason = "") {
   ) {
     throw createServiceError("Không thể hủy đơn đã hoàn thành.", 400);
   }
-  if (status === RESERVATION_STATUS.REFUNDED || status === RESERVATION_STATUS.REJECTED) {
+  if (status >= RESERVATION_STATUS.PICKUP_CONFIRMED) {
+    throw createServiceError(
+      "Không thể hủy đơn đã nhận hàng hoặc đang trong luồng xử lý sau nhận hàng.",
+      400
+    );
+  }
+  if (status === RESERVATION_STATUS.CANCELLED || status === RESERVATION_STATUS.REJECTED) {
     return getReservationDetail(reservationId);
   }
 
   await refundDepositIfHeld(reservation);
   await releaseVariantInventory(reservation);
 
-  reservation.status = RESERVATION_STATUS.REFUNDED;
+  reservation.status = RESERVATION_STATUS.CANCELLED;
   reservation.cancelledAt = new Date();
-  reservation.cancelReason = pickString(reason) || "Admin hủy đơn.";
-  reservation.UpdatedAt = new Date();
+  reservation.cancelNote = pickString(reason) || "Admin hủy đơn.";
+  reservation.updatedAt = new Date();
   await reservation.save();
 
-  const cancelNote = reservation.cancelReason;
+  const cancelNote = reservation.cancelNote;
   await notifyReservationBoth(reservation, {
     title: "Admin đã hủy đơn giữ hàng",
     content: `Đơn giữ hàng đã bị admin hủy. Tiền cọc (nếu có) đã được hoàn về ví người mua.\n\nLý do: ${cancelNote}`,
@@ -884,11 +1040,14 @@ async function cancelReservation(adminUser, reservationId, reason = "") {
   });
 
   if (adminUser?._id) {
-    await writeAuditLog(adminUser, reservation._id, {
-      action: RESERVATION_AUDIT_ACTION.ADMIN_REFUND_BUYER,
-      decision: "buyer_win",
-      note: reservation.cancelReason,
-    });
+    const dispute = await ReservationDispute.findOne({ reservationId: reservation._id });
+    if (dispute) {
+      await writeAuditLog(adminUser, reservation._id, {
+        action: RESERVATION_AUDIT_ACTION.ADMIN_REFUND_BUYER,
+        decision: "buyer_win",
+        note: reservation.cancelNote,
+      });
+    }
   }
 
   await emitOrderUpdated(reservation, { action: "admin_cancel" });
@@ -902,6 +1061,7 @@ module.exports = {
   getReservationDetail,
   refundToBuyer,
   releaseToSeller,
+  rejectDispute,
   cancelReservation,
   createServiceError,
 };

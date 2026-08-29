@@ -29,6 +29,7 @@ import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { REALTIME_COALESCE_MS } from '../constants/realtime';
 import { formatDateActivity, formatPrice } from '../utils/format';
 import { resolveMediaUrl } from '../utils/resolveMediaUrl';
+import PreviewableImage from '../components/PreviewableImage';
 import { keepIfSame, mergeListById } from '../utils/realtimeList';
 import { resolveAdminListStatusMeta } from '../utils/reservationOrderTimeline';
 
@@ -70,22 +71,41 @@ const TABS = [
     statsKey: 'waitingPickup',
   },
   {
+    id: 'received',
+    label: 'Đã nhận hàng',
+    tabParam: 'pickup_confirmed',
+    statsKey: 'received',
+  },
+  {
+    id: 'completed',
+    label: 'Hoàn thành',
+    tabParam: 'completed',
+    statsKey: 'completed',
+  },
+  {
     id: 'disputes',
     label: 'Tranh chấp',
-    tabParam: 'disputes',
+    tabParam: 'dispute_active',
     statsKey: 'disputed',
   },
-  { id: 'completed', label: 'Hoàn thành', tabParam: 'completed', statsKey: 'completedAll' },
+  {
+    id: 'disputeResolved',
+    label: 'Tranh chấp đã xử lý',
+    tabParam: 'dispute_resolved',
+    statsKey: 'disputeResolved',
+  },
   { id: 'cancelled', label: 'Đã hủy', tabParam: 'cancelled', statsKey: 'cancelled' },
 ];
 
 const EMPTY_STATS = {
   total: 0,
   waitingPickup: 0,
+  received: 0,
   completed: 0,
   autoCompleted: 0,
   completedAll: 0,
   disputed: 0,
+  disputeResolved: 0,
   refunded: 0,
   cancelled: 0,
   pendingSellerConfirmation: 0,
@@ -102,8 +122,10 @@ function normalizeTab(raw) {
   ) {
     return 'pending';
   }
-  if (value === 'disputes' || value === 'dispute') return 'disputes';
+  if (value === 'disputes' || value === 'dispute' || value === 'dispute_active') return 'disputes';
+  if (value === 'dispute_resolved' || value === 'dispute_resolved_history') return 'disputeResolved';
   if (value === 'waiting' || value === 'waiting_pickup') return 'waiting';
+  if (value === 'received' || value === 'pickup_confirmed') return 'received';
   if (value === 'completed' || value === 'auto' || value === 'auto_completed') return 'completed';
   if (
     value === 'cancelled' ||

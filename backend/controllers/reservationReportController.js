@@ -1,4 +1,5 @@
 const reservationDisputeService = require("../services/reservationDisputeService");
+const buyerOpsService = require("../services/buyerOpsService");
 const { success, fail } = require("../utils/apiResponse");
 
 function pickBodyValue(body, keys) {
@@ -17,19 +18,26 @@ exports.buyerReportSeller = async (req, res) => {
     return fail(res, { status: 400, message: "Thiếu reservationId." });
   }
 
-  const data = await reservationDisputeService.buyerReportSeller(req.currentUser, {
-    reservationId: String(reservationId).trim(),
-    description: pickBodyValue(req.body, ["description", "content", "note"]),
-    reason: pickBodyValue(req.body, ["reason"]),
-    latitude: pickBodyValue(req.body, ["latitude", "lat"]),
-    longitude: pickBodyValue(req.body, ["longitude", "lng", "lon"]),
-    address: pickBodyValue(req.body, ["address", "systemAddress", "diaChi"]),
-    images: req.body.images || req.body.imageUrls || [],
-  });
+  const reason = pickBodyValue(req.body, ["reason"]);
+  const result = await buyerOpsService.reportReservationByBuyer(
+    req.currentUser,
+    String(reservationId).trim(),
+    {
+      description: pickBodyValue(req.body, ["description", "content", "note"]),
+      reason,
+      images: req.body.images || req.body.imageUrls || [],
+    }
+  );
+
+  const reservation = result?.reservation || result;
+  const report = result?.report || result?.dispute || null;
+  const isPostDelivery = Boolean(result?.dispute && !result?.report);
 
   return success(res, {
-    message: "Đã gửi báo cáo. Đơn chuyển sang tranh chấp, cọc giữ ở ví hệ thống chờ admin.",
-    data,
+    message: isPostDelivery
+      ? "Đã gửi khiếu nại. Shop có thời gian phản hồi, sau đó admin sẽ xử lý."
+      : "Đã gửi báo cáo. Đơn chuyển sang tranh chấp, cọc giữ ở ví hệ thống chờ admin.",
+    data: { reservation, report, ...(result?.dispute ? { dispute: result.dispute } : {}) },
   });
 };
 
@@ -42,11 +50,8 @@ exports.sellerReportBuyer = async (req, res) => {
 
   const data = await reservationDisputeService.sellerReportBuyer(req.currentUser, {
     reservationId: String(reservationId).trim(),
-    title: pickBodyValue(req.body, ["title", "sellerTitle"]),
+    reason: pickBodyValue(req.body, ["reason"]),
     description: pickBodyValue(req.body, ["description", "content", "note", "sellerContent"]),
-    latitude: pickBodyValue(req.body, ["latitude", "lat", "sellerLatitude"]),
-    longitude: pickBodyValue(req.body, ["longitude", "lng", "lon", "sellerLongitude"]),
-    address: pickBodyValue(req.body, ["address", "sellerAddress", "systemAddress", "diaChi"]),
     images: req.body.images || req.body.imageUrls || [],
   });
 

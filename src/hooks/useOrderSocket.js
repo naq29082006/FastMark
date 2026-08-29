@@ -8,8 +8,47 @@ let sharedSocket = null;
 let connectPromise = null;
 let listenerCount = 0;
 const listeners = new Set();
+const recentEvents = new Map();
+const ORDER_EVENT_DEDUPE_MS = 800;
+
+function buildOrderEventKey(payload) {
+  const reservationId = String(payload?.reservationId || payload?.id || '').trim();
+  if (!reservationId) {
+    return '';
+  }
+  return [
+    reservationId,
+    payload?.status ?? '',
+    payload?.action ?? '',
+    payload?.updatedAt ?? '',
+  ].join(':');
+}
+
+function shouldSkipDuplicateOrderEvent(payload) {
+  const key = buildOrderEventKey(payload);
+  if (!key) {
+    return false;
+  }
+  const now = Date.now();
+  const lastSeen = recentEvents.get(key);
+  if (lastSeen != null && now - lastSeen < ORDER_EVENT_DEDUPE_MS) {
+    return true;
+  }
+  recentEvents.set(key, now);
+  if (recentEvents.size > 200) {
+    for (const [entryKey, seenAt] of recentEvents) {
+      if (now - seenAt > ORDER_EVENT_DEDUPE_MS * 2) {
+        recentEvents.delete(entryKey);
+      }
+    }
+  }
+  return false;
+}
 
 function notifyListeners(payload) {
+  if (shouldSkipDuplicateOrderEvent(payload)) {
+    return;
+  }
   listeners.forEach((listener) => {
     try {
       listener(payload);

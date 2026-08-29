@@ -39,12 +39,15 @@ export async function getWalletOnBackend(idToken) {
 
 export async function getWalletTransactionsOnBackend(
   idToken,
-  { page = 1, limit = DEFAULT_PAGE_SIZE } = {}
+  { page = 1, limit = DEFAULT_PAGE_SIZE, type } = {}
 ) {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
+  if (type != null && String(type).trim() !== '') {
+    params.set('type', String(type));
+  }
   const response = await apiRequest(
     `${API_ENDPOINTS.walletTransactions}?${params.toString()}`,
     { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
@@ -95,6 +98,12 @@ export async function createWalletTopupOnBackend(idToken, amount) {
     orderCode: payload.data?.orderCode ?? null,
     paymentLinkId: payload.data?.paymentLinkId || '',
     description: payload.data?.description || '',
+    qrCode: payload.data?.qrCode || '',
+    accountNumber: payload.data?.accountNumber || '',
+    accountName: payload.data?.accountName || '',
+    bin: payload.data?.bin || '',
+    bankName: payload.data?.bankName || '',
+    amount: payload.data?.amount ?? null,
   };
 }
 
@@ -139,7 +148,10 @@ export async function listWalletBanksOnBackend(idToken) {
     AUTH_TIMEOUT_MS
   );
   const payload = await parseApiResponse(response);
-  return payload.data?.banks || [];
+  return {
+    banks: payload.data?.banks || [],
+    withdrawProfile: payload.data?.withdrawProfile || null,
+  };
 }
 
 export async function createWalletWithdrawOnBackend(idToken, body) {

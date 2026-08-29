@@ -9,14 +9,13 @@ import {
 } from 'react-native';
 
 import { fetchRouteGeometry } from '../../api/routingApi';
-import { formatDurationSeconds } from '../../core/utils/pickupDateTime';
 import {
-  estimateTravelDurationSeconds,
   formatDistanceLabel,
   getDistanceFromCurrentLocation,
   hasValidLocation,
   calculateDistanceMeters,
 } from '../../core/utils/geo';
+import { ROUTING_PROFILE } from '../../constants/routingProfile';
 import {
   computeRemainingRouteStats,
   findNearestSegmentIndex,
@@ -29,6 +28,7 @@ import { useScreenInsets } from '../../hooks/useScreenInsets';
 import LeafletMap from '../shared/components/LeafletMap';
 import CircularBackButton from '../shared/components/CircularBackButton';
 
+const ROUTE_PROFILE = ROUTING_PROFILE.MOTORBIKE;
 const REROUTE_THRESHOLD_METERS = 30;
 const ARRIVAL_THRESHOLD_METERS = 20;
 const REROUTE_COOLDOWN_MS = 10000;
@@ -142,7 +142,7 @@ export default function DirectionsScreen({
       routeFetchInFlightRef.current = true;
 
       try {
-        const geometry = await fetchRouteGeometry(origin, destinationWithIcon);
+        const geometry = await fetchRouteGeometry(origin, destinationWithIcon, { profile: ROUTE_PROFILE });
         if (!mountedRef.current) {
           return null;
         }
@@ -175,13 +175,6 @@ export default function DirectionsScreen({
     },
     [applyRemainingRoute, destinationWithIcon, markRouteTrimmed]
   );
-
-  const displayDurationSeconds = useMemo(() => {
-    if (!Number.isFinite(displayDistanceMeters)) {
-      return null;
-    }
-    return estimateTravelDurationSeconds(displayDistanceMeters);
-  }, [displayDistanceMeters]);
 
   const hasRoutePolyline = Boolean(routePolyline?.coordinates?.length);
 
@@ -273,6 +266,17 @@ export default function DirectionsScreen({
     return undefined;
   }, [liveLocation, processNavigationUpdate, updateDisplayDistance]);
 
+  useEffect(() => {
+    if (!hasValidLocation(liveLocation) || !hasValidLocation(destinationWithIcon)) {
+      return undefined;
+    }
+    fullRouteRef.current = null;
+    lastSegmentIndexRef.current = 0;
+    setRoutePolyline(null);
+    fetchAndApplyRoute(liveLocation, { fitBounds: true });
+    return undefined;
+  }, [destinationWithIcon, fetchAndApplyRoute, liveLocation]);
+
   const handleMapEvent = useCallback((payload) => {
     if (payload?.type === 'userMovedMap') {
       setFollowUser(false);
@@ -283,7 +287,7 @@ export default function DirectionsScreen({
     if (!hasValidLocation(liveLocation)) {
       return;
     }
-    setFollowUser(true);
+    setFollowUser(false);
     setRecenterRequest({
       location: liveLocation,
       at: Date.now(),
@@ -303,14 +307,6 @@ export default function DirectionsScreen({
           onEvent={handleMapEvent}
         />
 
-        <View style={styles.topBar} pointerEvents="box-none">
-          <CircularBackButton
-            onPress={onStop}
-            variant="surface"
-            accessibilityLabel="Thoát chỉ đường"
-          />
-        </View>
-
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Về vị trí của tôi"
@@ -322,34 +318,38 @@ export default function DirectionsScreen({
       </View>
 
       <View style={[styles.directionsCard, { paddingBottom: 12 + insets.bottomSpacing }]}>
-        <View style={styles.directionsCardHeader}>
-          {isRemoteIcon(storeAvatar) ? (
-            <Image source={{ uri: storeAvatar }} style={styles.directionsCardImage} />
-          ) : (
-            <View style={styles.directionsCardImagePlaceholder}>
-              <Text style={styles.directionsCardIcon}>🏪</Text>
-            </View>
-          )}
-          <View style={styles.directionsCardTitles}>
-            <Text style={styles.directionsTitle}>Chỉ đường đến {session?.storeName || 'Gian hàng'}</Text>
-            {Number.isFinite(displayDistanceMeters) ? (
-              <Text style={styles.directionsMeta}>
-                {formatDistanceLabel(displayDistanceMeters)} • {formatDurationSeconds(displayDurationSeconds)}
-              </Text>
+        <View style={styles.directionsTopRow}>
+          <CircularBackButton
+            onPress={onStop}
+            variant="surface"
+            accessibilityLabel="Thoát chỉ đường"
+          />
+          <View style={styles.directionsCardHeader}>
+            {isRemoteIcon(storeAvatar) ? (
+              <Image source={{ uri: storeAvatar }} style={styles.directionsCardImage} />
             ) : (
-              <Text style={styles.directionsMeta}>
-                {!hasValidLocation(liveLocation)
-                  ? 'Đang lấy vị trí GPS...'
-                  : hasRoutePolyline
-                    ? 'Đang cập nhật khoảng cách...'
-                    : 'Đang tính lộ trình...'}
-              </Text>
+              <View style={styles.directionsCardImagePlaceholder}>
+                <Text style={styles.directionsCardIcon}>🏪</Text>
+              </View>
             )}
-            {Number.isFinite(displayDistanceMeters) ? (
-              <Text style={styles.directionsLiveMeta}>
-                Còn khoảng {formatDistanceLabel(displayDistanceMeters)} phía trước
+            <View style={styles.directionsCardTitles}>
+              <Text style={styles.directionsTitle}>
+                Chỉ đường đến: {session?.storeName || 'Gian hàng'}
               </Text>
-            ) : null}
+              {Number.isFinite(displayDistanceMeters) ? (
+                <Text style={styles.directionsLiveMeta}>
+                  Còn khoảng {formatDistanceLabel(displayDistanceMeters)} phía trước
+                </Text>
+              ) : (
+                <Text style={styles.directionsLiveMeta}>
+                  {!hasValidLocation(liveLocation)
+                    ? 'Đang lấy vị trí GPS...'
+                    : hasRoutePolyline
+                      ? 'Đang cập nhật khoảng cách...'
+                      : 'Đang tính lộ trình...'}
+                </Text>
+              )}
+            </View>
           </View>
         </View>
         <View style={styles.directionsActions}>
@@ -378,10 +378,16 @@ const styles = StyleSheet.create({
     left: 14,
     zIndex: 20,
   },
+  directionsTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
+  },
   recenterButton: {
     position: 'absolute',
     right: 14,
-    bottom: 14,
+    bottom: 20,
     minHeight: 38,
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -419,10 +425,10 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   directionsCardHeader: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    marginBottom: 12,
   },
   directionsCardIcon: {
     fontSize: 22,
@@ -452,15 +458,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0f172a',
   },
-  directionsMeta: {
+  directionsLiveMeta: {
     fontSize: 13,
     fontWeight: '600',
     color: '#076F32',
-  },
-  directionsLiveMeta: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
   },
   directionsActions: {
     flexDirection: 'row',

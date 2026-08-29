@@ -43,13 +43,3 @@ export async function getPublicUserProfileOnBackend(idToken, userId) {
   const payload = await parseApiResponse(response);
   return payload.data || null;
 }
-
-export async function getPublicUserFollowingOnBackend(idToken, userId, { page = 1, limit = 30 } = {}) {
-  const response = await apiRequest(
-    `${API_ENDPOINTS.buyerUserFollowing(userId)}${toQuery({ page, limit })}`,
-    { method: 'GET', headers: { Authorization: `Bearer ${idToken}` } },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data || { items: [], pagination: { page: 1, limit, total: 0, totalPages: 1 } };
-}

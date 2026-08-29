@@ -3,12 +3,21 @@ import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   RESERVATION_DISPUTE_REASON,
   RESERVATION_DISPUTE_REASON_LABELS,
-  RESERVATION_STATUS,
   VIEWER_ROLE,
-  DISPUTE_ADMIN_PENDING_FOOTER,
+  buildActiveDisputeDetailNotice,
+  buildDisputeAdminPendingFooter,
   buildDisputeReportOrder,
+  buildDisputeSideSummaryLine,
+  DISPUTE_FOOTER_CONTEXT,
+  getSellerDisputeReasonPickerLabel,
+  hasSellerPostDeliveryResponse,
+  isActiveDisputeOrder,
   reservationHasDisputeContext,
 } from '../../../constants/sellerOrders';
+import {
+  getActiveDisputeResponseCountdownLabel,
+} from '../../../core/utils/escrowHold';
+import { useMinuteNow } from '../../../hooks/useMinuteNow';
 
 function formatDateTime(iso) {
   if (!iso) {
@@ -28,22 +37,32 @@ function getReportCreatedAt(report) {
 }
 
 function getBuyerReasonLabel(report, reservation) {
+  const code = report?.reason || reservation?.buyerDisputeReason || reservation?.disputeReason;
   return (
     report?.reasonLabel ||
     RESERVATION_DISPUTE_REASON_LABELS[report?.reason] ||
+    String(reservation?.buyerDisputeReasonLabel || '').trim() ||
+    RESERVATION_DISPUTE_REASON_LABELS[reservation?.buyerDisputeReason] ||
     reservation?.disputeReasonLabel ||
-    RESERVATION_DISPUTE_REASON_LABELS[reservation?.disputeReason] ||
+    RESERVATION_DISPUTE_REASON_LABELS[code] ||
     report?.title ||
     ''
   );
 }
 
-function getSellerReasonLabel(report) {
+function getSellerReasonLabel(report, reservation) {
+  const code =
+    report?.reason ||
+    reservation?.sellerDisputeReason ||
+    (reservation?.disputeBySeller ? reservation?.disputeReason : '');
   return (
     report?.reasonLabel ||
     RESERVATION_DISPUTE_REASON_LABELS[report?.reason] ||
-    RESERVATION_DISPUTE_REASON_LABELS[RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW] ||
-    'Người mua không đến nhận hàng'
+    getSellerDisputeReasonPickerLabel(code) ||
+    String(reservation?.sellerDisputeReasonLabel || '').trim() ||
+    RESERVATION_DISPUTE_REASON_LABELS[reservation?.sellerDisputeReason] ||
+    RESERVATION_DISPUTE_REASON_LABELS[code] ||
+    getSellerDisputeReasonPickerLabel(RESERVATION_DISPUTE_REASON.BUYER_NO_SHOW)
   );
 }
 
@@ -68,32 +87,54 @@ function getReportHeading(side, viewerRole) {
     (side === 'buyer' && isViewerBuyer) || (side === 'seller' && !isViewerBuyer);
 
   if (isOwnReport) {
-    return 'Báo cáo của bạn';
+    return side === 'buyer' ? 'Khiếu nại của người mua' : 'Báo cáo của người bán';
   }
 
-  return side === 'buyer' ? 'Báo cáo của người mua' : 'Báo cáo của người bán';
+  return side === 'buyer' ? 'Khiếu nại của người mua' : 'Báo cáo của người bán';
 }
 
-function getSummaryLine(side, viewerRole, reasonLabel) {
-  const reason = String(reasonLabel || '').trim() || '—';
-  const isViewerBuyer = viewerRole === VIEWER_ROLE.BUYER;
+function getSummaryLine(side, viewerRole, reasonLabel, isResponse = false) {
+  return buildDisputeSideSummaryLine(side, viewerRole, reasonLabel, { isResponse });
+}
 
-  if (side === 'buyer') {
-    return isViewerBuyer
-      ? `Bạn đã báo cáo: ${reason}`
-      : `Người mua đã báo cáo: ${reason}`;
+function SellerResponseBlock({ reservation, viewerRole }) {
+  const response = reservation?.sellerResponse;
+  const content = String(response?.content || '').trim();
+  const images = Array.isArray(response?.images) ? response.images.filter(Boolean) : [];
+  const respondedAt = reservation?.tgPhShop || null;
+
+  if (!hasSellerPostDeliveryResponse(reservation) || !content) {
+    return null;
   }
 
-  return isViewerBuyer
-    ? `Shop đã báo cáo: ${reason}`
-    : `Bạn đã báo cáo: ${reason}`;
+  return (
+    <View style={styles.reportItem}>
+      <Text style={styles.reportItemTitle}>Phản hồi của người bán</Text>
+      <Text style={styles.summaryLine}>Người bán đã phản hồi khiếu nại</Text>
+      <Text style={styles.reportBody}>{content}</Text>
+      {respondedAt ? (
+        <Text style={styles.reportMeta}>Lúc: {formatDateTime(respondedAt)}</Text>
+      ) : null}
+      {images.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reportPhotos}>
+          {images.map((image) => (
+            <Image
+              key={image.id || image.imageUrl}
+              source={{ uri: image.imageUrl }}
+              style={styles.reportPhoto}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
 }
 
-function DisputeReportBlock({ side, report, reservation, viewerRole }) {
+function DisputeReportBlock({ side, report, reservation, viewerRole, isResponse = false }) {
   const reasonLabel =
     side === 'buyer'
       ? getBuyerReasonLabel(report, reservation)
-      : getSellerReasonLabel(report);
+      : getSellerReasonLabel(report, reservation);
   const content =
     side === 'seller'
       ? report?.sellerContent || report?.content || report?.description || ''
@@ -105,7 +146,7 @@ function DisputeReportBlock({ side, report, reservation, viewerRole }) {
     <View style={styles.reportItem}>
       <Text style={styles.reportItemTitle}>{getReportHeading(side, viewerRole)}</Text>
       <Text style={styles.summaryLine}>
-        {getSummaryLine(side, viewerRole, reasonLabel)}
+        {getSummaryLine(side, viewerRole, reasonLabel, isResponse)}
       </Text>
       {content ? <Text style={styles.reportBody}>{content}</Text> : null}
       {createdAt ? (
@@ -132,33 +173,60 @@ export default function ReservationDisputeSection({
   sellerReport,
   viewerRole = VIEWER_ROLE.BUYER,
 }) {
+  const currentTime = useMinuteNow(true);
+
   if (!reservationHasDisputeContext(reservation, { buyerReport, sellerReport })) {
     return null;
   }
 
+  const disputeCountdownLabel = isActiveDisputeOrder(reservation)
+    ? getActiveDisputeResponseCountdownLabel(reservation, currentTime, viewerRole)
+    : '';
+  const responseCountdown = isActiveDisputeOrder(reservation)
+    ? buildDisputeAdminPendingFooter(
+        reservation,
+        viewerRole,
+        DISPUTE_FOOTER_CONTEXT.DETAIL,
+        currentTime
+      )
+    : '';
+  const waitingNotice = isActiveDisputeOrder(reservation)
+    ? buildActiveDisputeDetailNotice(reservation, viewerRole, currentTime)
+    : null;
+
   const orderedReports = buildOrderedReports(buyerReport, sellerReport, reservation);
-  const showPendingAdminNotice =
-    Number(reservation?.status) === RESERVATION_STATUS.DISPUTED;
 
   return (
     <View style={styles.section}>
       <View style={styles.divider} />
       <Text style={styles.heading}>TRANH CHẤP</Text>
 
-      {orderedReports.map((entry) => (
+      {orderedReports.map((entry, index) => (
         <DisputeReportBlock
           key={entry.side}
           side={entry.side}
           report={entry.report}
           reservation={reservation}
           viewerRole={viewerRole}
+          isResponse={index > 0}
         />
       ))}
 
-      {showPendingAdminNotice ? (
+      {responseCountdown ? (
+        <Text style={styles.countdownLine}>{responseCountdown}</Text>
+      ) : disputeCountdownLabel ? (
+        <Text style={styles.countdownLine}>{disputeCountdownLabel}</Text>
+      ) : null}
+
+      <SellerResponseBlock reservation={reservation} viewerRole={viewerRole} />
+
+      {waitingNotice ? (
         <>
           <View style={styles.divider} />
-          <Text style={styles.adminPendingNotice}>{DISPUTE_ADMIN_PENDING_FOOTER}</Text>
+          <Text style={styles.pendingTitle}>{waitingNotice.title}</Text>
+          {waitingNotice.body ? (
+            <Text style={styles.pendingBody}>{waitingNotice.body}</Text>
+          ) : null}
         </>
       ) : null}
     </View>
@@ -175,11 +243,18 @@ const styles = StyleSheet.create({
     marginVertical: 14,
   },
   heading: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 0.6,
-    color: '#64748b',
+    letterSpacing: 0.2,
+    color: '#0f172a',
     marginBottom: 10,
+  },
+  countdownLine: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 10,
+    lineHeight: 22,
   },
   reportItem: {
     backgroundColor: '#f8fafc',
@@ -223,9 +298,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
     backgroundColor: '#e2e8f0',
   },
-  adminPendingNotice: {
+  pendingTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#b91c1c',
+    letterSpacing: 0.2,
+    marginBottom: 6,
+  },
+  pendingBody: {
     fontSize: 13,
-    color: '#64748b',
+    color: '#334155',
     fontWeight: '600',
     lineHeight: 20,
   },

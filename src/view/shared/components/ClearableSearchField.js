@@ -13,6 +13,8 @@ export default function ClearableSearchField({
   autoCorrect = false,
   autoFocus = false,
   inputRef = null,
+  onFocus,
+  onBlur,
 }) {
   const hasValue = String(value || '').length > 0;
 
@@ -31,6 +33,8 @@ export default function ClearableSearchField({
         autoCapitalize={autoCapitalize}
         autoCorrect={autoCorrect}
         autoFocus={autoFocus}
+        onFocus={onFocus}
+        onBlur={onBlur}
         clearButtonMode="never"
       />
       {hasValue ? (

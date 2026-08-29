@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react';
 
+import PreviewableImageGrid from '../PreviewableImage';
 import { formatDateTimeDetail, formatMoney } from '../../utils/format';
 import { buildReservationOrderTimeline } from '../../utils/reservationOrderTimeline';
 
@@ -96,26 +97,22 @@ export default function ReservationOrderProgress({ reservation }) {
             <OutcomeRow label="Lý do">{outcome.reason}</OutcomeRow>
           </div>
 
-          {outcome.sellerCancelNote || outcome.sellerCancelImages.length > 0 ? (
+          {outcome.sellerCancelNote || outcome.anhHuyShop.length > 0 ? (
             <div className="reservation-order-outcome-evidence">
               {outcome.sellerCancelNote ? (
                 <OutcomeRow label="Lý do người bán nhập">{outcome.sellerCancelNote}</OutcomeRow>
               ) : null}
-              {outcome.sellerCancelImages.length > 0 ? (
+              {outcome.anhHuyShop.length > 0 ? (
                 <div className="reservation-order-outcome-row reservation-order-outcome-row--block">
                   <span className="reservation-order-outcome-label">Hình ảnh minh chứng:</span>
                   <div className="reservation-order-outcome-images">
-                    {outcome.sellerCancelImages.map((url) => (
-                      <a
-                        key={url}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="reservation-order-outcome-image-link"
-                      >
-                        <img src={url} alt="Minh chứng hủy đơn" />
-                      </a>
-                    ))}
+                    <PreviewableImageGrid
+                      items={outcome.anhHuyShop}
+                      width={88}
+                      height={88}
+                      getSrc={(url) => url}
+                      getAlt={() => 'Minh chứng hủy đơn'}
+                    />
                   </div>
                 </div>
               ) : null}

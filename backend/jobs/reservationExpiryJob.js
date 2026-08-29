@@ -1,7 +1,7 @@
 const reservationService = require("../services/reservationService");
 
-/** Cron quyết định cọc mỗi 5 phút khi hết hạn PickupTime + 24h. */
-const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
+/** Quét lifecycle đơn (quá giờ nhận, auto giải ngân…) — 60s để UI realtime hơn. */
+const DEFAULT_INTERVAL_MS = 60 * 1000;
 
 function startReservationExpiryJob(intervalMs = DEFAULT_INTERVAL_MS) {
   const run = async () => {

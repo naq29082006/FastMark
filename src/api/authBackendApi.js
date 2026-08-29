@@ -6,7 +6,11 @@ async function parseApiResponse(response) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok || payload.success === false) {
-    const error = new Error(payload.message || 'Yêu cầu API thất bại.');
+    const message =
+      payload.message ||
+      payload.error ||
+      `Yêu cầu API thất bại (${response.status}).`;
+    const error = new Error(message);
     error.statusCode = response.status;
     error.code = payload.code || '';
     error.field = payload.field || '';

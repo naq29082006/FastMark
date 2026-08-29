@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { useDispatch } from 'react-redux';
 
 import { discoverProductsOnBackend, getProductCategoriesOnBackend, listPromotionProductsOnBackend } from '../../api/productApi';
 import {
@@ -25,7 +24,6 @@ import {
 import { listActiveBannersOnBackend, recordBannerClickOnBackend } from '../../api/bannerApi';
 import { formatDistance, hasValidLocation, normalizeExpoLocation, getDistanceFromCurrentLocation } from '../../core/utils/geo';
 import { formatPriceRange, getProductPromoPriceLabels } from '../../core/utils/productFormat';
-import { confirmLogout } from '../../core/utils/appAlert';
 import { resolveShopAvatarUri } from '../../core/utils/avatarInitial';
 import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
 import { mergeListById } from '../../core/utils/realtimeList';
@@ -36,13 +34,11 @@ import { loadNearbyRegisteredShops } from '../../viewmodel/map/mapViewModel';
 import { normalizeProduct } from '../../model/productModel';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { usePublicSocket } from '../../hooks/usePublicSocket';
-import { logoutUser } from '../../viewmodel/auth/authSlice';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import StoreDetailScreen from '../store/StoreDetailScreen';
 import SearchScreen from './SearchScreen';
 import BuyerProfileScreen from '../profile/BuyerProfileScreen';
 import AvatarBadge from '../shared/components/AvatarBadge';
-import BuyerQuickMenu from '../shared/components/BuyerQuickMenu';
 
 const NEARBY_RADIUS_METERS = 5000;
 const ALL_PRODUCTS_RADIUS_METERS = 20000;
@@ -405,6 +401,7 @@ export default function HomeScreen({
   onOpenShop,
   onOpenWalletTopUp,
   onNavigateDirections,
+  returnStoreRequest = null,
   resumeReserveRequest = null,
   onResumeReserveHandled,
   keepNestedAcrossTabs = false,
@@ -412,7 +409,6 @@ export default function HomeScreen({
   onNavigationStateChange,
 }) {
   const insets = useScreenInsets();
-  const dispatch = useDispatch();
 
   const [currentLocation, setCurrentLocation] = useState(null);
   const [products, setProducts] = useState([]);
@@ -453,7 +449,20 @@ export default function HomeScreen({
   const [selectedBuyerUserId, setSelectedBuyerUserId] = useState(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [showSearchScreen, setShowSearchScreen] = useState(false);
+  const [returnToSearchAfterDetail, setReturnToSearchAfterDetail] = useState(false);
+  const searchDetailStackRef = useRef({ productId: null, storeId: null });
+  const lastReturnStoreAtRef = useRef(0);
   const [seeAllSection, setSeeAllSection] = useState(null);
+
+  useEffect(() => {
+    const requestAt = returnStoreRequest?.at || 0;
+    if (!returnStoreRequest?.storeId || requestAt === lastReturnStoreAtRef.current) {
+      return;
+    }
+    lastReturnStoreAtRef.current = requestAt;
+    setSelectedProductId(null);
+    setSelectedStoreId(String(returnStoreRequest.storeId));
+  }, [returnStoreRequest]);
 
   useEffect(() => {
     onNavigationStateChange?.(
@@ -973,11 +982,24 @@ export default function HomeScreen({
     }
   }
 
+  function openFromSearch(openDetail) {
+    setReturnToSearchAfterDetail(true);
+    searchDetailStackRef.current = { productId: null, storeId: null };
+    setShowSearchScreen(false);
+    openDetail();
+  }
+
   if (selectedBuyerUserId) {
     return (
       <BuyerProfileScreen
         userId={selectedBuyerUserId}
-        onBack={() => setSelectedBuyerUserId(null)}
+        onBack={() => {
+          setSelectedBuyerUserId(null);
+          if (returnToSearchAfterDetail) {
+            setReturnToSearchAfterDetail(false);
+            setShowSearchScreen(true);
+          }
+        }}
         onOpenShop={(shopId) => {
           setSelectedBuyerUserId(null);
           setSelectedStoreId(String(shopId));
@@ -994,14 +1016,33 @@ export default function HomeScreen({
         onBack={() => {
           setSelectedProductId(null);
           onResumeReserveHandled?.();
+          const returnStoreId = searchDetailStackRef.current.storeId;
+          if (returnStoreId) {
+            searchDetailStackRef.current.storeId = null;
+            setSelectedStoreId(String(returnStoreId));
+            return;
+          }
+          if (returnToSearchAfterDetail) {
+            setReturnToSearchAfterDetail(false);
+            searchDetailStackRef.current = { productId: null, storeId: null };
+            setShowSearchScreen(true);
+          }
         }}
         onStorePress={(storeId) => {
+          if (returnToSearchAfterDetail) {
+            searchDetailStackRef.current.productId = String(selectedProductId || '');
+            searchDetailStackRef.current.storeId = null;
+          }
           setSelectedProductId(null);
           setSelectedStoreId(storeId);
         }}
-        onOrderSuccess={onOpenBuyerOrders}
+        onOrderSuccess={(tab) => {
+          setSelectedProductId(null);
+          setSelectedStoreId(null);
+          onOpenBuyerOrders?.(tab);
+        }}
         onOpenTopUp={onOpenWalletTopUp}
-        reservationSource="home"
+        reservationSource="products"
         resumeReserveRequest={
           resumeReserveRequest &&
           String(resumeReserveRequest.productId) === String(selectedProductId)
@@ -1018,12 +1059,36 @@ export default function HomeScreen({
       <StoreDetailScreen
         storeId={selectedStoreId}
         originLocation={currentLocation}
-        onBack={() => setSelectedStoreId(null)}
+        onBack={() => {
+          setSelectedStoreId(null);
+          const returnProductId = searchDetailStackRef.current.productId;
+          if (returnProductId) {
+            searchDetailStackRef.current.productId = null;
+            setSelectedProductId(String(returnProductId));
+            return;
+          }
+          if (returnToSearchAfterDetail) {
+            setReturnToSearchAfterDetail(false);
+            searchDetailStackRef.current = { productId: null, storeId: null };
+            setShowSearchScreen(true);
+          }
+        }}
         onProductPress={(productId) => {
+          if (returnToSearchAfterDetail) {
+            searchDetailStackRef.current.productId = null;
+            searchDetailStackRef.current.storeId = String(selectedStoreId || '');
+          }
           setSelectedStoreId(null);
           setSelectedProductId(productId);
         }}
         onNavigateDirections={onNavigateDirections}
+        onOrderSuccess={(tab) => {
+          setSelectedProductId(null);
+          setSelectedStoreId(null);
+          onOpenBuyerOrders?.(tab);
+        }}
+        onOpenTopUp={onOpenWalletTopUp}
+        reservationSource="products"
       />
     );
   }
@@ -1032,18 +1097,18 @@ export default function HomeScreen({
     return (
       <SearchScreen
         currentLocation={currentLocation}
-        onBack={() => setShowSearchScreen(false)}
-        onOpenProduct={(productId) => {
+        onBack={() => {
           setShowSearchScreen(false);
-          setSelectedProductId(String(productId));
+          setReturnToSearchAfterDetail(false);
+        }}
+        onOpenProduct={(productId) => {
+          openFromSearch(() => setSelectedProductId(String(productId)));
         }}
         onOpenShop={(shopId) => {
-          setShowSearchScreen(false);
-          setSelectedStoreId(String(shopId));
+          openFromSearch(() => setSelectedStoreId(String(shopId)));
         }}
         onOpenBuyer={(userId) => {
-          setShowSearchScreen(false);
-          setSelectedBuyerUserId(String(userId));
+          openFromSearch(() => setSelectedBuyerUserId(String(userId)));
         }}
       />
     );
@@ -1199,17 +1264,8 @@ export default function HomeScreen({
         }
       >
         <View style={styles.headerRow}>
-          <BuyerQuickMenu
-            onEditAccount={onEditAccount}
-            onOpenWallet={onOpenWallet}
-            onOpenFavoriteProducts={onOpenFavoriteProducts}
-            onOpenReport={onOpenReport}
-            onLogout={() => confirmLogout(() => dispatch(logoutUser()))}
-            buttonStyle={styles.utilityBtn}
-            iconColor="#334155"
-          />
-          <Text style={styles.brandTitle} numberOfLines={1}>
-            FastMark
+          <Text style={styles.screenTitle} numberOfLines={1}>
+            Sản phẩm
           </Text>
           <View style={styles.headerRight}>
             <Pressable
@@ -1439,6 +1495,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
+  },
+  screenTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: 0.1,
   },
   brandTitle: {
     flex: 1,

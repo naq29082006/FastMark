@@ -14,12 +14,19 @@ const SellerVerificationSchema = new mongoose.Schema({
     index: true,
   },
 
-  // URL ảnh CCCD mặt trước.
-  cccdFrontImage: { type: String, default: "" },
-  // URL ảnh CCCD mặt sau.
-  cccdBackImage: { type: String, default: "" },
+  // URL ảnh CCCD mặt trước / sau.
+  anhCccdTruoc: { type: String, default: "" },
+  anhCccdSau: { type: String, default: "" },
   // URL ảnh selfie cầm CCCD / xác minh khuôn mặt.
   selfieImage: { type: String, default: "" },
+
+  // Họ tên in trên CCCD/CMND (KYC).
+  fullName: { type: String, default: "", trim: true },
+  // Số CCCD/CMND (chỉ chữ số, 9 hoặc 12).
+  cccdNumber: { type: String, default: "", trim: true, index: true },
+
+  // URL ảnh giấy phép kinh doanh hoặc giấy chứng nhận ATTP.
+  anhKD: { type: String, default: "" },
 
   // Danh mục kinh doanh đề xuất (ref ShopCategory).
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "ShopCategory" },
@@ -28,16 +35,15 @@ const SellerVerificationSchema = new mongoose.Schema({
   shopName: { type: String, default: "", trim: true },
   // Username gian hàng (@handle).
   shopUsername: { type: String, default: "", trim: true, lowercase: true, index: true },
-  // Mô tả / giới thiệu gian hàng (tùy chọn lúc đăng ký).
-  shopDescription: { type: String, default: "" },
 
   // Địa chỉ hệ thống / geocode.
   addressHeThong: { type: String, default: "" },
 
-  // Vĩ độ (GPS), null nếu chưa có.
-  latitude: { type: Number, default: null },
-  // Kinh độ (GPS), null nếu chưa có.
-  longitude: { type: Number, default: null },
+  // Tọa độ GPS gian hàng lúc đăng ký.
+  latlong: {
+    lat: { type: Number, default: null },
+    long: { type: Number, default: null },
+  },
 
   // Trạng thái KYC: 0 = chờ duyệt, 1 = duyệt, 2 = từ chối.
   status: { type: Number, default: 0, index: true },

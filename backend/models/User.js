@@ -73,17 +73,11 @@ const userSchema = new mongoose.Schema({
   // Thời điểm bắt đầu lượt khóa hiện tại (khiếu nại khóa gắn theo lượt này).
   lockedAt: { type: Date, default: null },
 
-  // Số người mà user đang theo dõi (Follow.followerId).
-  FollowingCount: { type: Number, default: 0 },
+  // Số gian hàng mà tài khoản này đang theo dõi (Follow.followerId → shopId).
+  SoTheoDoi: { type: Number, default: 0 },
 
-  // Số người đang theo dõi user này (Follow.followedUserId).
-  FollowersCount: { type: Number, default: 0 },
-
-  // Đang online (presence realtime).
-  DangHoatDong: { type: Boolean, default: false },
-
-  // Lần hoạt động gần nhất (presence).
-  LanHoatDongCuoi: { type: Date, default: null },
+  // Lần hoạt động gần nhất — admin theo dõi, cập nhật khi user online/offline hoặc tương tác.
+  HoatDongCuoi: { type: Date, default: null },
 
   // true sau khi xác nhận mã OTP email (đăng ký email). Google có thể set sẵn true.
   VerifyAccount: { type: Boolean, default: false },
@@ -117,8 +111,7 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     verifyAccount: this.VerifyAccount,
     // Tương thích client: đã xác minh SĐT khi có Phone hợp lệ.
     sellerPhoneVerified: isPhoneVerified(this),
-    followingCount: Number(this.FollowingCount) || 0,
-    followersCount: Number(this.FollowersCount) || 0,
+    followingCount: Number(this.SoTheoDoi ?? this.SoTheoDoi) || 0,
     createdAt: this.CreatedAt,
     updatedAt: this.UpdatedAt,
   };

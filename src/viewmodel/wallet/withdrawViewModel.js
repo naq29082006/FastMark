@@ -15,7 +15,14 @@ async function requireToken() {
 
 export async function loadWithdrawBanksViewModel() {
   const idToken = await requireToken();
-  return listWalletBanksOnBackend(idToken);
+  const data = await listWalletBanksOnBackend(idToken);
+  if (Array.isArray(data)) {
+    return { banks: data, withdrawProfile: null };
+  }
+  return {
+    banks: Array.isArray(data?.banks) ? data.banks : [],
+    withdrawProfile: data?.withdrawProfile || null,
+  };
 }
 
 export async function loadMyWithdrawsViewModel({ page = 1, limit = 20 } = {}) {

@@ -66,6 +66,7 @@ exports.listProducts = async (req, res) => {
   const data = await adminCatalogService.listProducts({
     search: pickQueryValue(req.query, ["search", "q"]),
     status: pickQueryValue(req.query, ["status"]),
+    removedBy: pickQueryValue(req.query, ["removedBy", "removed_by"]),
     shopId: pickQueryValue(req.query, ["shopId"]),
     categoryId: pickQueryValue(req.query, ["categoryId"]),
     page: req.query.page,
@@ -91,7 +92,7 @@ exports.showProduct = async (req, res) => {
 };
 
 exports.deleteProduct = async (req, res) => {
-  const reason = pickBodyValue(req.body, ["reason", "violationReason"]);
+  const reason = pickBodyValue(req.body, ["reason", "lyDoVP"]);
   const product = await adminCatalogService.deleteProduct(req.params.id, reason);
   return success(res, { message: "Đã gỡ sản phẩm và thông báo cho shop.", data: { product } });
 };
@@ -113,7 +114,7 @@ exports.getReservationDetail = async (req, res) => {
 };
 
 exports.cancelReservation = async (req, res) => {
-  const reason = pickBodyValue(req.body, ["reason", "cancelReason"]);
+  const reason = pickBodyValue(req.body, ["reason", "cancelNote", "cancelReason"]);
   const reservation = await adminCatalogService.cancelReservation(req.params.id, reason);
   return success(res, { message: "Đã hủy đơn giữ hàng.", data: { reservation } });
 };

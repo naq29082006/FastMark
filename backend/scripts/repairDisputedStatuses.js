@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const { mongoUri } = require("../config/env");
 const { processReservationLifecycle } = require("../services/reservationService");
 const Reservation = require("../models/Reservation");
+const { RESERVATION_STATUS } = require("../constants");
 
 async function main() {
   await mongoose.connect(mongoUri);
@@ -13,7 +14,8 @@ async function main() {
     $or: [{ disputeByBuyer: true }, { disputeBySeller: true }],
   });
   const disputeCancelled = await Reservation.countDocuments({
-    status: { $in: [6, 7] },
+    status: RESERVATION_STATUS.DISPUTED,
+    cocChuyenDen: { $in: [1, 2] },
     $or: [{ disputeByBuyer: true }, { disputeBySeller: true }],
   });
   console.log(JSON.stringify({ result, stillMislabeled, disputeCancelled }, null, 2));

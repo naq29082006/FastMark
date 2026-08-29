@@ -20,8 +20,10 @@ import {
 } from '../../viewmodel/auth/authSelectors';
 import { uploadUserAvatar, syncSellerAccess, loadUserProfile, applyShopSettingsToProfile, clearAuthFeedback } from '../../viewmodel/auth/authSlice';
 import { getMyProductsOnBackend } from '../../api/productApi';
+import { getBuyerOrdersOnBackend } from '../../api/buyerOpsApi';
 import { getSellerShopSettingsOnBackend } from '../../api/sellerOpsApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
+import { RESERVATION_TAB } from '../../constants/sellerOrders';
 import StarRating from '../store/components/StarRating';
 import ProfileSideDrawer from '../shared/components/ProfileSideDrawer';
 import AvatarBadge from '../shared/components/AvatarBadge';
@@ -143,6 +145,25 @@ function BuyerMenuItem({ icon, title, subtitle, onPress }) {
   );
 }
 
+function BuyerOrderStatTile({ icon, iconColor, iconBg, title, value, subtitle, onPress }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.buyerOrderStatTile, pressed && styles.buttonPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <View style={[styles.buyerOrderStatIconWrap, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon} size={18} color={iconColor} />
+      </View>
+      <View style={styles.buyerOrderStatCopy}>
+        <Text style={styles.buyerOrderStatTitle}>{title}</Text>
+        <Text style={styles.buyerOrderStatValue}>{value}</Text>
+        {subtitle ? <Text style={styles.buyerOrderStatSubtitle}>{subtitle}</Text> : null}
+      </View>
+    </Pressable>
+  );
+}
+
 export default function AccountProfileScreen({
   profileMode = 'buyer',
   isProfileVisible = false,
@@ -186,6 +207,8 @@ export default function AccountProfileScreen({
   const [sellerProducts, setSellerProducts] = useState([]);
   const [shopContact, setShopContact] = useState(null);
   const [isLoadingShopContact, setIsLoadingShopContact] = useState(false);
+  const [buyerOrderStats, setBuyerOrderStats] = useState({ total: 0, holding: 0 });
+  const [isLoadingBuyerOrderStats, setIsLoadingBuyerOrderStats] = useState(false);
 
   const loadShopContact = useCallback(async () => {
     if (!showAsSeller) {
@@ -270,6 +293,42 @@ export default function AccountProfileScreen({
     dispatch(syncSellerAccess());
   }, [dispatch, isProfileVisible, canSwitchToSeller]);
 
+  const loadBuyerOrderStats = useCallback(async () => {
+    if (!showAsBuyer) {
+      return;
+    }
+
+    setIsLoadingBuyerOrderStats(true);
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        return;
+      }
+
+      const [allData, holdingData] = await Promise.all([
+        getBuyerOrdersOnBackend({ idToken, tab: RESERVATION_TAB.ALL, page: 1, limit: 1 }),
+        getBuyerOrdersOnBackend({ idToken, tab: RESERVATION_TAB.HOLDING, page: 1, limit: 1 }),
+      ]);
+
+      setBuyerOrderStats({
+        total: Math.max(0, Number(allData?.total) || 0),
+        holding: Math.max(0, Number(holdingData?.total) || 0),
+      });
+    } catch (loadError) {
+      console.warn('loadBuyerOrderStats failed', loadError);
+    } finally {
+      setIsLoadingBuyerOrderStats(false);
+    }
+  }, [showAsBuyer]);
+
+  useEffect(() => {
+    if (!isProfileVisible || !showAsBuyer) {
+      return;
+    }
+
+    loadBuyerOrderStats();
+  }, [isProfileVisible, showAsBuyer, loadBuyerOrderStats]);
+
   const displayName = profile?.fullName || user?.displayName || 'Fastmark user';
   const userName = profile?.userName || user?.email?.split('@')[0] || '';
   const personalAvatarUrl = resolveImageUrl(profile?.photoUrl);
@@ -298,13 +357,12 @@ export default function AccountProfileScreen({
 
   const stats = useMemo(
     () => ({
-      products: showAsSeller ? catalogStats.products : profile?.totalProducts ?? 0,
+      products: showAsSeller ? catalogStats.products : profile?.tongSP ?? 0,
       sold: profile?.soldCount ?? 0,
       likes: showAsSeller ? catalogStats.likes : profile?.likesCount ?? 0,
-      reviews: profile?.totalReviews ?? 0,
-      rating: profile?.averageRating ?? 0,
+      reviews: profile?.tongDG ?? 0,
+      rating: profile?.diemTB ?? 0,
       following: profile?.followingCount ?? 0,
-      followers: profile?.followersCount ?? 0,
     }),
     [catalogStats, showAsSeller, profile]
   );
@@ -381,64 +439,83 @@ export default function AccountProfileScreen({
             <Text style={styles.buyerHeaderTitle}>Tài khoản của tôi</Text>
           </View>
 
-          <View style={styles.buyerProfileRow}>
-            <ProfileAvatar
-              name={avatarLabelName}
-              photoUrl={avatarUrl}
-              onPress={handlePickAvatar}
-              isUploading={isUploadingAvatar}
-            />
-            <View style={styles.buyerProfileInfo}>
-              <Text style={styles.buyerDisplayName} numberOfLines={1}>
-                {displayName}
-              </Text>
-              {userName ? (
-                <Text style={styles.buyerUserName} numberOfLines={1}>
-                  @{userName}
+          <View style={styles.buyerHeroCard}>
+            <View style={styles.buyerProfileRow}>
+              <ProfileAvatar
+                name={avatarLabelName}
+                photoUrl={avatarUrl}
+                onPress={handlePickAvatar}
+                isUploading={isUploadingAvatar}
+              />
+              <View style={styles.buyerProfileInfo}>
+                <Text style={styles.buyerDisplayName} numberOfLines={1}>
+                  {displayName}
                 </Text>
-              ) : null}
-              <View style={styles.buyerFollowRow}>
-                <Pressable onPress={() => onOpenFollowConnections?.('following')}>
-                  <Text style={styles.buyerFollowText}>
-                    <Text style={styles.buyerFollowValue}>{formatCount(stats.following)}</Text>
-                    {' '}Đang theo dõi
+                {userName ? (
+                  <Text style={styles.buyerUserName} numberOfLines={1}>
+                    @{userName}
                   </Text>
-                </Pressable>
-                <View style={styles.buyerFollowDivider} />
-                <Pressable onPress={() => onOpenFollowConnections?.('followers')}>
-                  <Text style={styles.buyerFollowText}>
-                    <Text style={styles.buyerFollowValue}>{formatCount(stats.followers)}</Text>
-                    {' '}Người theo dõi
-                  </Text>
-                </Pressable>
+                ) : null}
+                <View style={styles.buyerFollowRow}>
+                  <Pressable onPress={() => onOpenFollowConnections?.('following')}>
+                    <Text style={styles.buyerFollowText}>
+                      <Text style={styles.buyerFollowValue}>{formatCount(stats.following)}</Text>
+                      {' '}Đang theo dõi
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
+
+            <Pressable
+              style={({ pressed }) => [styles.buyerWalletInner, pressed && styles.buttonPressed]}
+              onPress={() => onOpenWallet?.()}
+            >
+              <View style={styles.buyerWalletIcon}>
+                <Ionicons name="wallet" size={18} color="#076F32" />
+              </View>
+              <View style={styles.buyerWalletInfo}>
+                <Text style={styles.buyerWalletLabel}>Ví FastMark</Text>
+                <Text style={styles.buyerWalletBalance}>
+                  {formatPrice(profile?.walletBalance || 0)}
+                </Text>
+                <Pressable
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    onOpenWalletTopUp?.();
+                  }}
+                  hitSlop={8}
+                >
+                  <Text style={styles.buyerWalletCta}>Nạp tiền ngay →</Text>
+                </Pressable>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
           </View>
 
-          <Pressable
-            style={({ pressed }) => [styles.buyerWalletCard, pressed && styles.buttonPressed]}
-            onPress={() => onOpenWallet?.()}
-          >
-            <View style={styles.buyerWalletIcon}>
-              <Ionicons name="wallet" size={18} color="#076F32" />
-            </View>
-            <View style={styles.buyerWalletInfo}>
-              <Text style={styles.buyerWalletLabel}>Ví FastMark</Text>
-              <Text style={styles.buyerWalletBalance}>
-                {formatPrice(profile?.walletBalance || 0)}
-              </Text>
-              <Pressable
-                onPress={(event) => {
-                  event?.stopPropagation?.();
-                  onOpenWalletTopUp?.();
-                }}
-                hitSlop={8}
-              >
-                <Text style={styles.buyerWalletCta}>Nạp tiền ngay →</Text>
-              </Pressable>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.85)" />
-          </Pressable>
+          <View style={styles.buyerOrderStatsCard}>
+            <BuyerOrderStatTile
+              icon="bag-handle-outline"
+              iconColor="#076F32"
+              iconBg="#E6F4EC"
+              title="Đơn hàng"
+              value={
+                isLoadingBuyerOrderStats ? '…' : formatCount(buyerOrderStats.total)
+              }
+              onPress={() => onOpenBuyerOrders?.(RESERVATION_TAB.ALL)}
+            />
+            <View style={styles.buyerOrderStatsDivider} />
+            <BuyerOrderStatTile
+              icon="bookmark-outline"
+              iconColor="#c2410c"
+              iconBg="#ffedd5"
+              title="Giữ hàng"
+              value={
+                isLoadingBuyerOrderStats ? '…' : formatCount(buyerOrderStats.holding)
+              }
+              onPress={() => onOpenBuyerOrders?.(RESERVATION_TAB.HOLDING)}
+            />
+          </View>
 
           <View style={styles.buyerMenuCard}>
             {buyerMenuItems.map((item, index) => (
@@ -540,12 +617,6 @@ export default function AccountProfileScreen({
             <Pressable onPress={() => onOpenFollowConnections?.('following')}>
               <Text style={styles.followText}>
                 <Text style={styles.followValue}>{formatCount(stats.following)}</Text> đang theo dõi
-              </Text>
-            </Pressable>
-            <Text style={styles.followDivider}>•</Text>
-            <Pressable onPress={() => onOpenFollowConnections?.('followers')}>
-              <Text style={styles.followText}>
-                <Text style={styles.followValue}>{formatCount(stats.followers)}</Text> người theo dõi
               </Text>
             </Pressable>
           </View>
@@ -753,15 +824,93 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   buyerHeaderTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#076F32',
-    letterSpacing: -0.3,
+    color: '#0f172a',
+    letterSpacing: 0.1,
   },
   buyerProfileRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 0,
+  },
+  buyerHeroCard: {
+    backgroundColor: '#E6F4EC',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#A7D9B8',
+  },
+  buyerWalletInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6F4EC',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    marginTop: 14,
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#A7D9B8',
+    paddingTop: 14,
+  },
+  buyerOrderStatsCard: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e8f0eb',
+    overflow: 'hidden',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  buyerOrderStatsDivider: {
+    width: 1,
+    backgroundColor: '#f1f5f9',
+    marginVertical: 12,
+  },
+  buyerOrderStatTile: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  buyerOrderStatIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buyerOrderStatCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  buyerOrderStatTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  buyerOrderStatValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0f172a',
+    marginTop: 2,
+    lineHeight: 26,
+  },
+  buyerOrderStatSubtitle: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94a3b8',
   },
   buyerProfileInfo: {
     flex: 1,
@@ -826,19 +975,19 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   buyerWalletLabel: {
-    color: 'rgba(255,255,255,0.9)',
+    color: '#64748b',
     fontSize: 12,
     fontWeight: '700',
   },
   buyerWalletBalance: {
-    color: '#ffffff',
+    color: '#0f172a',
     fontSize: 22,
     fontWeight: '800',
     marginTop: 1,
   },
   buyerWalletCta: {
     marginTop: 2,
-    color: 'rgba(255,255,255,0.92)',
+    color: '#076F32',
     fontSize: 12,
     fontWeight: '700',
   },

@@ -1,17 +1,35 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { callStore } from '../../../core/utils/storeContact';
 
-export default function ContactActions({ phone, compact = false }) {
+function formatPhoneDisplay(phone) {
+  const value = String(phone || '').trim();
+  return value || 'Chưa cập nhật';
+}
+
+export default function ContactActions({ phone }) {
+  const displayPhone = formatPhoneDisplay(phone);
+  const canCall = Boolean(String(phone || '').trim());
+
   return (
-    <View style={[styles.row, compact && styles.rowCompact]}>
+    <View style={styles.row}>
+      <Text style={[styles.infoLine, styles.phoneText]} numberOfLines={2}>
+        <Text style={styles.infoLabelInline}>Số điện thoại: </Text>
+        <Text style={styles.infoValueInline}>{displayPhone}</Text>
+      </Text>
       <Pressable
         accessibilityRole="button"
-        style={({ pressed }) => [styles.btn, styles.callBtn, pressed && styles.pressed]}
+        accessibilityLabel="Gọi điện"
+        disabled={!canCall}
+        style={({ pressed }) => [
+          styles.callBtn,
+          !canCall && styles.callBtnDisabled,
+          pressed && canCall && styles.pressed,
+        ]}
         onPress={() => callStore(phone)}
       >
-        <Text style={styles.btnIcon}>📞</Text>
-        {!compact && <Text style={styles.btnText}>Gọi điện</Text>}
+        <Ionicons name="call" size={18} color={canCall ? '#076F32' : '#94a3b8'} />
       </Pressable>
     </View>
   );
@@ -20,33 +38,42 @@ export default function ContactActions({ phone, compact = false }) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  rowCompact: {
-    gap: 8,
-  },
-  btn: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minHeight: 44,
-    borderRadius: 12,
-    paddingHorizontal: 12,
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 4,
+  },
+  infoLine: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  phoneText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  infoLabelInline: {
+    color: '#64748b',
+    fontWeight: '700',
+  },
+  infoValueInline: {
+    color: '#0f172a',
+    fontWeight: '600',
   },
   callBtn: {
-    backgroundColor: '#076F32',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E6F4EC',
+    borderWidth: 1,
+    borderColor: '#A7D9B8',
+  },
+  callBtnDisabled: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
   },
   pressed: {
-    opacity: 0.8,
-  },
-  btnIcon: {
-    fontSize: 18,
-  },
-  btnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '800',
+    opacity: 0.85,
   },
 });

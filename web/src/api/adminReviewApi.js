@@ -14,6 +14,10 @@ export function listAdminReviews(token, params = {}) {
   return apiRequest(path, { token });
 }
 
+export function getAdminReviewDetail(token, reviewId) {
+  return apiRequest(`/api/admin/reviews/${encodeURIComponent(reviewId)}`, { token });
+}
+
 export function hideAdminReview(token, reviewId, body = {}) {
   return apiRequest(`/api/admin/reviews/${encodeURIComponent(reviewId)}/hide`, {
     method: 'POST',

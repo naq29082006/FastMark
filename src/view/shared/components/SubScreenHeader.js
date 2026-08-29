@@ -5,6 +5,8 @@ import CircularBackButton from './CircularBackButton';
 
 export const APP_HEADER_BACK_SIZE = 36;
 export const APP_HEADER_TITLE_SIZE = 17;
+/** Tiêu đề tab gốc (không nút back) — đồng bộ với HomeScreen “Sản phẩm”. */
+export const ROOT_TAB_SCREEN_TITLE_SIZE = 20;
 
 export const APP_HEADER_ICON_BUTTON_STYLE = {
   width: APP_HEADER_BACK_SIZE,
@@ -38,7 +40,11 @@ export default function SubScreenHeader({ title, onBack, rightSlot = null, cente
         <View style={styles.centerSlot}>{centerSlot}</View>
       ) : (
         <Text
-          style={[styles.title, !showBack && styles.titleFlush]}
+          style={[
+            styles.title,
+            !showBack && styles.titleRootTab,
+            !showBack && styles.titleFlush,
+          ]}
           numberOfLines={1}
         >
           {title}
@@ -75,6 +81,12 @@ const styles = StyleSheet.create({
   },
   titleFlush: {
     paddingLeft: 0,
+  },
+  titleRootTab: {
+    fontSize: ROOT_TAB_SCREEN_TITLE_SIZE,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: 0.1,
   },
   centerSlot: {
     flex: 1,

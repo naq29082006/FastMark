@@ -38,8 +38,8 @@ async function migrateUnifiedReviews(connection) {
       rating: Number(br.rating) || 1,
       comment: String(br.comment || ""),
       imageUrl: String(br.imageUrl || ""),
-      isHidden: Boolean(br.isHidden) || Boolean(br.deletedAt),
-      isDeleted: Boolean(br.isDeleted) || Boolean(br.deletedAt),
+      isHidden: Boolean(br.isHidden) || Boolean(br.deletedAt) ? 1 : 0,
+      isDeleted: Boolean(br.isDeleted) || Boolean(br.deletedAt) ? 0 : 1,
       deletedAt: br.deletedAt || null,
       legacyExternalId,
       CreatedAt: br.CreatedAt || br.createdAt || new Date(),
@@ -93,14 +93,14 @@ async function migrateUnifiedReviews(connection) {
     }
 
     if (doc.isHidden === undefined && doc.is_hidden !== undefined) {
-      set.isHidden = Boolean(doc.is_hidden);
+      set.isHidden = Boolean(doc.is_hidden) ? 1 : 0;
     }
     if (doc.is_hidden !== undefined) {
       unset.is_hidden = "";
     }
 
     if (doc.isDeleted === undefined && doc.is_deleted !== undefined) {
-      set.isDeleted = Boolean(doc.is_deleted);
+      set.isDeleted = Boolean(doc.is_deleted) ? 0 : 1;
     }
     if (doc.is_deleted !== undefined) {
       unset.is_deleted = "";

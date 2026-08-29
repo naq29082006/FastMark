@@ -70,7 +70,7 @@ exports.approveSellerBanner = async (req, res) => {
 exports.rejectSellerBanner = async (req, res) => {
   try {
     const banner = await sellerBannerService.rejectSellerBanner(req.params.id, {
-      reason: req.body?.reason || req.body?.violationReason,
+      reason: req.body?.reason || req.body?.lyDoVP,
     });
     return success(res, {
       message: "Đã từ chối treo banner. Seller có thể sửa và gửi lại.",

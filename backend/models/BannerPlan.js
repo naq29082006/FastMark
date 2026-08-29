@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 /**
  * BannerPlan — gói banner do admin cấu hình (thời hạn theo tháng + giá).
  * Seller mua khi có SellerSubscription Active; hiển thị Home theo thứ tự ngẫu nhiên.
+ * isActive: 1 = đang bán, 0 = xóa mềm.
  */
 const BannerPlanSchema = new mongoose.Schema({
   // Tên gói banner (VD: Banner 1 tháng).
@@ -13,8 +14,8 @@ const BannerPlanSchema = new mongoose.Schema({
   durationDays: { type: Number, required: true, min: 1 },
   // Giá gói (VND), trừ từ ví seller khi mua.
   price: { type: Number, required: true, min: 0 },
-  // Bật = seller được mua; tắt = ẩn khỏi danh sách bán.
-  isActive: { type: Boolean, default: true, index: true },
+  // 1 = đang bán, 0 = xóa mềm.
+  isActive: { type: Number, default: 1, index: true },
   // Thời điểm tạo gói.
   CreatedAt: { type: Date, default: Date.now },
   // Thời điểm cập nhật gần nhất (auto trong pre-save).

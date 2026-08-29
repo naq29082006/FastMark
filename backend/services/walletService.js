@@ -25,6 +25,16 @@ function createServiceError(message, statusCode = 400) {
   return error;
 }
 
+function resolveTransactionReservationId(tx) {
+  if (tx?.reservationId) {
+    return String(tx.reservationId);
+  }
+  if (String(tx?.referenceType || "") === WALLET_REFERENCE_TYPE.RESERVATION && tx?.referenceId) {
+    return String(tx.referenceId);
+  }
+  return null;
+}
+
 function toPublicTransaction(tx, extras = {}) {
   return {
     id: String(tx._id),
@@ -38,7 +48,7 @@ function toPublicTransaction(tx, extras = {}) {
     description: tx.description || "",
     balanceBefore: tx.balanceBefore == null ? null : Number(tx.balanceBefore),
     balanceAfter: tx.balanceAfter == null ? null : Number(tx.balanceAfter),
-    reservationId: tx.reservationId ? String(tx.reservationId) : null,
+    reservationId: resolveTransactionReservationId(tx),
     referenceId: tx.referenceId ? String(tx.referenceId) : null,
     referenceType: tx.referenceType || "",
     createdAt: tx.CreatedAt,
@@ -60,7 +70,7 @@ async function enrichWithdrawTransaction(tx, publicTx) {
     withdraw = await WithdrawRequest.findById(tx.referenceId).lean();
   }
   if (!withdraw) {
-    withdraw = await WithdrawRequest.findOne({ walletTransactionId: tx._id }).lean();
+    withdraw = await WithdrawRequest.findOne({ gdViId: tx._id }).lean();
   }
   if (!withdraw) {
     return publicTx;
@@ -113,21 +123,146 @@ async function getWalletBalance(userId) {
   };
 }
 
+/** Push số dư mới tới app (tab Tài khoản + màn Ví). Bỏ qua khi gọi trong Mongo session — emit sau commit. */
+function notifyWalletBalanceUpdated(userId, walletOrBalance, extra = {}) {
+  if (!userId) {
+    return;
+  }
+  const balance =
+    typeof walletOrBalance === "number"
+      ? Math.max(0, Math.round(walletOrBalance))
+      : Math.max(0, Number(walletOrBalance?.balance) || 0);
+
+  emitUserResourceUpdated(userId, "wallet", { balance, ...extra });
+  emitAdminUpdated("wallet", { userId: String(userId), balance, ...extra });
+}
+
 function generateOrderCode() {
   const base = Date.now() % 1000000000;
   const rand = Math.floor(Math.random() * 900) + 100;
   return Number(`${base}${rand}`.slice(0, 15));
 }
 
-async function createUniqueOrderCode() {
+async function createUniqueOrderCode(session = null) {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const orderCode = generateOrderCode();
-    const exists = await WalletTransaction.exists({ orderCode });
+    const existsQuery = WalletTransaction.exists({ orderCode });
+    if (session) {
+      existsQuery.session(session);
+    }
+    const exists = await existsQuery;
     if (!exists) {
       return orderCode;
     }
   }
   throw createServiceError("Không tạo được mã giao dịch. Thử lại.", 500);
+}
+
+function mongoSessionOptions(session) {
+  return session ? { session } : {};
+}
+
+async function readUserWalletBalance(userId, session = null) {
+  const wallet = await getOrCreateWallet(userId, session);
+  return Math.max(0, Number(wallet?.balance) || 0);
+}
+
+/** Cập nhật số dư ví user bằng $inc (atomic) — tránh lệch ledger vs bảng wallets. */
+async function applyUserWalletDelta(userId, delta, session = null) {
+  const change = Math.round(Number(delta));
+  if (!Number.isFinite(change) || change === 0) {
+    return getOrCreateWallet(userId, session);
+  }
+
+  const baseOpts = { returnDocument: "after", runValidators: true, ...mongoSessionOptions(session) };
+
+  if (change > 0) {
+    const updated = await Wallet.findOneAndUpdate(
+      { userId },
+      { $inc: { balance: change } },
+      { ...baseOpts, upsert: true, setDefaultsOnInsert: true }
+    );
+    if (!updated) {
+      throw createServiceError("Không cập nhật được số dư ví.", 500);
+    }
+    updated.balance = Math.max(0, Number(updated.balance) || 0);
+    return updated;
+  }
+
+  const debit = Math.abs(change);
+  const updated = await Wallet.findOneAndUpdate(
+    { userId, balance: { $gte: debit } },
+    { $inc: { balance: change } },
+    baseOpts
+  );
+  if (!updated) {
+    throw createServiceError(
+      `Số dư ví không đủ. Cần ${debit.toLocaleString("vi-VN")}đ.`,
+      400
+    );
+  }
+  updated.balance = Math.max(0, Number(updated.balance) || 0);
+  return updated;
+}
+
+/** Cập nhật số dư ví hệ thống (cọc escrow) bằng $inc. */
+async function applySystemWalletDelta(delta, session = null) {
+  const change = Math.round(Number(delta));
+  if (!Number.isFinite(change) || change === 0) {
+    return getOrCreateSystemWallet(session);
+  }
+
+  const wallet = await getOrCreateSystemWallet(session);
+  const baseOpts = { returnDocument: "after", runValidators: true, ...mongoSessionOptions(session) };
+
+  if (change > 0) {
+    const updated = await SystemWallet.findOneAndUpdate(
+      { _id: wallet._id },
+      { $inc: { balance: change } },
+      baseOpts
+    );
+    if (!updated) {
+      throw createServiceError("Không cập nhật được ví hệ thống.", 500);
+    }
+    updated.balance = Math.max(0, Number(updated.balance) || 0);
+    return updated;
+  }
+
+  const debit = Math.abs(change);
+  const updated = await SystemWallet.findOneAndUpdate(
+    { _id: wallet._id, balance: { $gte: debit } },
+    { $inc: { balance: change } },
+    baseOpts
+  );
+  if (!updated) {
+    throw createServiceError("Số dư ví hệ thống không đủ để hoàn cọc.", 500);
+  }
+  updated.balance = Math.max(0, Number(updated.balance) || 0);
+  return updated;
+}
+
+/** Đồng bộ wallets.balance theo balanceAfter giao dịch thành công mới nhất (sửa dữ liệu lệch). */
+async function reconcileUserWalletBalanceFromLedger(userId) {
+  const latest = await WalletTransaction.findOne({
+    userId,
+    status: WALLET_TX_STATUS.SUCCESS,
+    balanceAfter: { $ne: null },
+  })
+    .sort({ CreatedAt: -1, _id: -1 })
+    .select("balanceAfter")
+    .lean();
+
+  if (latest?.balanceAfter == null) {
+    return null;
+  }
+
+  const target = Math.max(0, Math.round(Number(latest.balanceAfter)));
+  const wallet = await Wallet.findOneAndUpdate(
+    { userId },
+    { $set: { balance: target, UpdatedAt: new Date() } },
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
+  );
+  return wallet;
 }
 
 function resolveReturnUrls() {
@@ -147,6 +282,24 @@ function buildPayosDescription(user) {
     return userId;
   }
   return userId.slice(0, 25) || "FastMark";
+}
+
+const PAYOS_BIN_LABELS = {
+  "970422": "Ngân hàng TMCP Quân đội",
+  "970436": "Ngân hàng TMCP Ngoại thương Việt Nam",
+  "970415": "Ngân hàng TMCP Công thương Việt Nam",
+  "970418": "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam",
+  "970407": "Ngân hàng TMCP Kỹ thương Việt Nam",
+  "970416": "Ngân hàng TMCP Á Châu",
+  "970432": "Ngân hàng TMCP Việt Nam Thịnh Vượng",
+  "970403": "Ngân hàng TMCP Sài Gòn Thương Tín",
+  "970405": "Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam",
+  "970448": "Ngân hàng TMCP Phương Đông",
+};
+
+function resolvePayosBankLabel(bin) {
+  const key = String(bin || "").trim();
+  return PAYOS_BIN_LABELS[key] || (key ? `Ngân hàng (${key})` : "");
 }
 
 async function applySuccessfulTopup(orderCode, { amount, paymentLinkId } = {}) {
@@ -267,14 +420,23 @@ async function createTopup(user, amountInput) {
     checkoutUrl: String(paymentLink.checkoutUrl || ""),
     orderCode,
     paymentLinkId: String(paymentLink.paymentLinkId || ""),
-    qrCode: paymentLink.qrCode || "",
+    qrCode: String(paymentLink.qrCode || ""),
+    accountNumber: String(paymentLink.accountNumber || ""),
+    accountName: String(paymentLink.accountName || ""),
+    bin: String(paymentLink.bin || ""),
+    bankName: resolvePayosBankLabel(paymentLink.bin),
+    amount,
     description: payosDescription,
   };
 }
 
-async function listTransactions(userId, { page, limit } = {}) {
+async function listTransactions(userId, { page, limit, type } = {}) {
   const { page: safePage, limit: safeLimit, skip } = parsePagination({ page, limit });
   const filter = { userId };
+  const typeNum = Number(type);
+  if (Number.isFinite(typeNum) && typeNum > 0) {
+    filter.type = typeNum;
+  }
   const [rows, total] = await Promise.all([
     WalletTransaction.find(filter).sort({ CreatedAt: -1, _id: -1 }).skip(skip).limit(safeLimit),
     WalletTransaction.countDocuments(filter),
@@ -469,7 +631,7 @@ async function creditWalletRefund(userId, amount, { description, session } = {})
 }
 
 async function getOrCreateSystemWallet(session = null) {
-  const query = SystemWallet.findOne({ key: "system" });
+  const query = SystemWallet.findOne().sort({ _id: 1 });
   if (session) {
     query.session(session);
   }
@@ -479,13 +641,13 @@ async function getOrCreateSystemWallet(session = null) {
   }
   try {
     const created = await SystemWallet.create(
-      [{ key: "system", balance: 0 }],
+      [{ balance: 0 }],
       session ? { session } : undefined
     );
     return created[0];
   } catch (error) {
     if (error?.code === 11000) {
-      const retry = SystemWallet.findOne({ key: "system" });
+      const retry = SystemWallet.findOne().sort({ _id: 1 });
       if (session) {
         retry.session(session);
       }
@@ -511,13 +673,10 @@ async function holdDepositToSystem(userId, amount, { description, reservationId,
     );
   }
 
-  const systemWallet = await getOrCreateSystemWallet(session);
-  userWallet.balance = balanceBefore - holdAmount;
-  systemWallet.balance = Math.max(0, Number(systemWallet.balance) || 0) + holdAmount;
-  await userWallet.save(session ? { session } : undefined);
-  await systemWallet.save(session ? { session } : undefined);
+  const userWalletAfter = await applyUserWalletDelta(userId, -holdAmount, session);
+  await applySystemWalletDelta(holdAmount, session);
 
-  const orderCode = await createUniqueOrderCode();
+  const orderCode = await createUniqueOrderCode(session);
   const created = await WalletTransaction.create(
     [
       {
@@ -528,20 +687,26 @@ async function holdDepositToSystem(userId, amount, { description, reservationId,
         orderCode,
         description: description || "Đặt cọc giữ hàng (Reservation Deposit)",
         balanceBefore,
-        balanceAfter: userWallet.balance,
+        balanceAfter: userWalletAfter.balance,
         reservationId: reservationId || null,
         referenceId: reservationId || null,
         referenceType: reservationId ? WALLET_REFERENCE_TYPE.RESERVATION : "",
       },
     ],
-    session ? { session } : undefined
+    mongoSessionOptions(session)
   );
 
-  return {
-    userWallet,
-    systemWallet,
+  const result = {
+    userWallet: userWalletAfter,
+    systemWallet: await getOrCreateSystemWallet(session),
     transaction: created[0],
   };
+  if (!session) {
+    notifyWalletBalanceUpdated(userId, userWalletAfter, {
+      transactionId: String(created[0]._id),
+    });
+  }
+  return result;
 }
 
 /** System Wallet → Buyer Wallet (hoàn cọc). */
@@ -555,20 +720,11 @@ async function refundDepositFromSystem(
     return null;
   }
 
-  const systemWallet = await getOrCreateSystemWallet(session);
-  const systemBalance = Math.max(0, Number(systemWallet.balance) || 0);
-  if (systemBalance < creditAmount) {
-    throw createServiceError("Số dư ví hệ thống không đủ để hoàn cọc.", 500);
-  }
+  const balanceBefore = await readUserWalletBalance(userId, session);
+  await applySystemWalletDelta(-creditAmount, session);
+  const userWalletAfter = await applyUserWalletDelta(userId, creditAmount, session);
 
-  const userWallet = await getOrCreateWallet(userId, session);
-  const balanceBefore = Math.max(0, Number(userWallet.balance) || 0);
-  systemWallet.balance = systemBalance - creditAmount;
-  userWallet.balance = balanceBefore + creditAmount;
-  await systemWallet.save(session ? { session } : undefined);
-  await userWallet.save(session ? { session } : undefined);
-
-  const orderCode = await createUniqueOrderCode();
+  const orderCode = await createUniqueOrderCode(session);
   const created = await WalletTransaction.create(
     [
       {
@@ -579,16 +735,23 @@ async function refundDepositFromSystem(
         orderCode,
         description: description || "Hoàn cọc giữ hàng (Reservation Refund)",
         balanceBefore,
-        balanceAfter: userWallet.balance,
+        balanceAfter: userWalletAfter.balance,
         reservationId: reservationId || null,
         referenceId: reservationId || null,
         referenceType: reservationId ? WALLET_REFERENCE_TYPE.RESERVATION : "",
       },
     ],
-    session ? { session } : undefined
+    mongoSessionOptions(session)
   );
 
-  return { userWallet, systemWallet, transaction: created[0] };
+  const result = { userWallet: userWalletAfter, systemWallet: await getOrCreateSystemWallet(session), transaction: created[0] };
+  if (!session) {
+    await reconcileUserWalletBalanceFromLedger(userId).catch(() => null);
+    notifyWalletBalanceUpdated(userId, userWalletAfter, {
+      transactionId: String(created[0]._id),
+    });
+  }
+  return result;
 }
 
 /** System Wallet → Seller Wallet (giải phóng cọc). */
@@ -602,20 +765,11 @@ async function releaseDepositFromSystem(
     return null;
   }
 
-  const systemWallet = await getOrCreateSystemWallet(session);
-  const systemBalance = Math.max(0, Number(systemWallet.balance) || 0);
-  if (systemBalance < creditAmount) {
-    throw createServiceError("Số dư ví hệ thống không đủ để giải phóng cọc.", 500);
-  }
+  const balanceBefore = await readUserWalletBalance(sellerUserId, session);
+  await applySystemWalletDelta(-creditAmount, session);
+  const sellerWalletAfter = await applyUserWalletDelta(sellerUserId, creditAmount, session);
 
-  const sellerWallet = await getOrCreateWallet(sellerUserId, session);
-  const balanceBefore = Math.max(0, Number(sellerWallet.balance) || 0);
-  systemWallet.balance = systemBalance - creditAmount;
-  sellerWallet.balance = balanceBefore + creditAmount;
-  await systemWallet.save(session ? { session } : undefined);
-  await sellerWallet.save(session ? { session } : undefined);
-
-  const orderCode = await createUniqueOrderCode();
+  const orderCode = await createUniqueOrderCode(session);
   const created = await WalletTransaction.create(
     [
       {
@@ -626,21 +780,51 @@ async function releaseDepositFromSystem(
         orderCode,
         description: description || "Giải phóng cọc giữ hàng (Reservation Release / Auto Release)",
         balanceBefore,
-        balanceAfter: sellerWallet.balance,
+        balanceAfter: sellerWalletAfter.balance,
         reservationId: reservationId || null,
         referenceId: reservationId || null,
         referenceType: reservationId ? WALLET_REFERENCE_TYPE.RESERVATION : "",
       },
     ],
-    session ? { session } : undefined
+    mongoSessionOptions(session)
   );
 
-  return { sellerWallet, systemWallet, transaction: created[0] };
+  const result = { sellerWallet: sellerWalletAfter, systemWallet: await getOrCreateSystemWallet(session), transaction: created[0] };
+  if (!session) {
+    await reconcileUserWalletBalanceFromLedger(sellerUserId).catch(() => null);
+    notifyWalletBalanceUpdated(sellerUserId, sellerWalletAfter, {
+      transactionId: String(created[0]._id),
+    });
+  }
+  return result;
+}
+
+async function loadWalletTransactionsForReservation(reservationId) {
+  const id = String(reservationId || "").trim();
+  if (!id || !mongoose.isValidObjectId(id)) {
+    return [];
+  }
+  const objectId = new mongoose.Types.ObjectId(id);
+  const docs = await WalletTransaction.find({
+    status: WALLET_TX_STATUS.SUCCESS,
+    $or: [
+      { reservationId: objectId },
+      {
+        referenceId: objectId,
+        referenceType: WALLET_REFERENCE_TYPE.RESERVATION,
+      },
+    ],
+  })
+    .sort({ CreatedAt: 1 })
+    .lean();
+  return docs.map((tx) => toPublicTransaction(tx));
 }
 
 module.exports = {
   getOrCreateWallet,
   getWalletBalance,
+  notifyWalletBalanceUpdated,
+  reconcileUserWalletBalanceFromLedger,
   getOrCreateSystemWallet,
   createUniqueOrderCode,
   createTopup,
@@ -655,4 +839,6 @@ module.exports = {
   holdDepositToSystem,
   refundDepositFromSystem,
   releaseDepositFromSystem,
+  loadWalletTransactionsForReservation,
+  resolveTransactionReservationId,
 };

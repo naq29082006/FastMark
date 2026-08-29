@@ -1,8 +1,14 @@
 const express = require("express");
-const verifyFirebaseToken = require("../middleware/authMiddleware");
+const {
+  verifyFirebaseToken,
+  verifyFirebaseTokenAllowBlocked,
+} = require("../middleware/authMiddleware");
 const requireSeller = require("../middleware/sellerMiddleware");
 const asyncHandler = require("../utils/asyncHandler");
 const reservationReportController = require("../controllers/reservationReportController");
+
+/** Nick/shop bị khóa vẫn xử lý tranh chấp đơn giữ hàng. */
+const verifyDisputeReportsAuth = verifyFirebaseTokenAllowBlocked;
 
 const router = express.Router();
 
@@ -12,20 +18,20 @@ const router = express.Router();
  */
 router.post(
   "/buyer-report-seller",
-  verifyFirebaseToken,
+  verifyDisputeReportsAuth,
   asyncHandler(reservationReportController.buyerReportSeller)
 );
 
 router.post(
   "/seller-report-buyer",
-  verifyFirebaseToken,
+  verifyDisputeReportsAuth,
   requireSeller,
   asyncHandler(reservationReportController.sellerReportBuyer)
 );
 
 router.get(
   "/reservation/:reservationId",
-  verifyFirebaseToken,
+  verifyDisputeReportsAuth,
   asyncHandler(reservationReportController.listReservationReports)
 );
 

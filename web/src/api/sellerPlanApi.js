@@ -23,13 +23,6 @@ export async function deleteSellerPlan(token, planId) {
   });
 }
 
-export async function restoreSellerPlan(token, planId) {
-  return apiRequest(`/api/admin/seller-plans/${planId}/restore`, {
-    method: 'POST',
-    token,
-  });
-}
-
 export async function listSellerSubscriptions(token, params = {}) {
   const query = new URLSearchParams();
   if (params.page) query.set('page', params.page);
@@ -63,13 +56,6 @@ export async function updateBannerPlan(token, planId, body) {
 export async function deleteBannerPlan(token, planId) {
   return apiRequest(`/api/admin/banner-plans/${planId}`, {
     method: 'DELETE',
-    token,
-  });
-}
-
-export async function restoreBannerPlan(token, planId) {
-  return apiRequest(`/api/admin/banner-plans/${planId}/restore`, {
-    method: 'POST',
     token,
   });
 }

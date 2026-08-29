@@ -1,7 +1,13 @@
 const path = require("path");
 
-const { getSupabaseClient } = require("../config/supabase");
-const { supabaseStorageBucket } = require("../config/env");
+const { StorageClient } = require("@supabase/storage-js");
+const {
+  getSupabaseClient,
+  getSupabaseConfigErrorMessage,
+  getSupabaseStorageConfig,
+} = require("../config/supabase");
+const { supabaseStorageBucket, supabaseUrl } = require("../config/env");
+const { isNewFormatSupabaseKey } = require("../utils/supabaseKey");
 
 const MIME_TO_EXTENSION = {
   "image/jpeg": "jpg",
@@ -31,6 +37,20 @@ function resolveFileExtension(mimeType, originalName = "") {
   return "jpg";
 }
 
+function getStorageUploadClient(resolvedKey) {
+  if (isNewFormatSupabaseKey(resolvedKey.key)) {
+    const storageUrl = `${String(supabaseUrl || "").replace(/\/$/, "")}/storage/v1`;
+    return new StorageClient(storageUrl, { apikey: resolvedKey.key });
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return null;
+  }
+
+  return supabase.storage;
+}
+
 async function uploadImageToSupabase({
   buffer,
   mimeType,
@@ -38,43 +58,48 @@ async function uploadImageToSupabase({
   fileName,
   upsert = true,
 }) {
-  const supabase = getSupabaseClient();
+  const resolved = getSupabaseStorageConfig();
 
-  if (!supabase) {
-    throw createUploadError(
-      "Supabase chưa được cấu hình. Thêm SUPABASE_URL và SUPABASE_ANON_KEY vào .env ở thư mục gốc dự án.",
-      503
-    );
+  if (!supabaseUrl || !resolved.key) {
+    throw createUploadError(getSupabaseConfigErrorMessage(), 503);
   }
 
   if (!buffer || !buffer.length) {
     throw createUploadError("File ảnh trống.", 400);
   }
 
+  const storage = getStorageUploadClient(resolved);
+  if (!storage) {
+    throw createUploadError(getSupabaseConfigErrorMessage(), 503);
+  }
+
   const bucket = supabaseStorageBucket;
   const storagePath = `${folder}/${fileName}`;
 
-  const { error } = await supabase.storage.from(bucket).upload(storagePath, buffer, {
+  const { error } = await storage.from(bucket).upload(storagePath, buffer, {
     contentType: mimeType || "image/jpeg",
     upsert,
   });
 
   if (error) {
+    const invalidKeyHint = error.message.includes("Invalid Compact JWS")
+      ? " Key Supabase không hợp lệ hoặc bị dính ký tự thừa trong FastMark/.env. Dùng sb_secret_... / sb_publishable_... từ Dashboard → Settings → API Keys."
+      : "";
     const rlsHint = error.message.includes("row-level security policy")
-      ? " Bucket đang bị chặn bởi RLS. Dùng SUPABASE_SERVICE_ROLE_KEY ở backend hoặc mở policy INSERT cho bucket."
+      ? " Bucket đang bị chặn bởi RLS. Dùng SUPABASE_SERVICE_ROLE_KEY (sb_secret_...) hợp lệ hoặc mở policy INSERT cho bucket."
       : "";
     throw createUploadError(
-      `Upload Supabase thất bại: ${error.message}.${rlsHint}`,
+      `Upload Supabase thất bại: ${error.message}.${invalidKeyHint}${rlsHint}`,
       502
     );
   }
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath);
+  const publicUrl = `${String(supabaseUrl).replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${storagePath}`;
 
   return {
     bucket,
     path: storagePath,
-    publicUrl: data.publicUrl,
+    publicUrl,
   };
 }
 

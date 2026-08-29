@@ -1,0 +1,598 @@
+' =============================================================================
+' FASTMARK Marketplace - UML 2.x Use Case Diagrams (PlantUML)
+' Import: https://app.diagrams.net/ → Arrange → Insert → Advanced → PlantUML
+'         hoặc File → Import from → Device (.puml)
+' Mỗi khối @startuml = 1 tab/trang riêng
+' =============================================================================
+
+@startuml UC00_Tong_quan
+!theme plain
+title Sơ đồ Use Case Tổng quát – FASTMARK
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #DAE8FC
+  BorderColor #6C8EBF
+  FontSize 12
+}
+skinparam actor {
+  BackgroundColor #FFF2CC
+  BorderColor #D6B656
+  FontSize 13
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+  FontSize 15
+}
+
+actor "Buyer\n(Người mua)" as buyer
+actor "Seller\n(Người bán)" as seller
+actor "Admin" as admin
+
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+
+  together {
+    usecase "Quản lý tài khoản" as UC01
+    usecase "Xác minh người bán" as UC02
+    usecase "Khám phá SP & gian hàng" as UC03
+    usecase "Theo dõi & yêu thích" as UC04
+  }
+
+  together {
+    usecase "Quản lý gian hàng" as UC05
+    usecase "Quản lý sản phẩm" as UC06
+    usecase "Giữ hàng" as UC07
+    usecase "Tranh chấp & báo cáo" as UC08
+  }
+
+  together {
+    usecase "Đánh giá" as UC09
+    usecase "Ví điện tử" as UC10
+    usecase "Gói dịch vụ & quảng cáo" as UC11
+    usecase "Thông báo" as UC12
+  }
+
+  together {
+    usecase "Quản trị người dùng" as UC13
+    usecase "Quản trị hệ thống" as UC14
+  }
+}
+
+buyer --> UC01
+buyer --> UC03
+buyer --> UC04
+buyer --> UC07
+buyer --> UC08
+buyer --> UC09
+buyer --> UC10
+buyer --> UC12
+buyer --> UC02
+
+seller --> UC05
+seller --> UC06
+seller --> UC07
+seller --> UC08
+seller --> UC09
+seller --> UC11
+seller --> UC12
+
+admin --> UC02
+admin --> UC08
+admin --> UC10
+admin --> UC11
+admin --> UC12
+admin --> UC13
+admin --> UC14
+
+note bottom of UC01
+  Chi tiết include/extend
+  xem 14 sơ đồ con (UC01–UC14)
+end note
+
+@enduml
+
+
+@startuml UC01_Quan_ly_tai_khoan
+!theme plain
+title Chi tiết: Quản lý tài khoản
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+actor "Seller" as seller
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Đăng ký tài khoản" as DK <<Main>>
+  usecase "Xác thực email" as XT
+  usecase "Đăng nhập" as DN <<Main>>
+  usecase "Kiểm tra thông tin\nđăng nhập" as KTTT
+  usecase "Đăng xuất" as DX
+  usecase "Quên mật khẩu" as QMK
+  usecase "Cập nhật hồ sơ cá nhân" as CPHS
+  usecase "Thay đổi ảnh đại diện" as AVATAR
+}
+
+buyer --> DK
+buyer --> DN
+buyer --> DX
+buyer --> QMK
+buyer --> CPHS
+buyer --> AVATAR
+seller --> CPHS
+seller --> AVATAR
+seller --> DX
+
+DK ..> XT : <<include>>
+DN ..> KTTT : <<include>>
+
+@enduml
+
+
+@startuml UC02_Xac_minh_nguoi_ban
+!theme plain
+title Chi tiết: Xác minh người bán
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+actor "Admin" as admin
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Đăng ký xác minh\nngười bán" as DKK <<Main>>
+  usecase "Upload CCCD\nmặt trước" as CCCD1
+  usecase "Upload CCCD\nmặt sau" as CCCD2
+  usecase "Upload ảnh selfie" as SELFIE
+  usecase "Nhập thông tin\ngian hàng" as TTGH
+  usecase "Duyệt người bán" as DUYET <<Main>>
+  usecase "Từ chối xác minh\nngười bán" as TC
+}
+
+buyer --> DKK
+admin --> DUYET
+admin --> TC
+
+DKK ..> CCCD1 : <<include>>
+DKK ..> CCCD2 : <<include>>
+DKK ..> SELFIE : <<include>>
+DKK ..> TTGH : <<include>>
+
+@enduml
+
+
+@startuml UC03_Kham_pha_SP_GH
+!theme plain
+title Chi tiết: Khám phá sản phẩm & gian hàng
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Xem sản phẩm" as XSP <<Main>>
+  usecase "Tìm kiếm sản phẩm" as TK
+  usecase "Lọc sản phẩm" as LOC
+  usecase "Xem chi tiết sản phẩm" as XCTSP
+  usecase "Xem gian hàng" as XGH <<Main>>
+  usecase "Khám phá gian hàng" as KPGH
+}
+
+buyer --> XSP
+buyer --> XCTSP
+buyer --> XGH
+buyer --> KPGH
+
+TK ..> XSP : <<extend>>
+LOC ..> XSP : <<extend>>
+
+@enduml
+
+
+@startuml UC04_Theo_doi_yeu_thich
+!theme plain
+title Chi tiết: Theo dõi & yêu thích
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Xem gian hàng" as XGH <<Main>>
+  usecase "Theo dõi gian hàng" as TD
+  usecase "Bỏ theo dõi gian hàng" as BTD
+  usecase "Xem chi tiết sản phẩm" as XCTSP <<Main>>
+  usecase "Yêu thích sản phẩm" as YT
+  usecase "Bỏ yêu thích sản phẩm" as BYT
+}
+
+buyer --> XGH
+buyer --> XCTSP
+
+TD ..> XGH : <<extend>>
+BTD ..> XGH : <<extend>>
+YT ..> XCTSP : <<extend>>
+BYT ..> XCTSP : <<extend>>
+
+@enduml
+
+
+@startuml UC05_Quan_ly_gian_hang
+!theme plain
+title Chi tiết: Quản lý gian hàng
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Seller" as seller
+actor "Buyer" as buyer
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Cập nhật thông tin\ngian hàng" as CAP <<Main>>
+  usecase "Xem thống kê gian hàng" as TK
+  usecase "Cài đặt shop" as CD
+}
+
+seller --> CAP
+seller --> TK
+seller --> CD
+
+@enduml
+
+
+@startuml UC06_Quan_ly_san_pham
+!theme plain
+title Chi tiết: Quản lý sản phẩm
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Seller" as seller
+actor "Buyer" as buyer
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Đăng sản phẩm" as DANG <<Main>>
+  usecase "Upload ảnh sản phẩm" as UPANH
+  usecase "Thiết lập giá" as GIA
+  usecase "Thiết lập tồn kho" as TON
+  usecase "Cập nhật sản phẩm" as CAP
+  usecase "Xóa sản phẩm" as XOA
+  usecase "Quản lý sản phẩm" as QLSP <<Main>>
+  usecase "Bật giảm giá sản phẩm" as GG
+  usecase "Ghim sản phẩm" as GHIM
+}
+
+seller --> DANG
+seller --> CAP
+seller --> XOA
+seller --> QLSP
+
+DANG ..> UPANH : <<include>>
+DANG ..> GIA : <<include>>
+DANG ..> TON : <<include>>
+GG ..> QLSP : <<extend>>
+GHIM ..> QLSP : <<extend>>
+
+@enduml
+
+
+@startuml UC07_Giu_hang
+!theme plain
+title Chi tiết: Giữ hàng
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+actor "Seller" as seller
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Đặt giữ hàng" as DAT <<Main>>
+  usecase "Chọn sản phẩm" as CHSP
+  usecase "Chọn số lượng" as CHSL
+  usecase "Chọn thời gian nhận" as CHTG
+  usecase "Xem danh sách\nđơn giữ hàng" as DS
+  usecase "Xem chi tiết\nđơn giữ hàng" as CT <<Main>>
+  usecase "Hủy đơn giữ hàng" as HUY_B
+  usecase "Xác nhận nhận hàng" as XNNH
+  usecase "Xác nhận đơn giữ hàng" as XND <<Main>>
+  usecase "Hủy đơn giữ hàng\n(Seller)" as HUY_S
+}
+
+buyer --> DAT
+buyer --> DS
+buyer --> CT
+buyer --> HUY_B
+buyer --> XNNH
+seller --> XND
+seller --> HUY_S
+
+DAT ..> CHSP : <<include>>
+DAT ..> CHSL : <<include>>
+DAT ..> CHTG : <<include>>
+
+@enduml
+
+
+@startuml UC08_Tranh_chap_bao_cao
+!theme plain
+title Chi tiết: Tranh chấp & báo cáo
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+actor "Seller" as seller
+actor "Admin" as admin
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Xem chi tiết\nđơn giữ hàng" as CT <<Main>>
+  usecase "Báo cáo không\ngiao hàng" as BCGH
+  usecase "Báo cáo không\nnhận hàng" as BCNH
+  usecase "Theo dõi tranh chấp" as TDTC
+  usecase "Báo cáo vi phạm" as BCVP <<Main>>
+  usecase "Chọn lý do" as LYDO
+  usecase "Upload bằng chứng" as UPBC
+  usecase "Quản lý tranh chấp" as QLTC <<Main>>
+  usecase "Hoàn tiền tranh chấp" as HTTC
+  usecase "Quản lý báo cáo\nvi phạm" as QLBC
+}
+
+buyer --> CT
+buyer --> TDTC
+buyer --> BCVP
+seller --> CT
+seller --> BCVP
+admin --> QLTC
+admin --> QLBC
+
+BCGH ..> CT : <<extend>>
+BCNH ..> CT : <<extend>>
+HTTC ..> QLTC : <<extend>>
+BCVP ..> LYDO : <<include>>
+BCVP ..> UPBC : <<include>>
+
+@enduml
+
+
+@startuml UC09_Danh_gia
+!theme plain
+title Chi tiết: Đánh giá
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+actor "Seller" as seller
+actor "Admin" as admin
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Đánh giá gian hàng" as DGGH <<Main>>
+  usecase "Báo cáo review" as BCR <<Main>>
+  usecase "Chọn lý do" as LYDO
+  usecase "Upload bằng chứng" as UPBC
+  usecase "Quản lý đánh giá\n(Seller)" as QLDG_S
+  usecase "Quản lý đánh giá\n(Admin)" as QLDG_A
+}
+
+buyer --> DGGH
+seller --> BCR
+seller --> QLDG_S
+admin --> QLDG_A
+
+BCR ..> LYDO : <<include>>
+BCR ..> UPBC : <<include>>
+
+@enduml
+
+
+@startuml UC10_Vi_dien_tu
+!theme plain
+title Chi tiết: Ví điện tử
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+actor "Seller" as seller
+actor "Admin" as admin
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Xem ví" as XEM
+  usecase "Xem lịch sử\ngiao dịch ví" as LS
+  usecase "Nạp tiền ví" as NAP <<Main>>
+  usecase "Chọn phương thức\nthanh toán" as PTTT
+  usecase "Tạo yêu cầu\nrút tiền" as RUT <<Main>>
+  usecase "Nhập thông tin\ntài khoản nhận tiền" as TKNN
+  usecase "Duyệt yêu cầu\nrút tiền" as DYRUT
+  usecase "Quản lý ví\nhệ thống" as QLV
+}
+
+buyer --> XEM
+buyer --> LS
+buyer --> NAP
+buyer --> RUT
+seller --> XEM
+seller --> LS
+seller --> NAP
+seller --> RUT
+admin --> DYRUT
+admin --> QLV
+
+NAP ..> PTTT : <<include>>
+RUT ..> TKNN : <<include>>
+
+@enduml
+
+
+@startuml UC11_Goi_dich_vu_quang_cao
+!theme plain
+title Chi tiết: Gói dịch vụ & quảng cáo
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Seller" as seller
+actor "Admin" as admin
+actor "Buyer" as buyer
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Mua gói dịch vụ" as MUAGOI <<Main>>
+  usecase "Mua banner\nquảng cáo" as MUABN <<Main>>
+  usecase "Upload banner" as UPBN
+  usecase "Chọn thời gian\nhiển thị" as TGH
+  usecase "Quản lý banner\ncủa gian hàng" as QLBN_S
+  usecase "Quản lý gói dịch vụ" as QLGOI
+  usecase "Quản lý banner\nhệ thống" as QLBN_A
+  usecase "Duyệt banner\nquảng cáo" as DUYETBN
+}
+
+seller --> MUAGOI
+seller --> MUABN
+seller --> QLBN_S
+admin --> QLGOI
+admin --> QLBN_A
+admin --> DUYETBN
+
+MUABN ..> UPBN : <<include>>
+MUABN ..> TGH : <<include>>
+
+@enduml
+
+
+@startuml UC12_Thong_bao
+!theme plain
+title Chi tiết: Thông báo
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Buyer" as buyer
+actor "Seller" as seller
+actor "Admin" as admin
+seller -|> buyer
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Xem thông báo" as XEM
+  usecase "Quản lý thông báo\nhệ thống" as QLTB <<Main>>
+  usecase "Gửi thông báo\nngười mua" as TBB
+  usecase "Gửi thông báo\nngười bán" as TBS
+}
+
+buyer --> XEM
+seller --> XEM
+admin --> QLTB
+
+TBB ..> QLTB : <<extend>>
+TBS ..> QLTB : <<extend>>
+
+@enduml
+
+
+@startuml UC13_Quan_tri_nguoi_dung
+!theme plain
+title Chi tiết: Quản trị người dùng
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 12 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Admin" as admin
+
+rectangle "FASTMARK" #FAFAFA {
+  usecase "Quản lý người dùng" as QLND <<Main>>
+  usecase "Khóa tài khoản" as KHOA
+  usecase "Mở khóa tài khoản" as MOKHOA
+  usecase "Duyệt người bán" as DUYET
+  usecase "Từ chối xác minh\nngười bán" as TC
+}
+
+admin --> QLND
+admin --> KHOA
+admin --> MOKHOA
+admin --> DUYET
+admin --> TC
+
+@enduml
+
+
+@startuml UC14_Quan_tri_he_thong
+!theme plain
+title Chi tiết: Quản trị hệ thống
+left to right direction
+skinparam shadowing false
+skinparam usecase { BackgroundColor #DAE8FC BorderColor #6C8EBF FontSize 11 }
+skinparam usecase<<Main>> { BackgroundColor #B1DDF0 BorderColor #0066CC FontStyle bold }
+skinparam actor { BackgroundColor #FFF2CC BorderColor #D6B656 }
+
+actor "Admin" as admin
+
+rectangle "FASTMARK" #FAFAFA {
+
+  together {
+    usecase "Quản lý danh mục\ngian hàng" as DMGH
+    usecase "Quản lý danh mục\nsản phẩm" as DMSP
+    usecase "Quản lý sản phẩm" as QLSP <<Main>>
+  }
+
+  together {
+    usecase "Quản lý banner\ncủa gian hàng" as QLBN_GH
+    usecase "Quản lý đánh giá" as QLDG
+    usecase "Quản lý báo cáo\nvi phạm" as QLBC
+  }
+
+  together {
+    usecase "Xem thống kê\ngian hàng" as TK_GH
+    usecase "Xem thống kê\ntoàn hệ thống" as TK_ALL <<Main>>
+  }
+}
+
+admin --> DMGH
+admin --> DMSP
+admin --> QLSP
+admin --> QLBN_GH
+admin --> QLDG
+admin --> QLBC
+admin --> TK_GH
+admin --> TK_ALL
+
+@enduml

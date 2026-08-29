@@ -22,6 +22,7 @@ import AdminPageShell from '../components/admin/AdminPageShell';
 import AdminPagination from '../components/admin/AdminPagination';
 import DataTableShell from '../components/admin/DataTableShell';
 import HomeBannerPreviewPanel from '../components/admin/HomeBannerPreviewPanel';
+import PreviewableImage, { PreviewableImageGrid } from '../components/PreviewableImage';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { REALTIME_COALESCE_MS } from '../constants/realtime';
@@ -105,14 +106,18 @@ function BannerDetailDialog({ row, onClose }) {
           <DetailField label="Kết thúc">{formatDate(row.endDate) || 'Chưa duyệt'}</DetailField>
           <DetailField label="Số click">{Number(row.clickCount) || 0}</DetailField>
           <DetailField label="Trạng thái">{row.lifecycleLabel || row.statusLabel || ''}</DetailField>
-          <DetailField label="Lý do vi phạm">{row.violationReason || ''}</DetailField>
+          <DetailField label="Lý do vi phạm">{row.lyDoVP || ''}</DetailField>
         </dl>
         {row.image ? (
-          <div className="image-grid account-verify-images">
-            <a href={row.image} target="_blank" rel="noreferrer">
-              <img src={row.image} alt="Banner" />
-            </a>
-          </div>
+          <PreviewableImageGrid
+            className="image-grid account-verify-images"
+            items={[row.image]}
+            width={160}
+            height={96}
+            shape="rounded"
+            getSrc={(url) => url}
+            getAlt={() => 'Banner'}
+          />
         ) : null}
         <div className="dialog-actions" style={{ justifyContent: 'flex-start', gap: 8 }}>
           {row.seller?.id || row.sellerId ? (
@@ -549,7 +554,15 @@ export default function SellerBannersPage() {
                       >
                         <td>
                           {row.image ? (
-                            <img src={row.image} alt="" className="banner-home-table-thumb" />
+                            <PreviewableImage
+                              src={row.image}
+                              alt=""
+                              width={72}
+                              height={40}
+                              shape="rounded"
+                              className="banner-home-table-thumb"
+                              onClick={(event) => event.stopPropagation()}
+                            />
                           ) : (
                             <span className="muted">Chưa có ảnh</span>
                           )}

@@ -12,12 +12,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { BOTTOM_SHEET_BORDER, BottomSheetDismissOverlay, BottomSheetHandle, BottomSheetPanel } from './bottomSheetChrome';
+import { BottomSheetDismissOverlay, BottomSheetHandle } from './bottomSheetChrome';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
-import KeyboardStickyFooter from './KeyboardStickyFooter';
+import FormSheetActions from './KeyboardStickyFooter';
 import KeyboardAwareTextInput from './KeyboardAwareTextInput';
-
-const ACTIONS_BAR_ESTIMATE = 72;
+import { FormSheetHeader, FormSheetShell, FORM_SHEET_SCROLL_STYLE } from './formSheetLayout';
 
 const MAX_IMAGES = 5;
 
@@ -155,17 +154,20 @@ export default function ReportComposeModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <BottomSheetDismissOverlay onClose={onClose}>
-        <BottomSheetPanel style={styles.sheet}>
-          <BottomSheetHandle />
+        <FormSheetShell panelStyle={styles.sheet}>
+            <BottomSheetHandle />
+            <FormSheetHeader
+              title={headerTitle}
+              onClose={onClose}
+              disabled={isSubmitting}
+            />
 
-          <View style={styles.sheetBody}>
             <KeyboardAwareScrollView
+              style={FORM_SHEET_SCROLL_STYLE}
               contentContainerStyle={styles.scrollContent}
-              extraBottomInset={ACTIONS_BAR_ESTIMATE}
               nestedScrollPadding={false}
               showsVerticalScrollIndicator={false}
             >
-              <Text style={styles.title}>{headerTitle}</Text>
               {reasonTitle ? (
                 <View style={styles.reasonBox}>
                   <Text style={styles.reasonLabel}>Lý do</Text>
@@ -210,22 +212,21 @@ export default function ReportComposeModal({
                   </Pressable>
                 ) : null}
               </ScrollView>
-            </KeyboardAwareScrollView>
 
-            <KeyboardStickyFooter style={styles.actions}>
-              <Pressable style={styles.cancelBtn} onPress={onClose} disabled={isSubmitting}>
-                <Text style={styles.cancelText}>Hủy</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.submitBtn, isSubmitting && styles.submitDisabled]}
-                onPress={handleSubmit}
-                disabled={isSubmitting}
-              >
-                <Text style={styles.submitText}>{isSubmitting ? 'Đang gửi...' : 'Gửi tố cáo'}</Text>
-              </Pressable>
-            </KeyboardStickyFooter>
-          </View>
-        </BottomSheetPanel>
+              <FormSheetActions style={styles.actions}>
+                <Pressable style={styles.cancelBtn} onPress={onClose} disabled={isSubmitting}>
+                  <Text style={styles.cancelText}>Hủy</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.submitBtn, isSubmitting && styles.submitDisabled]}
+                  onPress={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.submitText}>{isSubmitting ? 'Đang gửi...' : 'Gửi tố cáo'}</Text>
+                </Pressable>
+              </FormSheetActions>
+            </KeyboardAwareScrollView>
+        </FormSheetShell>
       </BottomSheetDismissOverlay>
     </Modal>
   );
@@ -233,26 +234,11 @@ export default function ReportComposeModal({
 
 const styles = StyleSheet.create({
   sheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    ...BOTTOM_SHEET_BORDER,
-    height: '88%',
-  },
-  sheetBody: {
-    flex:1,
-    position: 'relative',
-    minHeight: 0,
+    paddingTop: 8,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginBottom: 10,
+    paddingTop: 0,
   },
   reasonBox: {
     backgroundColor: '#E6F4EC',
@@ -279,7 +265,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   textArea: {
-    minHeight: 110,
+    minHeight: 96,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -344,10 +330,7 @@ const styles = StyleSheet.create({
     color: '#076F32',
   },
   actions: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingHorizontal: 0,
   },
   cancelBtn: {
     flex: 1,

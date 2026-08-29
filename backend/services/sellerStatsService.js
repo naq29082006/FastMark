@@ -1,20 +1,23 @@
 const Reservation = require("../models/Reservation");
 const Product = require("../models/Product");
 const ProductVariant = require("../models/ProductVariant");
-const ProductImage = require("../models/ProductImage");
 const User = require("../models/User");
 const Follow = require("../models/Follow");
 const Review = require("../models/Review");
 const { RESERVATION_STATUS } = require("../constants");
 const { PRODUCT_STATUS } = require("../constants");
+const { notRemovedProductMatch } = require("../utils/productRemoval");
+const { publicReviewFilter } = require("../utils/reviewVisibility");
 const { getShopForSeller } = require("./shopSettingsService");
 const { computeTotal } = require("./reservationService");
+const {
+  getPickupConfirmedAt,
+  getReservationUpdatedAt,
+  reservationCreatedInRange,
+  reservationPickupConfirmedRangeFilter,
+} = require("../utils/reservationCompat");
 
-const CANCELLED_RESERVATION_STATUSES = [
-  RESERVATION_STATUS.REJECTED,
-  RESERVATION_STATUS.REFUNDED,
-  RESERVATION_STATUS.DISPUTE_RESOLVED,
-];
+const CANCELLED_RESERVATION_STATUSES = [RESERVATION_STATUS.CANCELLED];
 
 function formatDayLabel(date) {
   const day = String(date.getDate()).padStart(2, "0");
@@ -138,8 +141,8 @@ function buildRevenueTrend(completedReservations, { from, to, maxDays = 7 } = {}
     const dayEnd = endOfDay(day);
     let amount = 0;
     for (const reservation of completedReservations) {
-      const completedAt = reservation.completedAt || reservation.UpdatedAt;
-      if (completedAt && completedAt >= day && completedAt <= dayEnd) {
+      const pickupAt = getPickupConfirmedAt(reservation) || getReservationUpdatedAt(reservation);
+      if (pickupAt && pickupAt >= day && pickupAt <= dayEnd) {
         amount += computeTotal(reservation);
       }
     }
@@ -154,8 +157,8 @@ function buildRevenueTrend(completedReservations, { from, to, maxDays = 7 } = {}
 async function sumPeriodRevenue(completedReservations, from, to) {
   let total = 0;
   for (const reservation of completedReservations) {
-    const completedAt = reservation.completedAt || reservation.UpdatedAt;
-    if (completedAt && completedAt >= from && completedAt <= to) {
+    const pickupAt = getPickupConfirmedAt(reservation) || getReservationUpdatedAt(reservation);
+    if (pickupAt && pickupAt >= from && pickupAt <= to) {
       total += computeTotal(reservation);
     }
   }
@@ -166,7 +169,7 @@ async function countPeriodCompletedOrders(shopId, from, to) {
   return Reservation.countDocuments({
     shopId,
     status: { $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
-    completedAt: { $gte: from, $lte: to },
+    ...reservationPickupConfirmedRangeFilter(from, to),
   });
 }
 
@@ -177,7 +180,7 @@ async function resolveTopSellingProducts(shopId, from, to, limit = 3) {
         shopId,
         productId: { $ne: null },
         status: { $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
-        completedAt: { $gte: from, $lte: to },
+        ...reservationPickupConfirmedRangeFilter(from, to),
       },
     },
     { $group: { _id: "$productId", orderCount: { $sum: 1 } } },
@@ -189,24 +192,11 @@ async function resolveTopSellingProducts(shopId, from, to, limit = 3) {
   }
 
   const productIds = rows.map((row) => row._id);
-  const [products, images] = await Promise.all([
-    Product.find({ _id: { $in: productIds } })
-      .select("ProductName")
-      .lean(),
-    ProductImage.find({ ProductId: { $in: productIds } })
-      .sort({ Stt: 1, UploadedAt: 1 })
-      .select("ProductId ImageUrl")
-      .lean(),
-  ]);
+  const products = await Product.find({ _id: { $in: productIds } })
+    .select("ProductName images")
+    .lean();
 
   const productById = new Map(products.map((item) => [String(item._id), item]));
-  const imageByProductId = new Map();
-  for (const image of images) {
-    const key = String(image.ProductId);
-    if (!imageByProductId.has(key)) {
-      imageByProductId.set(key, image.ImageUrl || "");
-    }
-  }
 
   return rows
     .map((row, index) => {
@@ -219,7 +209,7 @@ async function resolveTopSellingProducts(shopId, from, to, limit = 3) {
         rank: index + 1,
         productId,
         name: product.ProductName || "",
-        imageUrl: imageByProductId.get(productId) || "",
+        imageUrl: (product.images && product.images[0]) || "",
         orderCount: Number(row.orderCount) || 0,
       };
     })
@@ -233,7 +223,7 @@ async function resolveTopBuyers(shopId, from, to, limit = 3) {
         shopId,
         userId: { $ne: null },
         status: { $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
-        completedAt: { $gte: from, $lte: to },
+        ...reservationPickupConfirmedRangeFilter(from, to),
       },
     },
     {
@@ -284,8 +274,7 @@ async function resolveTopBuyers(shopId, from, to, limit = 3) {
 async function resolveLatestReview(shopId) {
   const review = await Review.findOne({
     shopId,
-    isDeleted: { $ne: true },
-    isHidden: { $ne: true },
+    $and: publicReviewFilter().$and,
     comment: { $nin: ["", null] },
   })
     .sort({ CreatedAt: -1 })
@@ -304,8 +293,92 @@ async function resolveLatestReview(shopId) {
   };
 }
 
+/** Đếm sản phẩm đang niêm yết: tổng = còn hàng + hết hàng (loại trừ lẫn nhau). */
+async function resolveShopProductInventoryStats(shopId) {
+  const rows = await Product.aggregate([
+    {
+      $match: {
+        ShopId: shopId,
+        ...notRemovedProductMatch(),
+        Status: PRODUCT_STATUS.ACTIVE,
+      },
+    },
+    {
+      $lookup: {
+        from: ProductVariant.collection.name,
+        localField: "_id",
+        foreignField: "ProductId",
+        as: "variants",
+      },
+    },
+    {
+      $addFields: {
+        stockTotal: { $sum: "$variants.Quantity" },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalListed: { $sum: 1 },
+        inStockProducts: {
+          $sum: { $cond: [{ $gt: ["$stockTotal", 0] }, 1, 0] },
+        },
+        outOfStockProducts: {
+          $sum: { $cond: [{ $lte: ["$stockTotal", 0] }, 1, 0] },
+        },
+      },
+    },
+  ]);
+
+  const row = rows[0] || {};
+  const inStockProducts = Number(row.inStockProducts) || 0;
+  const outOfStockProducts = Number(row.outOfStockProducts) || 0;
+  const totalListedProducts = Number(row.totalListed) || inStockProducts + outOfStockProducts;
+
+  return {
+    totalListedProducts,
+    inStockProducts,
+    outOfStockProducts,
+  };
+}
+
+/** Đánh giá công khai — breakdown + tổng + điểm TB (không dùng cache shop). */
+async function resolveShopReviewStats(shopId) {
+  const ratingAgg = await Review.aggregate([
+    {
+      $match: {
+        shopId,
+        $and: publicReviewFilter().$and,
+      },
+    },
+    { $group: { _id: "$rating", count: { $sum: 1 } } },
+  ]);
+
+  const ratingBreakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let tongDG = 0;
+  let ratingSum = 0;
+  for (const row of ratingAgg) {
+    const star = Number(row._id);
+    const count = Number(row.count) || 0;
+    if (star >= 1 && star <= 5) {
+      ratingBreakdown[star] = count;
+      tongDG += count;
+      ratingSum += star * count;
+    }
+  }
+  const diemTB = tongDG > 0 ? Math.round((ratingSum / tongDG) * 10) / 10 : 0;
+  return { ratingBreakdown, tongDG, diemTB };
+}
+
 async function countPeriodBuyerChats(_sellerUserId, _from, _to) {
   return 0;
+}
+
+function matchShopReservationsCreatedInRange(shopId, from, to, extraMatch = {}) {
+  return {
+    shopId,
+    $and: [reservationCreatedInRange(from, to), extraMatch],
+  };
 }
 
 async function getSellerStats(user, query = {}) {
@@ -321,7 +394,7 @@ async function getSellerStats(user, query = {}) {
   const completedReservations = await Reservation.find({
     shopId: shop._id,
     status: {
-      $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED],
+      $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.COMPLETED],
     },
   });
 
@@ -336,24 +409,22 @@ async function getSellerStats(user, query = {}) {
     const amount = computeTotal(reservation);
     const qty = Number(reservation.quantity) || 0;
     totalRevenue += amount;
-    const completedAt = reservation.completedAt || reservation.UpdatedAt;
-    if (completedAt && completedAt >= dayStart) {
+    const pickupAt = getPickupConfirmedAt(reservation) || getReservationUpdatedAt(reservation);
+    if (pickupAt && pickupAt >= dayStart) {
       dailyRevenue += amount;
     }
-    if (completedAt && completedAt >= monthStart) {
+    if (pickupAt && pickupAt >= monthStart) {
       monthlyRevenue += amount;
     }
-    if (completedAt && completedAt >= from && completedAt <= to) {
+    if (pickupAt && pickupAt >= from && pickupAt <= to) {
       periodRevenue += amount;
       periodSoldCount += qty;
       periodCompletedOrders += 1;
     }
   }
 
-  const createdInRange = {
-    shopId: shop._id,
-    CreatedAt: { $gte: from, $lte: to },
-  };
+  const periodMatch = (extraMatch = {}) =>
+    matchShopReservationsCreatedInRange(shop._id, from, to, extraMatch);
 
   const [
     pendingCount,
@@ -367,10 +438,10 @@ async function getSellerStats(user, query = {}) {
     periodCancelled,
     periodCompleted,
     periodDisputed,
+    periodPickupConfirmed,
     productLikeAgg,
     productViewsAgg,
-    activeProducts,
-    outOfStockAgg,
+    productInventoryStats,
     periodNewFollowers,
     previousNewFollowers,
     previousPeriodCompleted,
@@ -378,7 +449,7 @@ async function getSellerStats(user, query = {}) {
     previousNewProducts,
     periodNewProducts,
     periodUniqueBuyerIds,
-    ratingAgg,
+    shopReviewStats,
     topSellingProducts,
     topBuyers,
     latestReview,
@@ -386,7 +457,7 @@ async function getSellerStats(user, query = {}) {
   ] = await Promise.all([
     Reservation.countDocuments({
       shopId: shop._id,
-      status: RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION,
+      status: RESERVATION_STATUS.PENDING,
     }),
     Reservation.countDocuments({
       shopId: shop._id,
@@ -400,41 +471,35 @@ async function getSellerStats(user, query = {}) {
       shopId: shop._id,
       status: { $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
     }),
-    Reservation.countDocuments({
-      ...createdInRange,
-      status: RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION,
-    }),
-    Reservation.countDocuments({
-      ...createdInRange,
-      status: RESERVATION_STATUS.WAITING_PICKUP,
-    }),
-    Reservation.countDocuments({
-      ...createdInRange,
-      status: RESERVATION_STATUS.WAITING_PICKUP,
-      pickupTime: { $gt: now },
-    }),
-    Reservation.countDocuments({
-      ...createdInRange,
-      status: RESERVATION_STATUS.WAITING_PICKUP,
-      $or: [{ pickupTime: { $lte: now } }, { pickupTime: null }],
-    }),
-    Reservation.countDocuments({
-      ...createdInRange,
-      status: { $in: CANCELLED_RESERVATION_STATUSES },
-    }),
-    Reservation.countDocuments({
-      ...createdInRange,
-      status: { $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
-    }),
-    Reservation.countDocuments({
-      ...createdInRange,
-      status: RESERVATION_STATUS.DISPUTED,
-    }),
+    Reservation.countDocuments(periodMatch({ status: RESERVATION_STATUS.PENDING })),
+    Reservation.countDocuments(periodMatch({ status: RESERVATION_STATUS.WAITING_PICKUP })),
+    Reservation.countDocuments(
+      periodMatch({
+        status: RESERVATION_STATUS.WAITING_PICKUP,
+        pickupTime: { $gt: now },
+      })
+    ),
+    Reservation.countDocuments(
+      periodMatch({
+        status: RESERVATION_STATUS.WAITING_PICKUP,
+        $or: [{ pickupTime: { $lte: now } }, { pickupTime: null }],
+      })
+    ),
+    Reservation.countDocuments(
+      periodMatch({ status: { $in: CANCELLED_RESERVATION_STATUSES } })
+    ),
+    Reservation.countDocuments(
+      periodMatch({
+        status: { $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
+      })
+    ),
+    Reservation.countDocuments(periodMatch({ status: RESERVATION_STATUS.DISPUTED })),
+    Reservation.countDocuments(periodMatch({ status: RESERVATION_STATUS.PICKUP_CONFIRMED })),
     Product.aggregate([
       {
         $match: {
           ShopId: shop._id,
-          IsDeleted: { $ne: true },
+          ...notRemovedProductMatch(),
           Status: PRODUCT_STATUS.ACTIVE,
         },
       },
@@ -444,75 +509,38 @@ async function getSellerStats(user, query = {}) {
       {
         $match: {
           ShopId: shop._id,
-          IsDeleted: { $ne: true },
+          ...notRemovedProductMatch(),
         },
       },
       { $group: { _id: null, total: { $sum: { $ifNull: ["$ViewCount", 0] } } } },
     ]),
-    Product.countDocuments({
-      ShopId: shop._id,
-      IsDeleted: { $ne: true },
-      Status: PRODUCT_STATUS.ACTIVE,
-    }),
-    Product.aggregate([
-      {
-        $match: {
-          ShopId: shop._id,
-          IsDeleted: { $ne: true },
-          Status: PRODUCT_STATUS.ACTIVE,
-        },
-      },
-      {
-        $lookup: {
-          from: ProductVariant.collection.name,
-          localField: "_id",
-          foreignField: "ProductId",
-          as: "variants",
-        },
-      },
-      {
-        $addFields: {
-          stockTotal: { $sum: "$variants.Quantity" },
-        },
-      },
-      { $match: { stockTotal: { $lte: 0 } } },
-      { $count: "total" },
-    ]),
+    resolveShopProductInventoryStats(shop._id),
     Follow.countDocuments({
-      followedUserId: sellerUserId,
+      shopId: shop._id,
       CreatedAt: { $gte: from, $lte: to },
     }),
     Follow.countDocuments({
-      followedUserId: sellerUserId,
+      shopId: shop._id,
       CreatedAt: { $gte: prevFrom, $lte: prevTo },
     }),
     countPeriodCompletedOrders(shop._id, prevFrom, prevTo),
     sumPeriodRevenue(completedReservations, prevFrom, prevTo),
     Product.countDocuments({
       ShopId: shop._id,
-      IsDeleted: { $ne: true },
+      ...notRemovedProductMatch(),
       CreatedAt: { $gte: prevFrom, $lte: prevTo },
     }),
     Product.countDocuments({
       ShopId: shop._id,
-      IsDeleted: { $ne: true },
+      ...notRemovedProductMatch(),
       CreatedAt: { $gte: from, $lte: to },
     }),
     Reservation.distinct("userId", {
       shopId: shop._id,
       status: { $in: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
-      completedAt: { $gte: from, $lte: to },
+      ...reservationPickupConfirmedRangeFilter(from, to),
     }),
-    Review.aggregate([
-      {
-        $match: {
-          shopId: shop._id,
-          isDeleted: { $ne: true },
-          isHidden: { $ne: true },
-        },
-      },
-      { $group: { _id: "$rating", count: { $sum: 1 } } },
-    ]),
+    resolveShopReviewStats(shop._id),
     resolveTopSellingProducts(shop._id, from, to),
     resolveTopBuyers(shop._id, from, to),
     resolveLatestReview(shop._id),
@@ -523,23 +551,25 @@ async function getSellerStats(user, query = {}) {
   const completionRate =
     periodDecisionTotal > 0 ? Math.round((periodCompleted / periodDecisionTotal) * 100) : 0;
 
-  const ratingBreakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  for (const row of ratingAgg) {
-    const star = Number(row._id);
-    if (star >= 1 && star <= 5) {
-      ratingBreakdown[star] = Number(row.count) || 0;
-    }
-  }
+  const { ratingBreakdown, tongDG, diemTB } = shopReviewStats || {
+    ratingBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    tongDG: 0,
+    diemTB: 0,
+  };
 
-  const followersCount = Number(freshUser?.FollowersCount) || Number(shop.followersCount) || 0;
+  const totalListedProducts = Number(productInventoryStats?.totalListedProducts) || 0;
+  const inStockProducts = Number(productInventoryStats?.inStockProducts) || 0;
+  const outOfStockProducts = Number(productInventoryStats?.outOfStockProducts) || 0;
+
+  const soNguoiTheo = Number(shop.soNguoiTheo) || 0;
   const productViews = Number(productViewsAgg?.[0]?.total) || 0;
   const averageOrderValue =
     periodCompletedOrders > 0 ? Math.round(periodRevenue / periodCompletedOrders) : 0;
 
   const overviewTrends = {
     periodRevenue: computePercentChange(periodRevenue, previousPeriodRevenue),
-    periodCompleted: computePercentChange(periodCompleted, previousPeriodCompleted),
-    totalProducts: computePercentChange(periodNewProducts, previousNewProducts),
+    periodCompleted: computePercentChange(periodCompletedOrders, previousPeriodCompleted),
+    tongSP: computePercentChange(periodNewProducts, previousNewProducts),
     followers: computePercentChange(periodNewFollowers, previousNewFollowers),
   };
 
@@ -568,6 +598,7 @@ async function getSellerStats(user, query = {}) {
       confirmed: periodConfirmed,
       holding: periodHolding,
       waitingPickup: periodWaitingPickup,
+      pickupConfirmed: periodPickupConfirmed,
       cancelled: periodCancelled,
       completed: periodCompleted,
       disputed: periodDisputed,
@@ -575,24 +606,25 @@ async function getSellerStats(user, query = {}) {
       total:
         periodPending +
         periodConfirmed +
+        periodPickupConfirmed +
         periodCancelled +
         periodCompleted +
         periodDisputed,
     },
-    followersCount,
+    soNguoiTheo,
     periodNewFollowers,
     periodUniqueBuyers: Array.isArray(periodUniqueBuyerIds) ? periodUniqueBuyerIds.length : 0,
     periodChatCount,
     shopViews: productViews,
-    followingCount: freshUser?.FollowingCount || 0,
+    followingCount: freshUser?.SoTheoDoi || 0,
     productLikes: Number(productLikeAgg?.[0]?.total) || 0,
     productViews,
-    totalProducts: shop.totalProducts || 0,
-    activeProducts,
-    outOfStockProducts: Number(outOfStockAgg?.[0]?.total) || 0,
+    tongSP: totalListedProducts,
+    activeProducts: inStockProducts,
+    outOfStockProducts,
     soldCount: shop.soldCount || 0,
-    averageRating: shop.averageRating || 0,
-    totalReviews: shop.totalReviews || 0,
+    diemTB,
+    tongDG,
     ratingBreakdown,
     topSellingProducts,
     topBuyers,

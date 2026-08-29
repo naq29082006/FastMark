@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -18,18 +21,72 @@ import {
   cancelTopupViewModel,
   resolveTopupReturnViewModel,
   syncTopupViewModel,
+  loadWalletTransactionsViewModel,
 } from '../../viewmodel/wallet/walletViewModel';
 import SubScreenHeader from '../shared/components/SubScreenHeader';
 import KeyboardAwareScrollView from '../shared/components/KeyboardAwareScrollView';
-import KeyboardStickyFooter from '../shared/components/KeyboardStickyFooter';
 import KeyboardAwareTextInput from '../shared/components/KeyboardAwareTextInput';
+import PlanTabPanel from '../shared/components/PlanTabPanel';
+import LoadMoreButton from '../shared/components/LoadMoreButton';
+import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
+import { WALLET_TX_TYPE } from '../../model/walletModel';
+import { useResourceSocket } from '../../hooks/useResourceSocket';
+import WalletTransactionRow from './WalletTransactionRow';
+import WalletTransactionDetailScreen from './WalletTransactionDetailScreen';
 
-const ACTIONS_BAR_ESTIMATE = 72;
+const TOPUP_SCREEN_TABS = [
+  { key: 'topup', label: 'Nạp tiền' },
+  { key: 'history', label: 'Lịch sử nạp' },
+];
 
 const PRESETS = [50000, 100000, 200000, 500000];
 const POLL_MS = 2000;
 
-/** Ẩn thanh brand merchant (FASTMARK + payOS) trên trang checkout PayOS nếu DOM cho phép. */
+function buildQrImageUrl(payload, size = 240) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${encodeURIComponent(
+    payload
+  )}`;
+}
+
+function formatTransferAmount(amount) {
+  const value = Math.round(Number(amount) || 0);
+  return `${value.toLocaleString('vi-VN')} vnd`;
+}
+
+async function copyTransferValue(label, value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return;
+  }
+  await Clipboard.setStringAsync(text);
+  Alert.alert('Đã sao chép', `${label} đã được sao chép.`);
+}
+
+function TransferCopyRow({ label, value, copyValue: copyRaw, copyable = true }) {
+  const display = String(value || '—');
+  return (
+    <View style={styles.transferRow}>
+      <Text style={styles.transferLabel}>{label}</Text>
+      <View style={styles.transferValueRow}>
+        <Text style={styles.transferValue} selectable>
+          {display}
+        </Text>
+        {copyable ? (
+          <Pressable
+            style={styles.copyBtn}
+            onPress={() => copyTransferValue(label, copyRaw ?? value)}
+            accessibilityRole="button"
+            accessibilityLabel={`Sao chép ${label}`}
+          >
+            <Text style={styles.copyBtnText}>Sao chép</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/** Fallback WebView — chỉ dùng khi PayOS không trả qrCode. */
 const HIDE_PAYOS_BRAND_JS = `
 (function () {
   function hideBrandBar() {
@@ -89,8 +146,17 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
   const [submitting, setSubmitting] = useState(false);
   const [checkout, setCheckout] = useState(null);
   const [polling, setPolling] = useState(false);
+  const [screenTab, setScreenTab] = useState('topup');
+  const [topupHistory, setTopupHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
   const finishedRef = useRef(false);
   const handlingReturnRef = useRef(false);
+  const historyGuardRef = useRef(false);
 
   const selectedAmount = useMemo(() => {
     const custom = Math.round(Number(String(customText).replace(/\D/g, '')));
@@ -112,6 +178,7 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
       finishedRef.current = true;
       setPolling(false);
       setCheckout(null);
+      setScreenTab('history');
       onSuccess?.({
         amount: synced.transaction.amount,
         orderCode: synced.transaction.orderCode,
@@ -176,6 +243,71 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
     };
   }, [checkout?.orderCode, finishSuccess]);
 
+  const loadTopupHistory = useCallback(async ({ nextPage = 1, silent = false } = {}) => {
+    if (historyGuardRef.current) {
+      return;
+    }
+    historyGuardRef.current = true;
+    if (nextPage === 1) {
+      if (!silent) {
+        setHistoryLoading(true);
+      }
+    } else {
+      setHistoryLoadingMore(true);
+    }
+    try {
+      const data = await loadWalletTransactionsViewModel({
+        page: nextPage,
+        limit: DEFAULT_PAGE_SIZE,
+        type: WALLET_TX_TYPE.TOPUP,
+      });
+      const rows = data.transactions || [];
+      setTopupHistory((current) =>
+        nextPage === 1 ? rows : appendUniqueById(current, rows)
+      );
+      setHistoryPage(Number(data.page) || nextPage);
+      setHistoryHasMore(Boolean(data.hasMore));
+      setHistoryTotal(Math.max(0, Number(data.total) || 0));
+    } catch (error) {
+      if (!silent && nextPage === 1) {
+        Alert.alert('Lỗi', error.message || 'Không tải được lịch sử nạp.');
+        setTopupHistory([]);
+        setHistoryHasMore(false);
+        setHistoryTotal(0);
+      }
+    } finally {
+      if (!silent) {
+        setHistoryLoading(false);
+      }
+      setHistoryLoadingMore(false);
+      historyGuardRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (screenTab !== 'history') {
+      return;
+    }
+    loadTopupHistory({ nextPage: 1 });
+  }, [screenTab, loadTopupHistory]);
+
+  const handleWalletRealtime = useCallback(
+    (payload) => {
+      if (String(payload?.type || '').trim() !== 'wallet') {
+        return;
+      }
+      if (screenTab === 'history') {
+        loadTopupHistory({ nextPage: 1, silent: true });
+      }
+    },
+    [loadTopupHistory, screenTab]
+  );
+
+  useResourceSocket({
+    enabled: screenTab === 'history',
+    onResourceUpdated: handleWalletRealtime,
+  });
+
   async function handleConfirm() {
     if (submitting || checkout) return;
     if (!selectedAmount || selectedAmount < 10000) {
@@ -187,13 +319,18 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
     setSubmitting(true);
     try {
       const result = await createTopupViewModel(selectedAmount);
-      if (!result.checkoutUrl) {
-        throw new Error('Không nhận được liên kết thanh toán PayOS.');
+      if (!result.qrCode && !result.checkoutUrl) {
+        throw new Error('Không nhận được thông tin thanh toán PayOS.');
       }
       setCheckout({
         url: result.checkoutUrl,
         orderCode: result.orderCode,
         description: result.description || '',
+        qrCode: result.qrCode || '',
+        accountNumber: result.accountNumber || '',
+        accountName: result.accountName || '',
+        bankName: result.bankName || '',
+        amount: result.amount ?? selectedAmount,
       });
     } catch (error) {
       Alert.alert('Không nạp được', error.message || 'Vui lòng thử lại.');
@@ -229,140 +366,241 @@ export default function TopUpScreen({ balance = 0, onBack, onSuccess }) {
     );
   }
 
-  if (checkout?.url) {
+  if (selectedTransaction) {
     return (
-      <View style={styles.screen}>
-        <SubScreenHeader title="Thanh toán PayOS" onBack={handleCloseCheckout} />
+      <WalletTransactionDetailScreen
+        transactionId={selectedTransaction.id}
+        initialTransaction={selectedTransaction}
+        onBack={() => setSelectedTransaction(null)}
+      />
+    );
+  }
 
-        <View style={styles.checkoutMeta}>
-          <Text style={styles.checkoutMetaText}>
-            Nội dung CK: {checkout.description || 'userId'}
-          </Text>
-          {polling ? (
+  if (checkout?.orderCode != null) {
+    const useNativeQr = Boolean(String(checkout.qrCode || '').trim());
+
+    if (useNativeQr) {
+      const transferAmount = checkout.amount ?? selectedAmount;
+      const amountDigits = String(Math.round(Number(transferAmount) || 0));
+
+      return (
+        <View style={styles.screen}>
+          <SubScreenHeader title="Nạp tiền" onBack={handleCloseCheckout} />
+
+          <View style={styles.checkoutMeta}>
             <View style={styles.pollingRow}>
               <ActivityIndicator size="small" color={t.primaryDark} />
               <Text style={styles.pollingText}>Đang chờ xác nhận… cộng tiền tự động</Text>
             </View>
-          ) : null}
-        </View>
+          </View>
 
-        <WebView
-          source={{ uri: checkout.url }}
-          style={styles.webview}
-          startInLoadingState
-          javaScriptEnabled
-          domStorageEnabled
-          originWhitelist={['*', 'http://*', 'https://*', 'fastmark://*']}
-          setSupportMultipleWindows={false}
-          injectedJavaScript={HIDE_PAYOS_BRAND_JS}
-          onShouldStartLoadWithRequest={(request) => {
-            const url = request?.url || '';
-            if (isPayosReturnUrl(url) && url.startsWith('fastmark://')) {
-              handleReturnUrl(url);
-              return false;
-            }
-            return true;
-          }}
-          onNavigationStateChange={(navState) => {
-            const url = navState?.url || '';
-            if (isPayosReturnUrl(url)) {
-              handleReturnUrl(url);
-            }
-          }}
-          renderLoading={() => (
-            <View style={styles.webviewLoading}>
-              <ActivityIndicator color={t.primaryDark} />
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.qrCheckoutContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.qrCard}>
+              <Image
+                source={{ uri: buildQrImageUrl(checkout.qrCode, 260) }}
+                style={styles.qrImage}
+                accessibilityLabel="Mã QR chuyển khoản"
+              />
             </View>
-          )}
-        />
 
-        {/* Safe area dưới để nút Huỷ của PayOS không bị thanh home che */}
-        <View style={{ height: Math.max(insets.bottom, 12) }} />
-      </View>
-    );
+            {checkout.bankName ? (
+              <View style={styles.transferRow}>
+                <Text style={styles.transferLabel}>Ngân hàng</Text>
+                <Text style={styles.transferValueBold}>{checkout.bankName}</Text>
+              </View>
+            ) : null}
+
+            <TransferCopyRow label="Chủ tài khoản" value={checkout.accountName} copyable={false} />
+            <TransferCopyRow label="Số tài khoản" value={checkout.accountNumber} />
+            <TransferCopyRow
+              label="Số tiền"
+              value={formatTransferAmount(transferAmount)}
+              copyValue={amountDigits}
+            />
+            <TransferCopyRow label="Nội dung" value={checkout.description} />
+
+            <Text style={styles.transferNote}>
+              {`*Lưu ý: Nhập chính xác số tiền ${Number(transferAmount).toLocaleString('vi-VN')} khi chuyển khoản*`}
+            </Text>
+
+            <Pressable style={styles.checkoutCancelBtn} onPress={handleCloseCheckout}>
+              <Text style={styles.checkoutCancelBtnText}>Huỷ</Text>
+            </Pressable>
+          </ScrollView>
+
+          <View style={{ height: Math.max(insets.bottom, 12) }} />
+        </View>
+      );
+    }
+
+    if (checkout?.url) {
+      return (
+        <View style={styles.screen}>
+          <SubScreenHeader title="Nạp tiền" onBack={handleCloseCheckout} />
+
+          <View style={styles.checkoutMeta}>
+            {polling ? (
+              <View style={styles.pollingRow}>
+                <ActivityIndicator size="small" color={t.primaryDark} />
+                <Text style={styles.pollingText}>Đang chờ xác nhận… cộng tiền tự động</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <WebView
+            source={{ uri: checkout.url }}
+            style={styles.webview}
+            startInLoadingState
+            javaScriptEnabled
+            domStorageEnabled
+            originWhitelist={['*', 'http://*', 'https://*', 'fastmark://*']}
+            setSupportMultipleWindows={false}
+            injectedJavaScript={HIDE_PAYOS_BRAND_JS}
+            onShouldStartLoadWithRequest={(request) => {
+              const url = request?.url || '';
+              if (isPayosReturnUrl(url) && url.startsWith('fastmark://')) {
+                handleReturnUrl(url);
+                return false;
+              }
+              return true;
+            }}
+            onNavigationStateChange={(navState) => {
+              const url = navState?.url || '';
+              if (isPayosReturnUrl(url)) {
+                handleReturnUrl(url);
+              }
+            }}
+            renderLoading={() => (
+              <View style={styles.webviewLoading}>
+                <ActivityIndicator color={t.primaryDark} />
+              </View>
+            )}
+          />
+
+          <View style={{ height: Math.max(insets.bottom, 12) }} />
+        </View>
+      );
+    }
   }
 
   return (
     <View style={styles.screen}>
       <SubScreenHeader title="Nạp tiền" onBack={onBack} />
 
-      <KeyboardAwareScrollView
-        contentContainerStyle={styles.content}
-        extraBottomInset={ACTIONS_BAR_ESTIMATE}
-      >
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Số dư hiện tại</Text>
-          <Text style={styles.balanceValue}>{formatPrice(balance)}</Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>Chọn mệnh giá nạp</Text>
-        <View style={styles.presetGrid}>
-          {PRESETS.map((value) => {
-            const active = !customText && amount === value;
-            return (
-              <Pressable
-                key={value}
-                onPress={() => selectPreset(value)}
-                style={[styles.presetChip, active && styles.presetChipActive]}
-              >
-                <Text style={[styles.presetText, active && styles.presetTextActive]}>
-                  {formatPrice(value)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.inputWrap}>
-          <Ionicons name="wallet-outline" size={18} color={t.textMuted} />
-          <KeyboardAwareTextInput
-            style={styles.input}
-            value={customText}
-            onChangeText={setCustomText}
-            placeholder="Nhập số tiền khác..."
-            placeholderTextColor="#94a3b8"
-            keyboardType="number-pad"
-          />
-          <Text style={styles.inputSuffix}>VNĐ</Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>Phương thức nạp</Text>
-        <View style={[styles.methodCard, styles.methodCardActive]}>
-          <View style={styles.methodIcon}>
-            <Ionicons name="card-outline" size={20} color={t.primaryDark} />
-          </View>
-          <View style={styles.methodBody}>
-            <Text style={styles.methodTitle}>Thanh toán PayOS</Text>
-            <Text style={styles.methodSub}>Nhúng trong app · nội dung CK = userId</Text>
-          </View>
-          <Ionicons name="checkmark-circle" size={22} color={t.primary} />
-        </View>
-      </KeyboardAwareScrollView>
-
-      <KeyboardStickyFooter style={styles.footer}>
-        <Pressable
-          style={[styles.confirmBtn, submitting && styles.confirmBtnDisabled]}
-          onPress={handleConfirm}
-          disabled={submitting}
+      <View style={styles.tabShell}>
+        <PlanTabPanel
+          tabs={TOPUP_SCREEN_TABS}
+          activeTab={screenTab}
+          onChangeTab={setScreenTab}
         >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <View style={styles.confirmRow}>
-              <Text style={styles.confirmText}>
-                {`Xác nhận nạp ${formatPrice(selectedAmount || 0)}`}
-              </Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
+          {screenTab === 'topup' ? (
+            <KeyboardAwareScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.tabContent}
+              nestedScrollPadding={false}
+            >
+              <View style={styles.balanceCard}>
+                <Text style={styles.balanceLabel}>Số dư hiện tại</Text>
+                <Text style={styles.balanceValue}>{formatPrice(balance)}</Text>
+              </View>
+
+              <Text style={styles.sectionTitle}>Chọn mệnh giá nạp</Text>
+              <View style={styles.presetGrid}>
+                {PRESETS.map((value) => {
+                  const active = !customText && amount === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => selectPreset(value)}
+                      style={[styles.presetChip, active && styles.presetChipActive]}
+                    >
+                      <Text style={[styles.presetText, active && styles.presetTextActive]}>
+                        {formatPrice(value)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.inputWrap}>
+                <Ionicons name="wallet-outline" size={18} color={t.textMuted} />
+                <KeyboardAwareTextInput
+                  style={styles.input}
+                  value={customText}
+                  onChangeText={setCustomText}
+                  placeholder="Nhập số tiền khác..."
+                  placeholderTextColor="#94a3b8"
+                  keyboardType="number-pad"
+                />
+                <Text style={styles.inputSuffix}>VNĐ</Text>
+              </View>
+
+              <Pressable
+                style={[styles.confirmBtn, submitting && styles.confirmBtnDisabled]}
+                onPress={handleConfirm}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <View style={styles.confirmRow}>
+                    <Text style={styles.confirmText}>
+                      {`Xác nhận nạp ${formatPrice(selectedAmount || 0)}`}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={18} color="#fff" />
+                  </View>
+                )}
+              </Pressable>
+            </KeyboardAwareScrollView>
+          ) : historyLoading ? (
+            <View style={styles.historyLoading}>
+              <ActivityIndicator color={t.primary} size="large" />
             </View>
+          ) : (
+            <KeyboardAwareScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.historyContent}
+            >
+              {topupHistory.length === 0 ? (
+                <Text style={styles.historyEmpty}>Chưa có lần nạp tiền nào.</Text>
+              ) : (
+                <>
+                  <View style={styles.txCard}>
+                    {topupHistory.map((item) => (
+                      <WalletTransactionRow
+                        key={item.id}
+                        item={item}
+                        onPress={setSelectedTransaction}
+                      />
+                    ))}
+                  </View>
+                  <LoadMoreButton
+                    currentCount={topupHistory.length}
+                    totalCount={
+                      historyHasMore
+                        ? Math.max(historyTotal, topupHistory.length + DEFAULT_PAGE_SIZE)
+                        : topupHistory.length
+                    }
+                    loading={historyLoadingMore}
+                    onPress={() => loadTopupHistory({ nextPage: historyPage + 1 })}
+                  />
+                </>
+              )}
+            </KeyboardAwareScrollView>
           )}
-        </Pressable>
-      </KeyboardStickyFooter>
+        </PlanTabPanel>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#f8fafc' },
+  scroll: { flex: 1 },
   checkoutMeta: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -394,6 +632,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: { padding: 20, gap: 14 },
+  tabShell: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  tabContent: { gap: 14, paddingBottom: 24 },
+  historyContent: { gap: 12, paddingBottom: 24 },
+  historyLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  historyEmpty: {
+    color: t.textMuted,
+    fontWeight: '600',
+    textAlign: 'center',
+    paddingVertical: 32,
+  },
+  txCard: {
+    borderWidth: 1,
+    borderColor: t.border,
+    borderRadius: t.radius,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
   balanceCard: {
     backgroundColor: t.primaryDark,
     borderRadius: t.radiusLg,
@@ -432,37 +692,86 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, fontSize: 15, fontWeight: '600', color: t.text },
   inputSuffix: { fontWeight: '700', color: t.textMuted },
-  methodCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  qrCheckoutContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 14,
+  },
+  qrCard: {
+    alignSelf: 'center',
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: t.border,
-    borderRadius: 14,
-    padding: 14,
+  },
+  qrImage: {
+    width: 260,
+    height: 260,
+    borderRadius: 8,
     backgroundColor: '#fff',
   },
-  methodCardActive: {
-    borderColor: t.primary,
-    backgroundColor: '#f0fdf4',
+  transferRow: {
+    gap: 6,
   },
-  methodIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: t.primarySoft,
+  transferLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: t.textMuted,
+  },
+  transferValueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  transferValue: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: t.text,
+    lineHeight: 22,
+  },
+  transferValueBold: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: t.text,
+    lineHeight: 22,
+  },
+  copyBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  copyBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: t.primary,
+  },
+  transferNote: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: t.textMuted,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  checkoutCancelBtn: {
+    marginTop: 8,
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: t.border,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  methodBody: { flex: 1, gap: 2 },
-  methodTitle: { fontSize: 15, fontWeight: '800', color: t.text },
-  methodSub: { fontSize: 12, fontWeight: '600', color: t.textMuted },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    backgroundColor: '#f8fafc',
+  checkoutCancelBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: t.text,
   },
   confirmBtn: {
+    marginTop: 8,
     minHeight: 56,
     borderRadius: 999,
     backgroundColor: t.primaryDark,

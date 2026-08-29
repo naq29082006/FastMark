@@ -45,6 +45,14 @@ export function releaseReservation(token, reservationId, note = '') {
   });
 }
 
+export function rejectReservationDispute(token, reservationId, note = '') {
+  return apiRequest(`/api/admin/reservations/${reservationId}/reject-dispute`, {
+    method: 'POST',
+    token,
+    body: { note },
+  });
+}
+
 export function cancelReservation(token, reservationId, reason = '') {
   return apiRequest(`/api/admin/reservations/${reservationId}/cancel`, {
     method: 'POST',

@@ -21,8 +21,8 @@ import ProfileSubScreen from './ProfileSubScreen';
 const MAX_IMAGES = 5;
 
 export const ACCOUNT_REPORT_TYPE_OPTIONS = [
-  { value: 8, label: 'Hệ thống lỗi' },
-  { value: 9, label: 'Khác' },
+  { value: 4, label: 'Hệ thống lỗi' },
+  { value: 5, label: 'Khác' },
 ];
 
 async function assetToDataUri(asset) {
@@ -45,7 +45,7 @@ async function assetsToDataUris(assets = []) {
 }
 
 export default function AccountReportScreen({ onBack }) {
-  const [reportType, setReportType] = useState(8);
+  const [reportType, setReportType] = useState(4);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [content, setContent] = useState('');
   const [imageUris, setImageUris] = useState([]);
@@ -147,7 +147,7 @@ export default function AccountReportScreen({ onBack }) {
       await submitReportOnBackend({
         idToken,
         reportType,
-        title: selectedType?.label || 'Report',
+        title: selectedType?.label || 'Báo cáo',
         content: trimmed,
         images: validImages,
       });
@@ -165,7 +165,7 @@ export default function AccountReportScreen({ onBack }) {
   }
 
   return (
-    <ProfileSubScreen title="Report" onBack={onBack}>
+    <ProfileSubScreen title="Báo cáo" onBack={onBack}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -182,7 +182,7 @@ export default function AccountReportScreen({ onBack }) {
         </Pressable>
 
         <Text style={styles.hint}>
-          Báo cáo gian hàng / người dùng hãy mở trang gian hàng hoặc hồ sơ tương ứng rồi bấm Report.
+          Báo cáo gian hàng / người dùng hãy mở trang gian hàng hoặc hồ sơ tương ứng rồi bấm Báo cáo.
           Tại đây chỉ gửi tố cáo hệ thống hoặc loại khác.
         </Text>
 

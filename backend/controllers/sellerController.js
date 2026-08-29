@@ -128,7 +128,9 @@ exports.listAdminVerifications = async (req, res) => {
 
   return success(res, {
     data: {
-      verifications: payload.items.map(sellerService.toAdminVerification),
+      verifications: payload.items.map(({ verification, shop }) =>
+        sellerService.toAdminVerification(verification, shop)
+      ),
       pagination: payload.pagination,
       stats: payload.stats,
     },
@@ -169,6 +171,21 @@ exports.rejectVerification = async (req, res) => {
     message: "Đã từ chối hồ sơ người bán.",
     data: {
       verification: sellerService.toPublicVerification(verification),
+    },
+  });
+};
+
+exports.updateAdminVerification = async (req, res) => {
+  const verification = await sellerService.updateSellerVerificationByAdmin(
+    req.currentUser,
+    req.params.id,
+    sellerService.normalizeSellerRegistrationPayload(req.body)
+  );
+
+  return success(res, {
+    message: "Đã cập nhật thông tin CCCD.",
+    data: {
+      verification: sellerService.toAdminVerification(verification),
     },
   });
 };

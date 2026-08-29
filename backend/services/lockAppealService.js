@@ -11,8 +11,9 @@ function pickString(value) {
 }
 
 function isLegacyShopLockAppealReport(report) {
+  const type = Number(report?.reportType);
   return (
-    Number(report?.reportType) === REPORT_TYPE.OTHER &&
+    (type === REPORT_TYPE.OTHER || type === 9) &&
     Boolean(report?.shopId) &&
     SHOP_LOCK_APPEAL_TITLE_PATTERN.test(pickString(report?.title))
   );
@@ -38,8 +39,13 @@ function shopLockAppealBaseFilter(userId, shopId) {
     shopId,
     $or: [
       { reportType: REPORT_TYPE.SHOP_LOCK_APPEAL },
+      { reportType: 11 },
       {
         reportType: REPORT_TYPE.OTHER,
+        title: { $regex: SHOP_LOCK_APPEAL_TITLE_PATTERN },
+      },
+      {
+        reportType: 9,
         title: { $regex: SHOP_LOCK_APPEAL_TITLE_PATTERN },
       },
     ],
@@ -113,7 +119,7 @@ async function closePendingAccountLockAppeals(
   userId,
   adminUserId = null,
   {
-    adminDecision = "unblock-account",
+    qdAdmin = "unblock-account",
     adminNote = "Khiếu nại đã kết thúc do tài khoản được mở khóa.",
   } = {}
 ) {
@@ -126,9 +132,9 @@ async function closePendingAccountLockAppeals(
     {
       $set: {
         status: REPORT_STATUS.PROCESSED,
-        processedBy: adminUserId || null,
-        processedAt: now,
-        adminDecision,
+        xuLyBoi: adminUserId || null,
+        tgXuLy: now,
+        qdAdmin,
         adminNote,
         UpdatedAt: now,
       },
@@ -140,7 +146,7 @@ async function closePendingShopLockAppeals(
   shopId,
   adminUserId = null,
   {
-    adminDecision = "unblock-shop",
+    qdAdmin = "unblock-shop",
     adminNote = "Khiếu nại đã kết thúc do gian hàng được mở khóa.",
   } = {}
 ) {
@@ -151,8 +157,13 @@ async function closePendingShopLockAppeals(
       status: REPORT_STATUS.PENDING,
       $or: [
         { reportType: REPORT_TYPE.SHOP_LOCK_APPEAL },
+        { reportType: 11 },
         {
           reportType: REPORT_TYPE.OTHER,
+          title: { $regex: SHOP_LOCK_APPEAL_TITLE_PATTERN },
+        },
+        {
+          reportType: 9,
           title: { $regex: SHOP_LOCK_APPEAL_TITLE_PATTERN },
         },
       ],
@@ -160,9 +171,9 @@ async function closePendingShopLockAppeals(
     {
       $set: {
         status: REPORT_STATUS.PROCESSED,
-        processedBy: adminUserId || null,
-        processedAt: now,
-        adminDecision,
+        xuLyBoi: adminUserId || null,
+        tgXuLy: now,
+        qdAdmin,
         adminNote,
         UpdatedAt: now,
       },

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Eye, Lock, Store, Unlock, UserCheck, UserX } from 'lucide-react';
+import { Eye, Lock, Unlock, UserCheck, UserX } from 'lucide-react';
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 
 import { blockShop, listShops, unblockShop } from '../api/catalogApi';
 import AdminFilterPanel from '../components/admin/AdminFilterPanel';
@@ -15,6 +16,7 @@ import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch';
 import { useAdminDateFilter } from '../hooks/useAdminDateFilter';
 import { formatDate } from '../utils/format';
+import PreviewableImage from '../components/PreviewableImage';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -152,13 +154,13 @@ export default function ShopsPage() {
 
   return (
     <AdminPageShell
-      icon={Store}
+      icon={FastMarkShopPinIcon}
       title={pageMeta.title}
       description={pageMeta.description}
       stats={[
-        { label: 'Tổng gian hàng', value: loading ? '…' : pagination.total, icon: Store, tone: 'green' },
+        { label: 'Tổng gian hàng', value: loading ? '…' : pagination.total, icon: FastMarkShopPinIcon, tone: 'green' },
         { label: 'Đang hoạt động', value: loading ? '…' : activeCount, icon: UserCheck, tone: 'green' },
-        { label: 'Đang mở cửa', value: loading ? '…' : openCount, icon: Store, tone: 'blue' },
+        { label: 'Đang mở cửa', value: loading ? '…' : openCount, icon: FastMarkShopPinIcon, tone: 'blue' },
         { label: 'Bị khóa', value: loading ? '…' : lockedCount, icon: UserX, tone: 'red' },
       ]}
     >
@@ -255,13 +257,16 @@ export default function ShopsPage() {
                   <TableSttCell page={pagination.page} limit={limit} index={index} />
                   <td>
                     <div className="user-cell">
-                      {shop.avatar ? (
-                        <img src={shop.avatar} alt="" className="avatar-sm" />
-                      ) : (
-                        <div className="avatar-sm avatar-fallback">
-                          {(shop.shopName || 'S').charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                      <PreviewableImage
+                        src={shop.avatar}
+                        alt={shop.shopName || ''}
+                        width={48}
+                        height={48}
+                        shape="rounded"
+                        className="avatar-sm"
+                        fallbackLetter={shop.shopName || 'S'}
+                        fallbackClassName="avatar-sm avatar-fallback"
+                      />
                       <div>
                         <strong>{shop.shopName || ''}</strong>
                         <div className="muted">@{shop.shopUsername || ''}</div>
@@ -280,8 +285,8 @@ export default function ShopsPage() {
                   </td>
                   <td>{shop.categoryName || ''}</td>
                   <td>
-                    {Number(shop.averageRating) ? `${shop.averageRating} ★` : ''}
-                    <div className="muted">{Number(shop.followersCount) || 0} theo dõi</div>
+                    {Number(shop.diemTB) ? `${shop.diemTB} ★` : ''}
+                    <div className="muted">{Number(shop.soNguoiTheo) || 0} theo dõi</div>
                   </td>
                   <td className="col-open">
                     <span className={shop.isOpen === 1 ? 'badge badge-success' : 'badge'}>

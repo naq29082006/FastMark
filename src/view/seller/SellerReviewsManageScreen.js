@@ -11,8 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { getSellerShopSettingsOnBackend } from '../../api/sellerOpsApi';
-import { fetchReviewsFromNode } from '../../api/storeNodeApi';
+import { getSellerReviewsOnBackend, getSellerShopSettingsOnBackend } from '../../api/sellerOpsApi';
 import { submitReportOnBackend } from '../../api/reportApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { showErrorAlert } from '../../core/utils/appAlert';
@@ -45,7 +44,18 @@ function formatReviewDate(value) {
   return date.toLocaleDateString('vi-VN');
 }
 
-export default function SellerReviewsManageScreen({ onBack }) {
+function getReviewProductName(item) {
+  const name = String(
+    item?.productName ||
+      item?.product_name ||
+      item?.product?.productName ||
+      item?.product?.name ||
+      ''
+  ).trim();
+  return name || 'Sản phẩm';
+}
+
+export default function SellerReviewsManageScreen({ onBack, onOpenReview }) {
   const [reviews, setReviews] = useState([]);
   const [shopName, setShopName] = useState('');
   const [shopId, setShopId] = useState('');
@@ -85,11 +95,18 @@ export default function SellerReviewsManageScreen({ onBack }) {
         return;
       }
 
-      const data = await fetchReviewsFromNode(nextShopId, {
+      const data = await getSellerReviewsOnBackend({
+        idToken,
         page: nextPage,
         limit: DEFAULT_PAGE_SIZE,
       });
-      const rows = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+      const rows = Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.reviews)
+          ? data.reviews
+          : Array.isArray(data)
+            ? data
+            : [];
       setReviews((current) =>
         nextPage === 1 ? mergeListById(current, rows) : appendUniqueById(current, rows)
       );
@@ -224,8 +241,57 @@ export default function SellerReviewsManageScreen({ onBack }) {
           }
           renderItem={({ item }) => {
             const name = item.userName || item.fullName || item.buyerName || 'Khách hàng';
+            const productName = getReviewProductName(item);
+            const variantName = String(item.variantName || item.variant?.variantName || '').trim();
+            const productThumbnail =
+              item.productThumbnail || item.product?.thumbnail || '';
             return (
-              <View style={styles.card}>
+              <Pressable
+                style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+                onPress={() => {
+                  if (typeof onOpenReview === 'function') {
+                    onOpenReview({ item, shopName: shopName || '' });
+                    return;
+                  }
+                  showErrorAlert('Không mở được chi tiết đánh giá. Vui lòng thử lại sau.');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Xem chi tiết đánh giá ${productName}`}
+              >
+                <View style={styles.productTopRow}>
+                  <View style={styles.productRow}>
+                    <View style={styles.productThumbWrap}>
+                      {productThumbnail ? (
+                        <Image source={{ uri: productThumbnail }} style={styles.productThumb} />
+                      ) : (
+                        <Text style={styles.productThumbEmoji}>📦</Text>
+                      )}
+                    </View>
+                    <View style={styles.productInfo}>
+                      <Text style={styles.productName} numberOfLines={2}>
+                        {productName}
+                      </Text>
+                      {variantName ? (
+                        <Text style={styles.variantLine} numberOfLines={1}>
+                          Loại: {variantName}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Pressable
+                    onPress={(event) => {
+                      event.stopPropagation?.();
+                      openReport(item);
+                    }}
+                    style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Báo cáo đánh giá"
+                    hitSlop={8}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={18} color="#64748b" />
+                  </Pressable>
+                </View>
+                <View style={styles.cardDivider} />
                 <View style={styles.cardHeader}>
                   <AvatarBadge
                     name={name}
@@ -239,15 +305,6 @@ export default function SellerReviewsManageScreen({ onBack }) {
                     <Text style={styles.reviewDate}>{formatReviewDate(item.createdAt)}</Text>
                   </View>
                   <StarRating rating={item.rating} size={13} />
-                  <Pressable
-                    onPress={() => openReport(item)}
-                    style={({ pressed }) => [styles.menuBtn, pressed && styles.pressed]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Báo cáo đánh giá"
-                    hitSlop={8}
-                  >
-                    <Ionicons name="ellipsis-vertical" size={18} color="#64748b" />
-                  </Pressable>
                 </View>
                 {item.comment ? (
                   <Text style={styles.comment}>{item.comment}</Text>
@@ -276,7 +333,7 @@ export default function SellerReviewsManageScreen({ onBack }) {
                     resizeMode="cover"
                   />
                 ) : null}
-              </View>
+              </Pressable>
             );
           }}
         />
@@ -337,6 +394,55 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  productTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  productRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minWidth: 0,
+  },
+  productThumbWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  productThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  productThumbEmoji: {
+    fontSize: 22,
+  },
+  productInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  variantLine: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  productName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+    lineHeight: 21,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 12,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cardHeaderInfo: { flex: 1, minWidth: 0 },

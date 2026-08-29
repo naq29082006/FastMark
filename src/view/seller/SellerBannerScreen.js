@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { getMyProductsOnBackend } from '../../api/productApi';
@@ -28,7 +29,13 @@ import { useResourceSocket } from '../../hooks/useResourceSocket';
 import ProfileSubScreen from '../profile/ProfileSubScreen';
 import LoadMoreButton from '../shared/components/LoadMoreButton';
 import WalletBalanceTopUpBar from '../shared/components/WalletBalanceTopUpBar';
+import PlanTabPanel from '../shared/components/PlanTabPanel';
 import { BOTTOM_SHEET_BORDER, BottomSheetDismissOverlay, BottomSheetHandle, BottomSheetPanel } from '../shared/components/bottomSheetChrome';
+
+const BANNER_SCREEN_TABS = [
+  { key: 'owned', label: 'Gói đang có' },
+  { key: 'buy', label: 'Mua gói' },
+];
 
 const BANNER_TARGET_TYPE = {
   PRODUCT: 1,
@@ -83,6 +90,7 @@ export default function SellerBannerScreen({ onBack, onOpenWallet, onOpenSubscri
   const [productsTotal, setProductsTotal] = useState(0);
   const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [screenTab, setScreenTab] = useState('owned');
 
   const banners = useMemo(
     () => (Array.isArray(data?.banners) ? data.banners : data?.banner ? [data.banner] : []),
@@ -228,6 +236,7 @@ export default function SellerBannerScreen({ onBack, onOpenWallet, onOpenSubscri
             try {
               const purchased = await purchaseSellerBannerViewModel(plan.id);
               const newId = purchased?.banner?.id;
+              setScreenTab('owned');
               await load({ selectBannerId: newId, closeDetail: !newId });
             } catch (error) {
               const message = error.message || 'Không mua được banner.';
@@ -464,9 +473,9 @@ export default function SellerBannerScreen({ onBack, onOpenWallet, onOpenSubscri
                     : 'Gói này không còn chỉnh sửa được.'}
             </Text>
           )}
-          {selectedBanner.lifecycle === 'rejected' && selectedBanner.violationReason ? (
+          {selectedBanner.lifecycle === 'rejected' && selectedBanner.lyDoVP ? (
             <Text style={styles.rejectReason}>
-              Admin từ chối: {selectedBanner.violationReason}. Hãy sửa rồi gửi lại.
+              Admin từ chối: {selectedBanner.lyDoVP}. Hãy sửa rồi gửi lại.
             </Text>
           ) : null}
         </View>
@@ -551,84 +560,109 @@ export default function SellerBannerScreen({ onBack, onOpenWallet, onOpenSubscri
         </View>
       ) : (
         <>
-          <WalletBalanceTopUpBar
-            balance={data?.walletBalance ?? 0}
-            onTopUp={() => onOpenWallet?.()}
-          />
-
-          <Text style={styles.sectionTitle}>Mua thêm gói</Text>
-          <Text style={styles.sectionHint}>Có thể mua nhiều gói để treo song song.</Text>
-          {plans.map((plan) => {
-            const days = Number(plan.durationDays) || 7;
-            return (
-              <View key={plan.id} style={styles.planCard}>
-                <Text style={styles.planName}>{plan.name}</Text>
-                <Text style={styles.planMeta}>
-                  {days} ngày · {formatPrice(plan.price)}
-                </Text>
-                {plan.description ? (
-                  <Text style={styles.planDescription}>{plan.description}</Text>
-                ) : null}
-                <Pressable
-                  style={[styles.primaryBtn, Boolean(buyingPlan) && styles.disabled]}
-                  disabled={Boolean(buyingPlan)}
-                  onPress={() => handlePurchase(plan)}
-                >
-                  {buyingPlan === plan.id ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.primaryBtnText}>Mua ngay</Text>
-                  )}
-                </Pressable>
-              </View>
-            );
-          })}
-          {plans.length === 0 ? (
-            <Text style={styles.empty}>Chưa có gói banner. Liên hệ admin.</Text>
-          ) : null}
-
-          <Text style={styles.sectionTitle}>Gói đã mua</Text>
-          <Text style={styles.sectionHint}>Bấm vào gói để xem / gửi yêu cầu treo.</Text>
-          {banners.length === 0 ? (
-            <Text style={styles.empty}>Chưa mua gói banner nào.</Text>
+          <PlanTabPanel
+            tabs={BANNER_SCREEN_TABS}
+            activeTab={screenTab}
+            onChangeTab={setScreenTab}
+          >
+          {screenTab === 'owned' ? (
+            <>
+              <Text style={styles.sectionHintTop}>
+                Bấm vào gói để xem chi tiết hoặc gửi yêu cầu treo banner.
+              </Text>
+              {banners.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="images-outline" size={28} color="#94a3b8" />
+                  <Text style={styles.emptyCardTitle}>Chưa có gói banner</Text>
+                  <Text style={styles.emptyCardBody}>
+                    Gói đã mua sẽ hiển thị tại đây. Chuyển sang tab Mua gói để đăng ký.
+                  </Text>
+                </View>
+              ) : (
+                banners.map((banner) => (
+                  <Pressable
+                    key={banner.id}
+                    style={styles.bannerCard}
+                    onPress={() => handleSelectBanner(banner)}
+                  >
+                    <Text style={styles.bannerCardTitle}>{banner.planName || 'Gói banner'}</Text>
+                    <Text style={styles.bannerCardMeta}>
+                      Ngày mua {formatDateTime(banner.ngayMua)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.bannerCardStatus,
+                        banner.lifecycle === 'active' && styles.statusActive,
+                        banner.lifecycle === 'pending' && styles.statusPending,
+                        banner.lifecycle === 'purchased' && styles.statusPurchased,
+                        banner.lifecycle === 'rejected' && styles.statusRejected,
+                      ]}
+                    >
+                      {banner.lifecycleLabel || banner.statusLabel}
+                    </Text>
+                    {banner.lifecycle === 'active' ? (
+                      <>
+                        <Text style={styles.bannerCardMeta}>
+                          Hiệu lực {formatExpiry(banner.startDate)} → {formatExpiry(banner.endDate)}
+                        </Text>
+                        <Text style={styles.bannerCardMeta}>
+                          Số click: {Number(banner.clickCount) || 0}
+                        </Text>
+                      </>
+                    ) : null}
+                    {banner.lifecycle === 'rejected' && banner.lyDoVP ? (
+                      <Text style={styles.rejectReason}>Lý do: {banner.lyDoVP}</Text>
+                    ) : null}
+                  </Pressable>
+                ))
+              )}
+            </>
           ) : (
-            banners.map((banner) => (
-              <Pressable
-                key={banner.id}
-                style={styles.bannerCard}
-                onPress={() => handleSelectBanner(banner)}
-              >
-                <Text style={styles.bannerCardTitle}>{banner.planName || 'Gói banner'}</Text>
-                <Text style={styles.bannerCardMeta}>
-                  Ngày mua {formatDateTime(banner.ngayMua)}
-                </Text>
-                <Text
-                  style={[
-                    styles.bannerCardStatus,
-                    banner.lifecycle === 'active' && styles.statusActive,
-                    banner.lifecycle === 'pending' && styles.statusPending,
-                    banner.lifecycle === 'purchased' && styles.statusPurchased,
-                    banner.lifecycle === 'rejected' && styles.statusRejected,
-                  ]}
-                >
-                  {banner.lifecycleLabel || banner.statusLabel}
-                </Text>
-                {banner.lifecycle === 'active' ? (
-                  <>
-                    <Text style={styles.bannerCardMeta}>
-                      Hiệu lực {formatExpiry(banner.startDate)} → {formatExpiry(banner.endDate)}
-                    </Text>
-                    <Text style={styles.bannerCardMeta}>
-                      Số click: {Number(banner.clickCount) || 0}
-                    </Text>
-                  </>
-                ) : null}
-                {banner.lifecycle === 'rejected' && banner.violationReason ? (
-                  <Text style={styles.rejectReason}>Lý do: {banner.violationReason}</Text>
-                ) : null}
-              </Pressable>
-            ))
+            <>
+              <WalletBalanceTopUpBar
+                balance={data?.walletBalance ?? 0}
+                onTopUp={() => onOpenWallet?.()}
+              />
+              <Text style={styles.sectionHintTop}>Có thể mua nhiều gói để treo song song.</Text>
+              {plans.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <Ionicons name="pricetag-outline" size={28} color="#94a3b8" />
+                  <Text style={styles.emptyCardTitle}>Chưa có gói banner</Text>
+                  <Text style={styles.emptyCardBody}>Liên hệ admin để cấu hình gói quảng cáo.</Text>
+                </View>
+              ) : (
+                plans.map((plan) => {
+                  const days = Number(plan.durationDays) || 7;
+                  return (
+                    <View key={plan.id} style={styles.planCard}>
+                      <Text style={styles.planName}>{plan.name}</Text>
+                      <Text style={styles.planMeta}>
+                        {days} ngày · {formatPrice(plan.price)}
+                      </Text>
+                      {plan.description ? (
+                        <Text style={styles.planDescription}>{plan.description}</Text>
+                      ) : null}
+                      <Pressable
+                        style={[styles.primaryBtn, Boolean(buyingPlan) && styles.disabled]}
+                        disabled={Boolean(buyingPlan)}
+                        onPress={() => handlePurchase(plan)}
+                      >
+                        {buyingPlan === plan.id ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text style={styles.primaryBtnText}>Mua ngay</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  );
+                })
+              )}
+              <Text style={styles.buyFootnote}>
+                Sau khi mua, chọn gói ở tab Gói đang có để tải ảnh và gửi admin duyệt treo.
+              </Text>
+            </>
           )}
+          </PlanTabPanel>
         </>
       )}
     </ProfileSubScreen>
@@ -637,6 +671,42 @@ export default function SellerBannerScreen({ onBack, onOpenWallet, onOpenSubscri
 
 const styles = StyleSheet.create({
   centered: { paddingVertical: 40, alignItems: 'center' },
+  sectionHintTop: {
+    color: '#64748b',
+    fontSize: 12,
+    marginTop: 0,
+    marginBottom: 10,
+    lineHeight: 17,
+  },
+  buyFootnote: {
+    marginTop: 4,
+    marginBottom: 12,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#94a3b8',
+    textAlign: 'center',
+  },
+  emptyCard: {
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 24,
+    gap: 8,
+    marginBottom: 12,
+  },
+  emptyCardTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  emptyCardBody: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 19,
+  },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '800',

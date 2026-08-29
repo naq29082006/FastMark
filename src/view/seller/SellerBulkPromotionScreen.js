@@ -43,7 +43,7 @@ function todayInput() {
 
 /**
  * Giảm giá hàng loạt + danh sách sản phẩm đang giảm giá.
- * Cập nhật thẳng field Product (DiscountPercent / ngày), không tạo collection mới.
+ * Cập nhật thẳng field Product (PtGiam / ngày), không tạo collection mới.
  */
 export default function SellerBulkPromotionScreen({ onBack, onChanged, initialTab = 'bulk' }) {
   const insets = useScreenInsets();
@@ -52,7 +52,7 @@ export default function SellerBulkPromotionScreen({ onBack, onChanged, initialTa
   const [activePromos, setActivePromos] = useState([]);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [search, setSearch] = useState('');
-  const [discountPercent, setDiscountPercent] = useState('');
+  const [discountPercent, setPtGiam] = useState('');
   const [startDate, setStartDate] = useState(todayInput());
   const [endDate, setEndDate] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -373,7 +373,7 @@ export default function SellerBulkPromotionScreen({ onBack, onChanged, initialTa
                 value={discountPercent}
                 onChangeText={(text) => {
                   const cleaned = text.replace(/[^\d]/g, '');
-                  setDiscountPercent(
+                  setPtGiam(
                     cleaned === '' ? '' : String(Math.min(99, Number(cleaned) || 0))
                   );
                 }}

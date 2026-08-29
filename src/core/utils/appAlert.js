@@ -2,8 +2,16 @@ import { Alert } from 'react-native';
 
 const OK = [{ text: 'OK' }];
 
-export function showErrorAlert(message, title = 'Lỗi') {
+export function showErrorAlert(message, title = 'Lỗi', options = {}) {
+  const { accountLockedOrderMode = false } = options;
+  if (accountLockedOrderMode && isAccountLockBlockedApiMessage(message)) {
+    return;
+  }
   Alert.alert(title, message || 'Đã xảy ra lỗi.', OK);
+}
+
+export function isAccountLockBlockedApiMessage(message) {
+  return /tài khoản.*khóa|liên hệ quản trị/i.test(String(message || ''));
 }
 
 export function isAdminAccountMessage(message) {

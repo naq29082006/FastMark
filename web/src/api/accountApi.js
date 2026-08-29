@@ -1,4 +1,5 @@
 import { apiRequest } from './client';
+import { normalizeFinanceOverview } from '../admin/utils/apiNormalize';
 
 export function listAccounts(token, params = {}) {
   const searchParams = new URLSearchParams();
@@ -77,7 +78,7 @@ export function getAccountFollowers(token, accountId, params = {}) {
   );
 }
 
-export function getFinanceOverview(token, params = {}) {
+export async function getFinanceOverview(token, params = {}) {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && String(value).trim() !== '') {
@@ -85,9 +86,13 @@ export function getFinanceOverview(token, params = {}) {
     }
   });
   const query = searchParams.toString();
-  return apiRequest(`/api/admin/finance/overview${query ? `?${query}` : ''}`, {
+  const payload = await apiRequest(`/api/admin/finance/overview${query ? `?${query}` : ''}`, {
     token,
   });
+  if (payload?.data) {
+    payload.data = normalizeFinanceOverview(payload.data);
+  }
+  return payload;
 }
 export function getAccountStatistics(token) {
   return apiRequest('/api/admin/accounts/statistics', {

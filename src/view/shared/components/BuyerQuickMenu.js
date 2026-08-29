@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSelector } from 'react-redux';
 
+import { getBuyerOrdersOnBackend } from '../../../api/buyerOpsApi';
+import { RESERVATION_TAB } from '../../../constants/sellerOrders';
+import { getCurrentUserIdToken } from '../../../repository/authRepository';
 import { selectAuthProfile, selectAuthUser } from '../../../viewmodel/auth/authSelectors';
 import ProfileSideDrawer from './ProfileSideDrawer';
 
@@ -12,6 +15,7 @@ import ProfileSideDrawer from './ProfileSideDrawer';
 export default function BuyerQuickMenu({
   onEditAccount,
   onOpenWallet,
+  onOpenHoldingOrders,
   onOpenFavoriteProducts,
   onOpenReport,
   onLogout,
@@ -22,6 +26,8 @@ export default function BuyerQuickMenu({
   const profile = useSelector(selectAuthProfile);
   const user = useSelector(selectAuthUser);
   const [open, setOpen] = useState(false);
+  const [holdingOrdersCount, setHoldingOrdersCount] = useState(0);
+  const [holdingOrdersLoading, setHoldingOrdersLoading] = useState(false);
 
   const displayName =
     profile?.fullName || profile?.displayName || user?.displayName || user?.email || 'Tài khoản';
@@ -29,15 +35,37 @@ export default function BuyerQuickMenu({
   const photoUrl = profile?.photoUrl || profile?.avatarUrl || user?.photoURL || null;
   const walletBalance = Number(profile?.walletBalance) || 0;
 
+  const loadHoldingOrdersCount = useCallback(async () => {
+    setHoldingOrdersLoading(true);
+    try {
+      const idToken = await getCurrentUserIdToken();
+      if (!idToken) {
+        setHoldingOrdersCount(0);
+        return;
+      }
+      const data = await getBuyerOrdersOnBackend({
+        idToken,
+        tab: RESERVATION_TAB.HOLDING,
+        page: 1,
+        limit: 1,
+      });
+      setHoldingOrdersCount(Math.max(0, Number(data?.total) || 0));
+    } catch {
+      setHoldingOrdersCount(0);
+    } finally {
+      setHoldingOrdersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    loadHoldingOrdersCount();
+  }, [open, loadHoldingOrdersCount]);
+
   const sections = useMemo(() => {
     const personalItems = [
-      {
-        key: 'wallet',
-        icon: 'wallet-outline',
-        label: 'Ví FastMark',
-        value: undefined,
-        onPress: onOpenWallet,
-      },
       {
         key: 'favorites',
         icon: 'heart-outline',
@@ -74,13 +102,7 @@ export default function BuyerQuickMenu({
         : null,
       settingsItems.length ? { key: 'settings', title: 'Tài khoản', items: settingsItems } : null,
     ].filter(Boolean);
-  }, [
-    onEditAccount,
-    onLogout,
-    onOpenFavoriteProducts,
-    onOpenReport,
-    onOpenWallet,
-  ]);
+  }, [onEditAccount, onLogout, onOpenFavoriteProducts, onOpenReport]);
 
   return (
     <View style={[styles.wrap, style]}>
@@ -100,6 +122,10 @@ export default function BuyerQuickMenu({
         userName={userName}
         photoUrl={photoUrl}
         walletBalance={walletBalance}
+        holdingOrdersCount={holdingOrdersCount}
+        holdingOrdersLoading={holdingOrdersLoading}
+        onOpenWallet={onOpenWallet}
+        onOpenHoldingOrders={onOpenHoldingOrders}
         sections={sections}
       />
     </View>

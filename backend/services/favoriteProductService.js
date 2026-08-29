@@ -6,10 +6,11 @@ const ProductCategory = require("../models/ProductCategory");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
 const { PRODUCT_STATUS } = require("../constants");
+const { notRemovedProductMatch, isRemovedProduct } = require("../utils/productRemoval");
 const { createNotification } = require("./notificationService");
 const { NOTIFICATION_AUDIENCE, NOTIFICATION_INDEX } = require("../constants");
 const { attachPromotionDto } = require("./productPromotionService");
-const { normalizeSearchText } = require("../utils/searchText");
+const { normalizeSearchText, matchesTokenSearchAny } = require("../utils/searchText");
 
 function createServiceError(message, statusCode = 400) {
   const error = new Error(message);
@@ -28,8 +29,7 @@ function isStrictMongoObjectId(value) {
 function activeProductFilter(extra = {}) {
   return {
     ...extra,
-    IsDeleted: { $ne: true },
-    SellerRemovedAt: null,
+    ...notRemovedProductMatch(),
     Status: PRODUCT_STATUS.ACTIVE,
   };
 }
@@ -134,10 +134,9 @@ function toClientFavorite({
     categoryId: product?.CategoryId ? String(product.CategoryId) : "",
     categoryName:
       pickString(category?.name) ||
-      pickString(category?.categoryName) ||
       pickString(category?.Name) ||
       "",
-    rating: Number(shop?.averageRating) || 0,
+    rating: Number(shop?.diemTB) || 0,
     likeCount: Number(product?.LikeCount) || 0,
     soldCount: Number(product?.soldCount ?? product?.SoldCount) || 0,
     distanceMeters: roundedDistance,
@@ -175,7 +174,7 @@ async function buildFavoriteMaps(rows) {
     return map;
   }, new Map());
 
-  // Gắn cover từ ProductImage vào product lean doc để toClientFavorite dùng.
+  // Gắn cover từ Product.images vào product lean doc để toClientFavorite dùng.
   for (const product of products) {
     const thumbs = toPublicProductImages(imagesByProduct.get(String(product._id)) || []).map(
       (image) => image.imageUrl
@@ -238,7 +237,7 @@ function mapFavoriteRows(rows, maps, origin = {}) {
       const seller = shop ? sellerById.get(String(shop.userId)) : null;
       const category = categoryById.get(String(product.CategoryId));
       const isUnavailable =
-        Number(product.Status) === PRODUCT_STATUS.HIDDEN || Boolean(product.IsDeleted);
+        Number(product.Status) === PRODUCT_STATUS.HIDDEN || isRemovedProduct(product);
       const distanceMeters = hasOrigin
         ? calculateDistanceMeters(originLat, originLng, shop?.latitude, shop?.longitude)
         : null;
@@ -306,12 +305,12 @@ async function listFavorites(user, query = {}) {
 
   const search = normalizeSearchText(query.search || query.q);
   if (search) {
-    items = items.filter((item) => {
-      const haystack = normalizeSearchText(
-        `${item.name} ${item.shopName} ${item.categoryName} ${item.id || ""} ${item.productCode || ""}`
-      );
-      return haystack.includes(search);
-    });
+    items = items.filter((item) =>
+      matchesTokenSearchAny(
+        [item.name, item.shopName, item.categoryName, item.id, item.productCode],
+        search
+      )
+    );
   }
 
   const categoryId = pickString(query.categoryId);

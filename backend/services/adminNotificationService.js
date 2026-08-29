@@ -1,7 +1,7 @@
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const { USER_ROLE } = require("../constants");
-const { createNotification } = require("./notificationService");
+const { createNotificationsBulk } = require("./notificationService");
 const { NOTIFICATION_AUDIENCE, NOTIFICATION_INDEX } = require("../constants");
 const { applyCreatedAtRange } = require("../utils/dateRangeFilter");
 
@@ -61,6 +61,19 @@ function getAudienceLabel(audience) {
   }
 }
 
+async function runBroadcastBulk(recipientIds, payload) {
+  try {
+    const inAppCount = await createNotificationsBulk(recipientIds, payload);
+    console.log(
+      `[admin-broadcast] inserted=${inAppCount} audience=${payload.audience} recipients=${recipientIds.length}`
+    );
+    return inAppCount;
+  } catch (error) {
+    console.error("[admin-broadcast] bulk insert failed:", error?.message || error);
+    throw error;
+  }
+}
+
 async function sendSystemNotification(adminUser, { title, content, audience = AUDIENCE.ALL } = {}) {
   const normalizedTitle = pickString(title);
   const normalizedContent = pickString(content);
@@ -86,29 +99,26 @@ async function sendSystemNotification(adminUser, { title, content, audience = AU
     throw createServiceError("Không tìm thấy người dùng phù hợp để gửi thông báo.", 404);
   }
 
-  let inAppCount = 0;
-  await Promise.all(
-    recipients.map(async (user) => {
-      const created = await createNotification(user._id, {
-        title: normalizedTitle,
-        content: normalizedContent,
-        audience: mapSystemAudienceToNotificationAudience(normalizedAudience),
-        index: NOTIFICATION_INDEX.SYSTEM,
-        isAdminBroadcast: true,
-      });
-      if (created) {
-        inAppCount += 1;
-      }
-    })
-  );
+  const recipientIds = recipients.map((user) => user._id);
+  const notificationAudience = mapSystemAudienceToNotificationAudience(normalizedAudience);
+  const bulkPayload = {
+    title: normalizedTitle,
+    content: normalizedContent,
+    audience: notificationAudience,
+    index: NOTIFICATION_INDEX.SYSTEM,
+    tbAdmin: true,
+  };
+
+  const inAppCount = await runBroadcastBulk(recipientIds, bulkPayload);
 
   return {
     audience: normalizedAudience,
     audienceLabel: getAudienceLabel(normalizedAudience),
     title: normalizedTitle,
     content: normalizedContent,
-    recipientCount: recipients.length,
+    recipientCount: recipientIds.length,
     inAppCount,
+    status: "sent",
     sentBy: {
       id: String(adminUser._id),
       fullName: adminUser.FullName || "",
@@ -126,7 +136,7 @@ async function listBroadcastHistory({ page = 1, limit = 20, from = "", to = "" }
   const pageSize = Math.min(50, Math.max(1, Number(limit) || 20));
 
   const pipeline = [];
-  pipeline.push({ $match: { isAdminBroadcast: true } });
+  pipeline.push({ $match: { tbAdmin: true } });
   const dateMatch = {};
   applyCreatedAtRange(dateMatch, { from, to });
   if (Object.keys(dateMatch).length) {
@@ -150,25 +160,29 @@ async function listBroadcastHistory({ page = 1, limit = 20, from = "", to = "" }
     { $sort: { sentAt: -1 } },
     {
       $facet: {
-        items: [
-          { $skip: (currentPage - 1) * pageSize },
-          { $limit: pageSize },
-        ],
+        items: [{ $skip: (currentPage - 1) * pageSize }, { $limit: pageSize }],
         total: [{ $count: "count" }],
       },
-    },
+    }
   );
 
   const rows = await Notification.aggregate(pipeline);
 
-  const items = (rows[0]?.items || []).map((row) => ({
-    title: row._id.title || "",
-    content: row._id.content || "",
-    audience: row._id.audience || "",
-    recipientCount: row.recipientCount,
-    readCount: row.readCount,
-    sentAt: row.sentAt || null,
-  }));
+  const items = (rows[0]?.items || []).map((row) => {
+    const title = row._id.title || "";
+    const content = row._id.content || "";
+    const audience = row._id.audience || "";
+    const minute = row._id.minute || "";
+    return {
+      id: `${title}|${content}|${audience}|${minute}`,
+      title,
+      content,
+      audience,
+      recipientCount: row.recipientCount,
+      readCount: row.readCount,
+      sentAt: row.sentAt || null,
+    };
+  });
   const total = rows[0]?.total?.[0]?.count || 0;
 
   return {

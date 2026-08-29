@@ -1,7 +1,35 @@
 import {
-  RESERVATION_CANCEL_REASON,
   inferCancelReasonCode,
+  isPostDeliveryDisputeReservation,
+  RESERVATION_CANCEL_REASON,
 } from '../constants/reservationOrderFlow';
+import { resolveAdminReservationStatusMeta } from './adminReservationStatus';
+
+export { resolveAdminReservationStatusMeta, resolveAdminReservationStatusMeta as resolveAdminListStatusMeta };
+
+function getPickupConfirmedAt(reservation) {
+  return reservation?.tgNhanHang || reservation?.completedAt || null;
+}
+
+function getReservationCancelNote(reservation) {
+  const raw = String(reservation?.cancelNote || '').trim();
+  if (!raw) {
+    return '';
+  }
+  if (/^[a-z0-9_]+$/i.test(raw) && raw.includes('_')) {
+    return '';
+  }
+  return raw;
+}
+
+function isCancelledBySellerAfterAccept(reservation) {
+  const code = inferCancelReasonCode(reservation || {});
+  return (
+    code === RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING ||
+    code === RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP ||
+    String(reservation?.cancelType || '').trim() === 'seller_after_accept'
+  );
+}
 
 const R = RESERVATION_CANCEL_REASON;
 
@@ -28,13 +56,21 @@ const TERMINAL_KEYS_BY_REASON = {
   [R.BUYER_REPORT_SELLER_ABSENT]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
   [R.SELLER_REPORT_BUYER_NO_SHOW]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
   [R.DISPUTE_BOTH_REPORTED]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
+  [R.BUYER_POST_DELIVERY_COMPLAINT]: [
+    'created',
+    'confirmed',
+    'holding',
+    'received',
+    'dispute',
+    'cancelled',
+  ],
   [R.PICKUP_TIMEOUT]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'cancelled'],
   [R.ADMIN_BUYER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
   [R.ADMIN_SELLER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
   [R.AUTO_BUYER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
   [R.AUTO_SELLER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
   [R.BUYER_FORFEIT]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'cancelled'],
-  [R.ADMIN_COMPLETED]: ['created', 'confirmed', 'holding', 'received', 'completed'],
+  [R.ADMIN_COMPLETED]: ['created', 'confirmed', 'holding', 'completed'],
   [R.SELLER_ACCOUNT_LOCKED]: ['created', 'confirmed', 'holding', 'cancelled'],
   [R.SELLER_SHOP_LOCKED]: ['created', 'confirmed', 'holding', 'cancelled'],
   [R.BUYER_ACCOUNT_LOCKED]: ['created', 'cancelled'],
@@ -47,11 +83,13 @@ const OUTCOME_REASON = {
   [R.BUYER_CANCEL_HOLDING]: 'Người mua hủy đơn sau khi người bán đã xác nhận giữ hàng.',
   [R.SELLER_CANCEL_HOLDING]: 'Người bán chủ động hủy đơn sau khi đã xác nhận giữ hàng.',
   [R.SELLER_REFUND_AFTER_PICKUP]:
-    'Quá giờ nhận hàng, người bán đã hoàn cọc cho người mua.',
+    'Quá giờ nhận hàng, người bán đã đồng ý hoàn cọc.',
   [R.BUYER_RECEIVED]: 'Người mua đã xác nhận nhận hàng thành công.',
-  [R.BUYER_REPORT_SELLER_ABSENT]: 'Người mua báo cáo người bán không giao hàng đúng hẹn.',
+  [R.BUYER_REPORT_SELLER_ABSENT]: 'Người mua báo cáo người bán không giao hàng đúng hẹn (chưa nhận hàng).',
   [R.SELLER_REPORT_BUYER_NO_SHOW]: 'Người bán báo cáo người mua không đến nhận hàng.',
-  [R.DISPUTE_BOTH_REPORTED]: 'Cả người mua và người bán đều gửi báo cáo.',
+  [R.DISPUTE_BOTH_REPORTED]: 'Cả người mua và người bán đều gửi báo cáo (chưa hoàn tất nhận hàng).',
+  [R.BUYER_POST_DELIVERY_COMPLAINT]:
+    'Người mua khiếu nại sau khi shop đã xác nhận giao hàng (hàng hỏng, thiếu, sai mô tả…).',
   [R.PICKUP_TIMEOUT]: 'Quá thời gian nhận hàng và không có phản hồi từ hai bên.',
   [R.ADMIN_BUYER_WIN]: 'Admin xử lý tranh chấp theo hướng hoàn cọc cho người mua.',
   [R.ADMIN_SELLER_WIN]: 'Admin xử lý tranh chấp theo hướng chuyển cọc cho người bán.',
@@ -73,6 +111,48 @@ function isPastPickup(reservation) {
   return Number.isFinite(pickup.getTime()) && pickup.getTime() <= Date.now();
 }
 
+const PICKUP_DISPUTE_TERMINAL_REASONS = new Set([
+  R.BUYER_REPORT_SELLER_ABSENT,
+  R.SELLER_REPORT_BUYER_NO_SHOW,
+  R.DISPUTE_BOTH_REPORTED,
+  R.PICKUP_TIMEOUT,
+  R.ADMIN_BUYER_WIN,
+  R.ADMIN_SELLER_WIN,
+  R.AUTO_BUYER_WIN,
+  R.AUTO_SELLER_WIN,
+  R.BUYER_FORFEIT,
+]);
+
+function isPostDeliveryTimeline(reservation, reasonCode) {
+  if (reasonCode === R.BUYER_POST_DELIVERY_COMPLAINT) {
+    return true;
+  }
+  if (!isPostDeliveryDisputeReservation(reservation)) {
+    return false;
+  }
+  if (Number(reservation?.status) === 2 || Number(reservation?.status) === 3) {
+    return true;
+  }
+  return (
+    reasonCode === R.ADMIN_BUYER_WIN ||
+    reasonCode === R.ADMIN_SELLER_WIN ||
+    reasonCode === R.AUTO_BUYER_WIN ||
+    reasonCode === R.AUTO_SELLER_WIN
+  );
+}
+
+function buildPostDeliveryDisputeTerminalKeys(basePrefix = ['created', 'confirmed', 'holding']) {
+  return [...basePrefix, 'received', 'dispute', 'cancelled'];
+}
+
+function buildPostDeliveryDisputeResolvedKeys(basePrefix = ['created', 'confirmed', 'holding']) {
+  return [...basePrefix, 'received', 'dispute', 'completed'];
+}
+
+function buildPickupDisputeTerminalKeys(basePrefix = ['created', 'confirmed', 'holding']) {
+  return [...basePrefix, 'pickup_overdue', 'dispute', 'cancelled'];
+}
+
 function resolveStepAt(reservation, stepKey) {
   switch (stepKey) {
     case 'created':
@@ -80,13 +160,13 @@ function resolveStepAt(reservation, stepKey) {
     case 'pending_confirm':
       return reservation.createdAt;
     case 'confirmed':
-      return reservation.sellerConfirmedAt || reservation.confirmedAt;
+      return reservation.tgShopXN || reservation.confirmedAt;
     case 'holding':
-      return reservation.depositPaidAt || reservation.sellerConfirmedAt || reservation.confirmedAt;
+      return reservation.createdAt || reservation.tgShopXN || reservation.confirmedAt;
     case 'received':
-      return reservation.completedAt;
+      return getPickupConfirmedAt(reservation);
     case 'completed':
-      return reservation.completedAt;
+      return getPickupConfirmedAt(reservation);
     case 'pickup_overdue':
       return reservation.pickupTime;
     case 'dispute':
@@ -102,16 +182,44 @@ function resolveStepAt(reservation, stepKey) {
   }
 }
 
+function isDepositSettled(reservation) {
+  const code = Number(reservation?.cocChuyenDen);
+  return code === DEPOSIT_SETTLE_TO.BUYER || code === DEPOSIT_SETTLE_TO.SELLER;
+}
+
 function resolveTimelineKeys(reservation, reasonCode) {
   const status = Number(reservation?.status);
+  const postDelivery = isPostDeliveryTimeline(reservation, reasonCode);
 
   if (status === 0) {
     return ['created', 'pending_confirm'];
   }
-  if (status === 2) {
-    return ['created', 'confirmed', 'holding'];
+  if (status === 1) {
+    const keys = ['created', 'confirmed', 'holding'];
+    if (isPastPickup(reservation)) {
+      keys.push('pickup_overdue');
+    }
+    return keys;
   }
-  if (status === 4) {
+  if (status === 2) {
+    return ['created', 'confirmed', 'holding', 'received'];
+  }
+  if (status === 3) {
+    if (isDepositSettled(reservation)) {
+      if (postDelivery) {
+        if (Number(reservation.cocChuyenDen) === DEPOSIT_SETTLE_TO.BUYER) {
+          return buildPostDeliveryDisputeTerminalKeys();
+        }
+        return buildPostDeliveryDisputeResolvedKeys();
+      }
+      if (Number(reservation.cocChuyenDen) === DEPOSIT_SETTLE_TO.SELLER) {
+        return ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'completed'];
+      }
+      return ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'];
+    }
+    if (postDelivery) {
+      return ['created', 'confirmed', 'holding', 'received', 'dispute'];
+    }
     const keys = ['created', 'confirmed', 'holding'];
     if (isPastPickup(reservation)) {
       keys.push('pickup_overdue');
@@ -120,21 +228,37 @@ function resolveTimelineKeys(reservation, reasonCode) {
     return keys;
   }
 
-  return TERMINAL_KEYS_BY_REASON[reasonCode] || ['created', 'cancelled'];
+  const terminal = TERMINAL_KEYS_BY_REASON[reasonCode];
+  if (terminal) {
+    if (postDelivery && PICKUP_DISPUTE_TERMINAL_REASONS.has(reasonCode)) {
+      return buildPostDeliveryDisputeTerminalKeys();
+    }
+    if (postDelivery && reasonCode === R.ADMIN_SELLER_WIN) {
+      return buildPostDeliveryDisputeResolvedKeys();
+    }
+    return terminal;
+  }
+  return ['created', 'cancelled'];
 }
 
-function isTerminalStatus(status) {
+function isTerminalStatus(status, reservation) {
   const code = Number(status);
-  return code !== 0 && code !== 2 && code !== 4;
+  if (code === 4 || code === 5) {
+    return true;
+  }
+  if (code === 3 && isDepositSettled(reservation)) {
+    return true;
+  }
+  return false;
 }
 
 function buildSteps(reservation, reasonCode) {
   const status = Number(reservation?.status);
   const keys = resolveTimelineKeys(reservation, reasonCode);
-  const isActive = status === 0 || status === 2 || status === 4;
+  const isActive = !isTerminalStatus(status, reservation);
 
   return keys.map((key, index) => {
-    const def = STEP_DEFS[key];
+    const def = { ...STEP_DEFS[key] };
     const isLast = index === keys.length - 1;
     return {
       ...def,
@@ -145,42 +269,29 @@ function buildSteps(reservation, reasonCode) {
 }
 
 function resolveFinalStatusLabel(reservation) {
-  const status = Number(reservation?.status);
-  if (status === 3 || status === 5) return 'Hoàn thành';
-  if (status === 4) return 'Tranh chấp';
-  if (status === 0) return 'Chờ xác nhận';
-  if (status === 2) {
-    return isPastPickup(reservation) ? 'Quá giờ nhận' : 'Giữ hàng';
-  }
-  return 'Đã hủy';
-}
-
-export function resolveAdminListStatusMeta(reservation) {
-  const status = Number(reservation?.status);
-  if (status === 3 || status === 5) {
-    return { label: 'Hoàn thành', className: 'badge badge-success' };
-  }
-  if (status === 4) {
-    return { label: 'Tranh chấp', className: 'badge badge-warning' };
-  }
-  if (status === 0) {
-    return { label: 'Chờ xác nhận', className: 'badge badge-warning' };
-  }
-  if (status === 2) {
-    if (isPastPickup(reservation)) {
-      return { label: 'Quá giờ nhận', className: 'badge badge-warning' };
-    }
-    return { label: 'Giữ hàng', className: 'badge badge-warning' };
-  }
-  return { label: 'Đã hủy', className: 'badge badge-danger' };
+  return resolveAdminReservationStatusMeta(reservation).label;
 }
 
 function resolveActorLabel(reservation, reasonCode) {
-  const cancelledBy = String(reservation?.cancelledBy || '').trim();
+  const cancelledBy = String(reservation?.cancelType || '').trim();
   const status = Number(reservation?.status);
+  const code = String(reasonCode || cancelledBy || '').trim();
 
-  if (reasonCode === R.CONFIRM_TIMEOUT || reasonCode === R.PICKUP_TIMEOUT) {
+  if (
+    code === R.CONFIRM_TIMEOUT ||
+    code === R.PICKUP_TIMEOUT ||
+    code.startsWith('auto_')
+  ) {
     return 'Hệ thống';
+  }
+  if (code.startsWith('admin_')) {
+    return 'Admin';
+  }
+  if (code.startsWith('buyer_')) {
+    return 'Người mua';
+  }
+  if (code.startsWith('seller_')) {
+    return 'Người bán';
   }
   if (cancelledBy === 'buyer') return 'Người mua';
   if (cancelledBy === 'seller' || cancelledBy === 'seller_reject' || cancelledBy === 'seller_after_accept') {
@@ -188,22 +299,23 @@ function resolveActorLabel(reservation, reasonCode) {
   }
   if (cancelledBy === 'admin') return 'Admin';
   if (cancelledBy === 'system') return 'Hệ thống';
-  if (status === 4) {
+  if (status === 3) {
     if (reservation.disputeByBuyer && reservation.disputeBySeller) return 'Người mua & Người bán';
     if (reservation.disputeByBuyer) return 'Người mua';
     if (reservation.disputeBySeller) return 'Người bán';
   }
-  if (status === 3 || status === 5) return 'Người mua';
+  if (status === 4) return 'Người mua';
   return '—';
 }
 
 function resolveDepositResult(reservation, reasonCode) {
   const status = Number(reservation?.status);
-  const settleTo = Number(reservation?.depositSettleTo);
-  const label = String(reservation?.depositSettleToLabel || '').trim();
+  const settleTo = Number(reservation?.cocChuyenDen);
+  const label = String(reservation?.cocChuyenDenLabel || '').trim();
 
   if (
-    status === 4 &&
+    status === 3 &&
+    !isDepositSettled(reservation) &&
     reasonCode === R.DISPUTE_BOTH_REPORTED
   ) {
     return {
@@ -244,16 +356,16 @@ function resolveOutcomeReason(reservation, reasonCode) {
   if (human && !/^[a-z0-9_]+$/i.test(human)) {
     return human;
   }
-  const note = String(reservation?.cancelNote || '').trim();
+  const note = getReservationCancelNote(reservation);
   if (note) return note;
   return '—';
 }
 
 function resolveProcessedAt(reservation) {
   return (
-    reservation.depositSettledAt ||
+    reservation.tgGiaiCoc ||
     reservation.cancelledAt ||
-    reservation.completedAt ||
+    getPickupConfirmedAt(reservation) ||
     reservation.updatedAt ||
     null
   );
@@ -262,7 +374,7 @@ function resolveProcessedAt(reservation) {
 function shouldShowSellerEvidence(reservation, reasonCode) {
   return (
     reasonCode === R.SELLER_CANCEL_HOLDING ||
-    Boolean(reservation?.cancelledBySellerAfterAccept)
+    isCancelledBySellerAfterAccept(reservation)
   );
 }
 
@@ -272,28 +384,29 @@ export function buildReservationOrderTimeline(reservation) {
   }
 
   const reasonCode = inferCancelReasonCode(reservation);
+  const postDelivery = isPostDeliveryTimeline(reservation, reasonCode);
   const steps = buildSteps(reservation, reasonCode);
   const deposit = resolveDepositResult(reservation, reasonCode);
   const showSellerEvidence = shouldShowSellerEvidence(reservation, reasonCode);
-  const showOutcome = isTerminalStatus(reservation.status);
+  const showOutcome = isTerminalStatus(reservation.status, reservation);
 
   const outcome = showOutcome
     ? {
         statusLabel: resolveFinalStatusLabel(reservation),
         reason: resolveOutcomeReason(reservation, reasonCode),
         actor: resolveActorLabel(reservation, reasonCode),
-        processedAt: resolveProcessedAt(reservation),
+        tgXuLy: resolveProcessedAt(reservation),
         depositAmount: Number(reservation.depositAmount) || 0,
         depositRecipient: deposit.recipient,
         depositResult: deposit.text,
-        sellerCancelNote: showSellerEvidence ? String(reservation.cancelNote || '').trim() : '',
-        sellerCancelImages: showSellerEvidence
-          ? (Array.isArray(reservation.sellerCancelImages)
-              ? reservation.sellerCancelImages.filter(Boolean)
+        sellerCancelNote: showSellerEvidence ? getReservationCancelNote(reservation) : '',
+        anhHuyShop: showSellerEvidence
+          ? (Array.isArray(reservation.anhHuyShop)
+              ? reservation.anhHuyShop.filter(Boolean)
               : [])
           : [],
       }
     : null;
 
-  return { steps, outcome, reasonCode, showOutcome };
+  return { steps, outcome, reasonCode, showOutcome, postDelivery };
 }

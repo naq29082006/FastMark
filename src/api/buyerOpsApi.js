@@ -109,31 +109,9 @@ export async function confirmBuyerReceivedOnBackend(idToken, payload) {
   return payloadRes.data?.reservation;
 }
 
-export async function validateBuyerShopQrOnBackend(
-  idToken,
-  { reservationId, scannedShopId }
-) {
-  const id = String(reservationId || '').trim();
-  const shopId = String(scannedShopId || '').trim();
-  if (!id || !shopId) {
-    throw new Error('Thiếu thông tin quét mã.');
-  }
-  const response = await apiRequest(
-    API_ENDPOINTS.buyerReservationValidateShopQr,
-    {
-      method: 'POST',
-      headers: await authHeaders(idToken),
-      body: JSON.stringify({ reservationId: id, scannedShopId: shopId }),
-    },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data;
-}
-
 export async function reportBuyerReservationOnBackend(
   idToken,
-  { reservationId, reason, description, latitude, longitude, address, images }
+  { reservationId, reason, description, images }
 ) {
   const id = String(reservationId || '').trim();
   if (!id) {
@@ -149,9 +127,6 @@ export async function reportBuyerReservationOnBackend(
         reservationId: id,
         reason,
         description: description || '',
-        latitude,
-        longitude,
-        address: address || '',
         images: images || [],
       }),
     },

@@ -9,6 +9,14 @@ async function syncReviewCollectionIndexes(connection) {
   }
 
   const reviews = db.collection("reviews");
+
+  try {
+    await reviews.updateMany({ isDeleted: { $exists: false } }, { $set: { isDeleted: 1 } });
+    await reviews.updateMany({ isDeleted: false }, { $set: { isDeleted: 1 } });
+  } catch (error) {
+    console.warn("Could not normalize reviews isDeleted:", error.message);
+  }
+
   let indexes = [];
   try {
     indexes = await reviews.indexes();
@@ -46,8 +54,8 @@ async function syncReviewCollectionIndexes(connection) {
     { keys: { productId: 1, CreatedAt: -1 }, options: { name: "productId_1_CreatedAt_-1" } },
     { keys: { userId: 1, CreatedAt: -1 }, options: { name: "userId_1_CreatedAt_-1" } },
     {
-      keys: { isHidden: 1 },
-      options: { name: "isHidden_1" },
+      keys: { removedBy: 1 },
+      options: { name: "removedBy_1" },
     },
     {
       keys: { isDeleted: 1 },
@@ -58,7 +66,7 @@ async function syncReviewCollectionIndexes(connection) {
       options: {
         name: "reservationId_1_active",
         unique: true,
-        partialFilterExpression: { isDeleted: { $ne: true } },
+        partialFilterExpression: { isDeleted: 1 },
       },
     },
   ];

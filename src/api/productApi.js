@@ -35,7 +35,6 @@ export async function getProductCategoriesOnBackend() {
     id: normalizeCategoryId(category.id || category._id),
     name: category.name || category.categoryName || '',
     categoryName: category.name || category.categoryName || '',
-    icon: category.icon || '',
     description: category.description || '',
   })).filter((category) => category.id && category.categoryName);
 }
@@ -220,30 +219,6 @@ export async function listPromotionProductsOnBackend({
   );
   const payload = await parseApiResponse(response);
   return normalizePageResult(payload.data || {}, 'products');
-}
-
-export async function listShopPromotionProductsOnBackend(shopId, { limit = 80 } = {}) {
-  const response = await apiRequest(
-    `${API_ENDPOINTS.shopPromotions(shopId)}?limit=${limit}`,
-    { method: 'GET' },
-    AUTH_TIMEOUT_MS
-  );
-  const payload = await parseApiResponse(response);
-  return payload.data?.products || [];
-}
-
-export async function setProductPromotionOnBackend({ idToken, productId, payload }) {
-  const response = await apiRequest(
-    API_ENDPOINTS.productPromotion(productId),
-    {
-      method: 'PUT',
-      headers: await authHeaders(idToken),
-      body: JSON.stringify(payload),
-    },
-    AUTH_TIMEOUT_MS
-  );
-  const parsed = await parseApiResponse(response);
-  return parsed.data?.product;
 }
 
 export async function clearProductPromotionOnBackend({ idToken, productId }) {

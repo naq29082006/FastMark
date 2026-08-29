@@ -1,0 +1,8 @@
+{
+  "name": "fastmark-test-cases",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "docx": "^9.5.0"
+  }
+}

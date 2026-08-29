@@ -7,11 +7,14 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSelector } from 'react-redux';
 import {
   createReservationViewModel,
   loadReservationWalletViewModel,
 } from '../../viewmodel/buyer/reservationViewModel';
-import { saveReservationResume } from '../../viewmodel/buyer/reservationResumeSession';
+import { saveReservationResume, clearReservationResume } from '../../viewmodel/buyer/reservationResumeSession';
+import { requestWalletTopUp } from '../wallet/walletTopUpBridge';
+import { selectAuthProfile } from '../../viewmodel/auth/authSelectors';
 import { formatPrice, getPromotionalUnitPrice } from '../../core/utils/productFormat';
 import { showErrorAlert } from '../../core/utils/appAlert';
 import { formatPickupInputs, parsePickupInputs } from '../../core/utils/pickupDateTime';
@@ -35,17 +38,20 @@ function SectionDivider() {
 
 export default function ReservationScreen({
   loading = false,
+  loadError = null,
   product,
   store,
   preselectedVariantId = null,
   initialQuantity = 1,
+  initialFormResume = null,
   onBack,
   onSuccess,
   onOpenTopUp,
-  /** home | map | products | profile — quay lại đúng màn sau nạp ví */
-  resumeSource = 'home',
+  /** map | products | profile | orders */
+  resumeSource = 'products',
   resumeStoreId = null,
 }) {
+  const profile = useSelector(selectAuthProfile);
   const hasPresetVariant = Boolean(preselectedVariantId);
   const variants = useMemo(() => {
     const list = product?.variants || [];
@@ -99,15 +105,28 @@ export default function ReservationScreen({
     Number(walletBalance) < depositAmount;
 
   useEffect(() => {
-    setSelectedVariantId(preselectedVariantId || variants[0]?.id || null);
-    const seedQty = Math.max(1, Math.floor(Number(initialQuantity) || 1));
-    setQuantity(seedQty);
-    setNote('');
-    const defaults = formatPickupInputs(buildDefaultPickupDate());
-    setDateInput(defaults.dateInput);
-    setTimeInput(defaults.timeInput);
-
     let cancelled = false;
+
+    if (initialFormResume?.fromTopUp) {
+      if (initialFormResume.variantId) {
+        setSelectedVariantId(String(initialFormResume.variantId));
+      } else {
+        setSelectedVariantId(preselectedVariantId || variants[0]?.id || null);
+      }
+      setQuantity(Math.max(1, Number(initialFormResume.quantity) || Number(initialQuantity) || 1));
+      setDateInput(initialFormResume.dateInput || '');
+      setTimeInput(initialFormResume.timeInput || '');
+      setNote(initialFormResume.note || '');
+    } else {
+      setSelectedVariantId(preselectedVariantId || variants[0]?.id || null);
+      const seedQty = Math.max(1, Math.floor(Number(initialQuantity) || 1));
+      setQuantity(seedQty);
+      setNote('');
+      const defaults = formatPickupInputs(buildDefaultPickupDate());
+      setDateInput(defaults.dateInput);
+      setTimeInput(defaults.timeInput);
+    }
+
     loadReservationWalletViewModel()
       .then((result) => {
         if (!cancelled) {
@@ -123,7 +142,14 @@ export default function ReservationScreen({
     return () => {
       cancelled = true;
     };
-  }, [variants, preselectedVariantId, initialQuantity]);
+  }, [variants, preselectedVariantId, initialQuantity, initialFormResume]);
+
+  useEffect(() => {
+    const balance = Number(profile?.walletBalance);
+    if (Number.isFinite(balance)) {
+      setWalletBalance(balance);
+    }
+  }, [profile?.walletBalance]);
 
   useEffect(() => {
     if (!selectedVariant) {
@@ -157,26 +183,28 @@ export default function ReservationScreen({
     return '';
   }
 
-  async function handleOpenTopUp() {
+  function handleOpenTopUp() {
+    const normalizedProductId = String(product?.id || product?._id || '').trim();
     const resumePayload = {
-      productId: product?.id,
+      productId: normalizedProductId || null,
       variantId: selectedVariant?.id,
       quantity: qtyNum,
-      source: resumeSource || 'home',
+      source: resumeSource || 'products',
       storeId:
         resumeStoreId ||
         store?.id ||
         store?.shopId ||
         product?.shopId ||
         null,
+      dateInput,
+      timeInput,
+      note: note.trim(),
     };
-    try {
-      await saveReservationResume(resumePayload);
-    } catch {
-      // Continue to top-up even if resume save fails.
+    requestWalletTopUp(resumePayload);
+    if (resumeSource === 'map') {
+      onBack?.();
     }
-    onBack?.();
-    onOpenTopUp?.(resumePayload);
+    void saveReservationResume(resumePayload).catch(() => {});
   }
 
   async function handleSubmit() {
@@ -201,6 +229,7 @@ export default function ReservationScreen({
         pickupTime: pickupTime.toISOString(),
         note: note.trim(),
       });
+      await clearReservationResume();
       onSuccess?.(reservation);
       onBack?.();
     } catch (submitError) {
@@ -218,6 +247,19 @@ export default function ReservationScreen({
         <View style={styles.loadingBody}>
           <ActivityIndicator size="large" color="#076F32" />
           <Text style={styles.loadingText}>Đang tải sản phẩm...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!product || loadError) {
+    return (
+      <View style={styles.screen}>
+        <SubScreenHeader title="Yêu cầu giữ hàng" onBack={onBack} />
+        <View style={styles.loadingBody}>
+          <Text style={styles.errorText}>
+            {loadError || 'Không tải được thông tin sản phẩm. Vui lòng thử lại.'}
+          </Text>
         </View>
       </View>
     );
@@ -319,13 +361,11 @@ export default function ReservationScreen({
                             : 'Đang tải...'}
                         </Text>
                       </View>
-                      {depositAmount > 0 && onOpenTopUp ? (
-                        <Pressable style={styles.topUpBtn} onPress={handleOpenTopUp}>
-                          <Text style={styles.topUpBtnText}>
-                            {needsTopUp ? 'Nạp ví' : 'Nạp thêm'}
-                          </Text>
-                        </Pressable>
-                      ) : null}
+                      <Pressable style={styles.topUpBtn} onPress={handleOpenTopUp}>
+                        <Text style={styles.topUpBtnText}>
+                          {needsTopUp ? 'Nạp tiền' : 'Nạp thêm'}
+                        </Text>
+                      </Pressable>
                     </View>
                     {depositAmount > 0 && needsTopUp ? (
                       <Text style={styles.depositWarning}>
@@ -427,6 +467,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#64748b',
+  },
+  errorText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   scroll: {
     flex: 1,

@@ -41,7 +41,7 @@ export function resolveNotificationIndex(item) {
   if (parsed === NOTIFICATION_INDEX.ORDER) {
     return NOTIFICATION_INDEX.ORDER;
   }
-  if (parsed === NOTIFICATION_INDEX.SYSTEM && item?.isAdminBroadcast) {
+  if (parsed === NOTIFICATION_INDEX.SYSTEM && item?.tbAdmin) {
     return NOTIFICATION_INDEX.SYSTEM;
   }
 
@@ -67,4 +67,15 @@ export function filterNotificationsByTab(items, tabKey) {
     return list;
   }
   return list.filter((item) => resolveNotificationIndex(item) === tab.index);
+}
+
+export function notificationMatchesTab(item, tabKey) {
+  if (tabKey === NOTIFICATION_TAB.ALL) {
+    return true;
+  }
+  const tab = NOTIFICATION_TABS.find((entry) => entry.key === tabKey);
+  if (!tab?.index) {
+    return true;
+  }
+  return resolveNotificationIndex(item) === tab.index;
 }

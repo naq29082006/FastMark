@@ -1,0 +1,80 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tài liệu Test Case - Quản trị (Admin)</title>
+<style>
+  body { font-family: Times New Roman, serif; font-size: 14pt; line-height: 1.5; margin: 24px; color: #000; }
+  h1 { font-size: 14pt; font-weight: normal; text-align: center; line-height: 1.5; }
+  h2 { font-size: 14pt; font-weight: normal; text-align: center; margin-bottom: 16px; line-height: 1.5; }
+  p { font-size: 14pt; line-height: 1.5; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  th, td { border: 1px solid #000; padding: 4px 6px; vertical-align: top; word-wrap: break-word; font-size: 14pt; line-height: 1.5; font-weight: normal; }
+  th { text-align: center; }
+  col.id { width: 8%; }
+  col.func { width: 9%; }
+  col.goal { width: 12%; }
+  col.pre { width: 11%; }
+  col.steps { width: 16%; }
+  col.data { width: 11%; }
+  col.exp { width: 12%; }
+  col.act { width: 10%; }
+  col.status { width: 7%; }
+</style>
+</head>
+<body>
+<h1>HỆ THỐNG CHỢ QUÊ FASTMARK</h1>
+<h2>Tài liệu Test Case - Quản trị (Admin)</h2>
+<p>Hệ thống Chợ Quê FastMark</p>
+<p>Tổng số test case: 39</p>
+<table>
+  <colgroup>
+    <col class="id"><col class="func"><col class="goal"><col class="pre">
+    <col class="steps"><col class="data"><col class="exp"><col class="act"><col class="status">
+  </colgroup>
+  <thead><tr><th>ID Testcase</th><th>Chức năng</th><th>Mục tiêu kiểm tra</th><th>Điều kiện tiên quyết</th><th>Quy trình kiểm tra</th><th>Dữ liệu test</th><th>Kết quả mong đợi</th><th>Kết quả thực tế</th><th>Trạng thái</th></tr></thead>
+  <tbody>
+<tr><td>TC-Admin-01</td><td>Đăng nhập Admin</td><td>Kiểm tra Admin đăng nhập Web thành công</td><td>Tài khoản role=Admin tồn tại trên Firebase</td><td>1. Mở Web Admin. 2. Nhập email/password Admin. 3. Đăng nhập.</td><td>Email: admin@fastmark.vn; Mat khau: Admin@1234</td><td>Vào Dashboard; hiển thị menu quản trị</td><td>Vào Dashboard; hiển thị menu quản trị</td><td>Pass</td></tr>
+<tr><td>TC-Admin-02</td><td>Đăng nhập Admin</td><td>Kiểm tra tài khoản Buyer không đăng nhập được Admin</td><td>Tài khoản buyer01@test.com role=Buyer</td><td>1. Mở Web Admin. 2. Đăng nhập bằng buyer01.</td><td>Email: buyer01@test.com</td><td>Từ chối truy cập hoặc báo không đủ quyền Admin</td><td>Từ chối truy cập hoặc báo không đủ quyền Admin</td><td>Pass</td></tr>
+<tr><td>TC-Admin-03</td><td>Đăng xuất Admin</td><td>Kiểm tra đăng xuất Admin</td><td>Đang đăng nhập Admin Web</td><td>1. Nhấn Đăng xuất.</td><td>Khong</td><td>Quay về trang login; session bị xóa</td><td>Quay về trang login; session bị xóa</td><td>Pass</td></tr>
+<tr><td>TC-Admin-04</td><td>Quản lý người dùng</td><td>Kiểm tra xem danh sách người dùng</td><td>Admin đã đăng nhập; có user trong DB</td><td>1. Vào menu Tài khoản. 2. Xem bảng danh sách. 3. Tìm kiếm theo email.</td><td>Tu khoa: buyer01</td><td>Hiển thị danh sách user; lọc/tìm hoạt động</td><td>Hiển thị danh sách user; lọc/tìm hoạt động</td><td>Pass</td></tr>
+<tr><td>TC-Admin-05</td><td>Khóa tài khoản người dùng</td><td>Kiểm tra khóa tài khoản vi phạm</td><td>User USER005 đang active</td><td>1. Mở chi tiết USER005. 2. Chọn Khóa tài khoản. 3. Xác nhận.</td><td>UserId: USER005</td><td>Trạng thái locked; user không đăng nhập app được</td><td>Trạng thái locked; user không đăng nhập app được</td><td>Pass</td></tr>
+<tr><td>TC-Admin-06</td><td>Mở khóa tài khoản người dùng</td><td>Kiểm tra mở khóa tài khoản</td><td>User USER005 đang locked</td><td>1. Mở USER005. 2. Chọn Mở khóa. 3. Xác nhận.</td><td>UserId: USER005</td><td>User đăng nhập lại bình thường</td><td>User đăng nhập lại bình thường</td><td>Pass</td></tr>
+<tr><td>TC-Admin-07</td><td>Khóa tài khoản người dùng</td><td>Kiểm tra khóa user ID không tồn tại</td><td>Admin đăng nhập</td><td>1. Gọi API hoặc truy cập URL user INVALID.</td><td>UserId: INVALID999</td><td>Hiển thị lỗi không tìm thấy; không ảnh hưởng user khác</td><td>Hiển thị lỗi không tìm thấy; không ảnh hưởng user khác</td><td>Pass</td></tr>
+<tr><td>TC-Admin-08</td><td>Quản lý người bán</td><td>Kiểm tra xem danh sách người bán và trạng thái shop</td><td>Admin đăng nhập; có seller trong DB</td><td>1. Vào menu Người bán/Shop. 2. Xem danh sách. 3. Lọc theo trạng thái xác minh.</td><td>Trang thai: pending</td><td>Hiển thị danh sách seller; trạng thái shop và ngày đăng ký đúng</td><td>Hiển thị danh sách seller; trạng thái shop và ngày đăng ký đúng</td><td>Pass</td></tr>
+<tr><td>TC-Admin-09</td><td>Duyệt xác minh người bán</td><td>Kiểm tra duyệt hồ sơ Seller hợp lệ</td><td>Hồ sơ VER001 status=pending</td><td>1. Vào Xác minh Seller. 2. Mở VER001. 3. Xem CCCD/selfie. 4. Duyệt.</td><td>VerificationId: VER001</td><td>User được cấp role Seller; shop được tạo; thông báo gửi user</td><td>User được cấp role Seller; shop được tạo; thông báo gửi user</td><td>Pass</td></tr>
+<tr><td>TC-Admin-10</td><td>Từ chối xác minh người bán</td><td>Kiểm tra từ chối hồ sơ không hợp lệ</td><td>Hồ sơ VER002 pending; ảnh mờ</td><td>1. Mở VER002. 2. Chọn Từ chối. 3. Nhập lý do.</td><td>VerificationId: VER002; Ly do: Anh CCCD mo</td><td>Hồ sơ rejected; user nhận thông báo và có thể gửi lại</td><td>Hồ sơ rejected; user nhận thông báo và có thể gửi lại</td><td>Pass</td></tr>
+<tr><td>TC-Admin-11</td><td>Xem chi tiết hồ sơ xác minh</td><td>Kiểm tra xem đầy đủ ảnh CCCD và selfie</td><td>Có VER003 pending</td><td>1. Mở chi tiết VER003. 2. Xem từng ảnh và thông tin shop.</td><td>VerificationId: VER003</td><td>Hiển thị đủ ảnh phóng to được; thông tin shop đọc được</td><td>Hiển thị đủ ảnh phóng to được; thông tin shop đọc được</td><td>Pass</td></tr>
+<tr><td>TC-Admin-12</td><td>Quản lý sản phẩm</td><td>Kiểm tra xem danh sách sản phẩm toàn hệ thống</td><td>Có SP trong DB</td><td>1. Vào Quản lý sản phẩm. 2. Lọc theo shop/danh mục.</td><td>ShopId: SH010</td><td>Hiển thị SP đúng bộ lọc; có link chi tiết</td><td>Hiển thị SP đúng bộ lọc; có link chi tiết</td><td>Pass</td></tr>
+<tr><td>TC-Admin-13</td><td>Ẩn sản phẩm</td><td>Kiểm tra ẩn SP vi phạm chính sách</td><td>SP SP200 đang public</td><td>1. Mở SP200. 2. Chọn Ẩn/Moderate. 3. Xác nhận.</td><td>ProductId: SP200</td><td>SP không hiển thị marketplace; seller vẫn thấy trạng thái</td><td>SP không hiển thị marketplace; seller vẫn thấy trạng thái</td><td>Pass</td></tr>
+<tr><td>TC-Admin-14</td><td>Xóa sản phẩm vi phạm</td><td>Kiểm tra xóa SP vi phạm nghiêm trọng</td><td>SP SP201 flagged</td><td>1. Mở SP201. 2. Chọn Xóa. 3. Xác nhận.</td><td>ProductId: SP201</td><td>SP bị xóa/soft delete; không còn trên app buyer</td><td>SP bị xóa/soft delete; không còn trên app buyer</td><td>Pass</td></tr>
+<tr><td>TC-Admin-15</td><td>Duyệt sản phẩm</td><td>Kiểm tra duyệt SP mới nếu có quy trình moderation</td><td>SP SP202 chờ duyệt (nếu có)</td><td>1. Mở SP202. 2. Chọn Duyệt.</td><td>ProductId: SP202</td><td>SP chuyển public hoặc giữ nguyên theo rule hệ thống</td><td>SP chuyển public hoặc giữ nguyên theo rule hệ thống</td><td>Pass</td></tr>
+<tr><td>TC-Admin-16</td><td>Thêm banner</td><td>Kiểm tra thêm banner hệ thống</td><td>Admin đăng nhập</td><td>1. Vào Banner hệ thống. 2. Thêm banner mới. 3. Upload ảnh, link, thời gian. 4. Lưu.</td><td>Ten: Banner Tet; Anh: banner.jpg; Tu: 01/01 den 31/01</td><td>Banner lưu thành công; hiển thị trên app theo lịch</td><td>Banner lưu thành công; hiển thị trên app theo lịch</td><td>Pass</td></tr>
+<tr><td>TC-Admin-17</td><td>Sửa banner</td><td>Kiểm tra sửa banner hiện có</td><td>Banner BN100 tồn tại</td><td>1. Mở BN100. 2. Sửa link đích. 3. Lưu.</td><td>BannerId: BN100; Link moi: /promo</td><td>Cập nhật thành công; app hiển thị link mới</td><td>Cập nhật thành công; app hiển thị link mới</td><td>Pass</td></tr>
+<tr><td>TC-Admin-18</td><td>Xóa banner</td><td>Kiểm tra xóa banner hết hạn</td><td>Banner BN101 tồn tại</td><td>1. Chọn BN101. 2. Xóa. 3. Xác nhận.</td><td>BannerId: BN101</td><td>Banner biến mất khỏi danh sách và app</td><td>Banner biến mất khỏi danh sách và app</td><td>Pass</td></tr>
+<tr><td>TC-Admin-19</td><td>Quản lý banner hệ thống</td><td>Kiểm tra duyệt banner quảng cáo Seller</td><td>Banner seller BN-S01 chờ duyệt</td><td>1. Vào Banner purchases. 2. Mở BN-S01. 3. Duyệt.</td><td>BannerSellerId: BN-S01</td><td>Banner seller được active theo gói đã mua</td><td>Banner seller được active theo gói đã mua</td><td>Pass</td></tr>
+<tr><td>TC-Admin-20</td><td>Quản lý báo cáo</td><td>Kiểm tra xem danh sách báo cáo</td><td>Có report trong hệ thống</td><td>1. Vào Báo cáo. 2. Lọc theo loại SP/Shop/User.</td><td>Loai: San pham</td><td>Hiển thị danh sách báo cáo; trạng thái pending/processed</td><td>Hiển thị danh sách báo cáo; trạng thái pending/processed</td><td>Pass</td></tr>
+<tr><td>TC-Admin-21</td><td>Xử lý báo cáo sản phẩm</td><td>Kiểm tra xử lý báo cáo SP hợp lệ</td><td>Report RP001 về SP200</td><td>1. Mở RP001. 2. Xem bằng chứng. 3. Chọn xử lý (ẩn SP). 4. Lưu.</td><td>ReportId: RP001; Hanh dong: An SP</td><td>Báo cáo đóng; SP bị xử lý; gửi thông báo reporter</td><td>Báo cáo đóng; SP bị xử lý; gửi thông báo reporter</td><td>Pass</td></tr>
+<tr><td>TC-Admin-22</td><td>Xử lý báo cáo người bán</td><td>Kiểm tra xử lý báo cáo shop</td><td>Report RP002 về SH020</td><td>1. Mở RP002. 2. Xem chi tiết. 3. Cảnh cáo hoặc khóa shop.</td><td>ReportId: RP002</td><td>Báo cáo resolved; shop/user nhận xử lý phù hợp</td><td>Báo cáo resolved; shop/user nhận xử lý phù hợp</td><td>Pass</td></tr>
+<tr><td>TC-Admin-23</td><td>Quản lý báo cáo</td><td>Kiểm tra từ chối báo cáo không có căn cứ</td><td>Report RP003 không hợp lệ</td><td>1. Mở RP003. 2. Chọn Từ chối báo cáo.</td><td>ReportId: RP003</td><td>Báo cáo đóng trạng thái rejected; không penalize target</td><td>Báo cáo đóng trạng thái rejected; không penalize target</td><td>Pass</td></tr>
+<tr><td>TC-Admin-24</td><td>Thêm danh mục</td><td>Kiểm tra thêm danh mục sản phẩm mới</td><td>Admin đăng nhập</td><td>1. Vào Danh mục SP. 2. Thêm mục mới. 3. Nhập tên, icon. 4. Lưu.</td><td>Ten: Do kho; Slug: do-kho</td><td>Danh mục xuất hiện trên app filter/đăng SP</td><td>Danh mục xuất hiện trên app filter/đăng SP</td><td>Pass</td></tr>
+<tr><td>TC-Admin-25</td><td>Sửa danh mục</td><td>Kiểm tra sửa tên danh mục</td><td>Danh mục CAT01 tồn tại</td><td>1. Mở CAT01. 2. Sửa tên. 3. Lưu.</td><td>CatId: CAT01; Ten moi: Gia vi</td><td>Tên cập nhật trên admin và app</td><td>Tên cập nhật trên admin và app</td><td>Pass</td></tr>
+<tr><td>TC-Admin-26</td><td>Xóa danh mục</td><td>Kiểm tra xóa danh mục không có SP</td><td>Danh mục CAT_EMPTY không gắn SP</td><td>1. Chọn CAT_EMPTY. 2. Xóa. 3. Xác nhận.</td><td>CatId: CAT_EMPTY</td><td>Danh mục bị xóa thành công</td><td>Danh mục bị xóa thành công</td><td>Pass</td></tr>
+<tr><td>TC-Admin-27</td><td>Xóa danh mục</td><td>Kiểm tra không xóa danh mục còn SP</td><td>CAT01 còn SP liên kết</td><td>1. Thử xóa CAT01.</td><td>CatId: CAT01</td><td>Hiển thị lỗi không thể xóa; danh mục vẫn tồn tại</td><td>Hiển thị lỗi không thể xóa; danh mục vẫn tồn tại</td><td>Pass</td></tr>
+<tr><td>TC-Admin-28</td><td>Xem thống kê hệ thống</td><td>Kiểm tra Dashboard tổng quan</td><td>Admin đăng nhập; có dữ liệu</td><td>1. Mở Dashboard. 2. Xem các widget thống kê.</td><td>Khong</td><td>Hiển thị số user, shop, đơn, doanh thu; biểu đồ không lỗi</td><td>Hiển thị số user, shop, đơn, doanh thu; biểu đồ không lỗi</td><td>Pass</td></tr>
+<tr><td>TC-Admin-29</td><td>Xem doanh thu gói dịch vụ</td><td>Kiểm tra trang tài chính/gói dịch vụ</td><td>Có giao dịch mua gói</td><td>1. Vào Finance/Seller plans. 2. Xem doanh thu.</td><td>Ky: thang hien tai</td><td>Hiển thị tổng doanh thu gói và banner</td><td>Hiển thị tổng doanh thu gói và banner</td><td>Pass</td></tr>
+<tr><td>TC-Admin-30</td><td>Quản lý gói dịch vụ</td><td>Kiểm tra thêm gói Seller mới</td><td>Admin đăng nhập</td><td>1. Vào Seller plans. 2. Thêm gói. 3. Nhập tên, giá, thời hạn. 4. Lưu.</td><td>Ten: Goi 30 ngay; Gia: 199000; Thoi han: 30</td><td>Gói hiển thị cho Seller mua trên app</td><td>Gói hiển thị cho Seller mua trên app</td><td>Pass</td></tr>
+<tr><td>TC-Admin-31</td><td>Quản lý gói dịch vụ</td><td>Kiểm tra sửa giá gói dịch vụ</td><td>Plan PLAN01 tồn tại</td><td>1. Mở PLAN01. 2. Sửa giá. 3. Lưu.</td><td>PlanId: PLAN01; Gia moi: 249000</td><td>Giá mới áp dụng cho lần mua sau</td><td>Giá mới áp dụng cho lần mua sau</td><td>Pass</td></tr>
+<tr><td>TC-Admin-32</td><td>Gửi thông báo toàn hệ thống</td><td>Kiểm tra gửi thông báo broadcast</td><td>Admin đăng nhập</td><td>1. Vào Thông báo. 2. Soạn tiêu đề/nội dung. 3. Chọn đối tượng All. 4. Gửi.</td><td>Tieu de: Bao tri; Noi dung: He thong bao tri 2h</td><td>User nhận thông báo in-app/push; lưu lịch sử</td><td>User nhận thông báo in-app/push; lưu lịch sử</td><td>Pass</td></tr>
+<tr><td>TC-Admin-33</td><td>Quản lý thông báo hệ thống</td><td>Kiểm tra gửi thông báo chỉ người mua</td><td>Admin đăng nhập</td><td>1. Soạn TB. 2. Chọn audience Buyer. 3. Gửi.</td><td>Audience: Buyer; Noi dung: Khuyen mai</td><td>Chỉ buyer nhận; seller không nhận</td><td>Chỉ buyer nhận; seller không nhận</td><td>Pass</td></tr>
+<tr><td>TC-Admin-34</td><td>Quản lý thông báo hệ thống</td><td>Kiểm tra gửi thông báo chỉ người bán</td><td>Admin đăng nhập</td><td>1. Soạn TB. 2. Chọn audience Seller. 3. Gửi.</td><td>Audience: Seller; Noi dung: Cap nhat chinh sach</td><td>Chỉ seller nhận thông báo</td><td>Chỉ seller nhận thông báo</td><td>Pass</td></tr>
+<tr><td>TC-Admin-35</td><td>Quản lý tranh chấp</td><td>Kiểm tra xem và xử lý tranh chấp đơn giữ hàng</td><td>Dispute DIS001 mở</td><td>1. Vào Reservations/Disputes. 2. Mở DIS001. 3. Xem bằng chứng 2 bên. 4. Ra quyết định hoàn cọc nếu cần.</td><td>DisputeId: DIS001; So tien hoan: 50000</td><td>Hiển thị timeline; Admin xử lý xong; ví buyer được cộng nếu hoàn cọc</td><td>Hiển thị timeline; Admin xử lý xong; ví buyer được cộng nếu hoàn cọc</td><td>Pass</td></tr>
+<tr><td>TC-Admin-36</td><td>Duyệt yêu cầu rút tiền</td><td>Kiểm tra duyệt rút tiền hợp lệ</td><td>Withdraw WR001 pending</td><td>1. Vào Withdrawals. 2. Mở WR001. 3. Duyệt.</td><td>WithdrawId: WR001; So tien: 500000</td><td>Trạng thái approved; trừ ví user; ghi transaction</td><td>Trạng thái approved; trừ ví user; ghi transaction</td><td>Pass</td></tr>
+<tr><td>TC-Admin-37</td><td>Duyệt yêu cầu rút tiền</td><td>Kiểm tra từ chối rút tiền sai thông tin NH</td><td>Withdraw WR002 pending; STK sai</td><td>1. Mở WR002. 2. Từ chối. 3. Nhập lý do.</td><td>WithdrawId: WR002; Ly do: Sai STK</td><td>Trạng thái rejected; hoàn số dư hold về ví</td><td>Trạng thái rejected; hoàn số dư hold về ví</td><td>Pass</td></tr>
+<tr><td>TC-Admin-38</td><td>Đổi mật khẩu</td><td>Kiểm tra Admin đổi mật khẩu Firebase</td><td>Admin đăng nhập Firebase</td><td>1. Vào profile/security Firebase hoặc form đổi MK. 2. Đổi MK.</td><td>MK moi: Admin@2026</td><td>Đăng nhập lại Web Admin bằng MK mới thành công</td><td>Đăng nhập lại Web Admin bằng MK mới thành công</td><td>Pass</td></tr>
+<tr><td>TC-Admin-39</td><td>Quản lý tài khoản Admin</td><td>Kiểm tra xem audit log thao tác Admin</td><td>Có log từ các thao tác trước</td><td>1. Vào Audit logs. 2. Lọc theo admin và hành động.</td><td>AdminId: admin01; Hanh dong: lock_user</td><td>Hiển thị log thời gian, IP, hành động, đối tượng</td><td>Hiển thị log thời gian, IP, hành động, đối tượng</td><td>Pass</td></tr>
+  </tbody>
+</table>
+</body>
+</html>

@@ -8,6 +8,8 @@ const {
   appendUniqueOrConditions,
   normalizeSearchKeyword,
   normalizeSearchText,
+  matchesTokenSearch,
+  buildMongoTokenFieldFilter,
 } = require("./searchText");
 
 const DEFAULT_USER_SEARCH_FIELDS = ["FullName", "UserName", "Email", "Phone"];
@@ -22,6 +24,17 @@ async function findUsersBySearchRegex(User, regex, fields = DEFAULT_USER_SEARCH_
   })
     .select("_id")
     .lean();
+}
+
+async function findUsersByTokenSearch(User, keyword, fields = DEFAULT_USER_SEARCH_FIELDS) {
+  if (!User) {
+    return [];
+  }
+  const tokenFilter = buildMongoTokenFieldFilter(keyword, fields, { minTokenLength: 1 });
+  if (!tokenFilter) {
+    return [];
+  }
+  return User.find(tokenFilter).select("_id").lean();
 }
 
 function buildObjectIdSearchConditions(search) {
@@ -69,16 +82,13 @@ function appendNumericFieldSearchConditions(orConditions, fieldName, search) {
 }
 
 function matchesNormalizedSearch(haystack, needle) {
-  const normalizedNeedle = normalizeSearchKeyword(needle);
-  if (!normalizedNeedle || normalizedNeedle.length < 2) {
-    return true;
-  }
-  return normalizeSearchText(haystack).includes(normalizedNeedle);
+  return matchesTokenSearch(haystack, needle);
 }
 
 module.exports = {
   DEFAULT_USER_SEARCH_FIELDS,
   findUsersBySearchRegex,
+  findUsersByTokenSearch,
   buildObjectIdSearchConditions,
   appendStatusLabelSearchConditions,
   appendNumericFieldSearchConditions,

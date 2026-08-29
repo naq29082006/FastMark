@@ -31,7 +31,6 @@ async function seedProductCategories() {
       {
         $set: {
           name,
-          categoryName: name,
           IsDeleted: 1,
           UpdatedAt: new Date(),
         },

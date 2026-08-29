@@ -15,7 +15,13 @@ const {
   isSubscriptionActive,
   activeSubscriptionFilter,
 } = require("../constants");
-const { removeVietnameseDiacritics } = require("../utils/sanitizeFileName");
+const { publicReviewFilter } = require("../utils/reviewVisibility");
+const {
+  normalizeSearchText,
+  normalizeSearchKeyword,
+  matchesTokenSearch,
+  matchesTokenSearchAny,
+} = require("../utils/searchText");
 const {
   resolveShopDisplayName,
   resolveShopUsername,
@@ -26,6 +32,8 @@ const {
   parsePagination,
   sliceSeededPage,
 } = require("../utils/pagination");
+const { resolveShopLatlong, hasShopLatlong, shopHasCoordinatesFilter, buildBoundingBoxFilter } = require("../utils/shopCoordinates");
+const { ensureSubscriptionFresh } = require("./sellerPlanAccessService");
 
 const EARTH_RADIUS_METERS = 6371000;
 const MAX_SEARCH_RADIUS_METERS = 30000;
@@ -116,22 +124,21 @@ function activeProductFilter(extra = {}) {
   return publicProductFilter(extra);
 }
 
-function normalizeSearchText(value) {
-  return removeVietnameseDiacritics(String(value || ""))
-    .trim()
-    .toLowerCase();
+/** Đồng bộ isActive từ gói bán trước khi trả shop/sản phẩm công khai. */
+async function resolvePublicShop(shopId) {
+  const shopDoc = await ShopProfile.findById(shopId);
+  if (!shopDoc) {
+    return null;
+  }
+  await ensureSubscriptionFresh(shopDoc);
+  if (!isSubscriptionActive(shopDoc)) {
+    return null;
+  }
+  return shopDoc.toObject();
 }
 
 function textMatchesKeyword(haystackValue, keyword) {
-  const haystack = normalizeSearchText(haystackValue);
-  const needle = normalizeSearchText(keyword);
-  if (!needle) {
-    return true;
-  }
-  if (!haystack) {
-    return false;
-  }
-  return haystack.includes(needle);
+  return matchesTokenSearch(haystackValue, keyword);
 }
 
 function shopMatchesKeyword(shop, seller, keyword) {
@@ -139,46 +146,29 @@ function shopMatchesKeyword(shop, seller, keyword) {
     return true;
   }
 
-  const haystack = [
-    shop.shopName,
-    shop.shopUsername,
-    shop.description,
-    shop.addressHeThong,
-    shop.address,
-    seller?.FullName,
-    seller?.UserName,
-  ]
-    .map(normalizeSearchText)
-    .filter(Boolean);
-
-  return haystack.some((text) => text.includes(keyword));
+  return matchesTokenSearchAny(
+    [
+      shop.shopName,
+      shop.shopUsername,
+      shop.description,
+      shop.addressHeThong,
+      shop.address,
+      seller?.FullName,
+      seller?.UserName,
+    ],
+    keyword
+  );
 }
 
-/**
- * Match người dùng/gian hàng theo:
- * - tên (FullName / shopName) — bỏ dấu + lowercase
- * - username (UserName / shopUsername), có hoặc không có @
- */
 function shopMatchesNameOrUsername(shop, seller, keyword) {
   if (!keyword) {
     return true;
   }
 
-  const normalizedKeyword = normalizeSearchText(String(keyword || "").replace(/^@+/, ""));
-  if (!normalizedKeyword) {
-    return true;
-  }
-
-  const haystack = [
-    seller?.FullName,
-    seller?.UserName,
-    shop.shopName,
-    shop.shopUsername,
-  ]
-    .map(normalizeSearchText)
-    .filter(Boolean);
-
-  return haystack.some((text) => text.includes(normalizedKeyword));
+  return matchesTokenSearchAny(
+    [seller?.FullName, seller?.UserName, shop.shopName, shop.shopUsername],
+    keyword
+  );
 }
 
 async function findProductMatchesByShopId(keyword, categoryId = "") {
@@ -267,6 +257,94 @@ function resolveShopCategory(categoryMap, categoryId) {
   };
 }
 
+const MAP_SHOP_SELECT =
+  "userId shopName shopUsername avatar latlong latitude longitude addressHeThong address description categoryId isOpen openTime closeTime tongSP soNguoiTheo diemTB tongDG soldCount status cocTien";
+
+const NEARBY_SHOP_SELECT = MAP_SHOP_SELECT;
+
+async function collectShopsNearLocation({
+  latitude,
+  longitude,
+  radiusMeters = 2000,
+  shopCategoryId = "",
+  select = NEARBY_SHOP_SELECT,
+  shopFilterExtra = {},
+}) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  const radius = resolveSearchRadius(radiusMeters, 2000);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    const error = new Error("Thiếu tọa độ hợp lệ.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const andFilters = [shopHasCoordinatesFilter(), shopFilterExtra];
+  const normalizedCategoryId = String(shopCategoryId || "").trim();
+  if (normalizedCategoryId) {
+    andFilters.push({ categoryId: normalizedCategoryId });
+  }
+  if (radius != null) {
+    andFilters.push(buildBoundingBoxFilter(lat, lng, radius));
+  }
+
+  const shops = await ShopProfile.find({
+    $and: andFilters,
+    status: { $ne: 0 },
+    ...activeSubscriptionFilter(),
+  })
+    .select(select)
+    .lean();
+
+  const sellerIds = [
+    ...new Set(
+      shops
+        .map((shop) => shop.userId)
+        .filter(Boolean)
+        .map((id) => String(id))
+    ),
+  ];
+  const sellers = sellerIds.length
+    ? await User.find({
+        _id: { $in: sellerIds.map((id) => new mongoose.Types.ObjectId(id)) },
+        Role: USER_ROLE.SELLER,
+      })
+        .select("FullName UserName Role")
+        .lean()
+    : [];
+  const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
+
+  const rows = [];
+  for (const shop of shops) {
+    if (!hasShopLatlong(shop)) {
+      continue;
+    }
+
+    const seller = sellerMap.get(String(shop.userId));
+    if (!seller) {
+      continue;
+    }
+
+    const coords = resolveShopLatlong(shop);
+    const distanceMeters = calculateDistanceMeters(lat, lng, coords.lat, coords.long);
+    if (radius != null && distanceMeters > radius) {
+      continue;
+    }
+
+    rows.push({ shop, seller, distanceMeters });
+  }
+
+  rows.sort((left, right) => {
+    if (left.distanceMeters !== right.distanceMeters) {
+      return left.distanceMeters - right.distanceMeters;
+    }
+    return String(left.shop._id).localeCompare(String(right.shop._id));
+  });
+
+  return { rows, lat, lng, radius };
+}
+
 function toPublicStore(
   shop,
   user,
@@ -293,11 +371,9 @@ function toPublicStore(
   );
   const openTime = pickShopText(shop, "openTime", "open_time");
   const closeTime = pickShopText(shop, "closeTime", "close_time");
-  const pinHours = Boolean(shop.pinHours);
-  // Hiện giờ công khai khi shop đã có giờ mở/đóng cửa.
   const showHours = Boolean(openTime && closeTime);
-  const ownerFollowers =
-    Number(user?.FollowersCount) || Number(followCount) || Number(shop.followersCount) || 0;
+  const coords = resolveShopLatlong(shop);
+  const ownerFollowers = Number(followCount) || Number(shop.soNguoiTheo) || 0;
   const depositPercent = Math.max(
     0,
     Math.min(100, Number(shop.cocTien ?? shop.depositPercent) || 0)
@@ -315,8 +391,9 @@ function toPublicStore(
     categoryId: shop.categoryId ? String(shop.categoryId) : "",
     categoryName,
     type: "shop",
-    latitude: shop.latitude,
-    longitude: shop.longitude,
+    latlong: coords,
+    latitude: coords.lat,
+    longitude: coords.long,
     address: systemAddress || pickShopText(shop, "address"),
     system_address: systemAddress,
     systemAddress,
@@ -328,14 +405,13 @@ function toPublicStore(
     openTime: showHours ? openTime : "",
     close_time: showHours ? closeTime : "",
     closeTime: showHours ? closeTime : "",
-    pinHours,
     is_open: Number(shop.isOpen) === 1,
     isOpen: Number(shop.isOpen) === 1 ? 1 : 0,
-    rating_avg: Number(shop.averageRating) || 0,
-    review_count: Number(shop.totalReviews) || 0,
+    rating_avg: Number(shop.diemTB) || 0,
+    review_count: Number(shop.tongDG) || 0,
     follow_count: ownerFollowers,
-    product_count: Number(shop.totalProducts) || Number(productCount) || 0,
-    total_products: Number(shop.totalProducts) || Number(productCount) || 0,
+    product_count: Number(shop.tongSP) || Number(productCount) || 0,
+    total_products: Number(shop.tongSP) || Number(productCount) || 0,
     sold_count: Number(shop.soldCount) || 0,
     total_likes: Number(totalLikes) || 0,
     owner_user_id: shop.userId ? String(shop.userId) : "",
@@ -360,81 +436,18 @@ async function listNearbyShops({
   limit = 20,
   seed = "",
 }) {
-  const lat = Number(latitude);
-  const lng = Number(longitude);
-  const radius = resolveSearchRadius(radiusMeters, 2000);
   const { page: safePage, limit: safeLimit } = parsePagination(
     { page, limit },
     { defaultLimit: 20, maxLimit: 100 }
   );
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    const error = new Error("Thiếu tọa độ hợp lệ.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const shops = await ShopProfile.find({
-    latitude: { $ne: null },
-    longitude: { $ne: null },
-    status: { $ne: 0 },
-    ...activeSubscriptionFilter(),
-  })
-    .select(
-      "userId shopName shopUsername avatar latitude longitude addressHeThong address description categoryId isOpen openTime closeTime totalProducts followersCount averageRating totalReviews soldCount status"
-    )
-    .lean();
-
-  const sellerIds = shops
-    .map((shop) => shop.userId)
-    .filter(Boolean)
-    .map((id) => new mongoose.Types.ObjectId(String(id)));
-  const sellers = await User.find({
-    _id: { $in: sellerIds },
-    Role: USER_ROLE.SELLER,
-  })
-    .select("FullName UserName Role")
-    .lean();
-  const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
-  const categoryNameMap = await getShopCategoryNameMap(shops.map((shop) => shop.categoryId));
-
-  const nearby = [];
-
-  for (const shop of shops) {
-    if (!Number.isFinite(Number(shop.latitude)) || !Number.isFinite(Number(shop.longitude))) {
-      continue;
-    }
-
-    const seller = sellerMap.get(String(shop.userId));
-    if (!seller) {
-      continue;
-    }
-
-    const distanceMeters = calculateDistanceMeters(
-      lat,
-      lng,
-      Number(shop.latitude),
-      Number(shop.longitude)
-    );
-
-    if (radius != null && distanceMeters > radius) {
-      continue;
-    }
-
-    nearby.push({
-      shop,
-      seller,
-      distanceMeters,
-    });
-  }
-
-  nearby.sort((left, right) => {
-    if (left.distanceMeters !== right.distanceMeters) {
-      return left.distanceMeters - right.distanceMeters;
-    }
-    return String(left.shop._id).localeCompare(String(right.shop._id));
+  const { rows } = await collectShopsNearLocation({
+    latitude,
+    longitude,
+    radiusMeters,
   });
-  const seededPage = sliceSeededPage(nearby, {
+
+  const seededPage = sliceSeededPage(rows, {
     page: safePage,
     limit: safeLimit,
     seed,
@@ -453,18 +466,59 @@ async function listNearbyShops({
   const productCountMap = new Map(
     productCounts.map((row) => [String(row._id), Number(row.count) || 0])
   );
+  const categoryNameMap = await getShopCategoryNameMap(
+    pageRows.map(({ shop }) => shop.categoryId)
+  );
 
   const items = pageRows.map(({ shop, seller, distanceMeters }) => {
     const category = resolveShopCategory(categoryNameMap, shop.categoryId);
     const productCount =
-      productCountMap.get(String(shop._id)) ?? (Number(shop.totalProducts) || 0);
-    return toPublicStore(shop, seller, productCount, distanceMeters, category.name, 0);
+      productCountMap.get(String(shop._id)) ?? (Number(shop.tongSP) || 0);
+    return toPublicStore(shop, seller, productCount, distanceMeters, category.name, 0, 0);
   });
 
   return {
     items,
     shops: items,
     ...buildPaginationMeta({ page: safePage, limit: safeLimit, total }),
+  };
+}
+
+async function listNearbyShopsForMap({
+  latitude,
+  longitude,
+  radiusMeters = 2000,
+  shopCategoryId = "",
+  limit = 500,
+}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 500, 50), 2000);
+
+  const { rows } = await collectShopsNearLocation({
+    latitude,
+    longitude,
+    radiusMeters,
+    shopCategoryId,
+    select: MAP_SHOP_SELECT,
+  });
+
+  const total = rows.length;
+  const pageRows = rows.slice(0, safeLimit);
+  const categoryNameMap = await getShopCategoryNameMap(
+    pageRows.map(({ shop }) => shop.categoryId)
+  );
+
+  const items = pageRows.map(({ shop, seller, distanceMeters }) => {
+    const category = resolveShopCategory(categoryNameMap, shop.categoryId);
+    const productCount = Number(shop.tongSP) || 0;
+    return toPublicStore(shop, seller, productCount, distanceMeters, category.name, 0, 0);
+  });
+
+  return {
+    items,
+    shops: items,
+    total,
+    count: items.length,
+    truncated: total > items.length,
   };
 }
 
@@ -500,26 +554,15 @@ async function searchShops({
     throw error;
   }
 
-  const shops = await ShopProfile.find({
-    latitude: { $ne: null },
-    longitude: { $ne: null },
-    status: { $ne: 0 },
-    ...activeSubscriptionFilter(),
-  }).lean();
-
-  const sellerIds = shops
-    .map((shop) => shop.userId)
-    .filter(Boolean)
-    .map((id) => new mongoose.Types.ObjectId(String(id)));
-  const sellers = await User.find({
-    _id: { $in: sellerIds },
-    Role: USER_ROLE.SELLER,
-  }).lean();
-  const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
-  const categoryNameMap = await getShopCategoryNameMap(shops.map((shop) => shop.categoryId));
+  const { rows: candidateRows } = await collectShopsNearLocation({
+    latitude,
+    longitude,
+    radiusMeters,
+    shopCategoryId: normalizedShopCategoryId,
+  });
 
   let productMatchesByShopId = null;
-  if (!identityOnly) {
+  if (!identityOnly && (productKeyword || normalizedProductCategoryId)) {
     const [productMatchesFromProductQuery, productMatchesFromShopQuery] = await Promise.all([
       findProductMatchesByShopId(productKeyword, normalizedProductCategoryId),
       shopKeyword && !productKeyword
@@ -535,31 +578,7 @@ async function searchShops({
 
   const results = [];
 
-  for (const shop of shops) {
-    if (!Number.isFinite(Number(shop.latitude)) || !Number.isFinite(Number(shop.longitude))) {
-      continue;
-    }
-
-    const seller = sellerMap.get(String(shop.userId));
-    if (!seller) {
-      continue;
-    }
-
-    const distanceMeters = calculateDistanceMeters(
-      lat,
-      lng,
-      Number(shop.latitude),
-      Number(shop.longitude)
-    );
-
-    if (radius != null && distanceMeters > radius) {
-      continue;
-    }
-
-    if (normalizedShopCategoryId && String(shop.categoryId || "") !== normalizedShopCategoryId) {
-      continue;
-    }
-
+  for (const { shop, seller, distanceMeters } of candidateRows) {
     if (identityOnly) {
       if (shopKeyword && !shopMatchesNameOrUsername(shop, seller, shopKeyword)) {
         continue;
@@ -611,6 +630,9 @@ async function searchShops({
 
   const total = results.length;
   const sliced = results.slice(skip, skip + safeLimit);
+  const categoryNameMap = await getShopCategoryNameMap(
+    sliced.map(({ shop }) => shop.categoryId)
+  );
   const pageShopIds = sliced.map(({ shop }) => shop._id);
   const productCountRows = pageShopIds.length
     ? await Product.aggregate([
@@ -627,9 +649,10 @@ async function searchShops({
     const store = toPublicStore(
       shop,
       seller,
-      productCountMap.get(String(shop._id)) || Number(shop.totalProducts) || 0,
+      productCountMap.get(String(shop._id)) || Number(shop.tongSP) || 0,
       distanceMeters,
       category.name,
+      0,
       0
     );
     return {
@@ -647,8 +670,8 @@ async function searchShops({
 }
 
 async function getPublicShopById(shopId, { latitude, longitude } = {}) {
-  const shop = await ShopProfile.findById(shopId).lean();
-  if (!shop || !isSubscriptionActive(shop)) {
+  const shop = await resolvePublicShop(shopId);
+  if (!shop) {
     const error = new Error("Không tìm thấy gian hàng.");
     error.statusCode = 404;
     throw error;
@@ -674,7 +697,7 @@ async function getPublicShopById(shopId, { latitude, longitude } = {}) {
     ? 0
     : await Product.countDocuments(activeProductFilter({ ShopId: shop._id }));
   const categoryNameMap = await getShopCategoryNameMap([shop.categoryId]);
-  const followCount = Number(shop.followersCount) || 0;
+  const followCount = Number(shop.soNguoiTheo) || 0;
   const likeAgg = isShopLocked
     ? []
     : await Product.aggregate([
@@ -686,18 +709,9 @@ async function getPublicShopById(shopId, { latitude, longitude } = {}) {
   let distanceMeters = 0;
   const lat = Number(latitude);
   const lng = Number(longitude);
-  if (
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    Number.isFinite(Number(shop.latitude)) &&
-    Number.isFinite(Number(shop.longitude))
-  ) {
-    distanceMeters = calculateDistanceMeters(
-      lat,
-      lng,
-      Number(shop.latitude),
-      Number(shop.longitude)
-    );
+  const shopCoords = resolveShopLatlong(shop);
+  if (Number.isFinite(lat) && Number.isFinite(lng) && hasShopLatlong(shop)) {
+    distanceMeters = calculateDistanceMeters(lat, lng, shopCoords.lat, shopCoords.long);
   }
 
   const category = resolveShopCategory(categoryNameMap, shop.categoryId);
@@ -721,8 +735,8 @@ async function getPublicShopById(shopId, { latitude, longitude } = {}) {
 }
 
 async function listPublicProductsByShopId(shopId, { page, limit } = {}) {
-  const shop = await ShopProfile.findById(shopId).lean();
-  if (!shop || !isSubscriptionActive(shop)) {
+  const shop = await resolvePublicShop(shopId);
+  if (!shop) {
     const error = new Error("Không tìm thấy gian hàng.");
     error.statusCode = 404;
     throw error;
@@ -845,13 +859,12 @@ async function discoverProducts({
   };
 
   const shops = await ShopProfile.find({
-    latitude: { $ne: null },
-    longitude: { $ne: null },
+    ...shopHasCoordinatesFilter(),
     status: { $ne: 0 },
     ...activeSubscriptionFilter(),
   })
     .select(
-      "userId shopName shopUsername latitude longitude addressHeThong address status"
+      "userId shopName shopUsername latlong latitude longitude addressHeThong address status"
     )
     .lean();
 
@@ -871,7 +884,7 @@ async function discoverProducts({
   const eligibleShopIds = [];
 
   for (const shop of shops) {
-    if (!Number.isFinite(Number(shop.latitude)) || !Number.isFinite(Number(shop.longitude))) {
+    if (!hasShopLatlong(shop)) {
       continue;
     }
 
@@ -880,11 +893,12 @@ async function discoverProducts({
       continue;
     }
 
+    const coords = resolveShopLatlong(shop);
     const distanceMeters = calculateDistanceMeters(
       lat,
       lng,
-      Number(shop.latitude),
-      Number(shop.longitude)
+      coords.lat,
+      coords.long
     );
 
     if (radius != null && distanceMeters > radius) {
@@ -910,7 +924,7 @@ async function discoverProducts({
   // Lấy danh sách nhẹ để sort/filter trước, chỉ enrich trang hiện tại.
   let products = await Product.find(productFilter)
     .select(
-      "ShopId ProductName CategoryId MinPrice MaxPrice SoldCount LikeCount DonVi Description Thumbnail IsPromotion DiscountPercent PromotionStartDate PromotionEndDate Status IsDeleted SellerRemovedAt CreatedAt"
+      "ShopId ProductName CategoryId MinPrice MaxPrice SoldCount LikeCount DonVi Description Thumbnail IsPromotion PtGiam NgayKmBD NgayKmKT Status IsDeleted RemovedBy RemovedAt CreatedAt"
     )
     .lean();
 
@@ -1068,8 +1082,7 @@ async function listPublicReviewsByShopId(shopId, { page, limit } = {}) {
 
   const filter = {
     shopId,
-    isDeleted: { $ne: true },
-    isHidden: { $ne: true },
+    ...publicReviewFilter(),
   };
   const { page: safePage, limit: safeLimit, skip } = parsePagination({ page, limit });
   const [rows, total] = await Promise.all([
@@ -1113,6 +1126,7 @@ async function listPublicReviewsByShopId(shopId, { page, limit } = {}) {
 
 module.exports = {
   listNearbyShops,
+  listNearbyShopsForMap,
   searchShops,
   getPublicShopById,
   MAX_SEARCH_RADIUS_METERS,

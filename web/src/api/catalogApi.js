@@ -50,10 +50,6 @@ export function getShopFollowers(token, shopId, params = {}) {
   return apiRequest(`/api/admin/shops/${shopId}/followers${buildFollowQuery(params)}`, { token });
 }
 
-export function deleteShop(token, shopId) {
-  return apiRequest(`/api/admin/shops/${shopId}`, { method: 'DELETE', token });
-}
-
 export function listProducts(token, params = {}) {
   return apiRequest(buildQueryPath('/api/admin/products', params), { token });
 }
@@ -63,11 +59,19 @@ export function getProductDetail(token, productId) {
 }
 
 export function hideProduct(token, productId) {
-  return apiRequest(`/api/admin/products/${productId}/hide`, { method: 'POST', token, body: {} });
+  return apiRequest(`/api/admin/products/${productId}/hide`, {
+    method: 'POST',
+    token,
+    body: {},
+  });
 }
 
 export function showProduct(token, productId) {
-  return apiRequest(`/api/admin/products/${productId}/show`, { method: 'POST', token, body: {} });
+  return apiRequest(`/api/admin/products/${productId}/show`, {
+    method: 'POST',
+    token,
+    body: {},
+  });
 }
 
 export function deleteProduct(token, productId, { reason } = {}) {
@@ -75,21 +79,5 @@ export function deleteProduct(token, productId, { reason } = {}) {
     method: 'DELETE',
     token,
     body: reason ? { reason } : {},
-  });
-}
-
-export function listReservations(token, params = {}) {
-  return apiRequest(buildQueryPath('/api/admin/reservations', params), { token });
-}
-
-export function getReservationDetail(token, reservationId) {
-  return apiRequest(`/api/admin/reservations/${reservationId}`, { token });
-}
-
-export function cancelReservation(token, reservationId, reason = '') {
-  return apiRequest(`/api/admin/reservations/${reservationId}/cancel`, {
-    method: 'POST',
-    token,
-    body: { reason },
   });
 }

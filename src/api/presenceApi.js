@@ -74,7 +74,7 @@ export async function setShopPresenceOfflineOnBackend() {
   });
 }
 
-/** Gọi trước khi sign-out Firebase để DB cập nhật offline + LanHoatDongCuoi. */
+/** Gọi trước khi sign-out Firebase để DB cập nhật offline + HoatDongCuoi. */
 export async function markAllPresenceOfflineOnBackend() {
   await Promise.allSettled([
     setPresenceOfflineOnBackend(),

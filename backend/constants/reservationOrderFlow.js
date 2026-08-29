@@ -1,11 +1,10 @@
 /**
  * FastMark — State machine đơn giữ hàng (Reservation).
  *
- * Tab UX (5):
- *   pending (0) | holding (2) | dispute (4) | completed (3,5*) | cancelled (1,6,7)
- *   * AUTO_COMPLETED (5) chỉ còn cho admin hoàn tất tranh chấp / legacy.
+ * Tab UX (v2):
+ *   pending (0) | holding (1) | dispute (3) | completed (2,4) | cancelled (5)
  *
- * Không có trạng thái mồ côi: mọi transition đều ghi cancelReason (mã) + cancelledBy + depositSettleTo.
+ * Không có trạng thái mồ côi: mọi transition đều ghi cancelType (mã) + cancelNote (text, nếu có) + cocChuyenDen.
  */
 
 const RESERVATION_CANCEL_REASON = {
@@ -27,7 +26,9 @@ const RESERVATION_CANCEL_REASON = {
   SELLER_REPORT_BUYER_NO_SHOW: "seller_report_buyer_no_show",
   /** Cả hai báo cáo — chờ admin. */
   DISPUTE_BOTH_REPORTED: "dispute_both_reported",
-  /** Quá 24h sau giờ nhận, không ai báo cáo. */
+  /** Buyer khiếu nại sau khi đã nhận hàng (hàng thiếu, hỏng…). */
+  BUYER_POST_DELIVERY_COMPLAINT: "buyer_post_delivery_complaint",
+  /** Quá 48h sau giờ nhận, không ai báo cáo. */
   PICKUP_TIMEOUT: "pickup_timeout",
   /** Admin: buyer thắng tranh chấp. */
   ADMIN_BUYER_WIN: "admin_buyer_win",
@@ -41,9 +42,9 @@ const RESERVATION_CANCEL_REASON = {
   SELLER_SHOP_LOCKED: "seller_shop_locked",
   /** Admin khóa tài khoản buyer. */
   BUYER_ACCOUNT_LOCKED: "buyer_account_locked",
-  /** Auto buyer thắng (seller không phản hồi 24h). */
+  /** Auto buyer thắng (seller không phản hồi 48h). */
   AUTO_BUYER_WIN: "auto_buyer_win",
-  /** Auto seller thắng (buyer không phản hồi 24h). */
+  /** Auto seller thắng (buyer không phản hồi 48h). */
   AUTO_SELLER_WIN: "auto_seller_win",
   /** Buyer đồng ý mất cọc (forfeit). */
   BUYER_FORFEIT: "buyer_forfeit",
@@ -51,7 +52,7 @@ const RESERVATION_CANCEL_REASON = {
   SELLER_REFUND_AFTER_PICKUP: "seller_refund_after_pickup",
 };
 
-/** Mã lý do tranh chấp (disputeReason trên Reservation / Report). */
+/** Mã lý do tranh chấp (ReservationDispute.reason / Report). */
 const RESERVATION_DISPUTE_REASON_CODE = {
   SELLER_ABSENT: "seller_absent",
   SHOP_CLOSED: "shop_closed",
@@ -68,90 +69,88 @@ const VIEWER_ROLE = {
 /** Nhãn lý do theo góc nhìn người xem. */
 const CANCEL_REASON_VIEW_LABELS = {
   [RESERVATION_CANCEL_REASON.SELLER_REJECTED]: {
-    buyer: "Người bán đã từ chối giữ hàng.",
-    seller: "Bạn đã từ chối giữ hàng.",
+    buyer: "Người bán đã từ chối yêu cầu giữ hàng.",
+    seller: "Người bán đã từ chối yêu cầu giữ hàng",
   },
   [RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING]: {
-    buyer: "Bạn đã hủy đơn.",
-    seller: "Người mua đã hủy đơn.",
+    buyer: "Người mua đã hủy yêu cầu giữ hàng",
+    seller: "Người mua đã hủy yêu cầu giữ hàng",
   },
   [RESERVATION_CANCEL_REASON.CONFIRM_TIMEOUT]: {
-    buyer: "Đơn đã bị hủy do người bán chưa xác nhận giữ hàng.",
-    seller: "Đơn đã bị hủy do bạn chưa xác nhận giữ hàng.",
+    buyer: "Đơn đã tự động hủy do người bán không xác nhận giữ hàng đúng hạn",
+    seller: "Đơn đã tự động hủy do người bán không xác nhận giữ hàng đúng hạn",
   },
   [RESERVATION_CANCEL_REASON.BUYER_RECEIVED]: {
-    buyer: "Đã nhận hàng",
-    seller: "Đã giao hàng",
+    buyer: "Đơn hàng đã hoàn thành",
+    seller: "Đơn hàng đã hoàn thành",
   },
   [RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING]: {
-    buyer: "Người bán đã hủy đơn. Tiền cọc đã được hoàn lại cho bạn.",
-    seller: "Bạn đã hủy đơn. Tiền cọc đã được hoàn lại cho người mua.",
+    buyer: "Người bán đã hủy đơn.",
+    seller: "Người bán đã hủy đơn.",
   },
   [RESERVATION_CANCEL_REASON.BUYER_CANCEL_HOLDING]: {
-    buyer: "Bạn đã hủy đơn. Tiền cọc đã được chuyển cho người bán.",
-    seller: "Người mua đã hủy đơn. Tiền cọc đã được chuyển cho bạn.",
+    buyer: "Người mua đã hủy đơn.",
+    seller: "Người mua đã hủy đơn.",
   },
   [RESERVATION_CANCEL_REASON.BUYER_REPORT_SELLER_ABSENT]: {
-    buyer: "Người bán không có mặt",
-    seller: "Bạn không có mặt",
+    buyer: "Người mua đã báo cáo người bán không có mặt khi nhận hàng",
+    seller: "Người mua báo cáo người bán không có mặt khi nhận hàng",
   },
   [RESERVATION_CANCEL_REASON.SELLER_REPORT_BUYER_NO_SHOW]: {
-    buyer: "Bạn không đến nhận",
-    seller: "Người mua không đến nhận",
+    buyer: "Người bán báo cáo người mua không đến nhận hàng",
+    seller: "Người bán đã báo cáo người mua không đến nhận hàng",
   },
   [RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED]: {
-    buyer: "Đang tranh chấp",
-    seller: "Đang tranh chấp",
+    buyer: "Đơn hàng đang được xử lý tranh chấp",
+    seller: "Đơn hàng đang được xử lý tranh chấp",
+  },
+  [RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT]: {
+    buyer: "Người mua đã gửi khiếu nại sau khi nhận hàng",
+    seller: "Người mua đã gửi khiếu nại sau khi nhận hàng",
   },
   [RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT]: {
-    buyer:
-      "Quá giờ nhận hàng, đơn đã tự động hủy do không có phản hồi từ hai bên. Tiền cọc đã được chuyển cho người bán.",
-    seller:
-      "Quá giờ nhận hàng, đơn đã tự động hủy do không có phản hồi từ hai bên. Tiền cọc đã được chuyển cho bạn.",
+    buyer: "Quá giờ nhận hàng, đơn đã tự động hủy do không có phản hồi từ hai bên.",
+    seller: "Quá giờ nhận hàng, đơn đã tự động hủy do không có phản hồi từ hai bên.",
   },
   [RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN]: {
-    buyer: "Người bán vắng mặt",
-    seller: "Không có mặt",
+    buyer: "Admin xử lý tranh chấp.",
+    seller: "Admin xử lý tranh chấp.",
   },
   [RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN]: {
-    buyer: "Bạn không đến nhận",
-    seller: "Người mua không đến nhận",
+    buyer: "Admin xử lý tranh chấp.",
+    seller: "Admin xử lý tranh chấp.",
   },
   [RESERVATION_CANCEL_REASON.ADMIN_COMPLETED]: {
-    buyer: "Đã nhận hàng",
-    seller: "Đã giao hàng",
+    buyer: "Đơn hàng đã hoàn thành",
+    seller: "Đơn hàng đã hoàn thành",
   },
   [RESERVATION_CANCEL_REASON.SELLER_ACCOUNT_LOCKED]: {
-    buyer: "Người bán bị khóa",
-    seller: "Tài khoản bị khóa",
+    buyer: "Đơn bị hủy do tài khoản người bán bị khóa",
+    seller: "Đơn bị hủy do tài khoản người bán bị khóa",
   },
   [RESERVATION_CANCEL_REASON.SELLER_SHOP_LOCKED]: {
-    buyer: "Gian hàng bị khóa",
-    seller: "Gian hàng bị khóa",
+    buyer: "Đơn bị hủy do gian hàng của người bán bị khóa",
+    seller: "Đơn bị hủy do gian hàng người bán bị khóa",
   },
   [RESERVATION_CANCEL_REASON.BUYER_ACCOUNT_LOCKED]: {
-    buyer: "Tài khoản bị khóa",
-    seller: "Người mua bị khóa",
+    buyer: "Đơn bị hủy do tài khoản người mua bị khóa",
+    seller: "Đơn bị hủy do tài khoản người mua bị khóa",
   },
   [RESERVATION_CANCEL_REASON.AUTO_BUYER_WIN]: {
-    buyer: "Người bán không phản hồi",
-    seller: "Không phản hồi báo cáo",
+    buyer: "Người mua thắng tranh chấp do người bán không phản hồi trong thời hạn quy định",
+    seller: "Người mua thắng tranh chấp do người bán không phản hồi trong thời hạn quy định",
   },
   [RESERVATION_CANCEL_REASON.AUTO_SELLER_WIN]: {
-    buyer: "Bạn không phản hồi báo cáo",
-    seller: "Người mua không phản hồi",
+    buyer: "Người mua thua tranh chấp do không phản hồi trong thời hạn quy định",
+    seller: "Người bán thắng tranh chấp do người mua không phản hồi trong thời hạn quy định",
   },
   [RESERVATION_CANCEL_REASON.BUYER_FORFEIT]: {
-    buyer:
-      "Quá giờ nhận hàng, bạn đã đồng ý mất cọc. Tiền cọc đã được chuyển cho người bán.",
-    seller:
-      "Quá giờ nhận hàng, người mua đã đồng ý mất cọc. Tiền cọc đã được chuyển cho bạn.",
+    buyer: "Quá giờ nhận hàng, người mua đã đồng ý mất cọc.",
+    seller: "Quá giờ nhận hàng, người mua đã đồng ý mất cọc.",
   },
   [RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP]: {
-    buyer:
-      "Quá giờ nhận hàng, người bán đã hoàn cọc cho bạn. Tiền cọc đã được hoàn lại vào ví của bạn.",
-    seller:
-      "Quá giờ nhận hàng, bạn đã hoàn cọc cho người mua. Tiền cọc đã được hoàn lại cho người mua.",
+    buyer: "Quá giờ nhận hàng, người bán đã đồng ý hoàn cọc.",
+    seller: "Quá giờ nhận hàng, người bán đã đồng ý hoàn cọc.",
   },
 };
 
@@ -163,6 +162,10 @@ const LEGACY_CANCEL_REASON_ALIASES = {
   "Người bán đã từ chối giữ hàng": RESERVATION_CANCEL_REASON.SELLER_REJECTED,
   "Bạn đã từ chối giữ hàng": RESERVATION_CANCEL_REASON.SELLER_REJECTED,
   "Bạn đã đồng ý mất cọc": RESERVATION_CANCEL_REASON.BUYER_FORFEIT,
+  "Bạn đã đồng ý mất cọc sau quá giờ nhận hàng.": RESERVATION_CANCEL_REASON.BUYER_FORFEIT,
+  "Người mua đã đồng ý mất cọc sau quá giờ nhận hàng.": RESERVATION_CANCEL_REASON.BUYER_FORFEIT,
+  "Người bán đã hoàn cọc sau quá giờ nhận hàng.": RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP,
+  "Bạn đã hoàn cọc cho người mua sau quá giờ nhận hàng.": RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP,
   "Quá hạn nhận hàng": RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT,
 };
 
@@ -177,16 +180,29 @@ function normalizeCancelReasonCode(code) {
   return LEGACY_CANCEL_REASON_ALIASES[explicit] || explicit;
 }
 
+const {
+  getReservationCancelType,
+  getReservationCancelNoteRaw,
+} = require("../utils/reservationCompat");
+
 function resolveCancelReasonCodeFromReservation(reservation) {
   const fromReasonCode = normalizeCancelReasonCode(reservation?.reasonCode);
   if (CANCEL_REASON_VIEW_LABELS[fromReasonCode]) {
     return fromReasonCode;
   }
-  const fromCancelReason = normalizeCancelReasonCode(reservation?.cancelReason);
-  if (CANCEL_REASON_VIEW_LABELS[fromCancelReason]) {
-    return fromCancelReason;
+
+  const fromCancelType = normalizeCancelReasonCode(getReservationCancelType(reservation));
+  if (CANCEL_REASON_VIEW_LABELS[fromCancelType]) {
+    return fromCancelType;
   }
-  return fromCancelReason || fromReasonCode;
+
+  // Legacy: mã lưu trong cancelNote trước khi tách cancelType / cancelNote.
+  const legacyNoteCode = normalizeCancelReasonCode(getReservationCancelNoteRaw(reservation));
+  if (CANCEL_REASON_VIEW_LABELS[legacyNoteCode]) {
+    return legacyNoteCode;
+  }
+
+  return fromCancelType || fromReasonCode || legacyNoteCode;
 }
 
 function wasCancelledAfterPickup(reservation) {
@@ -201,13 +217,47 @@ function wasCancelledAfterPickup(reservation) {
   return cancelledAt.getTime() >= pickup.getTime();
 }
 
+const {
+  normalizeReservationStatus,
+  isPostPickupDisputeContext,
+  isDepositSettled,
+} = require("../utils/reservationStatus");
+
+const SETTLE_BUYER = 1;
+const SETTLE_SELLER = 2;
+
+function isPostDeliveryDisputeReservation(reservation) {
+  if (!reservation) {
+    return false;
+  }
+  if (reservation.isPostDeliveryDispute === true) {
+    return true;
+  }
+  if (String(reservation.disputeKind || "").trim() === "post_delivery") {
+    return true;
+  }
+  const reason = normalizeCancelReasonCode(getReservationCancelType(reservation));
+  if (reason === RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT) {
+    return true;
+  }
+  const legacyReason = normalizeCancelReasonCode(getReservationCancelNoteRaw(reservation));
+  if (legacyReason === RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT) {
+    return true;
+  }
+  return isPostPickupDisputeContext(reservation);
+}
+
 /** Map tab API → status filter. */
 const RESERVATION_TAB_STATUS_MAP = {
   pending: [0],
-  holding: [2],
-  dispute: [4],
-  completed: [3, 5],
-  cancelled: [1, 6, 7],
+  holding: [1],
+  dispute: [3],
+  dispute_active: [3],
+  dispute_resolved: [3],
+  completed: [2, 4],
+  completed_pickup: [2],
+  pickup_confirmed: [2],
+  cancelled: [5],
   all: null,
 };
 
@@ -227,12 +277,37 @@ function inferCancelReasonCode(reservation) {
 
   const explicit = resolved;
 
-  const status = Number(reservation?.status);
-  const cancelledBy = String(reservation?.cancelledBy || "").trim();
+  const status = normalizeReservationStatus(reservation?.status, reservation);
+  const cancelType = getReservationCancelType(reservation);
   const disputeByBuyer = Boolean(reservation?.disputeByBuyer);
   const disputeBySeller = Boolean(reservation?.disputeBySeller);
 
-  if (status === 4) {
+  if (status === 3) {
+    if (isDepositSettled(reservation)) {
+      const explicitSettled = resolveCancelReasonCodeFromReservation(reservation);
+      if (CANCEL_REASON_VIEW_LABELS[explicitSettled]) {
+        return explicitSettled;
+      }
+      const settleTo = Number(reservation?.cocChuyenDen);
+      if (settleTo === SETTLE_BUYER) {
+        if (cancelType === "system") {
+          return RESERVATION_CANCEL_REASON.AUTO_BUYER_WIN;
+        }
+        if (cancelType === "seller_after_accept") {
+          return RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP;
+        }
+        return RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
+      }
+      if (settleTo === SETTLE_SELLER) {
+        if (cancelType === "system") {
+          return RESERVATION_CANCEL_REASON.AUTO_SELLER_WIN;
+        }
+        return RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN;
+      }
+    }
+    if (isPostDeliveryDisputeReservation(reservation)) {
+      return RESERVATION_CANCEL_REASON.BUYER_POST_DELIVERY_COMPLAINT;
+    }
     if (disputeByBuyer && disputeBySeller) {
       return RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED;
     }
@@ -245,14 +320,21 @@ function inferCancelReasonCode(reservation) {
     return RESERVATION_CANCEL_REASON.DISPUTE_BOTH_REPORTED;
   }
 
-  if (status === 3 || status === 5) {
+  if (status === 4) {
     return RESERVATION_CANCEL_REASON.BUYER_RECEIVED;
   }
 
-  if (cancelledBy === "seller_reject") {
+  if (cancelType === "seller_reject") {
     return RESERVATION_CANCEL_REASON.SELLER_REJECTED;
   }
-  if (cancelledBy === "seller_after_accept" || reservation?.cancelledBySellerAfterAccept) {
+
+  if (status === 5) {
+    if (cancelType === "buyer" && Number(reservation?.cocChuyenDen) === SETTLE_SELLER) {
+      return RESERVATION_CANCEL_REASON.BUYER_FORFEIT;
+    }
+  }
+
+  if (cancelType === "seller_after_accept") {
     if (
       explicit === RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP ||
       wasCancelledAfterPickup(reservation)
@@ -261,22 +343,22 @@ function inferCancelReasonCode(reservation) {
     }
     return RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING;
   }
-  if (cancelledBy === "buyer") {
-    return status === 2 || reservation?.sellerConfirmedAt
+  if (cancelType === "buyer") {
+    return status === 1 || reservation?.tgShopXN
       ? RESERVATION_CANCEL_REASON.BUYER_CANCEL_HOLDING
       : RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING;
   }
-  if (cancelledBy === "system") {
+  if (cancelType === "system") {
     if (explicit.includes("xác nhận") || explicit.includes("shop chưa")) {
       return RESERVATION_CANCEL_REASON.CONFIRM_TIMEOUT;
     }
-    if (explicit.includes("24 giờ") || explicit.includes("quá hạn")) {
+    if (explicit.includes("48 giờ") || explicit.includes("24 giờ") || explicit.includes("quá hạn")) {
       return RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT;
     }
     return RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT;
   }
-  if (cancelledBy === "admin") {
-    const settleTo = Number(reservation?.depositSettleTo);
+  if (cancelType === "admin") {
+    const settleTo = Number(reservation?.cocChuyenDen);
     if (settleTo === 1) {
       return RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
     }
@@ -287,37 +369,42 @@ function inferCancelReasonCode(reservation) {
   }
 
   if (status === 1) {
-    if (cancelledBy === "system" || explicit.includes("xác nhận")) {
+    if (cancelType === "system" || explicit.includes("xác nhận")) {
       return RESERVATION_CANCEL_REASON.CONFIRM_TIMEOUT;
     }
     return RESERVATION_CANCEL_REASON.SELLER_REJECTED;
   }
-  if (status === 6) {
-    if (disputeByBuyer || disputeBySeller) {
-      return RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
-    }
-    if (cancelledBy === "seller_after_accept" || reservation?.cancelledBySellerAfterAccept) {
-      return wasCancelledAfterPickup(reservation)
-        ? RESERVATION_CANCEL_REASON.SELLER_REFUND_AFTER_PICKUP
-        : RESERVATION_CANCEL_REASON.SELLER_CANCEL_HOLDING;
-    }
-    return RESERVATION_CANCEL_REASON.BUYER_CANCEL_PENDING;
-  }
-  if (status === 7) {
-    if (CANCEL_REASON_VIEW_LABELS[explicit]) {
-      return explicit;
-    }
-    if (cancelledBy === "buyer" && Number(reservation?.depositSettleTo) === 2) {
-      return RESERVATION_CANCEL_REASON.BUYER_FORFEIT;
-    }
-    const settleTo = Number(reservation?.depositSettleTo);
-    if (settleTo === 1) {
-      return RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN;
-    }
-    return RESERVATION_CANCEL_REASON.PICKUP_TIMEOUT;
-  }
-
   return explicit;
+}
+
+const GENERIC_ADMIN_RESOLUTION_NOTES = new Set([
+  "Admin hoàn cọc cho người mua.",
+  "Admin xử lý tranh chấp: đền cọc cho người bán.",
+  "Shop tự hoàn cọc trong tranh chấp.",
+  "Shop tự hoàn cọc cho người mua.",
+  "Buyer đồng ý mất cọc.",
+]);
+
+function resolveAdminResolutionNote(reservation) {
+  const note = String(reservation?.cancelNote || "").trim();
+  if (!note || GENERIC_ADMIN_RESOLUTION_NOTES.has(note)) {
+    return "";
+  }
+  if (/^[a-z0-9_]+$/i.test(note) && note.includes("_")) {
+    return "";
+  }
+  return note;
+}
+
+function formatDisputeOutcomeLabel(baseLabel, code, reservation) {
+  if (
+    code !== RESERVATION_CANCEL_REASON.ADMIN_BUYER_WIN &&
+    code !== RESERVATION_CANCEL_REASON.ADMIN_SELLER_WIN
+  ) {
+    return baseLabel;
+  }
+  const note = resolveAdminResolutionNote(reservation);
+  return note ? `${baseLabel}. Lý do: ${note}` : baseLabel;
 }
 
 function getReservationReasonLabel(reservation, viewerRole = VIEWER_ROLE.BUYER) {
@@ -331,7 +418,8 @@ function getReservationReasonLabel(reservation, viewerRole = VIEWER_ROLE.BUYER) 
   const code = inferCancelReasonCode(reservation);
   const labels = CANCEL_REASON_VIEW_LABELS[code];
   if (labels) {
-    return labels[role] || labels.buyer || "";
+    const base = labels[role] || labels.buyer || "";
+    return formatDisputeOutcomeLabel(base, code, reservation);
   }
 
   return "";

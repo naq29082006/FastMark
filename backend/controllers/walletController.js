@@ -15,6 +15,7 @@ exports.listTransactions = async (req, res) => {
   const data = await walletService.listTransactions(req.currentUser._id, {
     page: req.query.page,
     limit: req.query.limit,
+    type: req.query.type,
   });
   return success(res, { data });
 };

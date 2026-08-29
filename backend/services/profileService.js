@@ -9,7 +9,7 @@ async function getShopStatsForUser(userId, userDoc = null) {
 
   const owner =
     userDoc ||
-    (await User.findById(userId).select("FullName UserName Phone Avatar FollowersCount").lean());
+    (await User.findById(userId).select("FullName UserName Phone Avatar SoTheoDoi").lean());
 
   if (!shop) {
     return {
@@ -19,11 +19,11 @@ async function getShopStatsForUser(userId, userDoc = null) {
       shopUsername: '',
       categoryId: '',
       categoryName: '',
-      totalProducts: 0,
+      tongSP: 0,
       likesCount: 0,
       soldCount: 0,
-      totalReviews: 0,
-      averageRating: 0,
+      tongDG: 0,
+      diemTB: 0,
       responseRate: 0,
       shopPhone: '',
       shopAddress: '',
@@ -49,11 +49,11 @@ async function getShopStatsForUser(userId, userDoc = null) {
         ? String(shop.categoryId)
         : '',
     categoryName: shop.categoryId?.categoryName || '',
-    totalProducts: shop.totalProducts || 0,
+    tongSP: shop.tongSP || 0,
     likesCount: 0,
     soldCount: shop.soldCount || 0,
-    totalReviews: shop.totalReviews || 0,
-    averageRating: shop.averageRating || 0,
+    tongDG: shop.tongDG || 0,
+    diemTB: shop.diemTB || 0,
     responseRate: shop.responseRate || 98,
     shopPhone: shop.phone || '',
     shopAddress: shop.addressHeThong || shop.address || '',
@@ -63,7 +63,7 @@ async function getShopStatsForUser(userId, userDoc = null) {
     openTime: shop.openTime || '',
     closeTime: shop.closeTime || '',
     isOpen: Number(shop.isOpen) === 1 ? 1 : 0,
-    legacyShopFollowersCount: Number(shop.followersCount) || 0,
+    legacyShopFollowersCount: Number(shop.soNguoiTheo) || 0,
   };
 }
 
@@ -75,18 +75,7 @@ async function buildPublicUserProfile(user) {
 
   const publicUser = user.toPublicJSON();
   const { legacyShopFollowersCount, ...storefrontStats } = shopStats;
-  const followersCount =
-    Number(publicUser.followersCount) || Number(legacyShopFollowersCount) || 0;
-
-  // Backfill User.FollowersCount once from legacy shop counter.
-  if (
-    Number(publicUser.followersCount) === 0 &&
-    Number(legacyShopFollowersCount) > 0 &&
-    user?.FollowersCount !== legacyShopFollowersCount
-  ) {
-    user.FollowersCount = legacyShopFollowersCount;
-    await user.save().catch(() => null);
-  }
+  const soNguoiTheo = Number(legacyShopFollowersCount) || 0;
 
   return {
     ...publicUser,
@@ -95,7 +84,7 @@ async function buildPublicUserProfile(user) {
     shopAvatar: storefrontStats.shopAvatar || "",
     shopName: storefrontStats.shopName || '',
     shopUsername: storefrontStats.shopUsername || '',
-    followersCount,
+    soNguoiTheo,
     followingCount: Number(publicUser.followingCount) || 0,
     walletBalance: Math.max(0, Number(wallet.balance) || 0),
   };

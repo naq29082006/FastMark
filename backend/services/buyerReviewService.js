@@ -2,7 +2,6 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const Review = require("../models/Review");
 const Reservation = require("../models/Reservation");
-const ReviewImage = require("../models/ReviewImage");
 const Product = require("../models/Product");
 const ShopProfile = require("../models/ShopProfile");
 const User = require("../models/User");
@@ -15,10 +14,23 @@ const { uploadImageToSupabase, resolveFileExtension } = require("./uploadService
 const { createNotification } = require("./notificationService");
 const { emitAdminUpdated, emitUserResourceUpdated, emitPublicUpdated } = require("./realtimeService");
 const { buildPaginationMeta, parsePagination } = require("../utils/pagination");
+const {
+  normalizeEmbeddedImages,
+  toPublicImageList,
+} = require("../utils/embeddedImages");
+const {
+  isReviewSoftDeleted,
+  isReviewHidden,
+  notDeletedReviewFilter,
+  publicReviewFilter,
+  markReviewBuyerDeleted,
+  toAdminReviewRemovalFields,
+} = require("../utils/reviewRemoval");
+const { RECORD_STATUS } = require("../constants");
 
 const REVIEWABLE_STATUSES = [
   RESERVATION_STATUS.COMPLETED,
-  RESERVATION_STATUS.AUTO_COMPLETED,
+  RESERVATION_STATUS.RECEIVED,
 ];
 
 function createServiceError(message, statusCode = 400) {
@@ -99,8 +111,7 @@ function collectImageInputs(payload = {}) {
   return single ? [single] : [];
 }
 
-async function replaceReviewImages(reviewId, imageInputs = []) {
-  await ReviewImage.deleteMany({ reviewId });
+async function resolveReviewImageUrls(reviewId, imageInputs = []) {
   const urls = [];
   for (let index = 0; index < imageInputs.length; index += 1) {
     const url = await resolveImageUrl(imageInputs[index]);
@@ -108,39 +119,25 @@ async function replaceReviewImages(reviewId, imageInputs = []) {
       urls.push(url);
     }
   }
-  if (!urls.length) {
-    return [];
-  }
-  const now = new Date();
-  return ReviewImage.insertMany(
-    urls.map((imageUrl, index) => ({
-      reviewId,
-      ImageUrl: imageUrl,
-      Stt: index,
-      UploadedAt: now,
-    }))
+  return normalizeEmbeddedImages(urls);
+}
+
+async function replaceReviewImages(reviewId, imageInputs = []) {
+  const urls = await resolveReviewImageUrls(reviewId, imageInputs);
+  await Review.updateOne(
+    { _id: reviewId },
+    { $set: { images: urls, UpdatedAt: new Date() } }
   );
+  return toPublicImageList(urls);
 }
 
 async function loadReviewImagesMap(reviewIds = []) {
   if (!reviewIds.length) {
     return new Map();
   }
-  const rows = await ReviewImage.find({ reviewId: { $in: reviewIds } }).sort({
-    Stt: 1,
-    UploadedAt: 1,
-  });
+  const rows = await Review.find({ _id: { $in: reviewIds } }).select("images").lean();
   return rows.reduce((map, row) => {
-    const key = String(row.reviewId);
-    if (!map.has(key)) {
-      map.set(key, []);
-    }
-    map.get(key).push({
-      id: row._id,
-      imageUrl: row.ImageUrl,
-      stt: Number(row.Stt) || 0,
-      uploadedAt: row.UploadedAt || null,
-    });
+    map.set(String(row._id), toPublicImageList(row.images || []));
     return map;
   }, new Map());
 }
@@ -201,7 +198,7 @@ async function toPublicReview(review, extras = {}) {
     image_url: imageUrl,
     createdAt: review.CreatedAt || null,
     created_at: review.CreatedAt || null,
-    isHidden: Boolean(review.isHidden),
+    ...toAdminReviewRemovalFields(review),
   };
 }
 
@@ -218,19 +215,18 @@ async function refreshShopReviewStats(shopId) {
 
   const reviews = await Review.find({
     shopId: id,
-    isDeleted: { $ne: true },
-    isHidden: { $ne: true },
+    ...publicReviewFilter(),
   }).lean();
 
   const total = reviews.length;
-  const averageRating =
+  const diemTB =
     total > 0
       ? Math.round((reviews.reduce((sum, row) => sum + Number(row.rating || 0), 0) / total) * 10) /
         10
       : 0;
 
-  shop.totalReviews = total;
-  shop.averageRating = averageRating;
+  shop.tongDG = total;
+  shop.diemTB = diemTB;
   shop.UpdatedAt = new Date();
   await shop.save();
   return shop;
@@ -245,8 +241,8 @@ function buildReviewRealtimePayload(review, shop = null, extras = {}) {
       ? String(review.reservationId)
       : String(extras.reservationId || ""),
     rating: Number(review?.rating || extras.rating || 0),
-    totalReviews: Number(shop?.totalReviews || 0),
-    averageRating: Number(shop?.averageRating || 0),
+    tongDG: Number(shop?.tongDG || 0),
+    diemTB: Number(shop?.diemTB || 0),
     action: extras.action || "updated",
   };
 }
@@ -307,7 +303,7 @@ async function assertPurchasedProduct(user, { productId, reservationId, shopId }
     filter._id = pickString(reservationId);
   }
 
-  const reservation = await Reservation.findOne(filter).sort({ completedAt: -1, UpdatedAt: -1 });
+  const reservation = await Reservation.findOne(filter).sort({ tgNhanHang: -1, updatedAt: -1 });
   if (!reservation) {
     throw createServiceError("Chỉ đánh giá được sản phẩm bạn đã mua / nhận hàng.", 403);
   }
@@ -326,7 +322,7 @@ async function assertPurchasedProduct(user, { productId, reservationId, shopId }
 async function listBuyerReviews(user, { page, limit } = {}) {
   const filter = {
     userId: user._id,
-    isDeleted: { $ne: true },
+    ...notDeletedReviewFilter(),
   };
   const { page: safePage, limit: safeLimit, skip } = parsePagination({ page, limit });
   const [rows, total] = await Promise.all([
@@ -388,18 +384,18 @@ async function createBuyerReview(user, payload = {}) {
     shopId: payload.shopId || payload.storeId || payload.store_id,
   });
 
-  if (reservation.hasReviewed) {
+  if (reservation.hasReview) {
     throw createServiceError("Bạn đã đánh giá đơn hàng này.", 409);
   }
 
   const existing = await Review.findOne({
     reservationId: reservation._id,
-    isDeleted: { $ne: true },
+    ...notDeletedReviewFilter(),
   });
   if (existing) {
     await Reservation.updateOne(
       { _id: reservation._id },
-      { $set: { hasReviewed: true } }
+      { $set: { hasReview: true } }
     );
     throw createServiceError("Bạn đã đánh giá đơn hàng này.", 409);
   }
@@ -412,20 +408,19 @@ async function createBuyerReview(user, payload = {}) {
     reservationId: reservation._id,
     rating,
     comment: pickString(payload.comment),
-    isHidden: false,
-    isDeleted: false,
+    isDeleted: RECORD_STATUS.ACTIVE,
     CreatedAt: now,
     UpdatedAt: now,
   });
 
-  const imageDocs = await replaceReviewImages(review._id, collectImageInputs(payload));
+  const images = await replaceReviewImages(review._id, collectImageInputs(payload));
   let shop = await refreshShopReviewStats(shopId);
   if (!shop?.userId && shopId) {
-    shop = await ShopProfile.findById(shopId).select("userId totalReviews averageRating shopName");
+    shop = await ShopProfile.findById(shopId).select("userId tongDG diemTB shopName");
   }
   await Reservation.updateOne(
     { _id: reservation._id },
-    { $set: { hasReviewed: true } }
+    { $set: { hasReview: true } }
   );
 
   await notifyShopNewReview({
@@ -440,12 +435,7 @@ async function createBuyerReview(user, payload = {}) {
     user,
     product,
     shop,
-    images: imageDocs.map((doc, index) => ({
-      id: doc._id,
-      imageUrl: doc.ImageUrl,
-      stt: Number(doc.Stt) || index,
-      uploadedAt: doc.UploadedAt || null,
-    })),
+    images,
   });
 }
 
@@ -453,7 +443,7 @@ async function updateBuyerReview(user, reviewId, payload = {}) {
   const review = await Review.findOne({
     _id: reviewId,
     userId: user._id,
-    isDeleted: { $ne: true },
+    ...notDeletedReviewFilter(),
   });
   if (!review) {
     throw createServiceError("Không tìm thấy đánh giá.", 404);
@@ -475,13 +465,7 @@ async function updateBuyerReview(user, reviewId, payload = {}) {
     payload.images !== undefined ||
     payload.imageUrl !== undefined
   ) {
-    const imageDocs = await replaceReviewImages(review._id, imageInputs);
-    images = imageDocs.map((doc, index) => ({
-      id: doc._id,
-      imageUrl: doc.ImageUrl,
-      stt: Number(doc.Stt) || index,
-      uploadedAt: doc.UploadedAt || null,
-    }));
+    images = await replaceReviewImages(review._id, imageInputs);
   }
 
   const shop = await refreshShopReviewStats(review.shopId);
@@ -493,16 +477,14 @@ async function deleteBuyerReview(user, reviewId) {
   const review = await Review.findOne({
     _id: reviewId,
     userId: user._id,
-    isDeleted: { $ne: true },
+    ...notDeletedReviewFilter(),
   });
   if (!review) {
     throw createServiceError("Không tìm thấy đánh giá.", 404);
   }
 
   const now = new Date();
-  review.isDeleted = true;
-  review.isHidden = true;
-  review.deletedAt = now;
+  markReviewBuyerDeleted(review, now);
   review.UpdatedAt = now;
   await review.save();
 
@@ -532,7 +514,7 @@ async function loadActiveReviewsByReservationIds(reservationIds = [], userId = n
 
   const query = {
     reservationId: { $in: objectIds },
-    isDeleted: { $ne: true },
+    ...notDeletedReviewFilter(),
   };
   if (userId) {
     query.userId = userId;

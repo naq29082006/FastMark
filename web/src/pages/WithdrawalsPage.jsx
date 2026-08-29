@@ -75,7 +75,7 @@ function WithdrawDetailDialog({ item, onClose }) {
           <DetailField label="Trạng thái">{item.statusLabel || ''}</DetailField>
           <DetailField label="Ghi chú admin">{item.adminNote || ''}</DetailField>
           <DetailField label="Tạo lúc">{formatDate(item.createdAt)}</DetailField>
-          <DetailField label="Xử lý lúc">{formatDate(item.processedAt)}</DetailField>
+          <DetailField label="Xử lý lúc">{formatDate(item.tgXuLy)}</DetailField>
         </dl>
         {item.userId ? (
           <div className="dialog-actions" style={{ justifyContent: 'flex-start' }}>
@@ -330,7 +330,7 @@ export default function WithdrawalsPage() {
                     </span>
                     {item.adminNote ? <div className="muted">{item.adminNote}</div> : null}
                   </td>
-                  <td>{formatDate(item.processedAt)}</td>
+                  <td>{formatDate(item.tgXuLy)}</td>
                   <td className="col-actions">
                     <TableIconActions
                       actions={[

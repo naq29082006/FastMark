@@ -75,10 +75,10 @@ export function subscribeKeyboardInsets({
 }) {
   let keyboardOpen = false;
   let baselineWindowHeight = Dimensions.get('window').height;
+  let hideTimer = null;
 
   const emitLayout = (event) => {
     if (!keyboardOpen) {
-      onChange(KEYBOARD_LAYOUT_HIDDEN);
       return;
     }
 
@@ -98,6 +98,10 @@ export function subscribeKeyboardInsets({
   };
 
   const showInset = (event) => {
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
     if (!keyboardOpen) {
       const currentHeight = Dimensions.get('window').height;
       baselineWindowHeight = Math.max(baselineWindowHeight, currentHeight);
@@ -110,9 +114,25 @@ export function subscribeKeyboardInsets({
     if (shouldSuppressHide?.()) {
       return;
     }
-    keyboardOpen = false;
-    baselineWindowHeight = Dimensions.get('window').height;
-    onChange(KEYBOARD_LAYOUT_HIDDEN);
+
+    const finishHide = () => {
+      keyboardOpen = false;
+      baselineWindowHeight = Dimensions.get('window').height;
+      onChange(KEYBOARD_LAYOUT_HIDDEN);
+    };
+
+    if (Platform.OS === 'android') {
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+      }
+      hideTimer = setTimeout(() => {
+        hideTimer = null;
+        finishHide();
+      }, 120);
+      return;
+    }
+
+    finishHide();
   };
 
   const subscriptions = [];
@@ -134,6 +154,9 @@ export function subscribeKeyboardInsets({
   }
 
   return () => {
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+    }
     subscriptions.forEach((subscription) => subscription.remove());
   };
 }

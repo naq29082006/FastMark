@@ -4,7 +4,7 @@ const DEFAULT_LOCATION = {
 };
 
 const MAP_EVENT_SOURCE = 'fastmark-map';
-export const LEAFLET_HTML_REVISION = 31;
+export const LEAFLET_HTML_REVISION = 39;
 
 function safeJson(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
@@ -34,15 +34,16 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: #eef2f0;
+        background: #f2efe9;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
       .leaflet-container {
-        background: #eef2f0;
+        background: #f2efe9;
       }
 
-      .leaflet-control-attribution {
+      .leaflet-control-attribution,
+      .leaflet-control-scale {
         display: none !important;
       }
 
@@ -217,7 +218,58 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         border: none !important;
       }
 
-      .fastmark-restaurant-icon .shop-marker,
+      .fastmark-restaurant-icon .gm-shop-marker {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 3px;
+        pointer-events: auto;
+        touch-action: manipulation;
+        max-width: 148px;
+      }
+
+      .gm-shop-dot-wrap {
+        width: 28px;
+        height: 28px;
+        flex-shrink: 0;
+      }
+
+      .gm-shop-dot {
+        width: 28px;
+        height: 28px;
+        display: block;
+        filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.2));
+      }
+
+      .gm-shop-label {
+        font-family: Roboto, system-ui, -apple-system, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.25;
+        color: #202124;
+        max-width: 112px;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        overflow: visible;
+        text-overflow: clip;
+        padding-bottom: 3px;
+        text-shadow:
+          1px 0 #fff,
+          -1px 0 #fff,
+          0 1px #fff,
+          0 -1px #fff;
+      }
+
+      .gm-shop-marker--closed .gm-shop-dot {
+        opacity: 0.55;
+        filter: grayscale(0.35) drop-shadow(0 2px 3px rgba(15, 23, 42, 0.12));
+      }
+
+      .gm-shop-marker--closed .gm-shop-label {
+        opacity: 0.65;
+      }
+
       .fastmark-restaurant-icon .shop-marker-card {
         pointer-events: auto;
         touch-action: manipulation;
@@ -294,6 +346,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
   <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
       const EVENT_SOURCE = '${MAP_EVENT_SOURCE}';
@@ -304,6 +357,11 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       let accuracyCircle = null;
       let radiusCircleLayer = null;
       let activeRadiusMeters = null;
+      let activeRadiusCenter = null;
+      let activeScanLocation = null;
+      let lastCurrentLocation = null;
+      let overlaySvgRenderer = null;
+      let geoOverlaySyncTimer = null;
       let userMovedMap = false;
       const restaurantMarkerById = {};
       let drawRestaurantsFrame = null;
@@ -312,11 +370,15 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       let routeLayer = null;
       let destinationMarker = null;
       let lastRoutePolylineKey = '';
+      let lastRouteLatLngs = [];
       let lastNavLocation = null;
       let lastNavPanAt = 0;
       let activeRouteDestination = null;
       let scanMarker = null;
       let lastMapTap = null;
+      let mapRotating = false;
+      let pendingRoutePolylinePayload = null;
+      let routeRedrawFrame = null;
 
       function hasLocation(value) {
         return (
@@ -376,27 +438,109 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       const map = L.map('map', {
         zoomControl: false,
         attributionControl: false,
+        rotate: true,
+        touchRotate: true,
+        touchGestures: true,
+        shiftKeyRotate: false,
+        bearing: 0,
+        bounceAtRotationLimits: false,
+        preferCanvas: true,
+        fadeAnimation: false,
+        zoomAnimation: true,
       }).setView(getLatLng(startLocation), 18);
+
+      overlaySvgRenderer = L.svg({ padding: 0.5 });
 
       L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '',
-      }).addTo(map);
+      /** Giống bản đồ trên nominatim.openstreetmap.org — OSM chuẩn, dễ đọc. */
+      const TILE_PROVIDERS = [
+        {
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          options: {
+            maxZoom: 19,
+            detectRetina: false,
+            updateWhenIdle: true,
+            updateWhenZooming: false,
+            keepBuffer: 2,
+            noWrap: true,
+          },
+        },
+        {
+          url: 'https://tile.openstreetmap.de/{z}/{x}/{y}.png',
+          options: {
+            maxZoom: 18,
+            detectRetina: false,
+            updateWhenIdle: true,
+            updateWhenZooming: false,
+            keepBuffer: 2,
+          },
+        },
+        {
+          url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+          options: {
+            subdomains: 'abcd',
+            maxZoom: 20,
+            detectRetina: false,
+            updateWhenIdle: true,
+            updateWhenZooming: false,
+            keepBuffer: 2,
+          },
+        },
+      ];
+
+      let baseTileLayerIndex = 0;
+      let baseTileErrorCount = 0;
+      let baseTileLayer = null;
+
+      function refreshMapLayout() {
+        if (typeof map.invalidateSize === 'function') {
+          map.invalidateSize({ animate: false });
+        }
+      }
+
+      function installBaseTileLayer() {
+        if (baseTileLayer) {
+          map.removeLayer(baseTileLayer);
+        }
+
+        const provider = TILE_PROVIDERS[baseTileLayerIndex];
+        baseTileLayer = L.tileLayer(provider.url, {
+          ...provider.options,
+          attribution: '',
+        });
+        baseTileErrorCount = 0;
+
+        baseTileLayer.on('tileerror', function () {
+          baseTileErrorCount += 1;
+          if (baseTileErrorCount >= 8 && baseTileLayerIndex < TILE_PROVIDERS.length - 1) {
+            baseTileLayerIndex += 1;
+            installBaseTileLayer();
+          }
+        });
+
+        baseTileLayer.on('load', function () {
+          refreshMapLayout();
+        });
+
+        baseTileLayer.addTo(map);
+      }
+
+      installBaseTileLayer();
 
       function createRestaurantLayerGroup() {
         if (typeof L.markerClusterGroup === 'function') {
           return L.markerClusterGroup({
             showCoverageOnHover: false,
             zoomToBoundsOnClick: true,
-            maxClusterRadius: 54,
-            disableClusteringAtZoom: 17,
+            maxClusterRadius: 42,
+            disableClusteringAtZoom: 16,
             chunkedLoading: true,
-            chunkInterval: 48,
-            chunkDelay: 24,
+            chunkInterval: 72,
+            chunkDelay: 32,
             spiderfyOnMaxZoom: true,
             removeOutsideVisibleBounds: true,
+            animate: false,
           });
         }
         return L.layerGroup();
@@ -446,7 +590,15 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       }
 
       function drawScanLocation(location) {
-        if (!hasLocation(location)) {
+        activeScanLocation =
+          location && hasLocation(location)
+            ? {
+                latitude: Number(location.latitude),
+                longitude: Number(location.longitude),
+              }
+            : null;
+
+        if (!activeScanLocation) {
           if (scanMarker) {
             map.removeLayer(scanMarker);
             scanMarker = null;
@@ -454,13 +606,78 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           return;
         }
 
-        const latLng = getLatLng(location);
+        const latLng = getLatLng(activeScanLocation);
 
         if (!scanMarker) {
           scanMarker = L.marker(latLng, { icon: scanIcon, interactive: false }).addTo(map);
         } else {
           scanMarker.setLatLng(latLng);
         }
+      }
+
+      function refreshMarkerPositions() {
+        if (lastCurrentLocation && hasLocation(lastCurrentLocation)) {
+          const latLng = getLatLng(lastCurrentLocation);
+          if (!currentMarker) {
+            currentMarker = L.marker(latLng, { icon: userIcon, interactive: false }).addTo(map);
+          } else {
+            currentMarker.setLatLng(latLng);
+          }
+        }
+
+        if (activeScanLocation && hasLocation(activeScanLocation)) {
+          const latLng = getLatLng(activeScanLocation);
+          if (!scanMarker) {
+            scanMarker = L.marker(latLng, { icon: scanIcon, interactive: false }).addTo(map);
+          } else {
+            scanMarker.setLatLng(latLng);
+          }
+        }
+      }
+
+      function applyRadiusCircleLayer() {
+        if (radiusCircleLayer) {
+          map.removeLayer(radiusCircleLayer);
+          radiusCircleLayer = null;
+        }
+
+        if (!activeRadiusCenter || !hasLocation(activeRadiusCenter) || !activeRadiusMeters) {
+          return;
+        }
+
+        const latLng = getLatLng(activeRadiusCenter);
+        radiusCircleLayer = L.circle(latLng, {
+          radius: activeRadiusMeters,
+          color: '#076F32',
+          weight: 2,
+          opacity: 0.85,
+          fillColor: '#076F32',
+          fillOpacity: 0.14,
+          dashArray: '8, 6',
+          interactive: false,
+          renderer: overlaySvgRenderer,
+        }).addTo(map);
+      }
+
+      function syncGeoOverlays() {
+        applyRadiusCircleLayer();
+        refreshMarkerPositions();
+        if (routeLayer && typeof routeLayer.redraw === 'function') {
+          routeLayer.redraw();
+        }
+      }
+
+      function scheduleGeoOverlaySync() {
+        if (mapRotating) {
+          return;
+        }
+        if (geoOverlaySyncTimer) {
+          return;
+        }
+        geoOverlaySyncTimer = setTimeout(function() {
+          geoOverlaySyncTimer = null;
+          syncGeoOverlays();
+        }, 48);
       }
 
       function hideAccuracyCircle() {
@@ -478,7 +695,14 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         map.fitBounds(bounds, { padding: [48, 48], maxZoom: 18, animate: true });
       }
 
+      function resetMapBearing() {
+        if (typeof map.setBearing === 'function' && Math.abs(Number(map.getBearing?.() ?? 0)) > 0.5) {
+          map.setBearing(0);
+        }
+      }
+
       function recenterMap(latLng) {
+        resetMapBearing();
         map.flyTo(latLng, 18, { duration: 1.2, easeLinearity: 0.22 });
       }
 
@@ -487,7 +711,11 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           return;
         }
 
-        const latLng = getLatLng(location);
+        lastCurrentLocation = {
+          latitude: Number(location.latitude),
+          longitude: Number(location.longitude),
+        };
+        const latLng = getLatLng(lastCurrentLocation);
 
         if (!currentMarker) {
           currentMarker = L.marker(latLng, { icon: userIcon, interactive: false }).addTo(map);
@@ -509,39 +737,30 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
 
       function drawRadiusCircle(center, radiusMeters) {
         activeRadiusMeters = radiusMeters || null;
+        activeRadiusCenter =
+          center && hasLocation(center)
+            ? {
+                latitude: Number(center.latitude),
+                longitude: Number(center.longitude),
+              }
+            : null;
 
-        if (radiusCircleLayer) {
-          map.removeLayer(radiusCircleLayer);
-          radiusCircleLayer = null;
-        }
-
-        if (!center || !hasLocation(center) || !radiusMeters) {
-          if (currentMarker) {
-            const latLng = currentMarker.getLatLng();
-            drawCurrentLocation(
-              { latitude: latLng.lat, longitude: latLng.lng },
-              { recenter: !userMovedMap }
-            );
+        if (!activeRadiusCenter || !activeRadiusMeters) {
+          if (radiusCircleLayer) {
+            map.removeLayer(radiusCircleLayer);
+            radiusCircleLayer = null;
+          }
+          if (lastCurrentLocation && hasLocation(lastCurrentLocation)) {
+            drawCurrentLocation(lastCurrentLocation, { recenter: !userMovedMap });
           }
           return;
         }
 
         hideAccuracyCircle();
-
-        const latLng = getLatLng(center);
-        radiusCircleLayer = L.circle(latLng, {
-          radius: radiusMeters,
-          color: '#076F32',
-          weight: 2,
-          opacity: 0.85,
-          fillColor: '#076F32',
-          fillOpacity: 0.14,
-          dashArray: '8, 6',
-          interactive: false,
-        }).addTo(map);
+        applyRadiusCircleLayer();
 
         if (!userMovedMap) {
-          fitMapToRadius(center, radiusMeters);
+          fitMapToRadius(activeRadiusCenter, activeRadiusMeters);
         }
       }
 
@@ -563,6 +782,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       }
 
       function clearRoute() {
+        pendingRoutePolylinePayload = null;
         if (routeLayer) {
           map.removeLayer(routeLayer);
           routeLayer = null;
@@ -573,6 +793,48 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         }
         activeRouteDestination = null;
         lastRoutePolylineKey = '';
+        lastRouteLatLngs = [];
+      }
+
+      function rebuildRouteLayer() {
+        if (!lastRouteLatLngs.length) {
+          return;
+        }
+        if (routeLayer) {
+          map.removeLayer(routeLayer);
+          routeLayer = null;
+        }
+        routeLayer = createRoutePolyline(lastRouteLatLngs).addTo(map);
+        scheduleRouteRedraw();
+      }
+
+      function scheduleRouteRedraw() {
+        if (!routeLayer) {
+          return;
+        }
+        if (routeRedrawFrame) {
+          return;
+        }
+        routeRedrawFrame = requestAnimationFrame(function() {
+          routeRedrawFrame = null;
+          if (routeLayer && typeof routeLayer.redraw === 'function') {
+            routeLayer.redraw();
+          }
+          if (destinationMarker && typeof destinationMarker.update === 'function') {
+            destinationMarker.update();
+          }
+        });
+      }
+
+      function createRoutePolyline(coords) {
+        return L.polyline(coords, {
+          color: '#2563eb',
+          weight: 6,
+          opacity: 0.92,
+          lineJoin: 'round',
+          lineCap: 'round',
+          interactive: false,
+        });
       }
 
       function routePolylineKey(coords) {
@@ -608,12 +870,9 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
 
         const destIcon = L.divIcon({
           className: 'fastmark-restaurant-icon',
-          html: getShopPinIcon({
-            image_url: to.image_url || to.storeAvatar || '',
-            type: to.type || 'shop',
-          }),
-          iconSize: [28, 36],
-          iconAnchor: [14, 36],
+          html: getShopPinIconOnly(true),
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
         });
 
         if (!destinationMarker) {
@@ -639,24 +898,27 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           return;
         }
 
+        if (mapRotating && !payload?.fitBounds) {
+          pendingRoutePolylinePayload = payload;
+          return;
+        }
+
         const nextKey = routePolylineKey(coords);
         if (!payload.fitBounds && nextKey === lastRoutePolylineKey && routeLayer) {
           drawDestinationMarker(destination);
+          scheduleRouteRedraw();
           return;
         }
         lastRoutePolylineKey = nextKey;
+        lastRouteLatLngs = coords.slice();
 
         drawDestinationMarker(destination);
 
         if (!routeLayer) {
-          routeLayer = L.polyline(coords, {
-            color: '#2563eb',
-            weight: 6,
-            opacity: 0.92,
-            lineJoin: 'round',
-          }).addTo(map);
+          routeLayer = createRoutePolyline(lastRouteLatLngs).addTo(map);
         } else {
-          routeLayer.setLatLngs(coords);
+          routeLayer.setLatLngs(lastRouteLatLngs);
+          scheduleRouteRedraw();
         }
 
         if (payload.fitBounds) {
@@ -725,12 +987,9 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
 
         const destIcon = L.divIcon({
           className: 'fastmark-restaurant-icon',
-          html: getShopPinIcon({
-            image_url: to.image_url || to.storeAvatar || '',
-            type: to.type || 'shop',
-          }),
-          iconSize: [28, 36],
-          iconAnchor: [14, 36],
+          html: getShopPinIconOnly(true),
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
         });
 
         destinationMarker = L.marker(getLatLng(to), {
@@ -758,12 +1017,10 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
             return [point[1], point[0]];
           });
 
-          routeLayer = L.polyline(coords, {
-            color: '#076F32',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round',
-          }).addTo(map);
+          routeLayer = createRoutePolyline(coords);
+          routeLayer.setStyle({ color: '#076F32' });
+          lastRouteLatLngs = coords.slice();
+          routeLayer.addTo(map);
 
           map.fitBounds(routeLayer.getBounds(), { padding: [100, 48], maxZoom: 17, animate: true });
 
@@ -783,8 +1040,30 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         }
       }
 
-      const SHOP_PIN_PATH =
-        'M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z';
+
+      function buildShopDotHtml(open) {
+        const innerFill = open ? '#64748b' : '#94a3b8';
+        return (
+          '<svg class="gm-shop-dot" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
+          '<circle cx="14" cy="14" r="13" fill="#ffffff" stroke="rgba(15,23,42,0.1)" stroke-width="1"/>' +
+          '<circle cx="14" cy="14" r="9" fill="' + innerFill + '"/>' +
+          '<circle cx="14" cy="14" r="3" fill="#ffffff"/>' +
+          '</svg>'
+        );
+      }
+
+      /** Marker tròn (route destination, không nhãn). */
+      function getShopPinIconOnly(open) {
+        return (
+          '<div class="gm-shop-marker">' +
+          '<div class="gm-shop-dot-wrap">' + buildShopDotHtml(open !== false) + '</div>' +
+          '</div>'
+        );
+      }
+
+      function getShopPinIcon() {
+        return getShopPinIconOnly(true);
+      }
 
       function getShopDisplayName(restaurant) {
         return String(
@@ -837,51 +1116,39 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           restaurant.isOpen !== 0;
       }
 
-      function getShopPinIcon() {
-        return (
-          '<div class="shop-marker">' +
-          '<svg viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg">' +
-          '<path fill="#076F32" stroke="#ffffff" stroke-width="2.25" d="' + SHOP_PIN_PATH + '"/>' +
-          '<circle cx="12" cy="11" r="9.2" fill="#0a8f42"/>' +
-          '<g transform="translate(12 11) scale(0.55) translate(-12 -12)">' +
-          '<path fill="#ffffff" d="M3.9 9.3 5.7 4.55A1.55 1.55 0 0 1 7.15 3.6h9.7c.6 0 1.15.35 1.4.9L20.1 9.3c.2.5-.18 1.05-.7 1.05H4.6c-.52 0-.9-.55-.7-1.05z"/>' +
-          '<path fill="#ffffff" d="M5.35 11.7h13.3V19.7c0 .66-.54 1.2-1.2 1.2h-2.95v-4.2c0-.66-.54-1.2-1.2-1.2h-2.6c-.66 0-1.2.54-1.2 1.2v4.2H6.55c-.66 0-1.2-.54-1.2-1.2v-8z"/>' +
-          '</g>' +
-          '</svg>' +
-          '</div>'
-        );
+      function estimateShopMarkerSize(displayName) {
+        const labelMaxWidth = 112;
+        const dotWidth = 28;
+        const gap = 3;
+        const totalWidth = dotWidth + gap + labelMaxWidth;
+        const charsPerLine = 14;
+        const lineCount = Math.max(1, Math.ceil(String(displayName || '').length / charsPerLine));
+        const labelHeight = 14 + (lineCount - 1) * 14;
+        const totalHeight = Math.max(dotWidth, labelHeight + 6);
+        return { totalWidth: totalWidth, totalHeight: Math.min(totalHeight, 72), lineCount: lineCount };
       }
 
       function getShopMarkerIcon(restaurant) {
         const name = escapeHtmlAttr(getShopDisplayName(restaurant));
-        const rating = escapeHtmlAttr(getShopRatingLabel(restaurant));
-        const distance = escapeHtmlAttr(getShopDistanceLabel(restaurant));
         const open = isShopOpen(restaurant);
-        const distanceHtml = distance
-          ? '<span> · </span><span class="shop-marker-distance">' + distance + '</span>'
-          : '';
+        const dotHtml = buildShopDotHtml(open);
 
         return (
-          '<div class="shop-marker-card">' +
-          '<div class="shop-marker-card-inner">' +
-          '<div class="shop-marker-meta">' +
-          '<div class="shop-marker-name">' + name + '</div>' +
-          '<div class="shop-marker-rating"><span class="shop-marker-star">★</span>' +
-          rating + distanceHtml + '</div>' +
-          '</div>' +
-          '</div>' +
-          '<div class="shop-marker-pointer' + (open ? '' : ' shop-marker-pointer-closed') +
-          '" title="' + (open ? 'Đang mở cửa' : 'Đóng cửa') + '"></div>' +
+          '<div class="gm-shop-marker' + (open ? '' : ' gm-shop-marker--closed') + '">' +
+          '<div class="gm-shop-dot-wrap">' + dotHtml + '</div>' +
+          '<div class="gm-shop-label">' + name + '</div>' +
           '</div>'
         );
       }
 
       function buildShopMarkerIconObject(restaurant) {
+        const displayName = getShopDisplayName(restaurant);
+        const size = estimateShopMarkerSize(displayName);
         return L.divIcon({
           className: 'fastmark-restaurant-icon',
           html: getShopMarkerIcon(restaurant),
-          iconSize: [118, 62],
-          iconAnchor: [59, 62],
+          iconSize: [size.totalWidth, size.totalHeight],
+          iconAnchor: [14, Math.round(size.totalHeight / 2)],
         });
       }
 
@@ -901,7 +1168,6 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           Number(restaurant.latitude).toFixed(6),
           Number(restaurant.longitude).toFixed(6),
           getShopDisplayName(restaurant),
-          getShopRatingLabel(restaurant),
           isShopOpen(restaurant) ? 'open' : 'closed',
         ].join('|');
       }
@@ -1044,6 +1310,10 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           recenterMap(latLng);
         }
 
+        if (command.type === 'invalidateSize') {
+          refreshMapLayout();
+        }
+
         if (command.type === 'showRestaurants') {
           scheduleDrawRestaurants(command.restaurants);
         }
@@ -1106,12 +1376,44 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         L.DomEvent.preventDefault(event);
       });
 
-      map.on('dragstart zoomstart', function() {
+      function markUserMovedMap() {
+        if (userMovedMap) {
+          return;
+        }
         userMovedMap = true;
         postToApp({ type: 'userMovedMap' });
+      }
+
+      map.on('dragstart zoomstart rotatestart', markUserMovedMap);
+
+      map.on('rotatestart', function() {
+        mapRotating = true;
+        if (routeLayer) {
+          map.removeLayer(routeLayer);
+          routeLayer = null;
+        }
+        if (radiusCircleLayer) {
+          map.removeLayer(radiusCircleLayer);
+          radiusCircleLayer = null;
+        }
       });
 
+      map.on('rotateend', function() {
+        mapRotating = false;
+        rebuildRouteLayer();
+        syncGeoOverlays();
+        if (pendingRoutePolylinePayload) {
+          const pending = pendingRoutePolylinePayload;
+          pendingRoutePolylinePayload = null;
+          setRoutePolyline(pending);
+        }
+      });
+
+      map.on('move zoom', scheduleGeoOverlaySync);
+      map.on('moveend zoomend', syncGeoOverlays);
+
       drawCurrentLocation(startLocation, { recenter: true });
+      refreshMapLayout();
       postToApp({ type: 'ready' });
     </script>
   </body>

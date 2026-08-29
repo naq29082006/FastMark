@@ -30,36 +30,6 @@ export const firebaseConfig = {
 
 export const nodeApiUrl =
   process.env.EXPO_PUBLIC_NODE_API_URL?.trim() || '';
-function readSupabaseEnv(...keys) {
-  for (const key of keys) {
-    const value = env[key];
-    if (value !== undefined && String(value).trim() !== '') {
-      return String(value).trim();
-    }
-  }
-
-  return '';
-}
-
-export const supabaseConfig = {
-  url: readSupabaseEnv('EXPO_PUBLIC_SUPABASE_URL', 'VITE_SUPABASE_URL'),
-  anonKey: readSupabaseEnv(
-    'EXPO_PUBLIC_SUPABASE_ANON_KEY',
-    'VITE_SUPABASE_ANON_KEY'
-  ),
-};
-
-export function getSupabaseConfig() {
-  return supabaseConfig;
-}
-
-export function getSupabaseConfigError() {
-  if (!supabaseConfig.url || !supabaseConfig.anonKey) {
-    return 'Thiếu EXPO_PUBLIC_SUPABASE_URL hoặc EXPO_PUBLIC_SUPABASE_ANON_KEY trong .env';
-  }
-
-  return '';
-}
 
 export const googleOAuthConfig = {
   webClientId:

@@ -10,6 +10,8 @@ const {
   SHOP_STATUS,
   NOTIFICATION_AUDIENCE,
   NOTIFICATION_INDEX,
+  RECORD_STATUS,
+  isRecordActive,
 } = require("../constants");
 const { createNotification } = require("./notificationService");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
@@ -52,9 +54,9 @@ async function syncShopFromSubscription(shop, subscription = null, session = nul
     (await findActiveSubscription(shop._id, now));
 
   if (active && active.endDate && new Date(active.endDate) >= now) {
-    shop.isActive = true;
+    shop.isActive = RECORD_STATUS.ACTIVE;
   } else {
-    shop.isActive = false;
+    shop.isActive = RECORD_STATUS.HIDDEN;
   }
   shop.UpdatedAt = now;
 
@@ -141,7 +143,7 @@ async function expireDueSubscriptions({ limit = 200 } = {}) {
     }
     const stillActive = await findActiveSubscription(shop._id, now);
     if (!stillActive) {
-      shop.isActive = false;
+      shop.isActive = RECORD_STATUS.HIDDEN;
       shop.UpdatedAt = now;
       await shop.save();
       await deactivateShopProducts(shop._id);
@@ -177,19 +179,20 @@ async function ensureSubscriptionFresh(shop) {
       stale.UpdatedAt = now;
       await stale.save();
       await expireShopBanners(shop._id);
-      shop.isActive = false;
+      shop.isActive = RECORD_STATUS.HIDDEN;
       shop.UpdatedAt = now;
       await shop.save();
       await deactivateShopProducts(shop._id);
-    } else if (shop.isActive) {
-      shop.isActive = false;
+    } else if (isRecordActive(shop.isActive)) {
+      shop.isActive = RECORD_STATUS.HIDDEN;
       shop.UpdatedAt = now;
       await shop.save();
     }
     return null;
   }
-  if (!shop.isActive) {
+  if (!isRecordActive(shop.isActive)) {
     await syncShopFromSubscription(shop, active);
+    await unhideShopProducts(shop._id);
   }
   return active;
 }

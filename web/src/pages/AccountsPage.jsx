@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, Lock, ShoppingCart, Store, Unlock, UserCheck, Users, UserX } from 'lucide-react';
+import { Eye, Lock, ShoppingCart, Unlock, UserCheck, Users, UserX } from 'lucide-react';
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 
 import {
   blockAccount,
@@ -19,6 +20,7 @@ import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
 import { useDebouncedSearch } from '../hooks/useDebouncedSearch';
 import { useAdminDateFilter } from '../hooks/useAdminDateFilter';
 import { formatDateActivity } from '../utils/format';
+import PreviewableImage from '../components/PreviewableImage';
 
 const SHOP_FILTER_OPTIONS = [
   { value: '', label: 'Tất cả người mua' },
@@ -378,7 +380,7 @@ export default function AccountsPage() {
       stats={[
         { label: 'Tổng người dùng', value: loading ? '…' : totalUsers, icon: Users, tone: 'green' },
         { label: 'Người mua (trang)', value: loading ? '…' : buyers, icon: ShoppingCart, tone: 'blue' },
-        { label: 'Có gian hàng', value: loading ? '…' : sellerCount, icon: Store, tone: 'amber' },
+        { label: 'Có gian hàng', value: loading ? '…' : sellerCount, icon: FastMarkShopPinIcon, tone: 'amber' },
         { label: 'Đang hoạt động', value: loading ? '…' : activeCount, icon: UserCheck, tone: 'green' },
         { label: 'Bị khóa', value: loading ? '…' : lockedCount, icon: UserX, tone: 'red' },
       ]}
@@ -439,13 +441,16 @@ export default function AccountsPage() {
                       <td className="col-stt stt-cell">{stt}</td>
                       <td className="col-account">
                         <div className="cell-with-avatar">
-                          {item.avatar ? (
-                            <img src={item.avatar} alt="" className="thumb-sm" />
-                          ) : (
-                            <div className="thumb-sm thumb-fallback">
-                              {item.userName?.charAt(0)?.toUpperCase() || 'U'}
-                            </div>
-                          )}
+                          <PreviewableImage
+                            src={item.avatar}
+                            alt={item.fullName || item.userName || ''}
+                            width={48}
+                            height={48}
+                            shape="rounded"
+                            className="thumb-sm"
+                            fallbackLetter={item.userName || 'U'}
+                            fallbackClassName="thumb-sm thumb-fallback"
+                          />
                           <div>
                             <div className="cell-title">{item.fullName || ''}</div>
                             <div className="cell-sub">@{item.userName}</div>

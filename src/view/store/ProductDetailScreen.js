@@ -17,6 +17,7 @@ import * as Location from 'expo-location';
 import { useSelector } from 'react-redux';
 
 import { formatPrice, formatPriceRange, getProductPromoPriceLabels, getPromotionalUnitPrice } from '../../core/utils/productFormat';
+import { resolveIsOutOfStock } from '../../core/utils/productAvailability';
 import {
   formatDistance,
   getDistanceFromCurrentLocation,
@@ -46,6 +47,7 @@ import AvatarBadge from '../shared/components/AvatarBadge';
 import PhoneVerifyGateFlow from '../shared/PhoneVerifyGateFlow';
 import { storeLogger as log } from '../../core/utils/logger';
 import { RESERVATION_TAB } from '../../constants/sellerOrders';
+import { toReservationFormResume } from '../../viewmodel/buyer/reservationResumeSession';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HERO_HEIGHT = 320;
@@ -76,30 +78,79 @@ export default function ProductDetailScreen({
   const [likeCount, setLikeCount] = useState(0);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [reserveModalVisible, setReserveModalVisible] = useState(false);
-  const [actionVariantId, setActionVariantId] = useState(null);
+  const pendingTopUpResume =
+    resumeReserveRequest?.fromTopUp && resumeReserveRequest?.at
+      ? resumeReserveRequest
+      : null;
+  const [reserveModalVisible, setReserveModalVisible] = useState(
+    () => Boolean(pendingTopUpResume && !onReserve)
+  );
+  const [actionVariantId, setActionVariantId] = useState(
+    () => pendingTopUpResume?.variantId || null
+  );
   const [phoneGateVisible, setPhoneGateVisible] = useState(false);
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(() =>
+    Math.max(1, Number(pendingTopUpResume?.quantity) || 1)
+  );
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [originLocation, setOriginLocation] = useState(null);
   const [showOwnerEdit, setShowOwnerEdit] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
+  const [reservationFormResume, setReservationFormResume] = useState(() =>
+    toReservationFormResume(pendingTopUpResume)
+  );
 
   const currentUserId = String(profile?.mongoUserId || profile?.id || '');
   const ownerUserId = String(store?.owner_user_id || '');
   const isProductOwner = Boolean(currentUserId && ownerUserId && currentUserId === ownerUserId);
 
   useEffect(() => {
-    if (!resumeReserveRequest?.at || !product || loading) {
+    if (!resumeReserveRequest?.at) {
       return;
     }
+
     const variantId = resumeReserveRequest.variantId || null;
     const qty = Math.max(1, Number(resumeReserveRequest.quantity) || 1);
+    const formResume = toReservationFormResume(resumeReserveRequest);
+
+    if (resumeReserveRequest.fromTopUp) {
+      if (formResume) {
+        setReservationFormResume(formResume);
+      }
+      if (variantId) {
+        setSelectedVariantId(variantId);
+        setActionVariantId(variantId);
+      }
+      setQuantity(qty);
+
+      if (onReserve) {
+        if (!product || loading) {
+          return;
+        }
+        const variantForAction = variantId
+          ? (product.variants || []).find((v) => String(v.id) === String(variantId))
+          : null;
+        onReserve(product, store, variantForAction);
+        onResumeReserveConsumed?.();
+        return;
+      }
+
+      setReserveModalVisible(true);
+      onResumeReserveConsumed?.();
+      return;
+    }
+
+    if (!product || loading) {
+      return;
+    }
     if (variantId) {
       setSelectedVariantId(variantId);
       setActionVariantId(variantId);
     }
     setQuantity(qty);
+    if (formResume) {
+      setReservationFormResume(formResume);
+    }
     if (onReserve) {
       const variantForAction = variantId
         ? (product.variants || []).find((v) => String(v.id) === String(variantId))
@@ -109,17 +160,27 @@ export default function ProductDetailScreen({
       setReserveModalVisible(true);
     }
     onResumeReserveConsumed?.();
-  }, [resumeReserveRequest?.at, product?.id, loading]);
+  }, [resumeReserveRequest?.at, resumeReserveRequest?.fromTopUp, product?.id, loading]);
 
   useEffect(() => {
     let isCurrent = true;
+    const normalizedProductId = String(productId || '').trim();
     setLoading(true);
     setSelectedVariantId(null);
     setActiveImageIndex(0);
 
-    log.info('ProductDetailScreen:load', { productId });
+    if (!normalizedProductId) {
+      setProduct(null);
+      setStore(null);
+      setLoading(false);
+      return () => {
+        isCurrent = false;
+      };
+    }
 
-    loadProductById(productId)
+    log.info('ProductDetailScreen:load', { productId: normalizedProductId });
+
+    loadProductById(normalizedProductId)
       .then(async (productData) => {
         if (!isCurrent) return;
         setProduct(productData);
@@ -129,7 +190,7 @@ export default function ProductDetailScreen({
           if (isCurrent) setStore(storeData);
         }
         log.ok('ProductDetailScreen:loaded', {
-          productId,
+          productId: normalizedProductId,
           found: Boolean(productData),
           storeId: productData?.store_id || null,
         });
@@ -274,8 +335,8 @@ export default function ProductDetailScreen({
       return [];
     }
 
-    // Chi tiết biến thể: đúng 1 ảnh từ ProductVariant.ImageUrl.
-    if (selectedVariant) {
+    // Nhiều biến thể + đã chọn: gallery 1 ảnh biến thể. Một biến thể → gallery sản phẩm.
+    if (selectedVariant && variants.length > 1) {
       const variantUrl =
         selectedVariant.imageUrl ||
         selectedVariant.images?.[0]?.imageUrl ||
@@ -285,7 +346,7 @@ export default function ProductDetailScreen({
       }
     }
 
-    // Chưa chọn biến thể: gallery ProductImage (thumbnail theo Stt).
+    // Một biến thể hoặc chưa chọn: gallery ảnh sản phẩm (Product.images).
     // Bỏ ảnh trùng để key theo URL luôn duy nhất (không cần dùng index).
     const productGallery = Array.isArray(product.thumbnails)
       ? Array.from(new Set(product.thumbnails.filter(Boolean)))
@@ -299,7 +360,7 @@ export default function ProductDetailScreen({
     }
 
     return [];
-  }, [product, selectedVariant]);
+  }, [product, selectedVariant, variants.length]);
 
   const priceLabel = useMemo(() => {
     if (!product) {
@@ -371,16 +432,56 @@ export default function ProductDetailScreen({
     setPhoneGateVisible(true);
   }
 
-  function openReserveFlow() {
+  function getReserveBlockAlert() {
     if (product?.isUnavailable || Number(product?.status) === 0) {
-      Alert.alert('Không có sẵn', 'Sản phẩm này đã bị người bán xóa hoặc ẩn.');
+      return {
+        title: 'Không có sẵn',
+        message: 'Sản phẩm này đã bị người bán xóa hoặc ẩn.',
+      };
+    }
+
+    const variantForAction = resolveActionVariant();
+    const hasVariantStock = variants.some((variant) => (Number(variant.quantity) || 0) > 0);
+
+    if (variants.length > 0) {
+      if (totalRemaining <= 0 || !hasVariantStock) {
+        return {
+          title: 'Hết hàng',
+          message: 'Sản phẩm này đã hết hàng. Vui lòng chọn sản phẩm khác.',
+        };
+      }
+      if (variantForAction && (Number(variantForAction.quantity) || 0) <= 0) {
+        return {
+          title: 'Hết hàng',
+          message: 'Phân loại này đã hết hàng. Vui lòng chọn phân loại khác.',
+        };
+      }
+      if (requiresVariantSelection && !variantForAction) {
+        return {
+          title: 'Chọn biến thể',
+          message: 'Vui lòng chọn phân loại sản phẩm trước khi giữ hàng.',
+        };
+      }
+      return null;
+    }
+
+    if (resolveIsOutOfStock(product) || maxQuantity <= 0) {
+      return {
+        title: 'Hết hàng',
+        message: 'Sản phẩm này đã hết hàng. Vui lòng chọn sản phẩm khác.',
+      };
+    }
+
+    return null;
+  }
+
+  function openReserveFlow() {
+    const blockAlert = getReserveBlockAlert();
+    if (blockAlert) {
+      Alert.alert(blockAlert.title, blockAlert.message);
       return;
     }
     const variantForAction = resolveActionVariant();
-    if (requiresVariantSelection && !variantForAction) {
-      Alert.alert('Chọn biến thể', 'Vui lòng chọn phân loại sản phẩm trước khi giữ hàng.');
-      return;
-    }
     runWithPhoneGate(() => {
       if (onReserve) {
         onReserve(product, store, variantForAction);
@@ -426,6 +527,32 @@ export default function ProductDetailScreen({
 
   function handleCallPress() {
     callStore(store?.phone);
+  }
+
+  if (reserveModalVisible) {
+    return (
+      <ReservationScreen
+        loading={loading}
+        loadError={!loading && !product ? 'Không tải được thông tin sản phẩm.' : null}
+        product={product}
+        store={store}
+        preselectedVariantId={actionVariantId}
+        initialQuantity={quantity > 0 ? quantity : 1}
+        initialFormResume={reservationFormResume}
+        onBack={() => {
+          setReserveModalVisible(false);
+          setReservationFormResume(null);
+        }}
+        onSuccess={() => {
+          setReserveModalVisible(false);
+          setReservationFormResume(null);
+          onOrderSuccess?.(RESERVATION_TAB.PENDING);
+        }}
+        onOpenTopUp={onOpenTopUp}
+        resumeSource={reservationSource}
+        resumeStoreId={reservationStoreId}
+      />
+    );
   }
 
   if (loading) {
@@ -486,7 +613,7 @@ export default function ProductDetailScreen({
 
       await submitReportOnBackend({
         idToken,
-        reportType: 4,
+        reportType: 3,
         productId: product.id,
         productName: product.name,
         shopId: store?.id || product.store_id,
@@ -505,6 +632,11 @@ export default function ProductDetailScreen({
   }
 
   const productUnavailable = Boolean(product.isUnavailable) || Number(product.status) === 0;
+  const productOutOfStock =
+    !productUnavailable &&
+    (variants.length > 0
+      ? totalRemaining <= 0
+      : resolveIsOutOfStock(product) || maxQuantity <= 0);
   const ratingValue = Number(store?.rating_avg) || 0;
   const reviewCount = Number(store?.review_count) || 0;
   const distanceLabel = formatDistance(distanceMeters);
@@ -527,25 +659,6 @@ export default function ProductDetailScreen({
     );
   }
 
-  if (reserveModalVisible) {
-    return (
-      <ReservationScreen
-        product={product}
-        store={store}
-        preselectedVariantId={actionVariantId}
-        initialQuantity={quantity > 0 ? quantity : 1}
-        onBack={() => setReserveModalVisible(false)}
-        onSuccess={() => {
-          setReserveModalVisible(false);
-          onOrderSuccess?.(RESERVATION_TAB.PENDING);
-        }}
-        onOpenTopUp={onOpenTopUp}
-        resumeSource={reservationSource}
-        resumeStoreId={reservationStoreId}
-      />
-    );
-  }
-
   return (
     <View style={styles.screen}>
       <SubScreenHeader
@@ -560,7 +673,7 @@ export default function ProductDetailScreen({
               accessibilityLabel="Báo cáo sản phẩm"
               hitSlop={8}
             >
-              <Ionicons name="ellipsis-vertical" size={18} color="#0f172a" />
+              <Ionicons name="ellipsis-horizontal" size={20} color="#0f172a" />
             </Pressable>
           )
         }
@@ -622,6 +735,10 @@ export default function ProductDetailScreen({
           {productUnavailable ? (
             <View style={styles.heroOutOfStockOverlay} pointerEvents="none">
               <OutOfStockOverlay label="Không có sẵn" />
+            </View>
+          ) : productOutOfStock ? (
+            <View style={styles.heroOutOfStockOverlay} pointerEvents="none">
+              <OutOfStockOverlay label="Hết hàng" />
             </View>
           ) : null}
         </View>
@@ -686,25 +803,35 @@ export default function ProductDetailScreen({
             </View>
           ) : null}
 
-          <Pressable
-            style={styles.descriptionRow}
-            onPress={() => setDescriptionExpanded((prev) => !prev)}
-            accessibilityRole="button"
-            accessibilityLabel="Xem mô tả sản phẩm"
-          >
-            <Ionicons name="list-outline" size={18} color="#076F32" />
-            <Text
-              style={styles.descriptionPreview}
-              numberOfLines={descriptionExpanded ? undefined : 1}
+          {String(product.categoryName || '').trim() ? (
+            <View style={styles.categoryBadgeWrap}>
+              <Text style={styles.categoryBadgeText}>
+                {String(product.categoryName).trim()}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.qtyBlock}>
+            <Text style={styles.qtyLabel}>Chi tiết sản phẩm</Text>
+            <Pressable
+              style={styles.descriptionRow}
+              onPress={() => setDescriptionExpanded((prev) => !prev)}
+              accessibilityRole="button"
+              accessibilityLabel="Xem chi tiết sản phẩm"
             >
-              {descriptionText}
-            </Text>
-            <Ionicons
-              name={descriptionExpanded ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color="#94a3b8"
-            />
-          </Pressable>
+              <Text
+                style={styles.descriptionPreview}
+                numberOfLines={descriptionExpanded ? undefined : 3}
+              >
+                {descriptionText}
+              </Text>
+              <Ionicons
+                name={descriptionExpanded ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#94a3b8"
+              />
+            </Pressable>
+          </View>
 
           {store ? (
             <Pressable
@@ -786,10 +913,23 @@ export default function ProductDetailScreen({
             <Ionicons name="call" size={22} color="#076F32" />
           </Pressable>
           <Pressable
-            style={({ pressed }) => [styles.actionBtn, styles.reserveBtn, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.actionBtn,
+              styles.reserveBtn,
+              (productUnavailable || productOutOfStock) && styles.reserveBtnDisabled,
+              pressed && !productUnavailable && !productOutOfStock && styles.pressed,
+            ]}
+            disabled={productUnavailable || productOutOfStock}
             onPress={handleReservePress}
           >
-            <Text style={styles.reserveBtnText}>Giữ hàng</Text>
+            <Text
+              style={[
+                styles.reserveBtnText,
+                (productUnavailable || productOutOfStock) && styles.reserveBtnTextDisabled,
+              ]}
+            >
+              {productUnavailable ? 'Không có sẵn' : productOutOfStock ? 'Hết hàng' : 'Giữ hàng'}
+            </Text>
           </Pressable>
           </>
         )}
@@ -1076,12 +1216,26 @@ const styles = StyleSheet.create({
   chipTextDisabled: {
     color: '#94a3b8',
   },
+  categoryBadgeWrap: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  categoryBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#076F32',
+    lineHeight: 18,
+  },
   descriptionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    paddingVertical: 4,
-    marginBottom: 12,
+    gap: 8,
   },
   descriptionPreview: {
     flex: 1,
@@ -1146,6 +1300,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
     lineHeight: 20,
+  },
+  reserveBtnDisabled: {
+    backgroundColor: '#e2e8f0',
+  },
+  reserveBtnTextDisabled: {
+    color: '#64748b',
   },
   ownerEditBtn: {
     flex: 1,

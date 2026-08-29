@@ -9,10 +9,11 @@ import {
   Lock,
   RotateCcw,
   Send,
-  Store,
   Users,
   Wallet,
 } from 'lucide-react';
+
+import FastMarkShopPinIcon from '../components/icons/FastMarkShopPinIcon';
 
 import { getFinanceOverview } from '../api/accountApi';
 import DashboardDateRange, { presetDates } from '../components/DashboardDateRange';
@@ -81,7 +82,7 @@ const BALANCE_METRICS = [
   {
     key: 'sellerWallets',
     label: 'Tổng ví người bán',
-    icon: Store,
+    icon: FastMarkShopPinIcon,
     tone: 'purple',
     value: (balances) => balances.sellerWalletTotal,
     detail: (balances) => `${formatNumber(balances.sellerWalletCount)} ví`,
@@ -249,9 +250,9 @@ const DETAIL_META = {
         render: (row) => formatCurrency(row.depositAmount),
       },
       {
-        key: 'depositPaidAt',
+        key: 'createdAt',
         label: 'Đặt cọc',
-        render: (row) => formatDate(row.depositPaidAt),
+        render: (row) => formatDate(row.createdAt),
       },
     ],
   },
@@ -403,7 +404,7 @@ function buildDetailFields(selectedKey, row) {
       { label: 'Số lượng', value: row.quantity ?? '' },
       { label: 'Đơn giá', value: row.reservedPrice != null ? formatCurrency(row.reservedPrice) : '' },
       { label: 'Tiền cọc', value: formatCurrency(row.depositAmount) },
-      { label: 'Đặt cọc lúc', value: formatDate(row.depositPaidAt) },
+      { label: 'Đặt cọc lúc', value: formatDate(row.createdAt) },
       { label: 'Giờ nhận', value: formatDate(row.pickupTime) },
     ];
   }

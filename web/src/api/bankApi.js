@@ -23,23 +23,21 @@ export async function deleteAdminBank(token, bankId) {
   });
 }
 
-export async function restoreAdminBank(token, bankId) {
-  return apiRequest(`/api/admin/banks/${bankId}/restore`, {
-    method: 'POST',
-    token,
-  });
-}
-
 export async function listAdminWithdraws(token, params = {}) {
   const query = new URLSearchParams();
   if (params.page) query.set('page', params.page);
   if (params.limit) query.set('limit', params.limit);
   if (params.status !== undefined && params.status !== '') query.set('status', params.status);
   if (params.q) query.set('q', params.q);
+  if (params.search) query.set('q', params.search);
   if (params.from) query.set('from', params.from);
   if (params.to) query.set('to', params.to);
   const suffix = query.toString() ? `?${query}` : '';
   return apiRequest(`/api/admin/withdraws${suffix}`, { token });
+}
+
+export async function getAdminWithdraw(token, withdrawId) {
+  return apiRequest(`/api/admin/withdraws/${withdrawId}`, { token });
 }
 
 export async function approveAdminWithdraw(token, withdrawId, body = {}) {

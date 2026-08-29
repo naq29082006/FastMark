@@ -20,8 +20,11 @@ const KeyboardAwareTextInput = forwardRef(function KeyboardAwareTextInput(
     if (!focused) {
       return;
     }
-    keyboardScroll?.scrollToInput?.(inputRef);
-  }, [focused, keyboardScroll?.keyboardInset, keyboardScroll]);
+    if (!keyboardScroll?.scrollToInput) {
+      return;
+    }
+    keyboardScroll.scrollToInput(inputRef);
+  }, [focused, keyboardScroll?.keyboardInset]);
 
   return (
     <TextInput

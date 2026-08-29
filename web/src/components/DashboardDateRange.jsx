@@ -137,6 +137,7 @@ export default function DashboardDateRange({
   onApply,
   label = 'Thời Gian Dữ Liệu',
   allowAll = false,
+  inline = false,
 }) {
   const rootRef = useRef(null);
   const popoverRef = useRef(null);
@@ -252,8 +253,11 @@ export default function DashboardDateRange({
         : `${formatDateDisplay(from)} → ${formatDateDisplay(to)}`;
 
   return (
-    <div className="dashboard-date-picker" ref={rootRef}>
-      <span className="dashboard-date-label">{label}</span>
+    <div
+      className={`dashboard-date-picker${inline ? ' dashboard-date-picker--inline' : ''}`}
+      ref={rootRef}
+    >
+      {label ? <span className="dashboard-date-label">{label}</span> : null}
       <button
         type="button"
         className={`dashboard-date-trigger${open ? ' open' : ''}`}

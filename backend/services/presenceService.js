@@ -1,3 +1,5 @@
+const User = require("../models/User");
+const { MF } = require("../constants/modelFields");
 const ShopProfile = require("../models/ShopProfile");
 const { mapPresenceFields } = require("../utils/activityLabel");
 
@@ -20,35 +22,31 @@ async function findShopByUser(user) {
   return ShopProfile.findOne({ userId: user._id });
 }
 
-async function setUserOnline(user) {
-  user.DangHoatDong = true;
-  user.LanHoatDongCuoi = new Date();
+async function touchUserActivity(user) {
+  user[MF.HoatDongCuoi] = new Date();
   await user.save();
+  return mapPresenceFields(user);
+}
 
-  const presence = mapPresenceFields(user);
+async function setUserOnline(user) {
+  const presence = await touchUserActivity(user);
   await emitPresenceUpdate({
     userId: user._id,
     shopId: null,
     target: "user",
     presence,
   });
-
   return presence;
 }
 
 async function setUserOffline(user) {
-  user.DangHoatDong = false;
-  user.LanHoatDongCuoi = new Date();
-  await user.save();
-
-  const presence = mapPresenceFields(user);
+  const presence = await touchUserActivity(user);
   await emitPresenceUpdate({
     userId: user._id,
     shopId: null,
     target: "user",
     presence,
   });
-
   return presence;
 }
 
@@ -60,18 +58,14 @@ async function setShopOnline(user) {
     throw error;
   }
 
-  shop.DangHoatDong = true;
-  shop.LanHoatDongCuoi = new Date();
-  await shop.save();
-
-  const presence = mapPresenceFields(shop);
+  const freshUser = await User.findById(user._id);
+  const presence = await touchUserActivity(freshUser || user);
   await emitPresenceUpdate({
     userId: user._id,
     shopId: shop._id,
     target: "shop",
     presence,
   });
-
   return presence;
 }
 
@@ -81,18 +75,14 @@ async function setShopOffline(user) {
     return null;
   }
 
-  shop.DangHoatDong = false;
-  shop.LanHoatDongCuoi = new Date();
-  await shop.save();
-
-  const presence = mapPresenceFields(shop);
+  const freshUser = await User.findById(user._id);
+  const presence = await touchUserActivity(freshUser || user);
   await emitPresenceUpdate({
     userId: user._id,
     shopId: shop._id,
     target: "shop",
     presence,
   });
-
   return presence;
 }
 

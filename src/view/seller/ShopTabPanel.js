@@ -29,7 +29,10 @@ import SellerRegistrationScreen from './SellerRegistrationScreen';
 import SellerVerificationStatusScreen from './SellerVerificationStatusScreen';
 import SellerShopSettingsScreen from './SellerShopSettingsScreen';
 import SellerShopQrScreen from './SellerShopQrScreen';
+import SellerBuyerQrScanScreen from './SellerBuyerQrScanScreen';
+import SellerPickupConfirmScreen from './SellerPickupConfirmScreen';
 import SellerReviewsManageScreen from './SellerReviewsManageScreen';
+import SellerReviewDetailScreen from './SellerReviewDetailScreen';
 import SellerOrdersScreen from './SellerOrdersScreen';
 import SellerOrderDetailScreen from './SellerOrderDetailScreen';
 import SellerProductDetailScreen from './SellerProductDetailScreen';
@@ -82,7 +85,10 @@ export default function ShopTabPanel({
   const [sellerStep, setSellerStep] = useState(null);
   const [sellerVerification, setSellerVerification] = useState(null);
   const [orderDetailTarget, setOrderDetailTarget] = useState(null);
+  const [reviewDetailTarget, setReviewDetailTarget] = useState(null);
+  const [pickupScanReservation, setPickupScanReservation] = useState(null);
   const [orderDetailNestedNav, setOrderDetailNestedNav] = useState(null);
+  const [reviewDetailNestedNav, setReviewDetailNestedNav] = useState(null);
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
   const [sellerOrdersTab, setSellerOrdersTab] = useState(RESERVATION_TAB.PENDING);
   const [phoneChangeReturn, setPhoneChangeReturn] = useState(null);
@@ -336,7 +342,8 @@ export default function ShopTabPanel({
       orders: 'orders',
       reviews: 'reviews',
       settings: 'shop-settings',
-      'pickup-qr': 'pickup-qr',
+      'scan-buyer-qr': 'scan-buyer-qr',
+      'pickup-qr': 'scan-buyer-qr',
       subscription: 'subscription',
       banner: 'banner',
       wallet: 'wallet',
@@ -429,8 +436,17 @@ export default function ShopTabPanel({
     );
   }
 
-  if (isSeller && shopLocked) {
-    return <ShopLockedScreen />;
+  const shopLockedOrderFlow = shopNav === 'orders' || shopNav === 'order-detail';
+
+  if (isSeller && shopLocked && !shopLockedOrderFlow) {
+    return (
+      <ShopLockedScreen
+        onManageOrders={() => {
+          setSellerOrdersTab(RESERVATION_TAB.DISPUTE);
+          setShopNav('orders');
+        }}
+      />
+    );
   }
 
   if (shopNav === 'post') {
@@ -467,12 +483,91 @@ export default function ShopTabPanel({
     );
   }
 
+  if (shopNav === 'scan-buyer-qr') {
+    return (
+      <SellerBuyerQrScanScreen
+        onBack={() => setShopNav('orders')}
+        onValidated={(reservation) => {
+          setPickupScanReservation(reservation);
+          setShopNav('pickup-confirm');
+        }}
+      />
+    );
+  }
+
+  if (shopNav === 'pickup-confirm' && pickupScanReservation) {
+    return (
+      <SellerPickupConfirmScreen
+        reservation={pickupScanReservation}
+        onBack={() => setShopNav('scan-buyer-qr')}
+        onCompleted={() => {
+          setPickupScanReservation(null);
+          setOrdersRefreshKey((value) => value + 1);
+          setShopNav('orders');
+        }}
+      />
+    );
+  }
+
   if (shopNav === 'pickup-qr') {
     return <SellerShopQrScreen onBack={() => setShopNav(null)} />;
   }
 
   if (shopNav === 'reviews') {
-    return <SellerReviewsManageScreen onBack={() => setShopNav(null)} />;
+    const reviewShopName =
+      shopSettings?.shopName || profile?.shopName || profile?.storeName || 'Gian hàng';
+    return (
+      <SellerReviewsManageScreen
+        onBack={() => setShopNav(null)}
+        onOpenReview={({ item, shopName }) => {
+          setReviewDetailNestedNav(null);
+          setReviewDetailTarget({
+            item,
+            shopName: shopName || reviewShopName,
+          });
+          setShopNav('review-detail');
+        }}
+      />
+    );
+  }
+
+  if (shopNav === 'review-detail' && reviewDetailTarget) {
+    if (reviewDetailNestedNav?.screen === 'buyer') {
+      return (
+        <BuyerProfileScreen
+          userId={String(reviewDetailNestedNav.userId)}
+          onBack={() => setReviewDetailNestedNav(null)}
+        />
+      );
+    }
+
+    if (reviewDetailNestedNav?.screen === 'product') {
+      return (
+        <SellerProductDetailScreen
+          productId={String(reviewDetailNestedNav.productId)}
+          onBack={() => setReviewDetailNestedNav(null)}
+          onChanged={() => {}}
+        />
+      );
+    }
+
+    return (
+      <SellerReviewDetailScreen
+        reviewId={String(reviewDetailTarget.item?.id || reviewDetailTarget.item?._id || '')}
+        initialItem={reviewDetailTarget.item || null}
+        shopName={reviewDetailTarget.shopName || ''}
+        onBack={() => {
+          setReviewDetailNestedNav(null);
+          setShopNav('reviews');
+        }}
+        onOpenBuyer={({ userId }) => {
+          setReviewDetailNestedNav({ screen: 'buyer', userId: String(userId) });
+        }}
+        onOpenProduct={({ productId }) => {
+          setReviewDetailNestedNav({ screen: 'product', productId: String(productId) });
+        }}
+      />
+    );
   }
 
   if (shopNav === 'notifications') {
@@ -494,6 +589,7 @@ export default function ShopTabPanel({
         activeTab={sellerOrdersTab}
         onActiveTabChange={setSellerOrdersTab}
         onRefreshKey={ordersRefreshKey}
+        isScreenActive={isVisible}
         onBack={() => {
           setSellerOrdersTab(RESERVATION_TAB.PENDING);
           setShopNav(null);
@@ -503,6 +599,11 @@ export default function ShopTabPanel({
           setOrderDetailTarget(target);
           setShopNav('order-detail');
         }}
+        onScanPickupQr={() => {
+          setPickupScanReservation(null);
+          setShopNav('scan-buyer-qr');
+        }}
+        onShowShopQr={() => setShopNav('pickup-qr')}
       />
     );
   }
@@ -580,6 +681,7 @@ export default function ShopTabPanel({
         onBack={() => setShopNav(null)}
         onTopUp={() => openTopUp('wallet')}
         onWithdraw={() => setShopNav('wallet-withdraw')}
+        canTopUp
         onSeeAllTransactions={() => setShopNav('wallet-transactions')}
       />
     );
@@ -591,27 +693,31 @@ export default function ShopTabPanel({
 
   if (shopNav === 'wallet-withdraw') {
     return (
-      <WithdrawScreen
-        balance={Number(profile?.walletBalance) || 0}
-        onBack={() => setShopNav('wallet')}
-        onSuccess={() => {
-          dispatch(loadUserProfile());
-        }}
-      />
+      <View style={styles.previewScreen}>
+        <WithdrawScreen
+          balance={Number(profile?.walletBalance) || 0}
+          onBack={() => setShopNav('wallet')}
+          onSuccess={() => {
+            dispatch(loadUserProfile());
+          }}
+        />
+      </View>
     );
   }
 
   if (shopNav === 'wallet-topup') {
     return (
-      <TopUpScreen
-        balance={Number(profile?.walletBalance) || 0}
-        onBack={() => setShopNav(topUpReturnNav || 'subscription')}
-        onSuccess={(result) => {
-          setTopUpResult(result || null);
-          dispatch(loadUserProfile());
-          setShopNav('wallet-topup-success');
-        }}
-      />
+      <View style={styles.previewScreen}>
+        <TopUpScreen
+          balance={Number(profile?.walletBalance) || 0}
+          onBack={() => setShopNav(topUpReturnNav || 'subscription')}
+          onSuccess={(result) => {
+            setTopUpResult(result || null);
+            dispatch(loadUserProfile());
+            setShopNav('wallet-topup-success');
+          }}
+        />
+      </View>
     );
   }
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { formatDate, formatPrice } from '../../utils/format';
+import PreviewableImage from '../../components/PreviewableImage';
 
 export default function HomeBannerPreviewPanel({ banner, activeBanners = [], loading = false }) {
   const [previewTab, setPreviewTab] = useState('app');
@@ -73,7 +74,14 @@ export default function HomeBannerPreviewPanel({ banner, activeBanners = [], loa
               ) : (
                 <div className="phone-banner-slot">
                   <div className="phone-banner-slide">
-                    <img src={current.image} alt="" className="phone-banner-image" />
+                    <PreviewableImage
+                      src={current.image}
+                      alt={shopLabel}
+                      width="100%"
+                      height={120}
+                      shape="rounded"
+                      className="phone-banner-image"
+                    />
                     <span className="phone-interest-btn">Quan tâm</span>
                   </div>
                   {carousel.length > 1 ? (

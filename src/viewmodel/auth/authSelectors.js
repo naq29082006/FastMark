@@ -34,6 +34,10 @@ export const selectNeedsEmailVerification = (state) => {
 export const selectIsAccountLocked = (state) =>
   state.auth.status === 'authenticated' && Number(state.auth.profile?.status) === 0;
 
+/** User đã có bản ghi gian hàng (dù shop có thể bị khóa). */
+export const selectHasShop = (state) =>
+  Boolean(String(state.auth.profile?.shopId || '').trim());
+
 /** Gian hàng bị khóa (ShopProfile.status = 0). */
 export const selectIsShopLocked = (state) =>
   state.auth.status === 'authenticated' && Number(state.auth.profile?.shopStatus) === 0;

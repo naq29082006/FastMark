@@ -84,7 +84,7 @@ export default function BuyerProfileScreen({
   const username = profile.userName ? `@${String(profile.userName).replace(/^@+/, '')}` : '';
   const shopName = profile.shopName || displayName;
   const headerTitle = hasFullName ? profile.fullName.trim() : displayName;
-  const followersCount = Number(profile.followersCount) || 0;
+  const soNguoiTheo = Number(profile.soNguoiTheo) || 0;
   const followingCount = Number(profile.followingCount) || 0;
 
   return (
@@ -120,7 +120,7 @@ export default function BuyerProfileScreen({
               </Text>
               <View style={styles.followDivider} />
               <Text style={styles.followText}>
-                <Text style={styles.followValue}>{formatCount(followersCount)}</Text>
+                <Text style={styles.followValue}>{formatCount(soNguoiTheo)}</Text>
                 {' '}Người theo dõi
               </Text>
             </View>

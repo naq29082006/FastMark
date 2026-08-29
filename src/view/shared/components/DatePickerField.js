@@ -18,6 +18,7 @@ import {
   BottomSheetHandle,
   BottomSheetPanel,
 } from './bottomSheetChrome';
+import { usePickerDismissGuard } from './pickerDismissGuard';
 
 export default function DatePickerField({
   label,
@@ -30,6 +31,7 @@ export default function DatePickerField({
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [draftDate, setDraftDate] = useState(() => parseDateString(value, new Date()));
+  const { guardOpen, closeWithGuard } = usePickerDismissGuard();
   const formatValue = valueFormat === 'iso' ? formatIsoDateString : formatDateString;
   const displayPlaceholder =
     valueFormat === 'iso' && placeholder === '16/07/2026' ? '2026-07-16' : placeholder;
@@ -45,13 +47,17 @@ export default function DatePickerField({
   }, [showPicker, value]);
 
   function openPicker() {
-    if (disabled) return;
-    setDraftDate(parseDateString(value, new Date()));
-    setShowPicker(true);
+    if (disabled) {
+      return;
+    }
+    guardOpen(() => {
+      setDraftDate(parseDateString(value, new Date()));
+      setShowPicker(true);
+    });
   }
 
   function closePicker() {
-    setShowPicker(false);
+    closeWithGuard(() => setShowPicker(false));
   }
 
   function confirmPicker() {
@@ -59,10 +65,18 @@ export default function DatePickerField({
     closePicker();
   }
 
-  function handlePickerChange(_event, selectedDate) {
+  function handleIosPickerChange(_event, selectedDate) {
     if (selectedDate) {
       setDraftDate(selectedDate);
     }
+  }
+
+  function handleAndroidChange(event, selectedDate) {
+    closeWithGuard(() => setShowPicker(false));
+    if (event?.type === 'dismissed' || !selectedDate) {
+      return;
+    }
+    onChange(formatValue(selectedDate));
   }
 
   if (Platform.OS === 'web') {
@@ -101,30 +115,42 @@ export default function DatePickerField({
         </View>
       </Pressable>
 
-      <Modal visible={showPicker} transparent animationType="slide" onRequestClose={closePicker}>
-        <BottomSheetDismissOverlay onClose={closePicker}>
-          <BottomSheetPanel style={styles.modalSheet}>
-            <BottomSheetHandle compact />
-            <View style={styles.modalHeader}>
-              <Pressable onPress={closePicker} hitSlop={8}>
-                <Text style={styles.modalActionText}>Hủy</Text>
-              </Pressable>
-              <Text style={styles.modalTitle}>{label || 'Chọn ngày'}</Text>
-              <Pressable onPress={confirmPicker} hitSlop={8}>
-                <Text style={[styles.modalActionText, styles.modalActionPrimary]}>Xong</Text>
-              </Pressable>
-            </View>
-            <DateTimePicker
-              value={draftDate}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
-              minimumDate={minimumDate}
-              onChange={handlePickerChange}
-              style={styles.iosPicker}
-            />
-          </BottomSheetPanel>
-        </BottomSheetDismissOverlay>
-      </Modal>
+      {Platform.OS === 'android' && showPicker ? (
+        <DateTimePicker
+          value={draftDate}
+          mode="date"
+          display="default"
+          minimumDate={minimumDate}
+          onChange={handleAndroidChange}
+        />
+      ) : null}
+
+      {Platform.OS === 'ios' ? (
+        <Modal visible={showPicker} transparent animationType="slide" onRequestClose={closePicker}>
+          <BottomSheetDismissOverlay onClose={closePicker}>
+            <BottomSheetPanel style={styles.modalSheet}>
+              <BottomSheetHandle compact />
+              <View style={styles.modalHeader}>
+                <Pressable onPress={closePicker} hitSlop={8}>
+                  <Text style={styles.modalActionText}>Hủy</Text>
+                </Pressable>
+                <Text style={styles.modalTitle}>{label || 'Chọn ngày'}</Text>
+                <Pressable onPress={confirmPicker} hitSlop={8}>
+                  <Text style={[styles.modalActionText, styles.modalActionPrimary]}>Xong</Text>
+                </Pressable>
+              </View>
+              <DateTimePicker
+                value={draftDate}
+                mode="date"
+                display="spinner"
+                minimumDate={minimumDate}
+                onChange={handleIosPickerChange}
+                style={styles.iosPicker}
+              />
+            </BottomSheetPanel>
+          </BottomSheetDismissOverlay>
+        </Modal>
+      ) : null}
     </View>
   );
 }

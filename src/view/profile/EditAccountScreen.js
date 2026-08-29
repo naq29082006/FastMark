@@ -572,6 +572,13 @@ export default function EditAccountScreen({ onBack, onChangePhone }) {
               hint="3-20 ký tự, chỉ chữ, số và dấu gạch dưới."
             />
 
+            <View style={styles.emailBlock}>
+              <Text style={styles.phoneLabel}>Email</Text>
+              <Text style={styles.emailValue} selectable>
+                {accountEmail || 'Chưa có email'}
+              </Text>
+            </View>
+
             <View style={styles.phoneBlock}>
               <Text style={styles.phoneLabel}>Số điện thoại</Text>
               <Text style={styles.phoneValue}>
@@ -873,6 +880,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
+  },
+  emailBlock: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  emailValue: {
+    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '800',
   },
   phoneLabel: {
     marginBottom: 6,

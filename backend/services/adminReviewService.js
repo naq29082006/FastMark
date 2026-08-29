@@ -3,12 +3,27 @@ const Review = require("../models/Review");
 const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
 const Product = require("../models/Product");
-const { NOTIFICATION_AUDIENCE, NOTIFICATION_INDEX } = require("../constants");
+const { NOTIFICATION_AUDIENCE, NOTIFICATION_INDEX, REVIEW_REMOVED_BY } = require("../constants");
+const {
+  isReviewSoftDeleted,
+  isReviewHidden,
+  notDeletedReviewFilter,
+  notAdminHiddenReviewFilter,
+  adminHiddenReviewFilter,
+  deletedReviewFilter,
+  visibleReviewMatch,
+  adminDeletedReviewFilter,
+  buyerDeletedReviewFilter,
+  markReviewAdminHidden,
+  markReviewAdminDeleted,
+  clearReviewRemoval,
+  toAdminReviewRemovalFields,
+} = require("../utils/reviewRemoval");
 const { refreshShopReviewStats, loadReviewImagesMap } = require("./buyerReviewService");
 const { createNotification } = require("./notificationService");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
-const { resolveShopDisplayName } = require("../utils/shopIdentity");
-const { buildSearchRegex } = require("../utils/searchText");
+const { resolveShopDisplayName, resolveShopUsername, resolveShopAvatar } = require("../utils/shopIdentity");
+const { buildSearchRegex, buildDocumentIdContainsCondition } = require("../utils/searchText");
 const {
   findUsersBySearchRegex,
   buildObjectIdSearchConditions,
@@ -27,6 +42,50 @@ function pickString(value) {
   return String(value || "").trim();
 }
 
+function resolveReviewStatusGroup(status) {
+  const raw = pickString(status).toLowerCase();
+  if (raw === "deleted" || raw === "removed") {
+    return "deleted";
+  }
+  if (raw === "visible") {
+    return "visible";
+  }
+  if (raw === "hidden") {
+    return "hidden";
+  }
+  return "";
+}
+
+function withReviewStatusGroup(baseFilter, group, removedBy = "") {
+  if (group === "deleted") {
+    const normalizedRemovedBy = pickString(removedBy).toLowerCase();
+    if (normalizedRemovedBy === REVIEW_REMOVED_BY.ADMIN) {
+      return adminDeletedReviewFilter();
+    }
+    if (normalizedRemovedBy === REVIEW_REMOVED_BY.BUYER) {
+      return buyerDeletedReviewFilter();
+    }
+    return deletedReviewFilter();
+  }
+  if (group === "visible") {
+    return visibleReviewMatch();
+  }
+  if (group === "hidden") {
+    return {
+      $and: [notDeletedReviewFilter(), adminHiddenReviewFilter()],
+    };
+  }
+  return { ...baseFilter };
+}
+
+function formatReviewOrderCode(reservationId) {
+  const id = pickString(reservationId);
+  if (!id) {
+    return "";
+  }
+  return id.slice(-6).toUpperCase();
+}
+
 function escapeRegex(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -35,16 +94,28 @@ function isStrictMongoObjectId(value) {
   return /^[a-f\d]{24}$/i.test(pickString(value));
 }
 
+function pickProductThumbnail(product) {
+  if (!product) {
+    return "";
+  }
+  if (Array.isArray(product.images) && product.images[0]) {
+    return String(product.images[0]);
+  }
+  return pickString(product.Thumbnail);
+}
+
 function toReviewerSummary(user, fallbackName = "") {
   if (!user) {
     return {
       fullName: fallbackName || "Khách hàng",
       email: "",
       userName: "",
+      avatar: "",
     };
   }
 
   return {
+    id: String(user._id),
     fullName: user.FullName || fallbackName || "Khách hàng",
     email: user.Email || "",
     userName: user.UserName || "",
@@ -52,29 +123,25 @@ function toReviewerSummary(user, fallbackName = "") {
   };
 }
 
-async function buildReviewFilter({ search, rating, status, productId, from, to }) {
-  const filter = {
-    isDeleted: { $ne: true },
-  };
+async function buildReviewFilter({ search, rating, status, removedBy, productId, from, to }) {
+  const statusGroup = resolveReviewStatusGroup(status);
+  let filter = withReviewStatusGroup({}, statusGroup, removedBy);
   const normalizedRating = pickString(rating);
-  const normalizedStatus = pickString(status);
   const keyword = pickString(search);
   const normalizedProductId = pickString(productId);
 
   if (normalizedProductId && mongoose.Types.ObjectId.isValid(normalizedProductId)) {
-    filter.productId = new mongoose.Types.ObjectId(normalizedProductId);
+    filter = {
+      $and: [filter, { productId: new mongoose.Types.ObjectId(normalizedProductId) }],
+    };
     applyCreatedAtRange(filter, { from, to });
     return filter;
   }
 
   if (normalizedRating !== "" && Number(normalizedRating) >= 1 && Number(normalizedRating) <= 5) {
-    filter.rating = Number(normalizedRating);
-  }
-
-  if (normalizedStatus === "visible") {
-    filter.isHidden = { $ne: true };
-  } else if (normalizedStatus === "hidden") {
-    filter.isHidden = true;
+    filter = {
+      $and: [filter, { rating: Number(normalizedRating) }],
+    };
   }
 
   if (!keyword) {
@@ -115,16 +182,23 @@ async function buildReviewFilter({ search, rating, status, productId, from, to }
     { label: "Đã ẩn", statuses: [1] },
   ]);
   if (matchedVisibility.includes(0)) {
-    orConditions.push({ isHidden: { $ne: true } });
+    orConditions.push(notAdminHiddenReviewFilter());
   }
   if (matchedVisibility.includes(1)) {
-    orConditions.push({ isHidden: true });
+    orConditions.push(adminHiddenReviewFilter());
   }
 
   orConditions.push(...buildObjectIdSearchConditions(keyword));
 
+  const reservationIdContains = buildDocumentIdContainsCondition(keyword, "reservationId");
+  if (reservationIdContains) {
+    orConditions.push(reservationIdContains);
+  }
+
   if (orConditions.length) {
-    appendUniqueOrConditions(filter, orConditions);
+    filter = {
+      $and: [filter, { $or: orConditions }],
+    };
   }
 
   applyCreatedAtRange(filter, { from, to });
@@ -145,7 +219,7 @@ async function enrichReviews(reviews) {
           .lean()
       : [],
     productIds.length
-      ? Product.find({ _id: { $in: productIds } }).select("ProductName").lean()
+      ? Product.find({ _id: { $in: productIds } }).select("ProductName images Thumbnail").lean()
       : [],
     loadReviewImagesMap(reviewIds),
   ]);
@@ -167,21 +241,26 @@ async function enrichReviews(reviews) {
     const product = review.productId ? productById.get(String(review.productId)) : null;
     const images = imagesByReview.get(String(review._id)) || [];
 
+    const removal = toAdminReviewRemovalFields(review);
+
     return {
       id: String(review._id),
       reviewer: toReviewerSummary(user),
       shopId: review.shopId ? String(review.shopId) : "",
       shopName: resolveShopDisplayName(shop, shopOwner),
+      shopUsername: resolveShopUsername(shop, shopOwner),
+      shopAvatar: resolveShopAvatar(shop, shopOwner),
       productId: review.productId ? String(review.productId) : "",
       productName: product?.ProductName || "—",
+      productImage: pickProductThumbnail(product),
       reservationId: review.reservationId ? String(review.reservationId) : "",
+      orderCode: formatReviewOrderCode(review.reservationId),
       rating: review.rating,
       comment: review.comment || "",
       images,
       imageUrl: images[0]?.imageUrl || "",
       createdAt: review.CreatedAt || null,
-      isHidden: Boolean(review.isHidden),
-      deletedAt: review.deletedAt || null,
+      ...removal,
     };
   });
 }
@@ -192,6 +271,7 @@ async function listReviews({
   search = "",
   rating = "",
   status = "",
+  removedBy = "",
   productId = "",
   from = "",
   to = "",
@@ -199,14 +279,36 @@ async function listReviews({
   const pageSize = Math.min(50, Math.max(1, Number(limit) || 20));
   const pageNumber = Math.max(1, Number(page) || 1);
   const skip = (pageNumber - 1) * pageSize;
-  const filter = await buildReviewFilter({ search, rating, status, productId, from, to });
+  const [filter, summaryFilter] = await Promise.all([
+    buildReviewFilter({ search, rating, status, removedBy, productId, from, to }),
+    buildReviewFilter({
+      search,
+      rating,
+      status: "",
+      removedBy: "",
+      productId,
+      from,
+      to,
+    }),
+  ]);
 
-  const [reviews, total] = await Promise.all([
+  const [reviews, total, summaryAgg] = await Promise.all([
     Review.find(filter).sort({ CreatedAt: -1 }).skip(skip).limit(pageSize).lean(),
     Review.countDocuments(filter),
+    Review.aggregate([
+      { $match: summaryFilter },
+      {
+        $facet: {
+          total: [{ $count: "count" }],
+          visible: [{ $match: visibleReviewMatch() }, { $count: "count" }],
+          deleted: [{ $match: deletedReviewFilter() }, { $count: "count" }],
+        },
+      },
+    ]),
   ]);
 
   const items = await enrichReviews(reviews);
+  const summaryBucket = summaryAgg[0] || {};
 
   return {
     items,
@@ -215,6 +317,11 @@ async function listReviews({
       limit: pageSize,
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    },
+    stats: {
+      total: Number(summaryBucket.total?.[0]?.count) || 0,
+      visible: Number(summaryBucket.visible?.[0]?.count) || 0,
+      deleted: Number(summaryBucket.deleted?.[0]?.count) || 0,
     },
     meta: {
       dataSource: "mongodb",
@@ -285,25 +392,26 @@ function assertModerationReason(reason) {
 
 async function setReviewVisibility(publicId, isHidden, { reason } = {}) {
   const review = await findReviewByPublicId(publicId);
-  if (review.isDeleted) {
+  if (isReviewSoftDeleted(review)) {
     throw createServiceError("Đánh giá đã bị xóa mềm.", 400);
   }
 
-  const wasHidden = Boolean(review.isHidden);
-  let moderationReason = "";
+  const wasHidden = isReviewHidden(review);
+  let lyDoGo = "";
 
   if (Boolean(isHidden) && !wasHidden) {
-    moderationReason = assertModerationReason(reason);
-    review.moderationReason = moderationReason;
+    lyDoGo = assertModerationReason(reason);
+    markReviewAdminHidden(review, lyDoGo);
+  } else if (!Boolean(isHidden) && wasHidden) {
+    clearReviewRemoval(review);
   }
 
-  review.isHidden = Boolean(isHidden);
   review.UpdatedAt = new Date();
   await review.save();
   const shop = await refreshShopReviewStats(review.shopId);
 
   if (Boolean(isHidden) && !wasHidden) {
-    await notifyReviewerReviewModerated(review, "hidden", moderationReason);
+    await notifyReviewerReviewModerated(review, "hidden", lyDoGo);
   }
 
   const [item] = await enrichReviews([review.toObject()]);
@@ -311,8 +419,8 @@ async function setReviewVisibility(publicId, isHidden, { reason } = {}) {
     reviewId: String(review._id),
     shopId: review.shopId ? String(review.shopId) : "",
     action: Boolean(isHidden) ? "hidden" : "visible",
-    totalReviews: Number(shop?.totalReviews || 0),
-    averageRating: Number(shop?.averageRating || 0),
+    tongDG: Number(shop?.tongDG || 0),
+    diemTB: Number(shop?.diemTB || 0),
   };
   emitAdminUpdated("review", payload);
   if (shop?.userId) {
@@ -326,27 +434,24 @@ async function setReviewVisibility(publicId, isHidden, { reason } = {}) {
 
 async function softDeleteReview(publicId, { reason } = {}) {
   const review = await findReviewByPublicId(publicId);
-  if (review.isDeleted) {
+  if (isReviewSoftDeleted(review)) {
     throw createServiceError("Đánh giá đã bị xóa mềm.", 400);
   }
 
-  const moderationReason = assertModerationReason(reason);
+  const lyDoGo = assertModerationReason(reason);
   const now = new Date();
-  review.isDeleted = true;
-  review.isHidden = true;
-  review.deletedAt = now;
-  review.moderationReason = moderationReason;
+  markReviewAdminDeleted(review, lyDoGo, now);
   review.UpdatedAt = now;
   await review.save();
   const shop = await refreshShopReviewStats(review.shopId);
-  await notifyReviewerReviewModerated(review, "deleted", moderationReason);
+  await notifyReviewerReviewModerated(review, "deleted", lyDoGo);
 
   const payload = {
     reviewId: String(review._id),
     shopId: review.shopId ? String(review.shopId) : "",
     action: "deleted",
-    totalReviews: Number(shop?.totalReviews || 0),
-    averageRating: Number(shop?.averageRating || 0),
+    tongDG: Number(shop?.tongDG || 0),
+    diemTB: Number(shop?.diemTB || 0),
   };
   emitAdminUpdated("review", payload);
   if (shop?.userId) {
@@ -356,11 +461,27 @@ async function softDeleteReview(publicId, { reason } = {}) {
     emitUserResourceUpdated(review.userId, "review", payload);
   }
 
-  return { id: String(review._id), deletedAt: now };
+  return { id: String(review._id), removedAt: now };
+}
+
+async function getReviewDetail(publicId) {
+  const review = await findReviewByPublicId(publicId);
+  const [item] = await enrichReviews([review.toObject()]);
+  if (!item) {
+    throw createServiceError("Không tìm thấy đánh giá.", 404);
+  }
+  return {
+    ...item,
+    meta: {
+      dataSource: "mongodb",
+      collection: "reviews",
+    },
+  };
 }
 
 module.exports = {
   listReviews,
+  getReviewDetail,
   setReviewVisibility,
   softDeleteReview,
   findReviewByPublicId,

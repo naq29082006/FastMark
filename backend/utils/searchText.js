@@ -1,47 +1,18 @@
-const { removeVietnameseDiacritics } = require("./sanitizeFileName");
-
-const LETTER_CLASSES = {
-  a: "aàáạảãâầấậẩẫăằắặẳẵ",
-  e: "eèéẹẻẽêềếệểễ",
-  i: "iìíịỉĩ",
-  o: "oòóọỏõôồốộổỗơờớợởỡ",
-  u: "uùúụủũưừứựửữ",
-  y: "yỳýỵỷỹ",
-  d: "dđ",
-};
-
-const MIN_SEARCH_LENGTH = 2;
-
-function escapeRegex(value) {
-  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function normalizeSearchText(value) {
-  return removeVietnameseDiacritics(String(value || "")).trim().toLowerCase();
-}
-
-function normalizeSearchKeyword(value) {
-  return normalizeSearchText(value).replace(/^@+/, "").replace(/^#+/, "");
-}
-
-function buildSearchRegex(keyword) {
-  const normalized = normalizeSearchKeyword(keyword);
-  if (!normalized || normalized.length < MIN_SEARCH_LENGTH) {
-    return null;
-  }
-
-  let pattern = "";
-  for (const char of normalized) {
-    const variants = LETTER_CLASSES[char];
-    if (variants) {
-      pattern += `[${variants}${variants.toUpperCase()}]`;
-    } else {
-      pattern += escapeRegex(char);
-    }
-  }
-
-  return new RegExp(pattern, "i");
-}
+const {
+  MIN_SEARCH_LENGTH,
+  removeVietnameseTones,
+  normalizeSearchText,
+  normalizeSearchKeyword,
+  tokenizeSearchQuery,
+  matchesTokenSearch,
+  matchesTokenSearchAny,
+  rankSearchMatch,
+  rankSearchMatchAny,
+  buildSearchRegex,
+  buildMongoTokenFieldFilter,
+  filterAndRankItems,
+  escapeRegex,
+} = require("./searchService");
 
 function buildDocumentIdContainsCondition(keyword, fieldName = "_id") {
   const normalized = normalizeSearchKeyword(keyword).replace(/^id:\s*/, "");
@@ -97,7 +68,7 @@ function resolveStatusesFromLabelSearch(keyword, entries = []) {
     if (!labelNorm) {
       continue;
     }
-    if (labelNorm.includes(normalized) || normalized.includes(labelNorm)) {
+    if (matchesTokenSearch(labelNorm, normalized)) {
       const statuses = Array.isArray(entry.statuses)
         ? entry.statuses
         : entry.status !== undefined
@@ -128,9 +99,17 @@ function appendUniqueOrConditions(target, conditions = []) {
 
 module.exports = {
   MIN_SEARCH_LENGTH,
+  removeVietnameseTones,
   normalizeSearchText,
   normalizeSearchKeyword,
+  tokenizeSearchQuery,
+  matchesTokenSearch,
+  matchesTokenSearchAny,
+  rankSearchMatch,
+  rankSearchMatchAny,
   buildSearchRegex,
+  buildMongoTokenFieldFilter,
+  filterAndRankItems,
   buildDocumentIdContainsCondition,
   buildNumberFieldContainsCondition,
   buildStatusLabelEntries,

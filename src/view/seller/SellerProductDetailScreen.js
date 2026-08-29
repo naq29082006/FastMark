@@ -522,7 +522,7 @@ export default function SellerProductDetailScreen({ productId, onBack, onChanged
               discountPercent={promotion.discountPercent}
               startDate={promotion.startDate}
               endDate={promotion.endDate}
-              onChange={setPromotion}
+              onChange={(partial) => setPromotion((prev) => ({ ...prev, ...partial }))}
               disabled={isSaving}
             />
 

@@ -1,9 +1,13 @@
-const mongoose = require("mongoose");
+const {
+  reservationCompletedWindowMatch,
+  getPickupConfirmedAt,
+  getReservationUpdatedAt,
+} = require("../utils/reservationCompat");
 const User = require("../models/User");
 const ShopProfile = require("../models/ShopProfile");
 const Product = require("../models/Product");
-const ProductImage = require("../models/ProductImage");
 const Reservation = require("../models/Reservation");
+const ReservationDispute = require("../models/ReservationDispute");
 const FavoriteProduct = require("../models/FavoriteProduct");
 const Follow = require("../models/Follow");
 const SystemWallet = require("../models/SystemWallet");
@@ -11,6 +15,7 @@ const SellerSubscription = require("../models/SellerSubscription");
 const SellerBannerPlan = require("../models/SellerBannerPlan");
 const SellerVerification = require("../models/SellerVerification");
 const Report = require("../models/Report");
+const Review = require("../models/Review");
 const WithdrawRequest = require("../models/WithdrawRequest");
 const WalletTransaction = require("../models/WalletTransaction");
 const { USER_ROLE } = require("../constants");
@@ -27,8 +32,22 @@ const {
   WITHDRAW_STATUS,
   WALLET_TX_TYPE,
   WALLET_TX_STATUS,
+  DISPUTE_STATUS,
 } = require("../constants");
 const { computeTotal } = require("./reservationService");
+const { mongoExcludeOrderLinkedReportsCondition } = require("../utils/reportType");
+const { notRemovedProductMatch } = require("../utils/productRemoval");
+const { notDeletedReviewFilter } = require("../utils/reviewRemoval");
+
+function pendingContentReportFilter() {
+  return {
+    $and: [
+      { status: REPORT_STATUS.PENDING },
+      { reportType: { $in: CONTENT_REPORT_TYPES } },
+      mongoExcludeOrderLinkedReportsCondition(),
+    ],
+  };
+}
 const {
   resolveShopDisplayName,
   resolveShopAvatar,
@@ -72,6 +91,8 @@ function resolveDateRange(query = {}) {
   const range = String(query.range || query.period || "today").toLowerCase();
   let from = null;
   let to = endOfDay(now);
+  const isAllTime =
+    range === "all" || range === "alltime" || range === "all-time";
 
   if (query.from || query.startDate) {
     from = startOfDay(new Date(query.from || query.startDate));
@@ -81,7 +102,9 @@ function resolveDateRange(query = {}) {
   }
 
   if (!from) {
-    if (range === "day" || range === "today") {
+    if (isAllTime) {
+      from = startOfDay(new Date(2020, 0, 1));
+    } else if (range === "day" || range === "today") {
       from = startOfDay(now);
     } else if (range === "week" || range === "7days") {
       from = startOfDay(addDays(now, -6));
@@ -107,14 +130,15 @@ function resolveDateRange(query = {}) {
   }
 
   const maxSpanMs = 366 * 24 * 60 * 60 * 1000;
-  if (to - from > maxSpanMs) {
+  if (!isAllTime && to - from > maxSpanMs) {
     throw createServiceError("Khoảng thời gian tối đa là 366 ngày.", 400);
   }
 
   return {
-    range: query.from || query.to ? "custom" : range === "custom" ? "custom" : range,
+    range: isAllTime ? "all" : query.from || query.to ? "custom" : range === "custom" ? "custom" : range,
     from,
     to,
+    allTime: isAllTime,
   };
 }
 
@@ -406,24 +430,236 @@ function mapPlanBreakdownRows(rows) {
   }));
 }
 
-const CANCELLED_RESERVATION_STATUSES = [
-  RESERVATION_STATUS.REJECTED,
-  RESERVATION_STATUS.REFUNDED,
-  RESERVATION_STATUS.DISPUTE_RESOLVED,
+const CANCELLED_RESERVATION_STATUSES = [RESERVATION_STATUS.CANCELLED];
+
+const COMPLETED_RESERVATION_STATUSES = [RESERVATION_STATUS.COMPLETED];
+
+/** Đơn đã giao / đang escrow / hoàn tất — dùng cho bảng xếp hạng doanh thu. */
+const SOLD_RESERVATION_STATUSES = [
+  RESERVATION_STATUS.PICKUP_CONFIRMED,
+  RESERVATION_STATUS.DISPUTED,
+  RESERVATION_STATUS.COMPLETED,
 ];
 
-const COMPLETED_RESERVATION_STATUSES = [
-  RESERVATION_STATUS.COMPLETED,
-  RESERVATION_STATUS.AUTO_COMPLETED,
-];
+/** Giá trị đơn / cọc: mọi đơn không ở trạng thái đã hủy. */
+function orderValueStatusMatch() {
+  return { status: { $nin: CANCELLED_RESERVATION_STATUSES } };
+}
+
+/** Đơn bán trong kỳ: đã giao (2–4) và (tạo trong kỳ hoặc nhận hàng trong kỳ). */
+function rankingSalesInWindowMatch(from, to) {
+  return {
+    status: { $in: SOLD_RESERVATION_STATUSES },
+    $or: [
+      reservationCreatedInRange(from, to),
+      reservationCompletedWindowMatch(from, to),
+    ],
+  };
+}
+
+async function aggregateTopReportedShops(from, to) {
+  return Report.aggregate([
+    { $match: { CreatedAt: { $gte: from, $lte: to } } },
+    {
+      $lookup: {
+        from: "products",
+        localField: "productId",
+        foreignField: "_id",
+        as: "product",
+      },
+    },
+    {
+      $lookup: {
+        from: "reviews",
+        localField: "reviewId",
+        foreignField: "_id",
+        as: "review",
+      },
+    },
+    {
+      $addFields: {
+        resolvedShopId: {
+          $ifNull: [
+            "$shopId",
+            {
+              $ifNull: [
+                { $arrayElemAt: ["$product.ShopId", 0] },
+                { $arrayElemAt: ["$review.shopId", 0] },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $match: { resolvedShopId: { $ne: null } } },
+    { $group: { _id: "$resolvedShopId", reportCount: { $sum: 1 } } },
+    { $sort: { reportCount: -1 } },
+    { $limit: 10 },
+  ]);
+}
+
+/** Fallback khi chưa có đủ đơn hoàn tất: ước lượng từ SoldCount trên catalog. */
+async function aggregateTopSellingShopsFromCatalog(limit = 10) {
+  const revenueRows = await Product.aggregate([
+    {
+      $match: {
+        ...notRemovedProductMatch(),
+        SoldCount: { $gt: 0 },
+        ShopId: { $ne: null },
+      },
+    },
+    {
+      $group: {
+        _id: "$ShopId",
+        revenue: {
+          $sum: {
+            $multiply: [
+              { $ifNull: ["$SoldCount", 0] },
+              {
+                $ifNull: [
+                  "$MinPrice",
+                  { $ifNull: ["$MaxPrice", 0] },
+                ],
+              },
+            ],
+          },
+        },
+        orders: { $sum: { $ifNull: ["$SoldCount", 0] } },
+      },
+    },
+  ]);
+  const revenueByShopId = new Map(
+    revenueRows.map((row) => [String(row._id || ""), row])
+  );
+
+  const shops = await ShopProfile.find({ soldCount: { $gt: 0 } })
+    .sort({ soldCount: -1 })
+    .limit(limit)
+    .select("shopName shopUsername avatar userId soldCount")
+    .lean();
+
+  return shops
+    .map((shop) => {
+      const revenueRow = revenueByShopId.get(String(shop._id));
+      return {
+        _id: shop._id,
+        revenue: Number(revenueRow?.revenue) || 0,
+        orders: Number(revenueRow?.orders) || Number(shop.soldCount) || 0,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue || b.orders - a.orders)
+    .slice(0, limit);
+}
+
+async function loadTopSellingProductsFromCatalog(limit = 10) {
+  return Product.find({
+    ...notRemovedProductMatch(),
+    SoldCount: { $gt: 0 },
+  })
+    .sort({ SoldCount: -1, MinPrice: -1 })
+    .limit(limit)
+    .select("ProductName Thumbnail images ShopId SoldCount MinPrice MaxPrice")
+    .lean();
+}
+
+/** Reservation dùng createdAt; giữ $or CreatedAt cho dữ liệu legacy. */
+function reservationCreatedInRange(from, to) {
+  return {
+    $or: [
+      { createdAt: { $gte: from, $lte: to } },
+      { CreatedAt: { $gte: from, $lte: to } },
+    ],
+  };
+}
+
+function reservationUpdatedInRange(from, to) {
+  return {
+    $or: [
+      { updatedAt: { $gte: from, $lte: to } },
+      { UpdatedAt: { $gte: from, $lte: to } },
+    ],
+  };
+}
+
+function reservationCreatedInRangeMatch(from, to, extraMatch = {}) {
+  return {
+    $and: [reservationCreatedInRange(from, to), extraMatch],
+  };
+}
+
+function reservationDepositInWindowMatch(from, to) {
+  return reservationCreatedInRangeMatch(from, to, {
+    ...orderValueStatusMatch(),
+    depositAmount: { $gt: 0 },
+  });
+}
+
+function reservationDepositAllTimeMatch() {
+  return {
+    ...orderValueStatusMatch(),
+    depositAmount: { $gt: 0 },
+  };
+}
+
+function orderValueInWindowMatch(from, to) {
+  return reservationCreatedInRangeMatch(from, to, orderValueStatusMatch());
+}
+
+async function aggregateReservationDailyCount(from, to, extraMatch = {}) {
+  return Reservation.aggregate([
+    {
+      $match: reservationCreatedInRangeMatch(from, to, extraMatch),
+    },
+    {
+      $addFields: {
+        _eventAt: { $ifNull: ["$createdAt", "$CreatedAt"] },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          $dateToString: { format: "%Y-%m-%d", date: "$_eventAt" },
+        },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+}
+
+async function aggregateReservationDailyDepositSum(from, to) {
+  return aggregateReservationDailyFieldSum(from, to, {
+    ...orderValueStatusMatch(),
+    depositAmount: { $gt: 0 },
+  }, "depositAmount");
+}
+
+async function aggregateReservationDailyFieldSum(from, to, extraMatch, sumField) {
+  return Reservation.aggregate([
+    {
+      $match: reservationCreatedInRangeMatch(from, to, extraMatch),
+    },
+    {
+      $addFields: {
+        _eventAt: { $ifNull: ["$createdAt", "$CreatedAt"] },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          $dateToString: { format: "%Y-%m-%d", date: "$_eventAt" },
+        },
+        count: { $sum: `$${sumField}` },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+}
 
 function completedInWindowMatch(from, to) {
   return {
     status: { $in: COMPLETED_RESERVATION_STATUSES },
-    $or: [
-      { completedAt: { $gte: from, $lte: to } },
-      { completedAt: null, UpdatedAt: { $gte: from, $lte: to } },
-    ],
+    ...reservationCompletedWindowMatch(from, to),
   };
 }
 
@@ -431,8 +667,8 @@ function approvedWithdrawInWindowMatch(from, to) {
   return {
     status: WITHDRAW_STATUS.APPROVED,
     $or: [
-      { processedAt: { $gte: from, $lte: to } },
-      { processedAt: null, UpdatedAt: { $gte: from, $lte: to } },
+      { tgXuLy: { $gte: from, $lte: to } },
+      { tgXuLy: null, UpdatedAt: { $gte: from, $lte: to } },
     ],
   };
 }
@@ -446,6 +682,7 @@ async function collectPeriodMetrics(from, to) {
     newProducts,
     newReservations,
     completedReservationDocs,
+    orderValueReservationDocs,
     cancelledReservations,
     disputedReservations,
     sellerPlanSales,
@@ -461,30 +698,31 @@ async function collectPeriodMetrics(from, to) {
   ] = await Promise.all([
     User.countDocuments({ ...createdInWindow, Role: { $ne: USER_ROLE.ADMIN } }),
     ShopProfile.countDocuments(createdInWindow),
-    Product.countDocuments({ ...createdInWindow, IsDeleted: { $ne: true } }),
-    Reservation.countDocuments(createdInWindow),
+    Product.countDocuments({ ...createdInWindow, ...notRemovedProductMatch() }),
+    Reservation.countDocuments(reservationCreatedInRangeMatch(from, to)),
     Reservation.find(completedInWindowMatch(from, to))
+      .select("agreedPrice reservedPrice quantity")
+      .lean(),
+    Reservation.find(orderValueInWindowMatch(from, to))
       .select("agreedPrice reservedPrice quantity")
       .lean(),
     Reservation.countDocuments({
       status: { $in: CANCELLED_RESERVATION_STATUSES },
       $or: [
         { cancelledAt: { $gte: from, $lte: to } },
-        { cancelledAt: null, UpdatedAt: { $gte: from, $lte: to } },
+        {
+          cancelledAt: null,
+          ...reservationUpdatedInRange(from, to),
+        },
       ],
     }),
-    Reservation.countDocuments({ disputedAt: { $gte: from, $lte: to } }),
+    ReservationDispute.countDocuments({ createdAt: { $gte: from, $lte: to } }),
     aggregatePackageSales(SellerSubscription, from, to, {
       status: { $ne: SELLER_SUBSCRIPTION_STATUS.PENDING_PAYMENT },
     }),
     aggregatePackageSales(SellerBannerPlan, from, to),
     Reservation.aggregate([
-      {
-        $match: {
-          depositPaidAt: { $gte: from, $lte: to },
-          depositAmount: { $gt: 0 },
-        },
-      },
+      { $match: reservationDepositInWindowMatch(from, to) },
       { $group: { _id: null, amount: { $sum: "$depositAmount" }, count: { $sum: 1 } } },
     ]),
     WalletTransaction.aggregate([
@@ -505,20 +743,19 @@ async function collectPeriodMetrics(from, to) {
     Report.countDocuments(createdInWindow),
     Report.distinct("shopId", { ...createdInWindow, shopId: { $ne: null } }),
     countActiveBannersAt(to),
-    // Cọc phát sinh trong kỳ và vẫn đang treo (chưa quyết toán).
+    // Cọc đang treo (chưa quyết toán) phát sinh trong kỳ.
     Reservation.aggregate([
       {
-        $match: {
-          depositPaidAt: { $gte: from, $lte: to },
-          depositSettleTo: 0,
+        $match: reservationCreatedInRangeMatch(from, to, {
+          cocChuyenDen: 0,
           depositAmount: { $gt: 0 },
-        },
+        }),
       },
       { $group: { _id: null, amount: { $sum: "$depositAmount" }, count: { $sum: 1 } } },
     ]),
   ]);
 
-  const orderRevenue = completedReservationDocs.reduce(
+  const orderValue = orderValueReservationDocs.reduce(
     (sum, doc) => sum + computeTotal(doc),
     0
   );
@@ -547,13 +784,19 @@ async function collectPeriodMetrics(from, to) {
     newBanners,
     escrowAmount: Number(escrowRows[0]?.amount) || 0,
     escrowCount: Number(escrowRows[0]?.count) || 0,
-    orderRevenue,
+    orderValue,
+    /** @deprecated alias — dùng orderValue */
+    orderRevenue: orderValue,
     revenue: sellerPlanSales.revenue + bannerPlanSales.revenue,
+    platformRevenue:
+      (Number(depositRows[0]?.amount) || 0) +
+      sellerPlanSales.revenue +
+      bannerPlanSales.revenue,
   };
 }
 
 async function getAdminDashboard(query = {}) {
-  const { range, from, to } = resolveDateRange(query);
+  const { range, from, to, allTime } = resolveDateRange(query);
   const createdInRange = { CreatedAt: { $gte: from, $lte: to } };
   const emptySeries = buildEmptySeries(from, to);
   const now = new Date();
@@ -578,7 +821,7 @@ async function getAdminDashboard(query = {}) {
     totalAdmins,
     totalShops,
     totalActiveShops,
-    totalProducts,
+    tongSP,
     totalActiveProducts,
     totalReservations,
     reservationsByStatus,
@@ -625,15 +868,21 @@ async function getAdminDashboard(query = {}) {
     reportedShopDaily,
     bannerDaily,
     escrowDaily,
+    tongDG,
+    totalReports,
+    pendingReservationDisputes,
+    depositAllTimeRows,
+    orderValueAllTimeRows,
+    topReportedShopRows,
   ] = await Promise.all([
     User.countDocuments({ Role: { $ne: USER_ROLE.ADMIN } }),
-    User.countDocuments({ Role: { $ne: USER_ROLE.ADMIN } }),
+    User.countDocuments({ Role: USER_ROLE.BUYER }),
     ShopProfile.countDocuments({}),
     User.countDocuments({ Role: USER_ROLE.ADMIN }),
     ShopProfile.countDocuments({}),
     ShopProfile.countDocuments({ status: SHOP_STATUS.ACTIVE }),
-    Product.countDocuments({ IsDeleted: { $ne: true } }),
-    Product.countDocuments({ IsDeleted: { $ne: true }, Status: PRODUCT_STATUS.ACTIVE }),
+    Product.countDocuments(notRemovedProductMatch()),
+    Product.countDocuments({ ...notRemovedProductMatch(), Status: PRODUCT_STATUS.ACTIVE }),
     Reservation.countDocuments({}),
     Reservation.aggregate([
       { $group: { _id: "$status", count: { $sum: 1 } } },
@@ -646,17 +895,11 @@ async function getAdminDashboard(query = {}) {
     aggregateDailyCount(ShopProfile, createdInRange),
     aggregateDailyCount(Product, {
       ...createdInRange,
-      IsDeleted: { $ne: true },
+      ...notRemovedProductMatch(),
     }),
-    aggregateDailyCount(Reservation, createdInRange),
-    Reservation.find({
-      status: RESERVATION_STATUS.COMPLETED,
-      $or: [
-        { completedAt: { $gte: from, $lte: to } },
-        { completedAt: null, UpdatedAt: { $gte: from, $lte: to } },
-      ],
-    })
-      .select("shopId productId agreedPrice reservedPrice quantity completedAt UpdatedAt")
+    aggregateReservationDailyCount(from, to),
+    Reservation.find(rankingSalesInWindowMatch(from, to))
+      .select("shopId productId agreedPrice reservedPrice quantity tgNhanHang updatedAt createdAt CreatedAt")
       .lean(),
     FavoriteProduct.aggregate([
       { $group: { _id: "$productId", likeCount: { $sum: 1 } } },
@@ -694,20 +937,19 @@ async function getAdminDashboard(query = {}) {
       },
     ]),
     ShopProfile.find({ status: SHOP_STATUS.ACTIVE })
-      .sort({ averageRating: -1, followersCount: -1, soldCount: -1, totalProducts: -1 })
+      .sort({ diemTB: -1, soNguoiTheo: -1, soldCount: -1, tongSP: -1 })
       .limit(10)
       .select(
-        "shopName shopUsername avatar averageRating followersCount totalProducts soldCount totalReviews DiaChiHeThong address isOpen userId"
+        "shopName shopUsername avatar diemTB soNguoiTheo tongSP soldCount tongDG DiaChiHeThong address isOpen userId"
       )
       .lean(),
     aggregateDailyCount(Follow, createdInRange),
     aggregateDailyCount(FavoriteProduct, createdInRange),
-    SystemWallet.findOne({ key: "system" }).lean(),
+    SystemWallet.findOne().sort({ _id: 1 }).lean(),
     Reservation.aggregate([
       {
         $match: {
-          depositPaidAt: { $ne: null },
-          depositSettleTo: 0,
+          cocChuyenDen: 0,
           depositAmount: { $gt: 0 },
         },
       },
@@ -749,14 +991,9 @@ async function getAdminDashboard(query = {}) {
     SellerVerification.countDocuments({
       status: SELLER_VERIFICATION_STATUS.PENDING,
     }),
-    Report.countDocuments({
-      status: REPORT_STATUS.PENDING,
-      reportType: { $in: CONTENT_REPORT_TYPES },
-    }),
+    Report.countDocuments(pendingContentReportFilter()),
     Report.distinct("shopId", {
-      status: REPORT_STATUS.PENDING,
-      shopId: { $ne: null },
-      reportType: { $in: CONTENT_REPORT_TYPES },
+      $and: [...pendingContentReportFilter().$and, { shopId: { $ne: null } }],
     }),
     SellerBannerPlan.countDocuments({
       status: SELLER_BANNER_STATUS.PENDING_REVIEW,
@@ -773,13 +1010,13 @@ async function getAdminDashboard(query = {}) {
     ),
     aggregateDailyPackageRevenue(SellerBannerPlan, from, to),
     Reservation.find(completedInWindowMatch(from, to))
-      .select("agreedPrice reservedPrice quantity completedAt UpdatedAt")
+      .select("agreedPrice reservedPrice quantity tgNhanHang updatedAt")
       .lean(),
     aggregateDailyCountWithFallback(
       Reservation,
       completedInWindowMatch(from, to),
-      "completedAt",
-      "UpdatedAt"
+      "tgNhanHang",
+      "updatedAt"
     ),
     aggregateDailyCountWithFallback(
       Reservation,
@@ -787,23 +1024,21 @@ async function getAdminDashboard(query = {}) {
         status: { $in: CANCELLED_RESERVATION_STATUSES },
         $or: [
           { cancelledAt: { $gte: from, $lte: to } },
-          { cancelledAt: null, UpdatedAt: { $gte: from, $lte: to } },
+          {
+            cancelledAt: null,
+            ...reservationUpdatedInRange(from, to),
+          },
         ],
       },
       "cancelledAt",
-      "UpdatedAt"
+      "updatedAt"
     ),
     aggregateDailyCount(
-      Reservation,
-      { disputedAt: { $gte: from, $lte: to } },
-      "disputedAt"
+      ReservationDispute,
+      { createdAt: { $gte: from, $lte: to } },
+      "createdAt"
     ),
-    aggregateDailySum(
-      Reservation,
-      { depositPaidAt: { $gte: from, $lte: to }, depositAmount: { $gt: 0 } },
-      "depositPaidAt",
-      "depositAmount"
-    ),
+    aggregateReservationDailyDepositSum(from, to),
     aggregateDailySum(
       WalletTransaction,
       {
@@ -817,7 +1052,7 @@ async function getAdminDashboard(query = {}) {
     aggregateDailySumWithFallback(
       WithdrawRequest,
       approvedWithdrawInWindowMatch(from, to),
-      "processedAt",
+      "tgXuLy",
       "UpdatedAt",
       "amount"
     ),
@@ -838,16 +1073,34 @@ async function getAdminDashboard(query = {}) {
       { $sort: { _id: 1 } },
     ]),
     aggregateDailyActiveBannerCount(from, to),
-    aggregateDailySum(
-      Reservation,
+    aggregateReservationDailyFieldSum(from, to, {
+      cocChuyenDen: 0,
+      depositAmount: { $gt: 0 },
+    }, "depositAmount"),
+    Review.countDocuments(notDeletedReviewFilter()),
+    Report.countDocuments({}),
+    ReservationDispute.countDocuments({ status: DISPUTE_STATUS.PENDING }),
+    Reservation.aggregate([
+      { $match: reservationDepositAllTimeMatch() },
+      { $group: { _id: null, amount: { $sum: "$depositAmount" } } },
+    ]),
+    Reservation.aggregate([
+      { $match: orderValueStatusMatch() },
       {
-        depositPaidAt: { $gte: from, $lte: to },
-        depositSettleTo: 0,
-        depositAmount: { $gt: 0 },
+        $group: {
+          _id: null,
+          amount: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ["$agreedPrice", { $ifNull: ["$reservedPrice", 0] }] },
+                { $ifNull: ["$quantity", 0] },
+              ],
+            },
+          },
+        },
       },
-      "depositPaidAt",
-      "depositAmount"
-    ),
+    ]),
+    aggregateTopReportedShops(from, to),
   ]);
 
   const topShopOwnerIds = [
@@ -889,7 +1142,7 @@ async function getAdminDashboard(query = {}) {
   const revenueOwnerById = new Map(revenueOwners.map((user) => [String(user._id), user]));
 
   // Danh sách đầy đủ (frontend hiển thị top 10, nút "Xem tất cả" mở toàn bộ).
-  const topSellingShops = [...revenueByShopMap.values()]
+  let topSellingShops = [...revenueByShopMap.values()]
     .map((row) => {
       const shop = revenueShopById.get(row.shopId);
       const owner = shop ? revenueOwnerById.get(String(shop.userId || "")) : null;
@@ -903,6 +1156,44 @@ async function getAdminDashboard(query = {}) {
       };
     })
     .sort((a, b) => b.revenue - a.revenue);
+
+  if (!topSellingShops.length || allTime) {
+    const catalogShopRows = await aggregateTopSellingShopsFromCatalog(10);
+    const catalogShopIds = catalogShopRows.map((row) => String(row._id || "")).filter(Boolean);
+    const catalogShops = catalogShopIds.length
+      ? await ShopProfile.find({ _id: { $in: catalogShopIds } })
+          .select("shopName shopUsername avatar userId")
+          .lean()
+      : [];
+    const catalogOwnerIds = [
+      ...new Set(catalogShops.map((shop) => String(shop.userId || "")).filter(Boolean)),
+    ];
+    const catalogOwners = catalogOwnerIds.length
+      ? await User.find({ _id: { $in: catalogOwnerIds } }).select("Avatar FullName").lean()
+      : [];
+    const catalogShopById = new Map(catalogShops.map((shop) => [String(shop._id), shop]));
+    const catalogOwnerById = new Map(catalogOwners.map((user) => [String(user._id), user]));
+    topSellingShops = catalogShopRows.map((row) => {
+      const shopId = String(row._id || "");
+      const shop = catalogShopById.get(shopId);
+      const owner = shop ? catalogOwnerById.get(String(shop.userId || "")) : null;
+      return {
+        shopId,
+        shopName: resolveShopDisplayName(shop, owner),
+        shopUsername: resolveShopUsername(shop, owner),
+        avatar: resolveShopAvatar(shop, owner),
+        revenue: Number(row.revenue) || 0,
+        orders: Number(row.orders) || 0,
+      };
+    });
+    for (const shop of catalogShops) {
+      revenueShopById.set(String(shop._id), shop);
+    }
+    for (const owner of catalogOwners) {
+      revenueOwnerById.set(String(owner._id), owner);
+    }
+  }
+
   const revenueByShop = topSellingShops.slice(0, 10);
 
   // Sản phẩm bán chạy trong kỳ (theo số lượng bán từ đơn hoàn thành).
@@ -928,32 +1219,23 @@ async function getAdminDashboard(query = {}) {
     (a, b) => b.soldQuantity - a.soldQuantity || b.revenue - a.revenue
   );
   const topProductIds = topProductRows.map((row) => row.productId);
-  const [topProductDocs, topProductCovers] = topProductIds.length
+  const [topProductDocs] = topProductIds.length
     ? await Promise.all([
         Product.find({ _id: { $in: topProductIds } })
-          .select("ProductName Thumbnail")
+          .select("ProductName Thumbnail images")
           .lean(),
-        // Ảnh đại diện lấy từ ProductImage (Stt nhỏ nhất = cover).
-        ProductImage.aggregate([
-          {
-            $match: {
-              ProductId: {
-                $in: topProductIds.map((id) => new mongoose.Types.ObjectId(id)),
-              },
-            },
-          },
-          { $sort: { Stt: 1, UploadedAt: 1 } },
-          { $group: { _id: "$ProductId", url: { $first: "$ImageUrl" } } },
-        ]),
       ])
-    : [[], []];
+    : [[]];
   const topProductById = new Map(
     topProductDocs.map((product) => [String(product._id), product])
   );
   const coverByProductId = new Map(
-    topProductCovers.map((row) => [String(row._id), row.url || ""])
+    topProductDocs.map((product) => [
+      String(product._id),
+      (Array.isArray(product.images) && product.images[0]) || product.Thumbnail || "",
+    ])
   );
-  const topSellingProducts = topProductRows.map((row) => {
+  let topSellingProducts = topProductRows.map((row) => {
     const product = topProductById.get(row.productId);
     const shop = revenueShopById.get(row.shopId);
     const owner = shop ? revenueOwnerById.get(String(shop.userId || "")) : null;
@@ -968,18 +1250,96 @@ async function getAdminDashboard(query = {}) {
     };
   });
 
+  if (!topSellingProducts.length || allTime) {
+    const catalogProducts = await loadTopSellingProductsFromCatalog(10);
+    const catalogProductShopIds = [
+      ...new Set(catalogProducts.map((product) => String(product.ShopId || "")).filter(Boolean)),
+    ];
+    const catalogProductShops = catalogProductShopIds.length
+      ? await ShopProfile.find({ _id: { $in: catalogProductShopIds } })
+          .select("shopName shopUsername avatar userId")
+          .lean()
+      : [];
+    const catalogProductOwnerIds = [
+      ...new Set(
+        catalogProductShops.map((shop) => String(shop.userId || "")).filter(Boolean)
+      ),
+    ];
+    const catalogProductOwners = catalogProductOwnerIds.length
+      ? await User.find({ _id: { $in: catalogProductOwnerIds } }).select("Avatar FullName").lean()
+      : [];
+    const catalogProductShopById = new Map(
+      catalogProductShops.map((shop) => [String(shop._id), shop])
+    );
+    const catalogProductOwnerById = new Map(
+      catalogProductOwners.map((user) => [String(user._id), user])
+    );
+    topSellingProducts = catalogProducts.map((product) => {
+      const shopId = String(product.ShopId || "");
+      const shop = catalogProductShopById.get(shopId);
+      const owner = shop ? catalogProductOwnerById.get(String(shop.userId || "")) : null;
+      const unitPrice = Number(product.MinPrice ?? product.MaxPrice) || 0;
+      const soldQuantity = Number(product.SoldCount) || 0;
+      return {
+        productId: String(product._id),
+        name: product.ProductName || "Sản phẩm",
+        thumbnail:
+          (Array.isArray(product.images) && product.images[0]) || product.Thumbnail || "",
+        shopName: resolveShopDisplayName(shop, owner),
+        soldQuantity,
+        revenue: unitPrice * soldQuantity,
+        orders: soldQuantity,
+      };
+    });
+  }
+
+  const topReportedShopIds = (topReportedShopRows || [])
+    .map((row) => String(row._id || ""))
+    .filter(Boolean);
+  const topReportedShopDocs = topReportedShopIds.length
+    ? await ShopProfile.find({ _id: { $in: topReportedShopIds } })
+        .select("shopName shopUsername avatar userId")
+        .lean()
+    : [];
+  const topReportedOwnerIds = [
+    ...new Set(
+      topReportedShopDocs.map((shop) => String(shop.userId || "")).filter(Boolean)
+    ),
+  ];
+  const topReportedOwners = topReportedOwnerIds.length
+    ? await User.find({ _id: { $in: topReportedOwnerIds } })
+        .select("Avatar FullName")
+        .lean()
+    : [];
+  const topReportedShopById = new Map(
+    topReportedShopDocs.map((shop) => [String(shop._id), shop])
+  );
+  const topReportedOwnerById = new Map(
+    topReportedOwners.map((user) => [String(user._id), user])
+  );
+  const topReportedShops = (topReportedShopRows || []).map((row) => {
+    const shopId = String(row._id || "");
+    const shop = topReportedShopById.get(shopId);
+    const owner = shop ? topReportedOwnerById.get(String(shop.userId || "")) : null;
+    return {
+      shopId,
+      shopName: resolveShopDisplayName(shop, owner),
+      shopUsername: resolveShopUsername(shop, owner),
+      avatar: resolveShopAvatar(shop, owner),
+      reportCount: Number(row.reportCount) || 0,
+    };
+  });
+
   const statusLabel = {
-    [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION]: "Chờ shop xác nhận",
-    [RESERVATION_STATUS.REJECTED]: "Đã từ chối",
-    [RESERVATION_STATUS.WAITING_PICKUP]: "Chờ nhận hàng",
-    [RESERVATION_STATUS.COMPLETED]: "Hoàn thành",
+    [RESERVATION_STATUS.PENDING]: "Chờ xác nhận",
+    [RESERVATION_STATUS.WAITING_PICKUP]: "Giữ hàng",
+    [RESERVATION_STATUS.PICKUP_CONFIRMED]: "Đã nhận hàng",
     [RESERVATION_STATUS.DISPUTED]: "Tranh chấp",
-    [RESERVATION_STATUS.AUTO_COMPLETED]: "Tự hoàn thành",
-    [RESERVATION_STATUS.REFUNDED]: "Đã hủy",
-    [RESERVATION_STATUS.DISPUTE_RESOLVED]: "Đã hủy",
+    [RESERVATION_STATUS.COMPLETED]: "Hoàn thành",
+    [RESERVATION_STATUS.CANCELLED]: "Đã hủy",
   };
 
-  const reservationStatusPie = [0, 1, 2, 3, 4, 5, 6, 7].map((status) => {
+  const reservationStatusPie = [0, 1, 2, 3, 4, 5].map((status) => {
     const found = reservationsByStatus.find((row) => Number(row._id) === status);
     return {
       status,
@@ -987,6 +1347,11 @@ async function getAdminDashboard(query = {}) {
       value: Number(found?.count) || 0,
     };
   });
+
+  const disputedReservationsCount =
+    Number(
+      reservationsByStatus.find((row) => Number(row._id) === RESERVATION_STATUS.DISPUTED)?.count
+    ) || 0;
 
   const rolePie = [
     { key: "buyers", label: "Người mua", value: totalBuyers },
@@ -1003,11 +1368,11 @@ async function getAdminDashboard(query = {}) {
       name: shopName,
       avatar: resolveShopAvatar(shop, owner),
       logo: resolveShopAvatar(shop, owner),
-      rating: Number(shop.averageRating) || 0,
-      followersCount: Number(shop.followersCount) || 0,
-      totalProducts: Number(shop.totalProducts) || 0,
+      rating: Number(shop.diemTB) || 0,
+      soNguoiTheo: Number(shop.soNguoiTheo) || 0,
+      tongSP: Number(shop.tongSP) || 0,
       soldCount: Number(shop.soldCount) || 0,
-      totalReviews: Number(shop.totalReviews) || 0,
+      tongDG: Number(shop.tongDG) || 0,
       address: shop.addressHeThong || shop.DiaChiHeThong || shop.address || "",
       isOpen: Number(shop.isOpen) === 1,
     };
@@ -1027,13 +1392,19 @@ async function getAdminDashboard(query = {}) {
     0
   );
   const escrowByReservations = unsettledDeposits[0] || {};
+  const depositAllTime = Number(depositAllTimeRows[0]?.amount) || 0;
+  const orderValueAllTime = Number(orderValueAllTimeRows[0]?.amount) || 0;
+  const packageRevenueAllTime =
+    sellerPlanSalesAllTime.revenue + bannerPlanSalesAllTime.revenue;
+  const platformRevenueAllTime =
+    packageRevenueAllTime + depositAllTime;
 
   // Chuỗi doanh thu theo ngày = gói seller + banner (tiền nền tảng thu).
   const sellerRevenueSeries = fillSeries(emptySeries, sellerPlanRevenueDaily);
   const bannerRevenueSeries = fillSeries(emptySeries, bannerPlanRevenueDaily);
   const orderRevenueByDay = new Map(emptySeries.map((item) => [item.date, 0]));
   for (const reservation of completedForRevenueSeries) {
-    const key = toDateKey(reservation.completedAt || reservation.UpdatedAt);
+    const key = toDateKey(getPickupConfirmedAt(reservation) || getReservationUpdatedAt(reservation));
     if (orderRevenueByDay.has(key)) {
       orderRevenueByDay.set(
         key,
@@ -1063,6 +1434,7 @@ async function getAdminDashboard(query = {}) {
       banners: pendingBanners,
       withdrawAmount: Number(pendingWithdrawRows[0]?.amount) || 0,
       withdrawCount: Number(pendingWithdrawRows[0]?.count) || 0,
+      reservationDisputes: pendingReservationDisputes,
     },
     cards: {
       totalUsers,
@@ -1070,9 +1442,12 @@ async function getAdminDashboard(query = {}) {
       totalSellers,
       totalShops,
       totalActiveShops,
-      totalProducts,
+      tongSP,
       totalActiveProducts,
       totalReservations,
+      tongDG,
+      totalReports,
+      disputedReservations: disputedReservationsCount,
       periodRevenue,
       activeUsers,
       blockedUsers,
@@ -1094,6 +1469,10 @@ async function getAdminDashboard(query = {}) {
       sellerPlanRevenueThisMonth: sellerPlanSalesThisMonth.revenue,
       bannerPlansSoldThisMonth: bannerPlanSalesThisMonth.count,
       bannerPlanRevenueThisMonth: bannerPlanSalesThisMonth.revenue,
+      platformRevenueAllTime,
+      packageRevenueAllTime,
+      depositAllTime,
+      orderValueAllTime,
     },
     charts: {
       usersOverTime: fillSeries(emptySeries, usersInRange),
@@ -1134,6 +1513,7 @@ async function getAdminDashboard(query = {}) {
       topShops: topShopsMapped,
       topSellingShops,
       topSellingProducts,
+      topReportedShops,
       sellerPlansInRange: mapPlanBreakdownRows(sellerPlanBreakdownInRange),
       bannerPlansInRange: mapPlanBreakdownRows(bannerPlanBreakdownInRange),
       sellerPlansAllTime: mapPlanBreakdownRows(sellerPlanBreakdownAllTime),
@@ -1144,6 +1524,35 @@ async function getAdminDashboard(query = {}) {
   };
 }
 
+async function getAdminPendingCounts() {
+  const { countAdminPendingDisputes } = require("../utils/adminDisputeQueue");
+
+  const [sellerVerifications, reports, withdrawRows, bannerPendingReview, disputeAdminQueue] =
+    await Promise.all([
+    SellerVerification.countDocuments({
+      status: SELLER_VERIFICATION_STATUS.PENDING,
+    }),
+    Report.countDocuments(pendingContentReportFilter()),
+    WithdrawRequest.aggregate([
+      { $match: { status: WITHDRAW_STATUS.PENDING } },
+      { $group: { _id: null, count: { $sum: 1 } } },
+    ]),
+    SellerBannerPlan.countDocuments({
+      status: SELLER_BANNER_STATUS.PENDING_REVIEW,
+    }),
+    countAdminPendingDisputes(),
+  ]);
+
+  return {
+    sellerVerifications: Number(sellerVerifications) || 0,
+    reports: Number(reports) || 0,
+    withdrawCount: Number(withdrawRows[0]?.count) || 0,
+    bannerPendingReview: Number(bannerPendingReview) || 0,
+    disputeAdminQueue: Number(disputeAdminQueue) || 0,
+  };
+}
+
 module.exports = {
   getAdminDashboard,
+  getAdminPendingCounts,
 };

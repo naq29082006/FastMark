@@ -6,12 +6,15 @@ const Product = require("../models/Product");
 const ProductVariant = require("../models/ProductVariant");
 const ProductCategory = require("../models/ProductCategory");
 const Reservation = require("../models/Reservation");
+const ReservationDispute = require("../models/ReservationDispute");
 const Report = require("../models/Report");
 const Review = require("../models/Review");
 const FavoriteProduct = require("../models/FavoriteProduct");
 const SellerSubscription = require("../models/SellerSubscription");
 const SellerVerification = require("../models/SellerVerification");
 const Wallet = require("../models/Wallet");
+const { resolveShopLatlong } = require("../utils/shopCoordinates");
+const { reservationHasEscrowDeposit } = require("../utils/reservationCompat");
 const { SHOP_STATUS, SHOP_OPEN, USER_STATUS, USER_ROLE } = require("../constants");
 const { PRODUCT_STATUS } = require("../constants");
 const {
@@ -35,10 +38,31 @@ const {
 } = require("../utils/adminSearchHelpers");
 const { applyCreatedAtRange } = require("../utils/dateRangeFilter");
 const {
+  getPickupConfirmedAt,
+  getReservationCreatedAt,
+  getReservationCancelNote,
+} = require("../utils/reservationCompat");
+const {
   resolveShopDisplayName,
   resolveShopUsername,
   resolveShopAvatar,
 } = require("../utils/shopIdentity");
+const {
+  isRemovedProduct,
+  isAdminRemovedProduct,
+  isSellerRemovedProduct,
+  notRemovedProductMatch,
+  removedProductMatch,
+  adminRemovedProductFilter,
+  sellerRemovedProductFilter,
+  removedProductConditions,
+  toAdminProductRemovalFields,
+} = require("../utils/productRemoval");
+const {
+  notDeletedReviewFilter,
+  toAdminReviewRemovalFields,
+} = require("../utils/reviewRemoval");
+const { PRODUCT_REMOVED_BY, isRecordActive } = require("../constants");
 
 const SHOP_STATUS_LABELS = {
   [SHOP_STATUS.ACTIVE]: "Hoạt động",
@@ -51,33 +75,30 @@ const SHOP_OPEN_LABELS = {
 };
 
 const RESERVATION_STATUS_LABELS = {
-  [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION]: "Chờ shop xác nhận",
+  [RESERVATION_STATUS.PENDING]: "Chờ shop xác nhận",
   [RESERVATION_STATUS.REJECTED]: "Đã từ chối",
   [RESERVATION_STATUS.WAITING_PICKUP]: "Chờ nhận hàng",
   [RESERVATION_STATUS.COMPLETED]: "Hoàn thành",
   [RESERVATION_STATUS.DISPUTED]: "Tranh chấp",
   [RESERVATION_STATUS.AUTO_COMPLETED]: "Tự hoàn thành",
-  [RESERVATION_STATUS.REFUNDED]: "Đã hoàn cọc",
+  [RESERVATION_STATUS.CANCELLED]: "Đã hoàn cọc",
 };
 
 const CANCELLED_RESERVATION_STATUSES = [
   RESERVATION_STATUS.REJECTED,
-  RESERVATION_STATUS.REFUNDED,
-  RESERVATION_STATUS.DISPUTE_RESOLVED,
+  RESERVATION_STATUS.CANCELLED,
+  RESERVATION_STATUS.CANCELLED,
 ];
 
-const DISPUTE_RESERVATION_STATUSES = [
-  RESERVATION_STATUS.DISPUTED,
-  RESERVATION_STATUS.DISPUTE_RESOLVED,
-];
+const DISPUTE_RESERVATION_STATUSES = [RESERVATION_STATUS.DISPUTED];
 
 const ADMIN_RESERVATION_STATUS_SEARCH = [
   ...buildStatusLabelEntries(RESERVATION_STATUS_LABELS),
   { label: "Hoàn thành", statuses: [RESERVATION_STATUS.COMPLETED, RESERVATION_STATUS.AUTO_COMPLETED] },
   { label: "Đã hủy", statuses: CANCELLED_RESERVATION_STATUSES },
-  { label: "Giữ hàng", statuses: [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION, RESERVATION_STATUS.WAITING_PICKUP] },
+  { label: "Giữ hàng", statuses: [RESERVATION_STATUS.PENDING, RESERVATION_STATUS.WAITING_PICKUP] },
   { label: "Tranh chấp", statuses: [RESERVATION_STATUS.DISPUTED] },
-  { label: "Chờ xác nhận", statuses: [RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION] },
+  { label: "Chờ xác nhận", statuses: [RESERVATION_STATUS.PENDING] },
 ];
 
 function createServiceError(message, statusCode = 400) {
@@ -94,39 +115,13 @@ function pickString(value) {
   return String(value || "").trim();
 }
 
-function isAdminRemovedProduct(product) {
-  return Boolean(product?.IsDeleted) && Boolean(pickString(product?.AdminRemovalReason));
-}
-
-function isSellerRemovedProduct(product) {
-  if (product?.SellerRemovedAt) {
-    return true;
-  }
-  // Data cũ: seller gỡ từng ghi IsDeleted mà không có lý do vi phạm.
-  return Boolean(product?.IsDeleted) && !pickString(product?.AdminRemovalReason);
-}
-
 /** Đã xóa = admin gỡ vi phạm hoặc seller tự gỡ. */
-function isRemovedProduct(product) {
-  return isAdminRemovedProduct(product) || isSellerRemovedProduct(product);
-}
-
-/** Điều kiện Mongo cho nhóm "đã xóa". */
-function removedProductConditions() {
-  return [{ IsDeleted: true }, { SellerRemovedAt: { $ne: null } }];
-}
-
-/** Điều kiện Mongo cho nhóm "chưa xóa". */
-function notRemovedProductMatch() {
-  return { IsDeleted: { $ne: true }, SellerRemovedAt: null };
-}
-
 function resolveAdminProductStatusLabel(product) {
   if (isAdminRemovedProduct(product)) {
     return "Đã gỡ";
   }
   if (isSellerRemovedProduct(product)) {
-    return "Seller đã gỡ";
+    return "Người bán đã gỡ";
   }
   return Number(product?.Status) === PRODUCT_STATUS.ACTIVE ? "Đang hiện" : "Đã ẩn";
 }
@@ -235,11 +230,11 @@ async function listShops(query = {}) {
       statusLabel: SHOP_STATUS_LABELS[shop.status] || "Không rõ",
       isOpen: shop.isOpen,
       isOpenLabel: SHOP_OPEN_LABELS[shop.isOpen] || "Không rõ",
-      averageRating: Number(shop.averageRating) || 0,
-      totalProducts: Number(shop.totalProducts) || 0,
-      followersCount: Number(shop.followersCount) || 0,
+      diemTB: Number(shop.diemTB) || 0,
+      tongSP: Number(shop.tongSP) || 0,
+      soNguoiTheo: Number(shop.soNguoiTheo) || 0,
       soldCount: Number(shop.soldCount) || 0,
-      subscriptionActive: Boolean(shop.isActive),
+      subscriptionActive: isRecordActive(shop.isActive),
       suspendedUntil: shop.suspendedUntil || null,
       permanentlyClosedAt: shop.permanentlyClosedAt || null,
       createdAt: shop.CreatedAt || null,
@@ -302,14 +297,14 @@ async function getShopDetail(shopId) {
   ] = await Promise.all([
     shop.userId
       ? User.findById(shop.userId)
-          .select("FullName UserName Email Phone Avatar Role Status FollowingCount FollowersCount")
+          .select("FullName UserName Email Phone Avatar Role Status SoTheoDoi")
           .lean()
       : null,
     shop.categoryId ? ShopCategory.findById(shop.categoryId).select("name").lean() : null,
     Product.find({ ShopId: objectId }).sort({ CreatedAt: -1 }).limit(50).lean(),
-    Reservation.find({ shopId: objectId }).sort({ CreatedAt: -1 }).limit(30).lean(),
+    Reservation.find({ shopId: objectId }).sort({ createdAt: -1 }).limit(30).lean(),
     Report.find({ shopId: objectId }).sort({ CreatedAt: -1 }).limit(20).lean(),
-    Review.find({ storeId: String(objectId), isDeleted: { $ne: true } })
+    Review.find({ storeId: String(objectId), ...notDeletedReviewFilter() })
       .sort({ CreatedAt: -1 })
       .limit(20)
       .lean(),
@@ -394,32 +389,38 @@ async function getShopDetail(shopId) {
     phone: owner?.Phone || shop.phone || "",
     openTime: shop.openTime || "",
     closeTime: shop.closeTime || "",
-    latitude: shop.latitude ?? null,
-    longitude: shop.longitude ?? null,
+    ...(() => {
+      const coords = resolveShopLatlong(shop);
+      return {
+        latlong: coords,
+        latitude: coords.lat,
+        longitude: coords.long,
+      };
+    })(),
     categoryId: shop.categoryId ? String(shop.categoryId) : "",
     categoryName: category?.name || "",
     status: shop.status,
     statusLabel: SHOP_STATUS_LABELS[shop.status] || "Không rõ",
     isOpen: shop.isOpen,
     isOpenLabel: SHOP_OPEN_LABELS[shop.isOpen] || "Không rõ",
-    averageRating: Number(shop.averageRating) || 0,
-    totalProducts: Number(productCount) || 0,
-    totalReviews: Number(shop.totalReviews) || 0,
+    diemTB: Number(shop.diemTB) || 0,
+    tongSP: Number(productCount) || 0,
+    tongDG: Number(shop.tongDG) || 0,
     totalTymViews: Number(productEngagement?.[0]?.totalViews) || 0,
     totalTym: Number(productEngagement?.[0]?.totalLikes) || 0,
     totalOrders: Number(totalOrders) || 0,
     totalCompletedOrders: Number(orderSummary.count) || 0,
     totalCancelledOrders: Number(cancelledOrdersCount) || 0,
     totalDisputes: Number(disputeOrdersCount) || 0,
-    followersCount: Number(shop.followersCount) || 0,
-    followingCount: Number(owner?.FollowingCount) || 0,
+    soNguoiTheo: Number(shop.soNguoiTheo) || 0,
+    followingCount: Number(owner?.SoTheoDoi) || 0,
     recentReportCount: Number(recentReportCount) || 0,
     soldCount: Number(shop.soldCount) || 0,
     completedOrders: Number(orderSummary.count) || 0,
     totalRevenue: Number(orderSummary.revenue) || 0,
     walletBalance: Number(ownerWallet?.balance) || 0,
     violationCount: Number(violationCount) || 0,
-    subscriptionActive: Boolean(shop.isActive),
+    subscriptionActive: isRecordActive(shop.isActive),
     subscriptionPlan: activeSubscription?.planName || "",
     subscriptionStartAt: activeSubscription?.startDate || null,
     subscriptionExpiresAt: activeSubscription?.endDate || null,
@@ -435,9 +436,14 @@ async function getShopDetail(shopId) {
                 : verification.status === SELLER_VERIFICATION_STATUS.REJECTED
                   ? "Từ chối"
                   : "Không rõ",
-          cccdFrontImage: verification.cccdFrontImage || "",
-          cccdBackImage: verification.cccdBackImage || "",
+          anhCccdTruoc: verification.anhCccdTruoc || "",
+          anhCccdSau: verification.anhCccdSau || "",
           selfieImage: verification.selfieImage || "",
+          anhKD:
+            verification.anhKD ||
+            verification.businessDocImage ||
+            verification.businessDoc?.imageUrl ||
+            "",
           updatedAt: verification.UpdatedAt || verification.CreatedAt || null,
         }
       : null,
@@ -496,7 +502,7 @@ async function getShopDetail(shopId) {
       userName: item.userName || "",
       rating: Number(item.rating) || 0,
       comment: item.comment || "",
-      isHidden: Boolean(item.isHidden),
+      ...toAdminReviewRemovalFields(item),
       createdAt: item.CreatedAt || null,
     })),
   };
@@ -646,26 +652,37 @@ function resolveProductStatusGroup(status) {
   return "";
 }
 
-function withProductStatusGroup(baseFilter, group) {
-  const extras = [];
+function withProductStatusGroup(baseFilter, group, removedBy = "") {
+  let statusFilter;
   if (group === "removed") {
-    extras.push({ $or: removedProductConditions() });
+    const normalizedRemovedBy = pickString(removedBy).toLowerCase();
+    if (normalizedRemovedBy === PRODUCT_REMOVED_BY.ADMIN) {
+      statusFilter = adminRemovedProductFilter();
+    } else if (normalizedRemovedBy === PRODUCT_REMOVED_BY.SELLER) {
+      statusFilter = sellerRemovedProductFilter();
+    } else {
+      statusFilter = removedProductMatch();
+    }
   } else if (group === "active") {
-    extras.push(notRemovedProductMatch(), { Status: PRODUCT_STATUS.ACTIVE });
+    statusFilter = { $and: [notRemovedProductMatch(), { Status: PRODUCT_STATUS.ACTIVE }] };
   } else if (group === "hidden") {
-    extras.push(notRemovedProductMatch(), { Status: PRODUCT_STATUS.HIDDEN });
+    statusFilter = { $and: [notRemovedProductMatch(), { Status: PRODUCT_STATUS.HIDDEN }] };
   }
 
-  if (extras.length === 0) {
+  if (!statusFilter) {
     return { ...baseFilter };
   }
-  return { $and: [baseFilter, ...extras] };
+  if (!Object.keys(baseFilter).length) {
+    return statusFilter;
+  }
+  return { $and: [baseFilter, statusFilter] };
 }
 
 async function listProducts(query = {}) {
   const { page, limit, skip } = parsePagination(query);
   const search = pickString(query.search).replace(/^@+/, "");
   const statusGroup = resolveProductStatusGroup(query.status);
+  const removedBy = pickString(query.removedBy);
   const shopId = toObjectId(query.shopId);
   const categoryId = toObjectId(query.categoryId);
 
@@ -724,14 +741,43 @@ async function listProducts(query = {}) {
 
   applyCreatedAtRange(filter, query);
 
-  const listFilter = withProductStatusGroup(filter, statusGroup);
+  const listFilter = withProductStatusGroup(filter, statusGroup, removedBy);
 
-  const [total, products, summaryTotal, summaryVisible, summaryRemoved] = await Promise.all([
+  const summaryAgg = await Product.aggregate([
+    { $match: filter },
+    {
+      $facet: {
+        total: [{ $count: "count" }],
+        visible: [
+          {
+            $match: {
+              $and: [notRemovedProductMatch(), { Status: PRODUCT_STATUS.ACTIVE }],
+            },
+          },
+          { $count: "count" },
+        ],
+        hidden: [
+          {
+            $match: {
+              $and: [notRemovedProductMatch(), { Status: PRODUCT_STATUS.HIDDEN }],
+            },
+          },
+          { $count: "count" },
+        ],
+        removed: [{ $match: removedProductMatch() }, { $count: "count" }],
+      },
+    },
+  ]);
+
+  const summaryBucket = summaryAgg[0] || {};
+  const summaryTotal = Number(summaryBucket.total?.[0]?.count) || 0;
+  const summaryVisible = Number(summaryBucket.visible?.[0]?.count) || 0;
+  const summaryHidden = Number(summaryBucket.hidden?.[0]?.count) || 0;
+  const summaryRemoved = Number(summaryBucket.removed?.[0]?.count) || 0;
+
+  const [total, products] = await Promise.all([
     Product.countDocuments(listFilter),
     Product.find(listFilter).sort({ CreatedAt: -1 }).skip(skip).limit(limit).lean(),
-    Product.countDocuments(filter),
-    Product.countDocuments(withProductStatusGroup(filter, "active")),
-    Product.countDocuments(withProductStatusGroup(filter, "removed")),
   ]);
 
   const shopIds = [...new Set(products.map((item) => String(item.ShopId || "")).filter(Boolean))];
@@ -746,7 +792,7 @@ async function listProducts(query = {}) {
           .lean()
       : [],
     categoryIds.length
-      ? ProductCategory.find({ _id: { $in: categoryIds } }).select("name categoryName").lean()
+      ? ProductCategory.find({ _id: { $in: categoryIds } }).select("name").lean()
       : [],
   ]);
 
@@ -764,17 +810,33 @@ async function listProducts(query = {}) {
           id: String(shop._id),
           shopName: resolveShopDisplayName(shop, owner),
           shopUsername: resolveShopUsername(shop, owner),
+          shopAvatar: resolveShopAvatar(shop, owner),
           ownerId: shop.userId ? String(shop.userId) : "",
         },
       ];
     })
   );
   const categoryMap = new Map(
-    categories.map((item) => [String(item._id), item.name || item.categoryName || ""])
+    categories.map((item) => [String(item._id), item.name || ""])
   );
 
   const { loadProductImagesByProductIds, toPublicProductImages } = require("./productService");
   const imagesByProduct = await loadProductImagesByProductIds(products.map((item) => item._id));
+  const productIds = products.map((item) => item._id);
+  const stockRows = productIds.length
+    ? await ProductVariant.aggregate([
+        { $match: { ProductId: { $in: productIds } } },
+        {
+          $group: {
+            _id: "$ProductId",
+            totalStock: { $sum: { $ifNull: ["$Quantity", 0] } },
+          },
+        },
+      ])
+    : [];
+  const stockMap = new Map(
+    stockRows.map((row) => [String(row._id), Math.max(0, Number(row.totalStock) || 0)])
+  );
 
   const items = products.map((product) => {
     const shop = shopMap.get(String(product.ShopId || ""));
@@ -796,12 +858,7 @@ async function listProducts(query = {}) {
       donVi: product.DonVi || "",
       ...buildAdminProductPriceFields(product),
       status: product.Status,
-      isDeleted: isRemovedProduct(product),
-      isAdminRemoved: isAdminRemovedProduct(product),
-      isSellerRemoved: isSellerRemovedProduct(product),
-      sellerRemovedAt: product.SellerRemovedAt || null,
-      adminRemovalReason: product.AdminRemovalReason || "",
-      adminRemovedAt: product.AdminRemovedAt || null,
+      ...toAdminProductRemovalFields(product),
       statusLabel: resolveAdminProductStatusLabel(product),
       viewCount: Number(product.ViewCount) || 0,
       likeCount: Number(product.LikeCount) || 0,
@@ -809,8 +866,11 @@ async function listProducts(query = {}) {
       shopId: product.ShopId ? String(product.ShopId) : "",
       shopName: shop?.shopName || "",
       shopUsername: shop?.shopUsername || "",
+      shopAvatar: shop?.shopAvatar || "",
       categoryId: product.CategoryId ? String(product.CategoryId) : "",
       categoryName: categoryMap.get(String(product.CategoryId || "")) || "",
+      stock: stockMap.get(String(product._id)) ?? 0,
+      totalStock: stockMap.get(String(product._id)) ?? 0,
       createdAt: product.CreatedAt || null,
     };
   });
@@ -820,6 +880,7 @@ async function listProducts(query = {}) {
     summary: {
       total: summaryTotal,
       visible: summaryVisible,
+      hidden: summaryHidden,
       removed: summaryRemoved,
     },
     pagination: {
@@ -850,7 +911,7 @@ async function getProductDetail(productId) {
             .lean()
         : null,
       product.CategoryId
-        ? ProductCategory.findById(product.CategoryId).select("name categoryName").lean()
+        ? ProductCategory.findById(product.CategoryId).select("name").lean()
         : null,
       ProductVariant.find({ ProductId: objectId }).sort({ CreatedAt: 1 }).lean(),
       require("./productService").loadProductImages(objectId),
@@ -858,15 +919,14 @@ async function getProductDetail(productId) {
       Review.aggregate([
         {
           $match: {
-            productId: objectId,
-            isDeleted: { $ne: true },
+            $and: [{ productId: objectId }, notDeletedReviewFilter()],
           },
         },
         {
           $group: {
             _id: null,
             reviewCount: { $sum: 1 },
-            averageRating: { $avg: "$rating" },
+            diemTB: { $avg: "$rating" },
           },
         },
       ]),
@@ -901,12 +961,12 @@ async function getProductDetail(productId) {
     (reservationsByStatus[RESERVATION_STATUS.COMPLETED] || 0) +
     (reservationsByStatus[RESERVATION_STATUS.AUTO_COMPLETED] || 0);
   const pendingReservations =
-    (reservationsByStatus[RESERVATION_STATUS.PENDING_SELLER_CONFIRMATION] || 0) +
+    (reservationsByStatus[RESERVATION_STATUS.PENDING] || 0) +
     (reservationsByStatus[RESERVATION_STATUS.WAITING_PICKUP] || 0);
   const reviewSummary = reviewAgg[0] || {};
   const reviewCount = Number(reviewSummary.reviewCount) || 0;
-  const averageRating = reviewSummary.averageRating
-    ? Math.round(Number(reviewSummary.averageRating) * 10) / 10
+  const diemTB = reviewSummary.diemTB
+    ? Math.round(Number(reviewSummary.diemTB) * 10) / 10
     : 0;
   const viewCount = Number(product.ViewCount) || 0;
   const likeCount = Number(product.LikeCount) || 0;
@@ -923,6 +983,24 @@ async function getProductDetail(productId) {
       : [];
   const gallery = thumbnails.length > 0 ? thumbnails : legacyThumbs;
   const { buildAdminProductPriceFields } = require("./productPromotionService");
+  const mappedVariants = variants.map((variant) => {
+    const imageUrl =
+      variant.ImageUrl ||
+      (Array.isArray(variant.Images) ? variant.Images[0]?.ImageUrl : "") ||
+      "";
+    const quantity = Number(variant.Quantity) || 0;
+    return {
+      id: String(variant._id),
+      variantName: variant.VariantName || "",
+      price: Number(variant.Price) || 0,
+      quantity,
+      stock: quantity,
+      soldCount: Number(variant.SoldCount) || 0,
+      imageUrl,
+      images: imageUrl ? [{ id: "", imageUrl }] : [],
+    };
+  });
+  const totalStock = mappedVariants.reduce((sum, variant) => sum + (Number(variant.quantity) || 0), 0);
 
   return {
     id: String(product._id),
@@ -934,12 +1012,7 @@ async function getProductDetail(productId) {
     donVi: product.DonVi || "",
     ...buildAdminProductPriceFields(product),
     status: product.Status,
-    isDeleted: isRemovedProduct(product),
-    isAdminRemoved: isAdminRemovedProduct(product),
-    isSellerRemoved: isSellerRemovedProduct(product),
-    sellerRemovedAt: product.SellerRemovedAt || null,
-    adminRemovalReason: product.AdminRemovalReason || "",
-    adminRemovedAt: product.AdminRemovedAt || null,
+    ...toAdminProductRemovalFields(product),
     statusLabel: resolveAdminProductStatusLabel(product),
     viewCount,
     likeCount: likeCount,
@@ -951,15 +1024,15 @@ async function getProductDetail(productId) {
     completedReservations,
     pendingReservations,
     reviewCount,
-    averageRating,
+    diemTB,
     reportCount: Number(reportCount) || 0,
     reservationsByStatus,
     // % lượt xem chuyển thành đơn giữ hàng.
     conversionRate: viewCount > 0 ? Number(((reservationCount / viewCount) * 100).toFixed(2)) : 0,
     productCode: String(product._id).slice(-8).toUpperCase(),
     verificationCode: String(product._id).slice(-12).toUpperCase(),
-    promotionStartDate: product.PromotionStartDate || null,
-    promotionEndDate: product.PromotionEndDate || null,
+    promotionStartDate: product.NgayKmBD || null,
+    promotionEndDate: product.NgayKmKT || null,
     pinProduct: Number(product.pinProduct) || 0,
     shopId: product.ShopId ? String(product.ShopId) : "",
     shopName,
@@ -967,24 +1040,12 @@ async function getProductDetail(productId) {
     shopAvatar,
     avatar: shopAvatar,
     categoryId: product.CategoryId ? String(product.CategoryId) : "",
-    categoryName: category?.name || category?.categoryName || "",
+    categoryName: category?.name || "",
     createdAt: product.CreatedAt || null,
     updatedAt: product.UpdatedAt || null,
-    variants: variants.map((variant) => {
-      const imageUrl =
-        variant.ImageUrl ||
-        (Array.isArray(variant.Images) ? variant.Images[0]?.ImageUrl : "") ||
-        "";
-      return {
-        id: String(variant._id),
-        variantName: variant.VariantName || "",
-        price: Number(variant.Price) || 0,
-        quantity: Number(variant.Quantity) || 0,
-        soldCount: Number(variant.SoldCount) || 0,
-        imageUrl,
-        images: imageUrl ? [{ id: "", imageUrl }] : [],
-      };
-    }),
+    stock: totalStock,
+    totalStock,
+    variants: mappedVariants,
   };
 }
 
@@ -1026,8 +1087,8 @@ async function deleteProduct(productId, reason = "") {
 }
 
 async function removeProductForViolation(productId, reason = "") {
-  const violationReason = pickString(reason);
-  if (!violationReason) {
+  const lyDoVP = pickString(reason);
+  if (!lyDoVP) {
     throw createServiceError("Vui lòng nhập lý do vi phạm.", 400);
   }
 
@@ -1049,15 +1110,15 @@ async function removeProductForViolation(productId, reason = "") {
 
   const now = new Date();
   product.Status = PRODUCT_STATUS.HIDDEN;
-  product.IsDeleted = true;
-  product.AdminRemovalReason = violationReason;
-  product.AdminRemovedAt = now;
-  product.SellerRemovedAt = product.SellerRemovedAt || now;
+  product.IsDeleted = 0;
+  product.RemovedBy = PRODUCT_REMOVED_BY.ADMIN;
+  product.LyDoGo = lyDoVP;
+  product.RemovedAt = now;
   product.pinProduct = 0;
   product.IsPromotion = false;
-  product.DiscountPercent = 0;
-  product.PromotionStartDate = null;
-  product.PromotionEndDate = null;
+  product.PtGiam = 0;
+  product.NgayKmBD = null;
+  product.NgayKmKT = null;
   product.UpdatedAt = now;
   await product.save();
 
@@ -1070,7 +1131,7 @@ async function removeProductForViolation(productId, reason = "") {
       const productName = String(product.ProductName || "Sản phẩm").trim();
       await createNotification(shop.userId, {
         title: "Sản phẩm bị gỡ",
-        content: `Sản phẩm "${productName}" đã bị gỡ khỏi hệ thống vì vi phạm: ${violationReason}.`,
+        content: `Sản phẩm "${productName}" đã bị gỡ khỏi hệ thống vì vi phạm: ${lyDoVP}.`,
         audience: NOTIFICATION_AUDIENCE.SELLER,
         index: NOTIFICATION_INDEX.SYSTEM,
       });
@@ -1134,11 +1195,20 @@ async function listReservations(query = {}) {
         { shopId: { $in: matchedShops.map((item) => item._id) } },
         { productId: { $in: matchedProducts.map((item) => item._id) } },
         { note: regex },
-        { cancelReason: regex },
         { cancelNote: regex },
-        { disputeReason: regex },
-        { disputeDescription: regex }
+        { cancelNote: regex },
       );
+
+      const matchedDisputes = await ReservationDispute.find({
+        $or: [{ buyerContent: regex }, { sellerContent: regex }],
+      })
+        .select("reservationId")
+        .lean();
+      if (matchedDisputes.length) {
+        orConditions.push({
+          _id: { $in: matchedDisputes.map((row) => row.reservationId).filter(Boolean) },
+        });
+      }
     }
 
     orConditions.push(...buildObjectIdSearchConditions(search));
@@ -1158,7 +1228,7 @@ async function listReservations(query = {}) {
 
   const [total, reservations] = await Promise.all([
     Reservation.countDocuments(filter),
-    Reservation.find(filter).sort({ CreatedAt: -1 }).skip(skip).limit(limit).lean(),
+    Reservation.find(filter).sort({ createdAt: -1, updatedAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
   ]);
 
   const userIds = [...new Set(reservations.map((item) => String(item.userId || "")).filter(Boolean))];
@@ -1197,7 +1267,7 @@ async function listReservations(query = {}) {
       agreedPrice: Number(item.agreedPrice) || 0,
       pickupTime: item.pickupTime || null,
       note: item.note || "",
-      cancelReason: item.cancelReason || "",
+      cancelNote: getReservationCancelNote(item),
       createdAt: item.CreatedAt || null,
       productId: item.productId ? String(item.productId) : "",
       buyer: buyer
@@ -1266,11 +1336,12 @@ async function getReservationDetail(reservationId) {
     agreedPrice: Number(reservation.agreedPrice) || 0,
     pickupTime: reservation.pickupTime || null,
     note: reservation.note || "",
-    cancelReason: reservation.cancelReason || "",
+    cancelNote: getReservationCancelNote(reservation),
     confirmedAt: reservation.confirmedAt || null,
-    completedAt: reservation.completedAt || null,
+    tgNhanHang: getPickupConfirmedAt(reservation),
+    completedAt: getPickupConfirmedAt(reservation),
     cancelledAt: reservation.cancelledAt || null,
-    createdAt: reservation.CreatedAt || null,
+    createdAt: getReservationCreatedAt(reservation),
     buyer: buyer
       ? {
           id: String(buyer._id),
@@ -1325,18 +1396,18 @@ async function cancelReservation(reservationId, reason = "") {
     throw createServiceError("Không thể hủy đơn đã hoàn thành.", 400);
   }
   if (
-    reservation.status === RESERVATION_STATUS.REFUNDED ||
+    reservation.status === RESERVATION_STATUS.CANCELLED ||
     reservation.status === RESERVATION_STATUS.REJECTED
   ) {
     return getReservationDetail(reservationId);
   }
 
-  reservation.status = RESERVATION_STATUS.REFUNDED;
+  reservation.status = RESERVATION_STATUS.CANCELLED;
   reservation.cancelledAt = new Date();
-  reservation.cancelReason = pickString(reason) || "Admin hủy đơn.";
-  reservation.UpdatedAt = new Date();
+  reservation.cancelNote = pickString(reason) || "Admin hủy đơn.";
+  reservation.updatedAt = new Date();
 
-  if (reservation.depositPaidAt && Number(reservation.depositAmount) > 0 && reservation.userId) {
+  if (reservationHasEscrowDeposit(reservation) && reservation.userId) {
     const { refundDepositIfHeld } = require("./reservationService");
     await refundDepositIfHeld(reservation);
   }
@@ -1365,6 +1436,7 @@ module.exports = {
   isSellerRemovedProduct,
   isRemovedProduct,
   removedProductConditions,
+  removedProductMatch,
   notRemovedProductMatch,
   resolveAdminProductStatusLabel,
 };

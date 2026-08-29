@@ -12,10 +12,15 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
-import KeyboardStickyFooter from './KeyboardStickyFooter';
+import FormSheetActions from './KeyboardStickyFooter';
 import KeyboardAwareTextInput from './KeyboardAwareTextInput';
-
-const ACTIONS_BAR_ESTIMATE = 72;
+import {
+  FormSheetBackdrop,
+  FormSheetHeader,
+  FormSheetShell,
+  FORM_SHEET_SCROLL_STYLE,
+} from './formSheetLayout';
+import { BottomSheetHandle } from './bottomSheetChrome';
 
 const REVIEW_PLACEHOLDER =
   'Hãy chia sẻ trải nghiệm của bạn về dịch vụ và sản phẩm của gian hàng này...';
@@ -103,16 +108,23 @@ export default function ShopReviewModal({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <KeyboardAwareScrollView
-          contentContainerStyle={styles.scrollContent}
-          extraBottomInset={ACTIONS_BAR_ESTIMATE}
-          nestedScrollPadding={false}
-          showsVerticalScrollIndicator={false}
-        >
+        <FormSheetBackdrop onClose={onClose} />
+        <FormSheetShell panelStyle={styles.sheet}>
+            <BottomSheetHandle />
+            <FormSheetHeader
+              title="Viết đánh giá"
+              onClose={onClose}
+              disabled={isSubmitting}
+            />
+            <KeyboardAwareScrollView
+              style={FORM_SHEET_SCROLL_STYLE}
+              contentContainerStyle={styles.scrollContent}
+              nestedScrollPadding={false}
+              showsVerticalScrollIndicator={false}
+            >
           <View style={styles.card}>
-            <Text style={styles.title}>Viết đánh giá</Text>
             {storeName ? <Text style={styles.storeName}>🏪 {storeName}</Text> : null}
             {productName ? <Text style={styles.productName}>{productName}</Text> : null}
 
@@ -161,33 +173,34 @@ export default function ShopReviewModal({
               ))}
             </View>
           </View>
-        </KeyboardAwareScrollView>
 
-        <KeyboardStickyFooter style={styles.footerActions}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.submitButton,
-              pressed && styles.pressed,
-              isSubmitting && styles.submitButtonDisabled,
-            ]}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.submitText}>Gửi đánh giá</Text>
-            )}
-          </Pressable>
+          <FormSheetActions style={styles.footerActions}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.submitButton,
+                pressed && styles.pressed,
+                isSubmitting && styles.submitButtonDisabled,
+              ]}
+              onPress={handleSubmit}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.submitText}>Gửi đánh giá</Text>
+              )}
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
-            onPress={onClose}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.cancelText}>Hủy</Text>
-          </Pressable>
-        </KeyboardStickyFooter>
+            <Pressable
+              style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]}
+              onPress={onClose}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.cancelText}>Hủy</Text>
+            </Pressable>
+          </FormSheetActions>
+            </KeyboardAwareScrollView>
+        </FormSheetShell>
       </View>
     </Modal>
   );
@@ -197,28 +210,20 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    position: 'relative',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    paddingTop: 8,
   },
   scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
   },
   card: {
     width: '100%',
-    maxWidth: 420,
-    alignSelf: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 16,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0f172a',
   },
   storeName: {
-    marginTop: 6,
+    marginTop: 0,
     color: '#076F32',
     fontSize: 14,
     fontWeight: '800',
@@ -230,7 +235,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   label: {
-    marginTop: 16,
+    marginTop: 12,
     marginBottom: 8,
     color: '#64748b',
     fontSize: 12,
@@ -249,7 +254,7 @@ const styles = StyleSheet.create({
     color: '#f59e0b',
   },
   input: {
-    minHeight: 110,
+    minHeight: 96,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 10,
@@ -332,9 +337,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0',
   },
   footerActions: {
+    flexDirection: 'column',
     gap: 10,
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingHorizontal: 0,
+    width: '100%',
   },
   cancelText: {
     color: '#334155',
