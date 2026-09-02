@@ -31,6 +31,19 @@ const {
   sendPhoneVerificationCode,
 } = require("./pusherService");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
+const {
+  PENDING_REVIEW_MESSAGE,
+  META_TYPE,
+  parseVerificationMeta,
+  buildAttpMeta,
+  buildReReviewPendingMeta,
+  buildSnapshotFromVerification,
+  applySnapshotToVerification,
+  isPendingReReviewVerification,
+  isShopOwnerPendingReReview,
+  assertShopOwnerCanSell,
+  enrichPublicVerification,
+} = require("../utils/sellerVerificationReReview");
 
 function resolveBusinessImage(source) {
   if (!source) {
@@ -148,7 +161,7 @@ function createServiceError(message, statusCode = 400) {
 }
 
 const PHONE_VERIFY_TTL_MS = 5 * 60 * 1000;
-const PHONE_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
+const PHONE_RESEND_COOLDOWN_MS = 60 * 1000;
 const PHONE_VERIFY_MAX_ATTEMPTS = 5;
 
 function ensureUserHasPhone(user) {
@@ -223,6 +236,7 @@ function toPhoneOtpResponse(phone, session) {
           ? new Date(new Date(session.resendAt).getTime() + PHONE_RESEND_COOLDOWN_MS)
           : null,
     resendCooldownSeconds: resendWait || PHONE_RESEND_COOLDOWN_MS / 1000,
+    remainingSeconds: resendWait || PHONE_RESEND_COOLDOWN_MS / 1000,
   };
 }
 
@@ -274,6 +288,7 @@ async function requestSellerPhoneCode(user, phoneInput) {
     error.data = {
       resendAvailableAt: new Date(Date.now() + resendWaitSeconds * 1000),
       resendCooldownSeconds: resendWaitSeconds,
+      remainingSeconds: resendWaitSeconds,
     };
     throw error;
   }
@@ -322,7 +337,7 @@ async function confirmSellerPhoneCode(user, code, phoneInput) {
       const issued = issuePhoneOtpSession(user._id, phone, { applyResendCooldown: true });
       await deliverPhoneVerificationCode(phone, issued.code);
       const error = createServiceError(
-        "Bạn đã nhập sai 5 lần. Hệ thống đã gửi mã mới — vui lòng nhập mã mới. Có thể gửi lại sau 2 phút.",
+        "Bạn đã nhập sai 5 lần. Hệ thống đã gửi mã mới — vui lòng nhập mã mới. Có thể gửi lại sau 60 giây.",
         400
       );
       error.data = {
@@ -483,6 +498,13 @@ async function syncSellerRoleFromVerification(user) {
     return verification;
   }
 
+  if (verification.status === SELLER_VERIFICATION_STATUS.PENDING) {
+    const shop = await ShopProfile.findOne({ userId: user._id }).select("_id").lean();
+    if (shop && isPendingReReviewVerification(verification, user)) {
+      return verification;
+    }
+  }
+
   if (user.Role === USER_ROLE.SELLER) {
     user.Role = USER_ROLE.BUYER;
     await user.save();
@@ -641,6 +663,121 @@ async function submitSellerVerification(user, payload) {
   return saved;
 }
 
+/** Seller đã duyệt — cập nhật hồ sơ xác thực (ATTP) và chờ admin duyệt lại. */
+async function submitSellerVerificationReReview(user, payload = {}) {
+  if (user.Role !== USER_ROLE.SELLER) {
+    throw createServiceError("Chỉ người bán đã duyệt mới được cập nhật hồ sơ xác thực.");
+  }
+
+  const shop = await ShopProfile.findOne({ userId: user._id });
+  if (!shop) {
+    throw createServiceError("Không tìm thấy gian hàng.", 404);
+  }
+
+  const existing = await getMySellerVerification(user);
+  if (!existing) {
+    throw createServiceError("Không tìm thấy hồ sơ xác thực.", 404);
+  }
+
+  if (existing.status === SELLER_VERIFICATION_STATUS.PENDING) {
+    const meta = parseVerificationMeta(existing.LyDoTuChoi);
+    if (meta.type === META_TYPE.RE_REVIEW_PENDING) {
+      throw createServiceError("Hồ sơ xác thực đang chờ duyệt lại.");
+    }
+    throw createServiceError("Hồ sơ đăng ký đang chờ duyệt.");
+  }
+
+  if (existing.status !== SELLER_VERIFICATION_STATUS.APPROVED) {
+    throw createServiceError("Chỉ cập nhật hồ sơ xác thực khi gian hàng đang hoạt động.");
+  }
+
+  const changeReason = String(payload.changeReason || payload.lyDoThayDoi || "").trim();
+  if (changeReason.length < 5) {
+    throw createServiceError("Vui lòng nhập lý do thay đổi (ít nhất 5 ký tự).");
+  }
+
+  const licenseNumber = String(payload.licenseNumber || payload.giayPhepAttp || "").trim();
+  const issuedAt = String(payload.issuedAt || payload.ngayCap || "").trim();
+  const expiresAt = String(payload.expiresAt || payload.ngayHetHan || "").trim();
+
+  if (!licenseNumber) {
+    throw createServiceError("Vui lòng nhập số giấy phép an toàn thực phẩm.");
+  }
+  if (!issuedAt || !expiresAt) {
+    throw createServiceError("Vui lòng nhập ngày cấp và ngày hết hạn giấy phép.");
+  }
+
+  const previousSnapshot = buildSnapshotFromVerification(existing);
+  const extraDocUrlsInput = Array.isArray(payload.extraDocUrls)
+    ? payload.extraDocUrls
+    : Array.isArray(payload.extraDocs)
+      ? payload.extraDocs
+      : [];
+
+  const anhKD = await resolveVerificationImage({
+    user,
+    imageBase64: payload.anhKDBase64 ?? payload.businessDocImageBase64,
+    mimeType: payload.anhKDMimeType ?? payload.businessDocMimeType,
+    existingUrl:
+      resolveBusinessImage(existing) ||
+      payload.anhKDUrl ||
+      payload.businessDocImageUrl ||
+      null,
+    folder: "seller-verification",
+    label: "business-doc",
+  });
+
+  if (!anhKD) {
+    throw createServiceError(
+      "Vui lòng tải ảnh giấy phép kinh doanh hoặc giấy chứng nhận ATTP."
+    );
+  }
+
+  const extraDocUrls = [];
+  for (let index = 0; index < extraDocUrlsInput.length; index += 1) {
+    const item = extraDocUrlsInput[index];
+    if (typeof item === "string" && item.startsWith("http")) {
+      extraDocUrls.push(item);
+      continue;
+    }
+    const base64 = item?.base64 || item?.imageBase64;
+    if (!base64) {
+      continue;
+    }
+    const url = await resolveVerificationImage({
+      user,
+      imageBase64: base64,
+      mimeType: item?.mimeType || "image/jpeg",
+      existingUrl: item?.existingUrl || item?.url || null,
+      folder: "seller-verification",
+      label: `extra-doc-${index + 1}`,
+    });
+    if (url) {
+      extraDocUrls.push(url);
+    }
+  }
+
+  existing.anhKD = anhKD;
+  existing.status = SELLER_VERIFICATION_STATUS.PENDING;
+  existing.approvedBy = null;
+  existing.LyDoTuChoi = JSON.stringify(
+    buildReReviewPendingMeta({
+      changeReason,
+      licenseNumber,
+      issuedAt,
+      expiresAt,
+      extraDocUrls,
+      previousSnapshot,
+    })
+  );
+  existing.UpdatedAt = new Date();
+  await existing.save();
+
+  const saved = await reloadVerificationById(existing._id);
+  emitSellerVerificationUpdated(saved, "re_review_submitted");
+  return saved;
+}
+
 async function listPendingSellerVerifications() {
   const verifications = await SellerVerification.find({
     status: SELLER_VERIFICATION_STATUS.PENDING,
@@ -690,6 +827,12 @@ function resolveShopStatusLabel(shop) {
 }
 
 function resolveAdminDisplayStatusLabel(verification, shop) {
+  if (
+    verification.status === SELLER_VERIFICATION_STATUS.PENDING &&
+    parseVerificationMeta(verification.LyDoTuChoi).type === META_TYPE.RE_REVIEW_PENDING
+  ) {
+    return "Chờ duyệt lại";
+  }
   if (verification.status === SELLER_VERIFICATION_STATUS.APPROVED) {
     if (shop && Number(shop.status) === SHOP_STATUS.BLOCKED) {
       return "Đã khóa";
@@ -850,6 +993,27 @@ async function approveSellerVerificationByAdmin(adminUser, verificationId) {
     throw createServiceError("Không tìm thấy người dùng của hồ sơ.", 404);
   }
 
+  const meta = parseVerificationMeta(verification.LyDoTuChoi);
+  const isReReview = meta.type === META_TYPE.RE_REVIEW_PENDING;
+
+  if (isReReview && sellerUser.Role === USER_ROLE.SELLER) {
+    const pendingMeta = meta.reReviewPending || {};
+    verification.status = SELLER_VERIFICATION_STATUS.APPROVED;
+    verification.approvedBy = adminUser._id;
+    verification.LyDoTuChoi = JSON.stringify(
+      buildAttpMeta({
+        licenseNumber: pendingMeta.licenseNumber,
+        issuedAt: pendingMeta.issuedAt,
+        expiresAt: pendingMeta.expiresAt,
+        extraDocUrls: pendingMeta.extraDocUrls,
+      })
+    );
+    verification.UpdatedAt = new Date();
+    await verification.save();
+    emitSellerVerificationUpdated(verification, "re_review_approved");
+    return verification;
+  }
+
   await promoteUserToSeller(sellerUser, verification, adminUser._id);
   emitSellerVerificationUpdated(verification, "approved");
   return verification;
@@ -868,6 +1032,31 @@ async function rejectSellerVerificationByAdmin(adminUser, verificationId, reason
   const lyDoTuChoi = String(reason || "").trim();
   if (!lyDoTuChoi) {
     throw createServiceError("Vui lòng nhập lý do từ chối.");
+  }
+
+  const meta = parseVerificationMeta(verification.LyDoTuChoi);
+  const isReReview = meta.type === META_TYPE.RE_REVIEW_PENDING;
+
+  if (isReReview) {
+    const snapshot = meta.reReviewPending?.previousSnapshot;
+    if (snapshot) {
+      applySnapshotToVerification(verification, snapshot);
+    }
+    verification.status = SELLER_VERIFICATION_STATUS.APPROVED;
+    verification.approvedBy = null;
+    verification.LyDoTuChoi = JSON.stringify(
+      buildAttpMeta({
+        ...(snapshot || {}),
+        lastReReviewRejection: {
+          reason: lyDoTuChoi,
+          rejectedAt: new Date().toISOString(),
+        },
+      })
+    );
+    verification.UpdatedAt = new Date();
+    await verification.save();
+    emitSellerVerificationUpdated(verification, "re_review_rejected");
+    return verification;
   }
 
   verification.status = SELLER_VERIFICATION_STATUS.REJECTED;
@@ -901,13 +1090,14 @@ async function updateSellerVerificationByAdmin(adminUser, verificationId, payloa
   return saved;
 }
 
-function toPublicVerification(verification) {
+function toPublicVerification(verification, user = null) {
   if (!verification) {
     return null;
   }
 
   const category = resolveCategoryFields(verification);
   const coords = resolveVerificationLatlong(verification);
+  const metaExtras = enrichPublicVerification(verification, user);
 
   return {
     id: verification._id,
@@ -942,8 +1132,17 @@ function toPublicVerification(verification) {
     categoryId: category.categoryId,
     categoryName: category.categoryName,
     status: verification.status,
-    statusLabel: ADMIN_VERIFICATION_STATUS_LABELS[verification.status] || "Không rõ",
-    lyDoTuChoi: verification.LyDoTuChoi || "",
+    statusLabel:
+      metaExtras.isPendingReReview
+        ? "Đang chờ duyệt lại"
+        : ADMIN_VERIFICATION_STATUS_LABELS[verification.status] || "Không rõ",
+    lyDoTuChoi:
+      metaExtras.rejectionReasonPlain ||
+      (typeof verification.LyDoTuChoi === "string" &&
+      !String(verification.LyDoTuChoi).trim().startsWith("{")
+        ? verification.LyDoTuChoi
+        : ""),
+    ...metaExtras,
     submittedAt: verification.submittedAt || verification.CreatedAt,
     approvedAt:
       verification.status === SELLER_VERIFICATION_STATUS.APPROVED
@@ -958,13 +1157,13 @@ function toPublicVerification(verification) {
   };
 }
 
-function toAdminVerification(verification, shop = null) {
-  const publicData = toPublicVerification(verification);
+function toAdminVerification(verification, shop = null, viewerUser = null) {
+  const publicData = toPublicVerification(verification, viewerUser);
   if (!publicData) {
     return null;
   }
 
-  const user = verification.userId;
+  const owner = verification.userId;
   const approver = verification.approvedBy;
   const shopStatus = shop != null ? Number(shop.status) : null;
   return {
@@ -973,14 +1172,14 @@ function toAdminVerification(verification, shop = null) {
     shopStatus,
     shopStatusLabel: resolveShopStatusLabel(shop),
     statusLabel: resolveAdminDisplayStatusLabel(verification, shop),
-    user: user && typeof user === "object"
+    user: owner && typeof owner === "object"
       ? {
-          id: user._id,
-          fullName: user.FullName || "",
-          email: user.Email || "",
-          phone: user.Phone || "",
-          userName: user.UserName || "",
-          avatar: user.Avatar || "",
+          id: owner._id,
+          fullName: owner.FullName || "",
+          email: owner.Email || "",
+          phone: owner.Phone || "",
+          userName: owner.UserName || "",
+          avatar: owner.Avatar || "",
         }
       : null,
     approvedByAdmin:
@@ -1001,6 +1200,7 @@ module.exports = {
   getMySellerVerification,
   syncSellerRoleFromVerification,
   submitSellerVerification,
+  submitSellerVerificationReReview,
   normalizeSellerRegistrationPayload,
   listPendingSellerVerifications,
   listAdminSellerVerifications,
@@ -1009,4 +1209,7 @@ module.exports = {
   updateSellerVerificationByAdmin,
   toPublicVerification,
   toAdminVerification,
+  assertShopOwnerCanSell,
+  isShopOwnerPendingReReview,
+  PENDING_REVIEW_MESSAGE,
 };

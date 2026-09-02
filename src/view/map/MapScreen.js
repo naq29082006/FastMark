@@ -610,7 +610,7 @@ export default function MapScreen({
         reservationId: null,
         storeName: storeName || 'Gian hàng',
         storeAvatar: String(storeAvatar || '').trim(),
-        initialLocation: hasValidLocation(liveDistanceOrigin) ? { ...liveDistanceOrigin } : null,
+        initialLocation: hasValidLocation(currentLocation) ? { ...currentLocation } : null,
         destination: {
           latitude: nextLatitude,
           longitude: nextLongitude,
@@ -621,7 +621,7 @@ export default function MapScreen({
       });
       onClearFocus?.();
     },
-    [onClearFocus, liveDistanceOrigin]
+    [onClearFocus, currentLocation]
   );
 
   useEffect(() => {
@@ -668,7 +668,7 @@ export default function MapScreen({
           reservationId: focusStoreRequest?.reservationId || null,
           storeName: focusStoreRequest?.storeName || enrichedStore.name || 'Gian hàng',
           storeAvatar: String(enrichedStore.image_url || enrichedStore.cover_image_url || '').trim(),
-          initialLocation: hasValidLocation(liveDistanceOrigin) ? { ...liveDistanceOrigin } : null,
+          initialLocation: hasValidLocation(currentLocation) ? { ...currentLocation } : null,
           destination: {
             latitude: targetStore.latitude,
             longitude: targetStore.longitude,
@@ -707,7 +707,7 @@ export default function MapScreen({
     return () => {
       isCurrent = false;
     };
-  }, [focusStoreRequest, registeredShops, enrichShopWithCategory, liveDistanceOrigin]);
+  }, [focusStoreRequest, registeredShops, enrichShopWithCategory, currentLocation]);
 
   const shopDistanceOrigin = hasValidLocation(scanLocation) ? scanLocation : liveDistanceOrigin;
 

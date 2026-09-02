@@ -78,7 +78,7 @@ exports.getMyVerification = async (req, res) => {
 
   return success(res, {
     data: {
-      verification: sellerService.toPublicVerification(verification),
+      verification: sellerService.toPublicVerification(verification, req.currentUser),
       sellerPhoneVerified: require("../models/User").isPhoneVerified(user),
       hasPhone: Boolean(String(user?.Phone || "").trim()),
       role: user?.Role ?? req.currentUser.Role,
@@ -95,7 +95,7 @@ exports.submitVerification = async (req, res) => {
 
   let publicVerification = null;
   try {
-    publicVerification = sellerService.toPublicVerification(verification);
+    publicVerification = sellerService.toPublicVerification(verification, req.currentUser);
   } catch (serializationError) {
     console.error("[seller] submitVerification serialize failed", serializationError);
     publicVerification = {
@@ -111,6 +111,28 @@ exports.submitVerification = async (req, res) => {
       role: user?.Role ?? req.currentUser.Role,
     },
   });
+};
+
+exports.submitVerificationReReview = async (req, res) => {
+  try {
+    const verification = await sellerService.submitSellerVerificationReReview(
+      req.currentUser,
+      req.body || {}
+    );
+    return success(res, {
+      message:
+        "Đã gửi hồ sơ xác thực cập nhật. Gian hàng tạm dừng nhận đơn mới cho đến khi admin duyệt.",
+      data: {
+        verification: sellerService.toPublicVerification(verification, req.currentUser),
+        role: req.currentUser?.Role,
+      },
+    });
+  } catch (error) {
+    return fail(res, {
+      status: error.statusCode || 400,
+      message: error.message || "Không gửi được hồ sơ xác thực.",
+    });
+  }
 };
 
 exports.listPendingVerifications = async (req, res) => {

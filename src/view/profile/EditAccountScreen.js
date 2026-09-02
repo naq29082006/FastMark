@@ -236,11 +236,22 @@ export default function EditAccountScreen({ onBack, onChangePhone }) {
       const email = payload.data?.email || accountEmail;
       setForgotEmail(email);
       setResendCooldown(
-        Number(payload.data?.verification?.resendCooldownSeconds) || 120
+        Number(payload.data?.verification?.remainingSeconds) ||
+          Number(payload.data?.verification?.resendCooldownSeconds) ||
+          60
       );
       setForgotMessage('Đã gửi mã OTP đến email của bạn.');
       setForgotStep(FORGOT_STEPS.OTP);
     } catch (requestError) {
+      const errData = requestError?.data || requestError?.payload?.data || {};
+      const remaining =
+        Number(requestError?.remainingSeconds) ||
+        Number(errData.remainingSeconds) ||
+        Number(errData.resendCooldownSeconds) ||
+        0;
+      if (remaining > 0) {
+        setResendCooldown(remaining);
+      }
       setForgotError(requestError.message || 'Không gửi được OTP.');
     } finally {
       setForgotLoading(false);
@@ -264,17 +275,18 @@ export default function EditAccountScreen({ onBack, onChangePhone }) {
       setForgotMessage('Xác thực OTP thành công. Nhập mật khẩu mới.');
       setForgotStep(FORGOT_STEPS.PASSWORD);
     } catch (verifyError) {
-      const errData = verifyError?.data || {};
+      const errData = verifyError?.data || verifyError?.payload?.data || {};
       if (errData.mustUseNewCode) {
         setForgotOtp('');
         setResendCooldown(
-          Number(errData.resendCooldownSeconds) ||
+          Number(errData.remainingSeconds) ||
+            Number(errData.resendCooldownSeconds) ||
             (errData.resendAvailableAt
               ? Math.max(
                   0,
                   Math.ceil((new Date(errData.resendAvailableAt).getTime() - Date.now()) / 1000)
                 )
-              : 120)
+              : 60)
         );
         setForgotError(
           verifyError.message ||
@@ -656,7 +668,7 @@ export default function EditAccountScreen({ onBack, onChangePhone }) {
                   style={styles.resendOtpLink}
                 >
                   <Text style={styles.resendOtpText}>
-                    {resendCooldown > 0 ? `Gửi lại sau ${resendCooldown}s` : 'Gửi lại mã OTP'}
+                    {resendCooldown > 0 ? `Gửi lại mã sau (${resendCooldown}s)` : 'Gửi lại mã OTP'}
                   </Text>
                 </Pressable>
                 <ActionButton

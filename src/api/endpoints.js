@@ -20,6 +20,7 @@ export const API_ENDPOINTS = {
   sellerPhoneCodeConfirm: '/api/seller/phone-code/confirm',
   sellerVerificationMe: '/api/seller/verification/me',
   sellerVerificationSubmit: '/api/seller/verification',
+  sellerVerificationReReview: '/api/seller/verification/re-review',
   productCategories: '/api/products/categories',
   adminProductCategories: '/api/categories/products',
   adminShopCategories: '/api/categories/shops',

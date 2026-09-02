@@ -28,6 +28,7 @@ import SellerPhoneSetupScreen from './SellerPhoneSetupScreen';
 import SellerRegistrationScreen from './SellerRegistrationScreen';
 import SellerVerificationStatusScreen from './SellerVerificationStatusScreen';
 import SellerShopSettingsScreen from './SellerShopSettingsScreen';
+import SellerVerificationReReviewScreen from './SellerVerificationReReviewScreen';
 import SellerShopQrScreen from './SellerShopQrScreen';
 import SellerBuyerQrScanScreen from './SellerBuyerQrScanScreen';
 import SellerPickupConfirmScreen from './SellerPickupConfirmScreen';
@@ -478,6 +479,24 @@ export default function ShopTabPanel({
         onChangePhone={() => {
           setPhoneChangeReturn('shop-settings');
           setSellerStep('phone');
+        }}
+        onEditVerification={() => setShopNav('verification-re-review')}
+      />
+    );
+  }
+
+  if (shopNav === 'verification-re-review') {
+    return (
+      <SellerVerificationReReviewScreen
+        onBack={() => setShopNav('shop-settings')}
+        onSubmitted={async () => {
+          try {
+            const result = await dispatch(syncSellerAccess()).unwrap();
+            setSellerVerification(result?.verification || null);
+          } catch {
+            // ignore
+          }
+          setShopNav('shop-settings');
         }}
       />
     );

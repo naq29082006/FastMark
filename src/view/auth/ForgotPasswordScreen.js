@@ -58,11 +58,22 @@ export default function ForgotPasswordScreen({ onBack, onSuccess }) {
       const payload = await requestPasswordResetOnBackend({ email: normalizedEmail });
       setEmail(normalizedEmail);
       setResendCooldown(
-        Number(payload.data?.verification?.resendCooldownSeconds) || 120
+        Number(payload.data?.verification?.remainingSeconds) ||
+          Number(payload.data?.verification?.resendCooldownSeconds) ||
+          60
       );
       setSuccessMessage('Đã gửi mã OTP đến email của bạn.');
       setStep(STEPS.OTP);
     } catch (requestError) {
+      const errData = requestError?.data || requestError?.payload?.data || {};
+      const remaining =
+        Number(requestError?.remainingSeconds) ||
+        Number(errData.remainingSeconds) ||
+        Number(errData.resendCooldownSeconds) ||
+        0;
+      if (remaining > 0) {
+        setResendCooldown(remaining);
+      }
       showErrorAlert(requestError.message || 'Không gửi được OTP.');
     } finally {
       setIsLoading(false);
@@ -83,17 +94,18 @@ export default function ForgotPasswordScreen({ onBack, onSuccess }) {
       setSuccessMessage('Xác thực OTP thành công. Nhập mật khẩu mới.');
       setStep(STEPS.PASSWORD);
     } catch (verifyError) {
-      const errData = verifyError?.data || {};
+      const errData = verifyError?.data || verifyError?.payload?.data || {};
       if (errData.mustUseNewCode) {
         setOtp('');
         setResendCooldown(
-          Number(errData.resendCooldownSeconds) ||
+          Number(errData.remainingSeconds) ||
+            Number(errData.resendCooldownSeconds) ||
             (errData.resendAvailableAt
               ? Math.max(
                   0,
                   Math.ceil((new Date(errData.resendAvailableAt).getTime() - Date.now()) / 1000)
                 )
-              : 120)
+              : 60)
         );
         showErrorAlert(
           verifyError.message ||
@@ -146,7 +158,7 @@ export default function ForgotPasswordScreen({ onBack, onSuccess }) {
     step === STEPS.EMAIL
       ? isLoading
         ? 'Đang gừi OTP...'
-        : 'Gừi mã OTP'
+        : 'Gửi mã OTP'
       : step === STEPS.OTP
         ? isLoading
           ? 'Đang xác thực...'
@@ -206,8 +218,8 @@ export default function ForgotPasswordScreen({ onBack, onSuccess }) {
               >
                 <Text style={styles.resendText}>
                   {resendCooldown > 0
-                    ? `Gừi lại sau ${resendCooldown}s`
-                    : 'Gừi lại mã OTP'}
+                    ? `Gửi lại mã sau (${resendCooldown}s)`
+                    : 'Gửi lại mã OTP'}
                 </Text>
               </Pressable>
             </>

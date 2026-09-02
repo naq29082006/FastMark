@@ -4,7 +4,7 @@ const DEFAULT_LOCATION = {
 };
 
 const MAP_EVENT_SOURCE = 'fastmark-map';
-export const LEAFLET_HTML_REVISION = 39;
+export const LEAFLET_HTML_REVISION = 40;
 
 function safeJson(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
@@ -858,8 +858,8 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
 
       function isNavMoveSignificant(left, right) {
         return (
-          Math.abs(Number(left.latitude) - Number(right.latitude)) >= 0.000012 ||
-          Math.abs(Number(left.longitude) - Number(right.longitude)) >= 0.000012
+          Math.abs(Number(left.latitude) - Number(right.latitude)) >= 0.000006 ||
+          Math.abs(Number(left.longitude) - Number(right.longitude)) >= 0.000006
         );
       }
 
@@ -958,16 +958,16 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         const centerShiftMeters = center.distanceTo(targetLatLng);
         const now = Date.now();
 
-        if (centerShiftMeters < 12 && now - lastNavPanAt < 500) {
+        if (centerShiftMeters < 6 && now - lastNavPanAt < 220) {
           return;
         }
 
         lastNavPanAt = now;
-        const animate = centerShiftMeters > 18;
+        const animate = centerShiftMeters > 3;
         map.panTo(targetLatLng, {
           animate,
-          duration: animate ? (centerShiftMeters > 45 ? 0.3 : 0.18) : 0,
-          easeLinearity: 0.4,
+          duration: animate ? (centerShiftMeters > 45 ? 0.32 : 0.22) : 0,
+          easeLinearity: 0.28,
         });
       }
 

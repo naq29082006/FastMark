@@ -21,6 +21,9 @@ function fail(res, { status = 500, message = "Đã có lỗi xảy ra.", code = 
   }
   if (data !== null && data !== undefined) {
     payload.data = data;
+    if (data.remainingSeconds != null) {
+      payload.remainingSeconds = data.remainingSeconds;
+    }
   }
   return res.status(status).json(payload);
 }

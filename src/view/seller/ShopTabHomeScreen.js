@@ -23,7 +23,8 @@ import {
   selectUserRole,
 } from '../../viewmodel/auth/authSelectors';
 import { getSellerRegisterButtonLabel } from './sellerRegistrationFlow';
-import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
+import { SELLER_VERIFICATION_STATUS, SELLER_VERIFICATION_PENDING_REVIEW_MESSAGE } from '../../constants/sellerVerification';
+import { showErrorAlert } from '../../core/utils/appAlert';
 
 const HUB_ITEMS = [
   { key: 'stats', label: 'Thống kê', icon: 'stats-chart-outline', action: 'stats' },
@@ -70,6 +71,7 @@ export default function ShopTabHomeScreen({
 
   const isPending = verification?.status === SELLER_VERIFICATION_STATUS.PENDING;
   const isRejected = verification?.status === SELLER_VERIFICATION_STATUS.REJECTED;
+  const isPendingReReview = Boolean(verification?.isPendingReReview);
   const showManageHub = Boolean(canSwitchToSeller && isSeller);
   const notificationBadgeCount = Math.max(0, Number(unreadNotificationsCount) || 0);
   const walletBalance = Number(profile?.walletBalance) || 0;
@@ -171,6 +173,13 @@ export default function ShopTabHomeScreen({
           ) : null}
         </View>
 
+        {showManageHub && isPendingReReview ? (
+          <View style={styles.reReviewBanner}>
+            <Text style={styles.reReviewBannerTitle}>Đang chờ duyệt lại hồ sơ xác thực</Text>
+            <Text style={styles.reReviewBannerBody}>{SELLER_VERIFICATION_PENDING_REVIEW_MESSAGE}</Text>
+          </View>
+        ) : null}
+
         {!showManageHub ? (
           <View style={styles.registerBanner}>
             <View style={styles.registerBannerIcon}>
@@ -223,18 +232,34 @@ export default function ShopTabHomeScreen({
             <Text style={styles.sectionTitle}>Quản lý gian hàng</Text>
 
             <View style={styles.hubGrid}>
-              {HUB_ITEMS.map((item) => (
+              {HUB_ITEMS.map((item) => {
+                const blockedByReReview =
+                  isPendingReReview && (item.action === 'post' || item.action === 'products');
+                return (
                 <Pressable
                   key={item.key}
-                  style={({ pressed }) => [styles.hubItem, pressed && styles.pressed]}
-                  onPress={() => onOpenHub?.(item.action)}
+                  style={({ pressed }) => [
+                    styles.hubItem,
+                    blockedByReReview && styles.hubItemDisabled,
+                    pressed && !blockedByReReview && styles.pressed,
+                  ]}
+                  onPress={() => {
+                    if (blockedByReReview) {
+                      showErrorAlert(SELLER_VERIFICATION_PENDING_REVIEW_MESSAGE);
+                      return;
+                    }
+                    onOpenHub?.(item.action);
+                  }}
                 >
                   <View style={styles.hubIconWrap}>
-                    <Ionicons name={item.icon} size={22} color={t.primary} />
+                    <Ionicons name={item.icon} size={22} color={blockedByReReview ? '#94a3b8' : t.primary} />
                   </View>
-                  <Text style={styles.hubLabel}>{item.label}</Text>
+                  <Text style={[styles.hubLabel, blockedByReReview && styles.hubLabelDisabled]}>
+                    {item.label}
+                  </Text>
                 </Pressable>
-              ))}
+              );
+              })}
             </View>
           </>
         )}
@@ -443,6 +468,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  hubItemDisabled: {
+    opacity: 0.55,
+    backgroundColor: '#f8fafc',
+  },
   hubIconWrap: {
     width: 40,
     height: 40,
@@ -456,5 +485,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#334155',
     textAlign: 'center',
+  },
+  hubLabelDisabled: {
+    color: '#94a3b8',
+  },
+  reReviewBanner: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fdba74',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+  },
+  reReviewBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#c2410c',
+    marginBottom: 6,
+  },
+  reReviewBannerBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#9a3412',
   },
 });
