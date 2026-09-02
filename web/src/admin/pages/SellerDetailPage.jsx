@@ -165,6 +165,8 @@ export default function SellerDetailPage() {
   const longitude = record?.latlong?.long ?? record?.longitude ?? null;
   const hasCoords = latitude != null && longitude != null && !Number.isNaN(Number(latitude)) && !Number.isNaN(Number(longitude));
   const isPending = record?.status === 0;
+  const isPendingReReview = Boolean(record?.isPendingReReview || record?.reReviewChangeReason);
+  const previousSnapshot = record?.reReviewPreviousSnapshot || null;
   const systemAddress = record?.addressHeThong || record?.address || '—';
 
   return (
@@ -405,6 +407,59 @@ export default function SellerDetailPage() {
                 )}
               </aside>
             </div>
+
+            {isPendingReReview ? (
+              <div className="seller-verify-rereview-panel">
+                <h3>Duyệt lại hồ sơ xác thực</h3>
+                <p className="muted">
+                  Ngày gửi:{' '}
+                  {record.reReviewSubmittedAt
+                    ? formatDateTimeDetail(record.reReviewSubmittedAt)
+                    : formatDateTimeDetail(record.updatedAt)}
+                </p>
+                <p>
+                  <strong>Lý do thay đổi:</strong> {record.reReviewChangeReason || '—'}
+                </p>
+                <div className="seller-verify-rereview-grid">
+                  <div>
+                    <h4>Hồ sơ cũ</h4>
+                    {previousSnapshot?.anhKD ? (
+                      <VerifyDocCard label="Giấy phép ATTP (cũ)" url={previousSnapshot.anhKD} />
+                    ) : (
+                      <p className="admin-detail-empty">Không có ảnh cũ.</p>
+                    )}
+                    <ul className="seller-verify-register-list">
+                      <li>
+                        <span>Số GP:</span> {previousSnapshot?.licenseNumber || '—'}
+                      </li>
+                      <li>
+                        <span>Ngày cấp:</span> {previousSnapshot?.issuedAt || '—'}
+                      </li>
+                      <li>
+                        <span>Ngày hết hạn:</span> {previousSnapshot?.expiresAt || '—'}
+                      </li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4>Hồ sơ mới</h4>
+                    {record.anhKD ? (
+                      <VerifyDocCard label="Giấy phép ATTP (mới)" url={record.anhKD} />
+                    ) : null}
+                    <ul className="seller-verify-register-list">
+                      <li>
+                        <span>Số GP:</span> {record.attpMeta?.licenseNumber || '—'}
+                      </li>
+                      <li>
+                        <span>Ngày cấp:</span> {record.attpMeta?.issuedAt || '—'}
+                      </li>
+                      <li>
+                        <span>Ngày hết hạn:</span> {record.attpMeta?.expiresAt || '—'}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className="seller-verify-hero-docs">
               <h3>Ảnh xác minh</h3>

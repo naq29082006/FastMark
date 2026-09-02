@@ -14,6 +14,9 @@ async function parseApiResponse(response) {
     if (payload.data !== undefined) {
       error.data = payload.data;
     }
+    if (payload.remainingSeconds != null) {
+      error.remainingSeconds = payload.remainingSeconds;
+    }
     log.warn('request failed', response.status, payload.message || payload.error || '');
     throw error;
   }
@@ -72,6 +75,20 @@ export async function getMySellerVerificationOnBackend(idToken) {
 
   const payload = await parseApiResponse(response);
   return payload.data;
+}
+
+export async function submitSellerVerificationReReviewOnBackend({ idToken, payload }) {
+  const response = await apiRequest(
+    API_ENDPOINTS.sellerVerificationReReview,
+    {
+      method: 'POST',
+      headers: await authHeaders(idToken),
+      body: JSON.stringify(payload),
+    },
+    SELLER_UPLOAD_TIMEOUT_MS
+  );
+  const parsed = await parseApiResponse(response);
+  return parsed.data;
 }
 
 export async function submitSellerVerificationOnBackend({ idToken, payload }) {

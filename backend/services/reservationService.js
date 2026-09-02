@@ -712,6 +712,11 @@ async function getSellerReservationDetail(user, reservationId) {
 async function confirmReservation(user, reservationId) {
   const { shop, reservation } = await getOwnedReservation(user, reservationId);
 
+  const { assertShopOwnerCanSell } = require("../utils/sellerVerificationReReview");
+  if (shop?.userId) {
+    await assertShopOwnerCanSell(shop.userId);
+  }
+
   if (reservation.status !== RESERVATION_STATUS.PENDING) {
     throw createServiceError("Chỉ có thể đồng ý đơn đang chờ xác nhận.");
   }

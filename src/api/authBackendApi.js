@@ -18,6 +18,9 @@ async function parseApiResponse(response) {
     if (payload.data !== undefined) {
       error.data = payload.data;
     }
+    if (payload.remainingSeconds != null) {
+      error.remainingSeconds = payload.remainingSeconds;
+    }
     throw error;
   }
 

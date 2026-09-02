@@ -96,6 +96,14 @@ async function validateProductAndShop(productId, variantId) {
     throw createServiceError("Cửa hàng đang đóng cửa.", 400);
   }
 
+  const { isShopOwnerPendingReReview } = require("../utils/sellerVerificationReReview");
+  if (shop.userId && (await isShopOwnerPendingReReview(shop.userId))) {
+    throw createServiceError(
+      "Gian hàng đang chờ duyệt lại hồ sơ xác thực — tạm thời không nhận đơn giữ hàng mới.",
+      400
+    );
+  }
+
   return { product, variant, shop };
 }
 

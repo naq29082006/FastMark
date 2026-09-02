@@ -14,6 +14,7 @@ const {
   isRecordActive,
 } = require("../constants");
 const { createNotification } = require("./notificationService");
+const { assertShopOwnerCanSell } = require("../utils/sellerVerificationReReview");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
 
 function createServiceError(message, statusCode = 400) {
@@ -203,6 +204,9 @@ async function assertCanManageProducts(shop) {
   }
   if (Number(shop.status) === SHOP_STATUS.BLOCKED) {
     throw createServiceError("Gian hàng đang bị khóa.", 403);
+  }
+  if (shop.userId) {
+    await assertShopOwnerCanSell(shop.userId);
   }
   const active = await ensureSubscriptionFresh(shop);
   if (!active) {

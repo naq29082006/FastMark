@@ -62,7 +62,7 @@ const initialState = {
 };
 
 const EMAIL_CODE_TTL_SECONDS = 5 * 60;
-const EMAIL_RESEND_COOLDOWN_SECONDS = 3 * 60;
+const EMAIL_RESEND_COOLDOWN_SECONDS = 60;
 
 const SELLER_ACCESS_PROFILE_KEYS = [
   'role',

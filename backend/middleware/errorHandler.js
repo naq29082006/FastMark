@@ -70,6 +70,11 @@ function errorHandler(error, req, res, next) {
     ...(error.code ? { code: error.code } : {}),
     ...(error.field ? { field: error.field } : {}),
     ...(error.data !== undefined && error.data !== null ? { data: error.data } : {}),
+    ...(error.data?.remainingSeconds != null
+      ? { remainingSeconds: error.data.remainingSeconds }
+      : error.retryAfterSeconds != null
+        ? { remainingSeconds: error.retryAfterSeconds }
+        : {}),
   });
 }
 

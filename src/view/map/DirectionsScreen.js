@@ -32,8 +32,8 @@ const ROUTE_PROFILE = ROUTING_PROFILE.MOTORBIKE;
 const REROUTE_THRESHOLD_METERS = 30;
 const ARRIVAL_THRESHOLD_METERS = 20;
 const REROUTE_COOLDOWN_MS = 10000;
-const ROUTE_TRIM_MIN_MOVE_METERS = 8;
-const ROUTE_TRIM_MIN_INTERVAL_MS = 500;
+const ROUTE_TRIM_MIN_MOVE_METERS = 12;
+const ROUTE_TRIM_MIN_INTERVAL_MS = 800;
 const DISPLAY_DISTANCE_THROTTLE_MS = 700;
 
 function isRemoteIcon(value) {
@@ -265,17 +265,6 @@ export default function DirectionsScreen({
     processNavigationUpdate(liveLocation);
     return undefined;
   }, [liveLocation, processNavigationUpdate, updateDisplayDistance]);
-
-  useEffect(() => {
-    if (!hasValidLocation(liveLocation) || !hasValidLocation(destinationWithIcon)) {
-      return undefined;
-    }
-    fullRouteRef.current = null;
-    lastSegmentIndexRef.current = 0;
-    setRoutePolyline(null);
-    fetchAndApplyRoute(liveLocation, { fitBounds: true });
-    return undefined;
-  }, [destinationWithIcon, fetchAndApplyRoute, liveLocation]);
 
   const handleMapEvent = useCallback((payload) => {
     if (payload?.type === 'userMovedMap') {

@@ -234,6 +234,7 @@ exports.requestEmailVerification = async (req, res) => {
       expiresInSeconds: result.verification.expiresInSeconds,
       resendAvailableAt: result.verification.resendAvailableAt,
       resendCooldownSeconds: result.verification.resendCooldownSeconds,
+      remainingSeconds: result.verification.remainingSeconds,
     },
   });
 };

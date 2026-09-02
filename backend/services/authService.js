@@ -28,7 +28,7 @@ function generateEmailVerifyCode() {
 }
 
 const EMAIL_VERIFY_TTL_MS = 5 * 60 * 1000;
-const EMAIL_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
+const EMAIL_RESEND_COOLDOWN_MS = 60 * 1000;
 const EMAIL_VERIFY_MAX_ATTEMPTS = 5;
 
 function buildVerificationMeta(session) {
@@ -53,6 +53,7 @@ function buildVerificationMeta(session) {
     expiresInSeconds,
     resendAvailableAt,
     resendCooldownSeconds,
+    remainingSeconds: resendCooldownSeconds,
   };
 }
 
@@ -66,11 +67,17 @@ function assertResendCooldown(session, cooldownMs = EMAIL_RESEND_COOLDOWN_MS) {
 
   if (waitMs > 0) {
     const waitSeconds = Math.ceil(waitMs / 1000);
+    const resendAvailableAtIso = new Date(resendAvailableAt).toISOString();
     const error = new Error(
-      `Vui lòng đợi ${Math.ceil(waitSeconds / 60)} phút trước khi gửi lại mã.`
+      `Vui lòng chờ ${waitSeconds} giây trước khi gửi lại mã.`
     );
     error.statusCode = 429;
     error.retryAfterSeconds = waitSeconds;
+    error.data = {
+      resendAvailableAt: resendAvailableAtIso,
+      resendCooldownSeconds: waitSeconds,
+      remainingSeconds: waitSeconds,
+    };
     throw error;
   }
 }
@@ -531,7 +538,7 @@ async function confirmEmailVerification({ firebaseUid, code }) {
 }
 
 const PASSWORD_RESET_TTL_MS = 5 * 60 * 1000;
-const PASSWORD_RESET_RESEND_COOLDOWN_MS = 2 * 60 * 1000;
+const PASSWORD_RESET_RESEND_COOLDOWN_MS = 60 * 1000;
 const PASSWORD_RESET_MAX_ATTEMPTS = 5;
 const PASSWORD_RESET_SESSION_TTL_MS = 10 * 60 * 1000;
 
@@ -560,6 +567,7 @@ function buildPasswordResetMeta(session) {
     expiresInSeconds,
     resendAvailableAt,
     resendCooldownSeconds,
+    remainingSeconds: resendCooldownSeconds,
   };
 }
 

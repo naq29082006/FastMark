@@ -106,6 +106,8 @@ export default function SellerPhoneSetupScreen({
     } catch (sendError) {
       const payload = sendError?.payload || {};
       const cooldown =
+        Number(payload?.remainingSeconds) ||
+        Number(payload?.data?.remainingSeconds) ||
         Number(payload?.data?.resendCooldownSeconds) ||
         Number(payload?.data?.resendAvailableAt
           ? Math.ceil((new Date(payload.data.resendAvailableAt).getTime() - Date.now()) / 1000)
@@ -286,8 +288,8 @@ export default function SellerPhoneSetupScreen({
                 {isSending
                   ? 'Đang gửi lại mã...'
                   : resendSecondsLeft > 0
-                    ? `Gửi lại mã xác minh (${formatCountdown(resendSecondsLeft)})`
-                    : 'Gửi lại mã xác minh'}
+                    ? `Gửi lại mã sau (${resendSecondsLeft}s)`
+                    : 'Gửi lại mã'}
               </Text>
             </Pressable>
 

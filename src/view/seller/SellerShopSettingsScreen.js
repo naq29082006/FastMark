@@ -171,7 +171,12 @@ function ShopAvatarField({ name, photoUrl, isUploading, onPress }) {
   );
 }
 
-export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSaved }) {
+export default function SellerShopSettingsScreen({
+  onBack,
+  onChangePhone,
+  onSaved,
+  onEditVerification,
+}) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
   const [isLoading, setIsLoading] = useState(true);
@@ -476,7 +481,7 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
   if (isLoading) {
     return (
       <View style={styles.screenWrap}>
-        <ProfileSubScreen title="Cài đặt cửa hàng" onBack={onBack}>
+        <ProfileSubScreen title="Chỉnh sửa thông tin gian hàng" onBack={onBack}>
           <View style={styles.centered}>
             <ActivityIndicator color="#076F32" size="large" />
           </View>
@@ -489,7 +494,7 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
 
   return (
     <View style={styles.screenWrap}>
-      <ProfileSubScreen title="Cài đặt cửa hàng" onBack={onBack}>
+      <ProfileSubScreen title="Chỉnh sửa thông tin gian hàng" onBack={onBack}>
         <View style={styles.card}>
           <ShopAvatarField
             name={shopName || profile?.shopName}
@@ -677,6 +682,14 @@ export default function SellerShopSettingsScreen({ onBack, onChangePhone, onSave
                 : 'Lưu thay đổi'}
           </Text>
         </Pressable>
+        {onEditVerification ? (
+          <Pressable
+            onPress={onEditVerification}
+            style={({ pressed }) => [styles.secondarySaveButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.secondarySaveButtonText}>Chỉnh sửa hồ sơ xác thực</Text>
+          </Pressable>
+        ) : null}
       </View>
       </ProfileSubScreen>
     </View>
@@ -900,6 +913,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   saveButtonText: { color: '#ffffff', fontWeight: '800', fontSize: 15 },
+  secondarySaveButton: {
+    minHeight: 50,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#076F32',
+  },
+  secondarySaveButtonText: { color: '#076F32', fontWeight: '800', fontSize: 15 },
   buttonPressed: { opacity: 0.85 },
   buttonDisabled: { backgroundColor: '#94a3b8' },
 });

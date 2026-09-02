@@ -9,8 +9,8 @@ import { useThrottledCallback } from '../../../hooks/useThrottledCallback';
 
 const MAP_COMMAND_SOURCE = 'fastmark-map-command';
 const log = createLogger('LeafletMap');
-const NAV_LOCATION_THROTTLE_MS = 180;
-const NAV_ROUTE_THROTTLE_MS = 350;
+const NAV_LOCATION_THROTTLE_MS = 120;
+const NAV_ROUTE_THROTTLE_MS = 500;
 
 export default function LeafletMap({
   currentLocation,

@@ -23,7 +23,7 @@ import AuthInput from './components/AuthInput';
 import { AUTH_COLORS, AUTH_RADIUS } from './components/authTheme';
 
 const CODE_TTL_SECONDS = 5 * 60;
-const RESEND_COOLDOWN_SECONDS = 2 * 60;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 function formatCountdown(secondsLeft) {
   const safeSeconds = Math.max(0, Number(secondsLeft) || 0);
@@ -213,6 +213,17 @@ export default function EmailVerificationScreen() {
       setCodeExpiresAtMs(now + CODE_TTL_SECONDS * 1000);
       setResendAvailableAtMs(now + RESEND_COOLDOWN_SECONDS * 1000);
     } catch (resendError) {
+      const errData =
+        (typeof resendError === 'object' && (resendError?.data || resendError?.payload?.data)) ||
+        {};
+      const remaining =
+        Number(resendError?.remainingSeconds) ||
+        Number(errData.remainingSeconds) ||
+        Number(errData.resendCooldownSeconds) ||
+        0;
+      if (remaining > 0) {
+        setResendAvailableAtMs(Date.now() + remaining * 1000);
+      }
       setLocalError(
         typeof resendError === 'string'
           ? resendError
@@ -284,8 +295,8 @@ export default function EmailVerificationScreen() {
               {isResending
                 ? 'Đang gửi lại mã...'
                 : showResendCooldown
-                  ? `Gửi lại mã xác minh (${formatCountdown(resendSecondsLeft)})`
-                  : 'Gửi lại mã xác minh'}
+                  ? `Gửi lại mã sau (${resendSecondsLeft}s)`
+                  : 'Gửi lại mã'}
             </Text>
           </Pressable>
         </View>

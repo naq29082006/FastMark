@@ -15,9 +15,9 @@ const MODE_CONFIG = {
   },
   navigation: {
     accuracy: Location.Accuracy.BestForNavigation,
-    distanceInterval: 5,
-    timeInterval: 1000,
-    minMovementMeters: 4,
+    distanceInterval: 3,
+    timeInterval: 800,
+    minMovementMeters: 2,
     maxAccuracyMeters: 120,
     lastKnownMaxAge: null,
     lastKnownRequiredAccuracy: null,

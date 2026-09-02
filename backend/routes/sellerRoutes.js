@@ -45,6 +45,12 @@ router.post(
   asyncHandler(sellerController.submitVerification)
 );
 router.post(
+  "/verification/re-review",
+  verifyFirebaseToken,
+  requireSeller,
+  asyncHandler(sellerController.submitVerificationReReview)
+);
+router.post(
   "/shop/username-availability",
   verifyFirebaseToken,
   asyncHandler(sellerOpsController.checkShopUsernameAvailability)
