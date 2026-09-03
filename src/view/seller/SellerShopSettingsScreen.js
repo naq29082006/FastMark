@@ -75,7 +75,7 @@ async function pickAvatarFromLibrary() {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsEditing: true,
-    aspect: [1, 1],
+    aspect: SHOP_AVATAR_CROP_ASPECT,
     quality: 0.7,
     base64: true,
   });
@@ -91,7 +91,7 @@ async function takeAvatarPhoto() {
 
   const result = await ImagePicker.launchCameraAsync({
     allowsEditing: true,
-    aspect: [1, 1],
+    aspect: SHOP_AVATAR_CROP_ASPECT,
     quality: 0.7,
     base64: true,
   });
@@ -128,7 +128,8 @@ function chooseShopAvatarSource() {
   });
 }
 
-const SHOP_AVATAR_PREVIEW_HEIGHT = 148;
+const SHOP_AVATAR_CROP_ASPECT = [16, 9];
+const SHOP_AVATAR_PREVIEW_HEIGHT = 180;
 
 function ShopAvatarField({ name, photoUrl, isUploading, onPress }) {
   const previewUrl = isRemoteAvatarUrl(photoUrl) ? String(photoUrl).trim() : '';
@@ -165,7 +166,7 @@ function ShopAvatarField({ name, photoUrl, isUploading, onPress }) {
       </Pressable>
       <Text style={styles.avatarHint}>Ảnh đại diện gian hàng</Text>
       <Text style={styles.avatarSubHint}>
-        Hiển thị dạng banner ngang trên trang gian hàng — nên dùng ảnh rộng, không cắt tròn.
+        Khung cắt ngang 16:9 — hiển thị banner trên trang gian hàng, nên dùng ảnh rộng.
       </Text>
     </View>
   );
@@ -176,6 +177,8 @@ export default function SellerShopSettingsScreen({
   onChangePhone,
   onSaved,
   onEditVerification,
+  onViewCccdProfile,
+  hideEditVerification = false,
 }) {
   const dispatch = useDispatch();
   const profile = useSelector(selectAuthProfile);
@@ -682,7 +685,15 @@ export default function SellerShopSettingsScreen({
                 : 'Lưu thay đổi'}
           </Text>
         </Pressable>
-        {onEditVerification ? (
+        {onViewCccdProfile ? (
+          <Pressable
+            onPress={onViewCccdProfile}
+            style={({ pressed }) => [styles.secondarySaveButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.secondarySaveButtonText}>Xem hồ sơ CCCD</Text>
+          </Pressable>
+        ) : null}
+        {onEditVerification && !hideEditVerification ? (
           <Pressable
             onPress={onEditVerification}
             style={({ pressed }) => [styles.secondarySaveButton, pressed && styles.buttonPressed]}

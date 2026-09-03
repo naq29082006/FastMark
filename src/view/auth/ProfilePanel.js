@@ -35,6 +35,8 @@ import VisitedStoresScreen from '../profile/VisitedStoresScreen';
 import SellerPhoneSetupScreen from '../seller/SellerPhoneSetupScreen';
 import SellerRegistrationScreen from '../seller/SellerRegistrationScreen';
 import SellerVerificationStatusScreen from '../seller/SellerVerificationStatusScreen';
+import SellerCccdProfileViewScreen from '../seller/SellerCccdProfileViewScreen';
+import SellerAttpProfileViewScreen from '../seller/SellerAttpProfileViewScreen';
 import SellerProductDetailScreen from '../seller/SellerProductDetailScreen';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import SellerShopSettingsScreen from '../seller/SellerShopSettingsScreen';
@@ -400,7 +402,21 @@ export default function ProfilePanel({
       <SellerVerificationStatusScreen
         verification={sellerVerification}
         onBack={() => setSellerStep(null)}
-        onEdit={() => setSellerStep('register')}
+        onViewAttp={() => setSellerStep('attp-view')}
+        onEdit={
+          sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED
+            ? () => setSellerStep('register')
+            : undefined
+        }
+      />
+    );
+  }
+
+  if (sellerStep === 'attp-view') {
+    return (
+      <SellerAttpProfileViewScreen
+        verification={sellerVerification}
+        onBack={() => setSellerStep('pending')}
       />
     );
   }
@@ -410,10 +426,7 @@ export default function ProfilePanel({
       <SellerRegistrationScreen
         initialVerification={sellerVerification}
         onBack={() => {
-          if (
-            sellerVerification?.status === SELLER_VERIFICATION_STATUS.PENDING ||
-            sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED
-          ) {
+          if (sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED) {
             setSellerStep('pending');
             return;
           }
@@ -454,6 +467,16 @@ export default function ProfilePanel({
           setProfileNav(null);
           setSellerStep('phone');
         }}
+        onViewCccdProfile={() => setProfileNav('seller-verification-cccd-view')}
+      />
+    );
+  }
+
+  if (profileNav === 'seller-verification-cccd-view') {
+    return (
+      <SellerCccdProfileViewScreen
+        verification={reduxVerification || sellerVerification}
+        onBack={() => setProfileNav('seller-shop-settings')}
       />
     );
   }

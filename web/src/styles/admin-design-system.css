@@ -1017,6 +1017,60 @@
   padding: 8px;
 }
 
+.seller-verify-rereview-panel {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--fm-border);
+  border-radius: var(--fm-radius);
+  background: var(--fm-surface);
+}
+
+.seller-verify-rereview-panel h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.seller-verify-rereview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 14px;
+}
+
+.seller-verify-rereview-grid h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fm-text);
+}
+
+.seller-verify-doc-card--portrait {
+  max-width: 220px;
+}
+
+.seller-verify-doc-preview--portrait {
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  max-width: 220px;
+  max-height: 300px;
+  background: #f8fafc;
+}
+
+.seller-verify-doc-preview--portrait .previewable-image.ant-image,
+.seller-verify-doc-preview--portrait .ant-image {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+}
+
+.seller-verify-doc-preview--portrait .ant-image-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  background: #f8fafc;
+}
+
 .seller-verify-detail-section textarea {
   width: 100%;
   border: 1px solid var(--fm-border);

@@ -124,14 +124,31 @@ function activeProductFilter(extra = {}) {
   return publicProductFilter(extra);
 }
 
-/** Đồng bộ isActive từ gói bán trước khi trả shop/sản phẩm công khai. */
+/** Đồng bộ isActive từ gói bán và giấy phép ATTP trước khi trả shop/sản phẩm công khai. */
 async function resolvePublicShop(shopId) {
   const shopDoc = await ShopProfile.findById(shopId);
   if (!shopDoc) {
     return null;
   }
   await ensureSubscriptionFresh(shopDoc);
+  const { ensureAttpLicenseFresh, ensurePendingReReviewFresh, isShopAttpLicenseExpired } =
+    require("./attpLicenseService");
+  await ensureAttpLicenseFresh(shopDoc);
+  await ensurePendingReReviewFresh(shopDoc);
   if (!isSubscriptionActive(shopDoc)) {
+    return null;
+  }
+  if (await isShopAttpLicenseExpired(shopDoc)) {
+    return null;
+  }
+  const { isShopOwnerPendingReReview } = require("../utils/sellerVerificationReReview");
+  if (await isShopOwnerPendingReReview(shopDoc.userId)) {
+    return null;
+  }
+  const { shopRequiresAttpReApproval } = require("../utils/sellerVerificationReReview");
+  if (await shopRequiresAttpReApproval(shopDoc.userId)) {
+    const { finalizeShopAfterReReviewRejected } = require("./attpLicenseService");
+    await finalizeShopAfterReReviewRejected(shopDoc, { notify: false });
     return null;
   }
   return shopDoc.toObject();
@@ -314,6 +331,12 @@ async function collectShopsNearLocation({
         .lean()
     : [];
   const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
+  const pendingReReviewUserIds = await require("../utils/sellerVerificationReReview").loadPendingReReviewUserIdSet(
+    sellerIds
+  );
+  const attpResubmitUserIds = await require("../utils/sellerVerificationReReview").loadAttpResubmitRequiredUserIdSet(
+    sellerIds
+  );
 
   const rows = [];
   for (const shop of shops) {
@@ -323,6 +346,12 @@ async function collectShopsNearLocation({
 
     const seller = sellerMap.get(String(shop.userId));
     if (!seller) {
+      continue;
+    }
+    if (pendingReReviewUserIds.has(String(shop.userId))) {
+      continue;
+    }
+    if (attpResubmitUserIds.has(String(shop.userId))) {
       continue;
     }
 
@@ -879,6 +908,12 @@ async function discoverProducts({
     .select("FullName UserName Role")
     .lean();
   const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
+  const pendingReReviewUserIds = await require("../utils/sellerVerificationReReview").loadPendingReReviewUserIdSet(
+    sellerIds.map((id) => String(id))
+  );
+  const attpResubmitUserIds = await require("../utils/sellerVerificationReReview").loadAttpResubmitRequiredUserIdSet(
+    sellerIds.map((id) => String(id))
+  );
 
   const shopDistanceMap = new Map();
   const eligibleShopIds = [];
@@ -890,6 +925,12 @@ async function discoverProducts({
 
     const seller = sellerMap.get(String(shop.userId));
     if (!seller) {
+      continue;
+    }
+    if (pendingReReviewUserIds.has(String(shop.userId))) {
+      continue;
+    }
+    if (attpResubmitUserIds.has(String(shop.userId))) {
       continue;
     }
 

@@ -7,7 +7,6 @@ import {
   approveVerification,
   listAdminVerifications,
   rejectVerification,
-  updateAdminVerification,
 } from '../../api/sellerApi';
 import { useAdminTopbar } from '../context/AdminTopbarContext';
 import { sellerAdminStatusBadgeClass, sellerAdminStatusLabel } from '../utils/format';
@@ -27,6 +26,33 @@ function DetailSkeleton() {
   );
 }
 
+function isRecordPendingReReview(row) {
+  return Boolean(row?.isPendingReReview || row?.reReviewChangeReason);
+}
+
+function formatAttpDateLabel(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '—';
+  }
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)) {
+    const [day, month, year] = text.split('/');
+    return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+  }
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  if (isoMatch) {
+    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  }
+  return text;
+}
+
+function resolvePendingAttpDates(record) {
+  return {
+    issuedAt: record?.attpMeta?.issuedAt || record?.attpIssuedAt || '',
+    expiresAt: record?.attpMeta?.expiresAt || record?.attpExpiresAt || '',
+  };
+}
+
 export default function SellerDetailPage() {
   const { verificationId } = useParams();
   const { getIdToken } = useAuth();
@@ -34,17 +60,9 @@ export default function SellerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [record, setRecord] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [identityEdit, setIdentityEdit] = useState(false);
-  const [identityFullName, setIdentityFullName] = useState('');
-  const [identityCccd, setIdentityCccd] = useState('');
-  const [identitySaving, setIdentitySaving] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
-
-  const syncIdentityForm = useCallback((row) => {
-    setIdentityFullName(row?.fullName || '');
-    setIdentityCccd(row?.cccdNumber || '');
-  }, []);
+  const [approveOpen, setApproveOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,14 +82,13 @@ export default function SellerDetailPage() {
         return;
       }
       setRecord(found);
-      syncIdentityForm(found);
     } catch (err) {
       message.error(err.message || 'Không tải được hồ sơ');
       setRecord(null);
     } finally {
       setLoading(false);
     }
-  }, [getIdToken, verificationId, syncIdentityForm]);
+  }, [getIdToken, verificationId]);
 
   useEffect(() => {
     load();
@@ -87,46 +104,43 @@ export default function SellerDetailPage() {
     return () => clearTrail();
   }, [displayName, setTrail, clearTrail]);
 
-  async function handleSaveIdentity() {
-    const name = identityFullName.trim().replace(/\s+/g, ' ');
-    const digits = String(identityCccd || '').replace(/\D/g, '');
-    if (name.length < 2) {
-      message.warning('Họ tên trên CCCD phải có ít nhất 2 ký tự.');
+  async function handleApproveConfirm() {
+    if (!record) {
       return;
     }
-    if (!digits || (digits.length !== 9 && digits.length !== 12)) {
-      message.warning('Số CCCD/CMND phải gồm 9 hoặc 12 chữ số.');
-      return;
+    const pendingReReview = isRecordPendingReReview(record);
+    if (pendingReReview) {
+      const pendingDates = resolvePendingAttpDates(record);
+      if (!pendingDates.issuedAt.trim()) {
+        message.warning('Hồ sơ thiếu ngày cấp giấy phép từ người bán.');
+        return;
+      }
+      if (!pendingDates.expiresAt.trim()) {
+        message.warning('Hồ sơ thiếu ngày hết hạn giấy phép từ người bán.');
+        return;
+      }
     }
-    setIdentitySaving(true);
-    try {
-      const token = await getIdToken();
-      await updateAdminVerification(token, record.id || record._id, {
-        fullName: name,
-        cccdNumber: digits,
-      });
-      message.success('Đã cập nhật thông tin CCCD');
-      setIdentityEdit(false);
-      load();
-    } catch (err) {
-      message.error(err.message || 'Cập nhật thất bại');
-    } finally {
-      setIdentitySaving(false);
-    }
-  }
-
-  async function handleApprove() {
     setBusy(true);
     try {
       const token = await getIdToken();
-      await approveVerification(token, record.id || record._id);
+      await approveVerification(token, record.id || record._id, {});
       message.success('Đã duyệt hồ sơ seller');
+      setApproveOpen(false);
       load();
     } catch (err) {
       message.error(err.message || 'Duyệt thất bại');
     } finally {
       setBusy(false);
     }
+  }
+
+  function openApproveModal() {
+    const pendingReReview = isRecordPendingReReview(record);
+    if (pendingReReview) {
+      setApproveOpen(true);
+      return;
+    }
+    handleApproveConfirm();
   }
 
   async function handleRejectConfirm() {
@@ -165,7 +179,7 @@ export default function SellerDetailPage() {
   const longitude = record?.latlong?.long ?? record?.longitude ?? null;
   const hasCoords = latitude != null && longitude != null && !Number.isNaN(Number(latitude)) && !Number.isNaN(Number(longitude));
   const isPending = record?.status === 0;
-  const isPendingReReview = Boolean(record?.isPendingReReview || record?.reReviewChangeReason);
+  const isPendingReReview = isRecordPendingReReview(record);
   const previousSnapshot = record?.reReviewPreviousSnapshot || null;
   const systemAddress = record?.addressHeThong || record?.address || '—';
 
@@ -184,7 +198,7 @@ export default function SellerDetailPage() {
               ) : null}
               {isPending ? (
                 <>
-                  <button type="button" className="approve-btn" disabled={busy} onClick={handleApprove}>
+                  <button type="button" className="approve-btn" disabled={busy} onClick={openApproveModal}>
                     Duyệt
                   </button>
                   <button
@@ -246,36 +260,11 @@ export default function SellerDetailPage() {
                 <ul className="seller-verify-register-list">
                   <li>
                     <span className="seller-verify-register-label">Họ tên (trên CCCD)</span>
-                    <span className="seller-verify-register-value">
-                      {identityEdit ? (
-                        <input
-                          className="admin-inline-input"
-                          value={identityFullName}
-                          onChange={(e) => setIdentityFullName(e.target.value)}
-                          placeholder="Họ tên trên giấy tờ"
-                        />
-                      ) : (
-                        record.fullName || '—'
-                      )}
-                    </span>
+                    <span className="seller-verify-register-value">{record.fullName || '—'}</span>
                   </li>
                   <li>
                     <span className="seller-verify-register-label">Số CCCD/CMND</span>
-                    <span className="seller-verify-register-value">
-                      {identityEdit ? (
-                        <input
-                          className="admin-inline-input"
-                          value={identityCccd}
-                          onChange={(e) =>
-                            setIdentityCccd(String(e.target.value).replace(/\D/g, '').slice(0, 12))
-                          }
-                          inputMode="numeric"
-                          placeholder="9 hoặc 12 chữ số"
-                        />
-                      ) : (
-                        record.cccdNumber || '—'
-                      )}
-                    </span>
+                    <span className="seller-verify-register-value">{record.cccdNumber || '—'}</span>
                   </li>
                   <li>
                     <span className="seller-verify-register-label">Tên gian hàng</span>
@@ -309,43 +298,6 @@ export default function SellerDetailPage() {
                     <span className="seller-verify-register-value">{systemAddress}</span>
                   </li>
                 </ul>
-
-                <div className="seller-verify-hero-inline-actions">
-                  {identityEdit ? (
-                    <>
-                      <button
-                        type="button"
-                        className="approve-btn"
-                        disabled={identitySaving}
-                        onClick={handleSaveIdentity}
-                      >
-                        Lưu CCCD
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        disabled={identitySaving}
-                        onClick={() => {
-                          setIdentityEdit(false);
-                          syncIdentityForm(record);
-                        }}
-                      >
-                        Hủy
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      className="ghost-btn"
-                      onClick={() => {
-                        syncIdentityForm(record);
-                        setIdentityEdit(true);
-                      }}
-                    >
-                      Sửa họ tên / CCCD
-                    </button>
-                  )}
-                </div>
 
                 {record.lyDoTuChoi || record.LyDoTuChoi ? (
                   <div className="seller-verify-reject-reason">
@@ -424,36 +376,34 @@ export default function SellerDetailPage() {
                   <div>
                     <h4>Hồ sơ cũ</h4>
                     {previousSnapshot?.anhKD ? (
-                      <VerifyDocCard label="Giấy phép ATTP (cũ)" url={previousSnapshot.anhKD} />
+                      <VerifyDocCard
+                        variant="portrait"
+                        label="Giấy phép ATTP (cũ)"
+                        url={previousSnapshot.anhKD}
+                      />
                     ) : (
                       <p className="admin-detail-empty">Không có ảnh cũ.</p>
                     )}
                     <ul className="seller-verify-register-list">
                       <li>
-                        <span>Số GP:</span> {previousSnapshot?.licenseNumber || '—'}
+                        <span>Ngày cấp:</span> {formatAttpDateLabel(previousSnapshot?.issuedAt)}
                       </li>
                       <li>
-                        <span>Ngày cấp:</span> {previousSnapshot?.issuedAt || '—'}
-                      </li>
-                      <li>
-                        <span>Ngày hết hạn:</span> {previousSnapshot?.expiresAt || '—'}
+                        <span>Ngày hết hạn:</span> {formatAttpDateLabel(previousSnapshot?.expiresAt)}
                       </li>
                     </ul>
                   </div>
                   <div>
                     <h4>Hồ sơ mới</h4>
                     {record.anhKD ? (
-                      <VerifyDocCard label="Giấy phép ATTP (mới)" url={record.anhKD} />
+                      <VerifyDocCard variant="portrait" label="Giấy phép ATTP (mới)" url={record.anhKD} />
                     ) : null}
                     <ul className="seller-verify-register-list">
                       <li>
-                        <span>Số GP:</span> {record.attpMeta?.licenseNumber || '—'}
+                        <span>Ngày cấp:</span> {formatAttpDateLabel(resolvePendingAttpDates(record).issuedAt)}
                       </li>
                       <li>
-                        <span>Ngày cấp:</span> {record.attpMeta?.issuedAt || '—'}
-                      </li>
-                      <li>
-                        <span>Ngày hết hạn:</span> {record.attpMeta?.expiresAt || '—'}
+                        <span>Ngày hết hạn:</span> {formatAttpDateLabel(resolvePendingAttpDates(record).expiresAt)}
                       </li>
                     </ul>
                   </div>
@@ -480,6 +430,26 @@ export default function SellerDetailPage() {
       {!loading && !record ? (
         <p className="error-banner">Không tìm thấy hồ sơ xác minh.</p>
       ) : null}
+
+      <Modal
+        title="Duyệt lại hồ sơ xác thực"
+        open={approveOpen}
+        okText="Duyệt"
+        okButtonProps={{ loading: busy }}
+        cancelText="Huỷ"
+        onOk={handleApproveConfirm}
+        onCancel={() => setApproveOpen(false)}
+      >
+        <p style={{ marginBottom: 8 }}>
+          Xác nhận duyệt giấy phép ATTP mới của{' '}
+          <strong>{record?.shopName || 'gian hàng'}</strong>?
+        </p>
+        <p style={{ margin: 0, color: '#64748b', lineHeight: 1.6 }}>
+          Ngày cấp và ngày hết hạn do người bán khai báo — xem lại ở mục{' '}
+          <strong>Hồ sơ mới</strong> phía trên. Admin chỉ duyệt hoặc từ chối, không chỉnh sửa
+          thông tin này.
+        </p>
+      </Modal>
 
       <Modal
         title="Từ chối hồ sơ"
