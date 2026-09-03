@@ -15,6 +15,7 @@ const {
 } = require("../constants");
 const { createNotification } = require("./notificationService");
 const { assertShopOwnerCanSell } = require("../utils/sellerVerificationReReview");
+const { shopHasAttpVisibilityBlock } = require("./attpLicenseService");
 const { emitAdminUpdated, emitUserResourceUpdated } = require("./realtimeService");
 
 function createServiceError(message, statusCode = 400) {
@@ -192,6 +193,9 @@ async function ensureSubscriptionFresh(shop) {
     return null;
   }
   if (!isRecordActive(shop.isActive)) {
+    if (await shopHasAttpVisibilityBlock(shop)) {
+      return active;
+    }
     await syncShopFromSubscription(shop, active);
     await unhideShopProducts(shop._id);
   }
@@ -207,6 +211,12 @@ async function assertCanManageProducts(shop) {
   }
   if (shop.userId) {
     await assertShopOwnerCanSell(shop.userId);
+  }
+  if (await shopHasAttpVisibilityBlock(shop)) {
+    throw createServiceError(
+      "Giấy phép an toàn thực phẩm chưa hợp lệ hoặc đang chờ duyệt. Vui lòng cập nhật hồ sơ xác thực trong Cài đặt shop.",
+      403
+    );
   }
   const active = await ensureSubscriptionFresh(shop);
   if (!active) {

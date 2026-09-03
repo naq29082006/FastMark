@@ -175,12 +175,14 @@ export default function WithdrawalsPage() {
   }
 
   async function handleApprove(item) {
-    const note = window.prompt('Ghi chú duyệt (tuỳ chọn):', '') ?? '';
+    if (!window.confirm(`Duyệt rút ${formatPrice(item.amount)} cho ${item.shopName || item.userName || 'người bán'}?`)) {
+      return;
+    }
     setActionId(item.id);
     setError('');
     try {
       const token = await getIdToken();
-      await approveAdminWithdraw(token, item.id, { adminNote: note });
+      await approveAdminWithdraw(token, item.id);
       setSuccessMessage(`Đã duyệt rút ${formatPrice(item.amount)}.`);
       await loadItems();
     } catch (approveError) {
@@ -191,13 +193,17 @@ export default function WithdrawalsPage() {
   }
 
   async function handleReject(item) {
-    const note = window.prompt('Lý do từ chối (sẽ hiện trên app):', 'Thông tin tài khoản không hợp lệ');
+    const note = window.prompt('Lý do từ chối (bắt buộc, sẽ hiện trên app):', '');
     if (note === null) return;
+    if (!String(note).trim()) {
+      setError('Vui lòng nhập lý do từ chối.');
+      return;
+    }
     setActionId(item.id);
     setError('');
     try {
       const token = await getIdToken();
-      await rejectAdminWithdraw(token, item.id, { adminNote: note });
+      await rejectAdminWithdraw(token, item.id, { adminNote: note.trim() });
       setSuccessMessage(`Đã từ chối và hoàn ${formatPrice(item.amount)} về ví.`);
       await loadItems();
     } catch (rejectError) {

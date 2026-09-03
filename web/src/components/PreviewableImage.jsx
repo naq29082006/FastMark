@@ -136,28 +136,44 @@ export function PreviewableImageGrid({
   );
 }
 
-export function VerifyDocCard({ label, url, className = '' }) {
+export function VerifyDocCard({ label, url, className = '', variant = 'landscape' }) {
   const src = resolveMediaUrl(url);
+  const isPortrait = variant === 'portrait';
+  const cardClass = [
+    'seller-verify-doc-card',
+    isPortrait ? 'seller-verify-doc-card--portrait' : '',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const previewClass = [
+    'seller-verify-doc-preview',
+    isPortrait ? 'seller-verify-doc-preview--portrait' : '',
+    'shop-detail-doc-preview-btn',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   if (!src) {
     return (
-      <article className={`seller-verify-doc-card empty ${className}`.trim()}>
-        <div className="seller-verify-doc-preview placeholder">{label}</div>
+      <article className={`${cardClass} empty`.trim()}>
+        <div className={`${previewClass} placeholder`}>{label}</div>
         <span>{label}</span>
       </article>
     );
   }
 
   return (
-    <article className={`seller-verify-doc-card ${className}`.trim()}>
-      <div className="seller-verify-doc-preview shop-detail-doc-preview-btn">
+    <article className={cardClass}>
+      <div className={previewClass}>
         <PreviewableImage
           src={src}
           alt={label}
-          width={320}
-          height={132}
+          width={isPortrait ? 180 : 320}
+          height={isPortrait ? 240 : 132}
           shape="rounded"
           className="verify-doc-preview-image"
-          style={{ width: '100%', height: 132 }}
+          style={{ width: '100%', height: '100%', objectFit: isPortrait ? 'contain' : 'cover' }}
         />
       </div>
       <span>{label}</span>

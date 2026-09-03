@@ -454,6 +454,11 @@ async function approveWithdraw(adminUser, withdrawId, { adminNote } = {}) {
 }
 
 async function rejectWithdraw(adminUser, withdrawId, { adminNote } = {}) {
+  const reason = String(adminNote || "").trim();
+  if (!reason) {
+    throw createServiceError("Vui lòng nhập lý do từ chối.");
+  }
+
   const session = await mongoose.startSession();
   try {
     let withdraw;
@@ -500,7 +505,7 @@ async function rejectWithdraw(adminUser, withdrawId, { adminNote } = {}) {
       }
 
       withdraw.status = WITHDRAW_STATUS.REJECTED;
-      withdraw.adminNote = String(adminNote || "").trim() || "Admin từ chối yêu cầu rút tiền.";
+      withdraw.adminNote = reason;
       withdraw.gdHoanId = refundTx[0]._id;
       withdraw.xuLyBoi = adminUser._id;
       withdraw.tgXuLy = new Date();
@@ -510,7 +515,7 @@ async function rejectWithdraw(adminUser, withdrawId, { adminNote } = {}) {
       walletDto = { balance: wallet.balance };
     });
 
-    const rejectNote = String(adminNote || "").trim();
+    const rejectNote = reason;
     await createNotification(withdraw.userId, {
       title: "Rút tiền bị từ chối",
       content:

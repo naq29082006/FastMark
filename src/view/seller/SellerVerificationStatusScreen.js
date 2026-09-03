@@ -20,65 +20,85 @@ export default function SellerVerificationStatusScreen({
   verification,
   onBack,
   onEdit,
+  onViewAttp,
 }) {
   const isPending = verification?.status === SELLER_VERIFICATION_STATUS.PENDING;
   const isRejected = verification?.status === SELLER_VERIFICATION_STATUS.REJECTED;
+  const isPendingReReview = Boolean(verification?.isPendingReReview);
+
+  const screenTitle = isPendingReReview
+    ? 'Giấy phép chờ duyệt'
+    : isPending
+      ? 'Hồ sơ chờ duyệt'
+      : 'Hồ sơ đăng ký';
+
+  const statusTitle = isPendingReReview
+    ? 'Giấy phép mới đang được xem xét'
+    : isPending
+      ? 'Hồ sơ đăng ký đang được xem xét'
+      : 'Hồ sơ chưa được duyệt';
+
+  const statusDescription = isPendingReReview
+    ? 'Gian hàng tạm ẩn trên bản đồ và danh sách sản phẩm cho đến khi admin duyệt giấy phép mới. Bạn có thể xem lại nội dung đã gửi.'
+    : isPending
+      ? 'Admin đang duyệt hồ sơ đăng ký của bạn. Gian hàng sẽ hiển thị sau khi được phê duyệt.'
+      : verification?.lyDoTuChoi ||
+        'Hồ sơ đăng ký người bán chưa đạt yêu cầu. Vui lòng chỉnh sửa và gửi lại.';
+
+  const badgeLabel = isPendingReReview ? 'Đang chờ duyệt lại' : isPending ? 'Đang chờ duyệt' : 'Bị từ chối';
 
   return (
-    <ProfileSubScreen
-      title={isPending ? 'Hồ sơ chờ duyệt' : 'Hồ sơ đăng ký'}
-      onBack={onBack}
-    >
+    <ProfileSubScreen title={screenTitle} onBack={onBack}>
       <View style={styles.card}>
         <View style={[styles.badge, isRejected ? styles.badgeRejected : styles.badgePending]}>
-          <Text style={[styles.badgeText, isRejected && styles.badgeTextRejected]}>
-            {isPending ? 'Đang chờ duyệt' : 'Bị từ chối'}
-          </Text>
+          <Text style={[styles.badgeText, isRejected && styles.badgeTextRejected]}>{badgeLabel}</Text>
         </View>
 
-        <Text style={styles.title}>
-          {isPending
-            ? 'Hồ sơ đang được xem xét'
-            : 'Hồ sơ chưa được duyệt'}
-        </Text>
-
-        <Text style={styles.description}>
-          {isPending
-            ? 'Admin đang duyệt hồ sơ của bạn. Bạn có thể xem lại và chỉnh sửa trước khi được phê duyệt.'
-            : verification?.lyDoTuChoi ||
-              'Hồ sơ đăng ký người bán chưa đạt yêu cầu. Vui lòng chỉnh sửa và gửi lại.'}
-        </Text>
+        <Text style={styles.title}>{statusTitle}</Text>
+        <Text style={styles.description}>{statusDescription}</Text>
 
         <View style={styles.metaBlock}>
           <Text style={styles.metaLabel}>Gửi lúc</Text>
-          <Text style={styles.metaValue}>{formatSubmittedAt(verification?.submittedAt)}</Text>
+          <Text style={styles.metaValue}>
+            {formatSubmittedAt(
+              isPendingReReview ? verification?.reReviewSubmittedAt : verification?.submittedAt
+            )}
+          </Text>
         </View>
 
-        {verification?.shopName ? (
+        {isPendingReReview && verification?.reReviewChangeReason ? (
+          <View style={styles.metaBlock}>
+            <Text style={styles.metaLabel}>Lý do thay đổi</Text>
+            <Text style={styles.metaValue}>{verification.reReviewChangeReason}</Text>
+          </View>
+        ) : null}
+
+        {!isPendingReReview && verification?.shopName ? (
           <View style={styles.metaBlock}>
             <Text style={styles.metaLabel}>Tên shop</Text>
             <Text style={styles.metaValue}>{verification.shopName}</Text>
           </View>
         ) : null}
 
-        {verification?.shopUsername ? (
+        {!isPendingReReview && verification?.shopUsername ? (
           <View style={styles.metaBlock}>
             <Text style={styles.metaLabel}>Username shop</Text>
             <Text style={styles.metaValue}>@{verification.shopUsername}</Text>
           </View>
         ) : null}
 
-        {verification?.categoryName ? (
+        {!isPendingReReview && verification?.categoryName ? (
           <View style={styles.metaBlock}>
             <Text style={styles.metaLabel}>Danh mục kinh doanh</Text>
             <Text style={styles.metaValue}>{verification.categoryName}</Text>
           </View>
         ) : null}
 
-        {verification?.addressHeThong ||
-        verification?.systemAddress ||
-        verification?.DiaChiHeThong ||
-        verification?.address ? (
+        {!isPendingReReview &&
+        (verification?.addressHeThong ||
+          verification?.systemAddress ||
+          verification?.DiaChiHeThong ||
+          verification?.address) ? (
           <View style={styles.metaBlock}>
             <Text style={styles.metaLabel}>Địa chỉ</Text>
             <Text style={styles.metaValue}>
@@ -90,14 +110,25 @@ export default function SellerVerificationStatusScreen({
           </View>
         ) : null}
 
-        <Pressable
-          onPress={onEdit}
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
-        >
-          <Text style={styles.primaryButtonText}>
-            {isPending ? 'Xem và chỉnh sửa' : 'Chỉnh sửa và gửi lại'}
-          </Text>
-        </Pressable>
+        {isPending && onViewAttp ? (
+          <Pressable
+            onPress={onViewAttp}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.primaryButtonText}>
+              {isPendingReReview ? 'Xem giấy phép đã gửi' : 'Xem giấy phép đăng ký'}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {isRejected && onEdit ? (
+          <Pressable
+            onPress={onEdit}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.primaryButtonText}>Chỉnh sửa và gửi lại</Text>
+          </Pressable>
+        ) : null}
       </View>
     </ProfileSubScreen>
   );

@@ -57,6 +57,7 @@ export default function ShopTabHomeScreen({
   onStartRegister,
   onOpenHub,
   onOpenWallet,
+  onEditVerification,
 }) {
   const insets = useScreenInsets();
   const profile = useSelector(selectAuthProfile);
@@ -72,6 +73,10 @@ export default function ShopTabHomeScreen({
   const isPending = verification?.status === SELLER_VERIFICATION_STATUS.PENDING;
   const isRejected = verification?.status === SELLER_VERIFICATION_STATUS.REJECTED;
   const isPendingReReview = Boolean(verification?.isPendingReReview);
+  const isAttpExpired = Boolean(verification?.isAttpExpired);
+  const isAttpResubmitRequired = Boolean(verification?.isAttpResubmitRequired);
+  const showAttpActionBanner =
+    (isAttpExpired || isAttpResubmitRequired) && !isPendingReReview;
   const showManageHub = Boolean(canSwitchToSeller && isSeller);
   const notificationBadgeCount = Math.max(0, Number(unreadNotificationsCount) || 0);
   const walletBalance = Number(profile?.walletBalance) || 0;
@@ -173,6 +178,31 @@ export default function ShopTabHomeScreen({
           ) : null}
         </View>
 
+        {showManageHub && showAttpActionBanner ? (
+          <View style={styles.expiredAttpBanner}>
+            <Text style={styles.expiredAttpBannerTitle}>
+              {isAttpResubmitRequired ? 'Giấy phép ATTP chưa được duyệt' : 'Giấy phép ATTP đã hết hạn'}
+            </Text>
+            <Text style={styles.expiredAttpBannerBody}>
+              {isAttpResubmitRequired
+                ? verification?.attpMeta?.lastReReviewRejection?.reason
+                  ? `Lý do từ chối: ${verification.attpMeta.lastReReviewRejection.reason}. Gian hàng đang tạm ẩn — vui lòng gửi lại hồ sơ xác thực.`
+                  : 'Gian hàng đang tạm ẩn. Vui lòng gửi lại giấy phép kinh doanh hoặc chứng nhận an toàn thực phẩm.'
+                : 'Gian hàng đang tạm ẩn. Vui lòng cập nhật giấy phép kinh doanh hoặc chứng nhận an toàn thực phẩm.'}
+            </Text>
+            {onEditVerification ? (
+              <Pressable
+                style={({ pressed }) => [styles.expiredAttpBannerBtn, pressed && styles.pressed]}
+                onPress={onEditVerification}
+              >
+                <Text style={styles.expiredAttpBannerBtnText}>
+                  {isAttpResubmitRequired ? 'Gửi lại hồ sơ xác thực' : 'Cập nhật hồ sơ xác thực'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
         {showManageHub && isPendingReReview ? (
           <View style={styles.reReviewBanner}>
             <Text style={styles.reReviewBannerTitle}>Đang chờ duyệt lại hồ sơ xác thực</Text>
@@ -234,7 +264,8 @@ export default function ShopTabHomeScreen({
             <View style={styles.hubGrid}>
               {HUB_ITEMS.map((item) => {
                 const blockedByReReview =
-                  isPendingReReview && (item.action === 'post' || item.action === 'products');
+                  (isPendingReReview || isAttpResubmitRequired) &&
+                  (item.action === 'post' || item.action === 'products');
                 return (
                 <Pressable
                   key={item.key}
@@ -507,5 +538,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: '#9a3412',
+  },
+  expiredAttpBanner: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  expiredAttpBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#b91c1c',
+    marginBottom: 4,
+  },
+  expiredAttpBannerBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: '#991b1b',
+  },
+  expiredAttpBannerBtn: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    minHeight: 38,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#b91c1c',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expiredAttpBannerBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

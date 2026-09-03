@@ -10,6 +10,7 @@ import {
 } from '../../api/sellerApi';
 import PageContainer from '../components/PageContainer';
 import RowActions from '../components/RowActions';
+import ShopCell from '../components/ShopCell';
 import StatCards from '../components/StatCards';
 import ListToolbar from '../components/ListToolbar';
 import { usePaginatedQuery } from '../hooks/usePaginatedQuery';
@@ -51,6 +52,7 @@ export default function SellersPage() {
         limit,
         search,
         status: apiFilterParam(status),
+        sort: 'newest',
       });
       return {
         data: {
@@ -119,9 +121,15 @@ export default function SellersPage() {
     buildSttColumn({ page, pageSize: limit }),
     {
       title: 'Gian hàng',
-      dataIndex: 'shopName',
       key: 'shopName',
-      render: (v) => v || '—',
+      render: (_, row) => (
+        <ShopCell
+          shopName={row.shopName}
+          shopUsername={row.shopUsername}
+          shopAvatar={row.shopAvatar}
+          onClick={row.shopId ? () => navigate(`/sellers/shops/${row.shopId}`) : undefined}
+        />
+      ),
     },
     {
       title: 'Họ tên (CCCD)',
@@ -136,8 +144,18 @@ export default function SellersPage() {
     {
       title: 'Chủ gian hàng',
       key: 'owner',
-      render: (_, row) =>
-        row.user?.fullName || row.user?.userName || row.ownerName || '—',
+      render: (_, row) => {
+        const owner = row.user || {};
+        const ownerName = owner.fullName || row.ownerName || '';
+        return (
+          <ShopCell
+            shopName={ownerName}
+            shopUsername={ownerName ? owner.userName : owner.userName || ''}
+            shopAvatar={owner.avatar}
+            onClick={owner.id ? () => navigate(`/users/${owner.id}`) : undefined}
+          />
+        );
+      },
     },
     {
       title: 'Trạng thái',
@@ -152,10 +170,11 @@ export default function SellersPage() {
       render: (_, row) => row.categoryName || row.category?.name || '—',
     },
     {
-      title: 'Ngày gửi',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (v, row) => formatDateTime(v || row.submittedAt),
+      title: 'Cập nhật lúc',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      render: (v, row) =>
+        formatDateTime(row.reReviewSubmittedAt || v || row.submittedAt || row.createdAt),
     },
     {
       title: 'Thao tác',
@@ -201,7 +220,7 @@ export default function SellersPage() {
       stats={<StatCards items={statItems} loading={loading && !stats} columns={5} />}
     >
       <ListToolbar
-        searchPlaceholder="Tìm theo tên shop, CCCD, họ tên CCCD, chủ gian hàng..."
+        searchPlaceholder="Tìm theo tên shop, username shop, username chủ shop, CCCD, họ tên CCCD..."
         searchValue={search}
         onSearchChange={setSearch}
         onSearch={setSearch}

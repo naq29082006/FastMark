@@ -18,8 +18,6 @@ import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination
 import { mergeListById } from '../../core/utils/realtimeList';
 import { formatPriceRange, getProductPromoPriceLabels } from '../../core/utils/productFormat';
 import {
-  getProductImageOverlayLabel,
-  isProductHidden,
   resolveIsOutOfStock,
 } from '../../core/utils/productAvailability';
 import ClearableSearchField from '../shared/components/ClearableSearchField';
@@ -54,9 +52,6 @@ function mapApiProductToManageCard(product) {
     remainingQuantity,
     variants,
     isOutOfStock: Boolean(product.isOutOfStock),
-    status,
-    isUnavailable: Boolean(product.isUnavailable),
-    statusLabel: isProductHidden(product) ? 'Đã ẩn' : 'Đang hiện',
     pinProduct: Math.max(0, Math.min(2, Number(product.pinProduct) || 0)),
     isPromotion: Boolean(product.isPromotion) && Number(product.discountPercent) > 0,
     discountPercent: Number(product.discountPercent) || 0,
@@ -77,8 +72,7 @@ const ProductManageCard = memo(function ProductManageCard({
   onPinPress,
   pinningId,
 }) {
-  const overlayLabel = getProductImageOverlayLabel(product);
-  const hidden = isProductHidden(product);
+  const overlayLabel = resolveIsOutOfStock(product) ? 'Hết hàng' : null;
   const pin = Number(product.pinProduct) || 0;
   const isPromotion = Boolean(product.isPromotion) && Number(product.discountPercent) > 0;
   const promoLabels = isPromotion ? getProductPromoPriceLabels(product) : null;
@@ -136,11 +130,6 @@ const ProductManageCard = memo(function ProductManageCard({
         <Text style={styles.metaLine} numberOfLines={2}>
           {metaLine}
         </Text>
-        {hidden ? (
-          <View style={styles.hiddenBadge}>
-            <Text style={styles.hiddenBadgeText}>Đã ẩn</Text>
-          </View>
-        ) : null}
       </View>
 
       <Pressable
@@ -189,7 +178,6 @@ export default function SellerProductsTabScreen({
   const [showBulkPromo, setShowBulkPromo] = useState(false);
   const [bulkPromoTab, setBulkPromoTab] = useState('bulk');
   const [pinningId, setPinningId] = useState('');
-  const [visibilityTab, setVisibilityTab] = useState('visible');
 
   const loadProducts = useCallback(async ({ nextPage = 1 } = {}) => {
     if (loadingGuardRef.current) {
@@ -254,16 +242,10 @@ export default function SellerProductsTabScreen({
   }, [onNavigationStateChange, productDetailId, showBulkPromo]);
 
   const filteredProducts = useMemo(() => {
-    let list = products;
-    if (visibilityTab === 'visible') {
-      list = list.filter((product) => !isProductHidden(product));
-    } else {
-      list = list.filter((product) => isProductHidden(product));
-    }
     if (!normalizeSearchText(search)) {
-      return list;
+      return products;
     }
-    return list.filter((product) =>
+    return products.filter((product) =>
       matchesSearchAny(
         [
           product.name,
@@ -277,16 +259,7 @@ export default function SellerProductsTabScreen({
         search
       )
     );
-  }, [products, search, visibilityTab]);
-
-  const visibleCount = useMemo(
-    () => products.filter((product) => !isProductHidden(product)).length,
-    [products]
-  );
-  const hiddenCount = useMemo(
-    () => products.filter((product) => isProductHidden(product)).length,
-    [products]
-  );
+  }, [products, search]);
 
   async function applyPin(productId, pinProduct) {
     setPinningId(productId);
@@ -400,43 +373,6 @@ export default function SellerProductsTabScreen({
     <View style={styles.screen}>
       <SubScreenHeader title="Quản lý sản phẩm" onBack={onBack} />
 
-      <View style={styles.actionRow}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.visibilityTab,
-            visibilityTab === 'visible' && styles.visibilityTabActive,
-            pressed && styles.actionChipPressed,
-          ]}
-          onPress={() => setVisibilityTab('visible')}
-        >
-          <Text
-            style={[
-              styles.visibilityTabText,
-              visibilityTab === 'visible' && styles.visibilityTabTextActive,
-            ]}
-          >
-            Đang hiện ({visibleCount})
-          </Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.visibilityTab,
-            visibilityTab === 'hidden' && styles.visibilityTabActive,
-            pressed && styles.actionChipPressed,
-          ]}
-          onPress={() => setVisibilityTab('hidden')}
-        >
-          <Text
-            style={[
-              styles.visibilityTabText,
-              visibilityTab === 'hidden' && styles.visibilityTabTextActive,
-            ]}
-          >
-            Đã ẩn ({hiddenCount})
-          </Text>
-        </Pressable>
-      </View>
-
       <View style={styles.promoActionRow}>
         <Pressable
           style={({ pressed }) => [styles.actionChip, pressed && styles.actionChipPressed]}
@@ -498,18 +434,12 @@ export default function SellerProductsTabScreen({
           ListEmptyComponent={
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>
-                {search.trim()
-                  ? 'Không tìm thấy sản phẩm'
-                  : visibilityTab === 'hidden'
-                    ? 'Chưa có sản phẩm đã ẩn'
-                    : 'Chưa có sản phẩm'}
+                {search.trim() ? 'Không tìm thấy sản phẩm' : 'Chưa có sản phẩm'}
               </Text>
               <Text style={styles.emptyText}>
                 {search.trim()
                   ? 'Thử từ khóa khác hoặc xóa ô tìm kiếm.'
-                  : visibilityTab === 'hidden'
-                    ? 'Sản phẩm ẩn khi hết gói Seller hoặc gian hàng tạm ngưng — gia hạn gói để hiện lại.'
-                    : 'Chưa có sản phẩm nào. Hãy đăng bài từ mục Đăng bài sản phẩm.'}
+                  : 'Chưa có sản phẩm nào. Hãy đăng bài từ mục Đăng bài sản phẩm.'}
               </Text>
             </View>
           }
@@ -557,43 +487,13 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: '#f1f5f9',
   },
-  actionRow: {
+  promoActionRow: {
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 4,
     backgroundColor: '#f1f5f9',
-  },
-  promoActionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    paddingBottom: 4,
-    backgroundColor: '#f1f5f9',
-  },
-  visibilityTab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#ffffff',
-  },
-  visibilityTabActive: {
-    borderColor: '#076F32',
-    backgroundColor: '#ecfdf3',
-  },
-  visibilityTabText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  visibilityTabTextActive: {
-    color: '#076F32',
   },
   actionChip: {
     flex: 1,
@@ -731,19 +631,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     lineHeight: 16,
-  },
-  hiddenBadge: {
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    backgroundColor: '#fef3c7',
-  },
-  hiddenBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#b45309',
   },
   pinButton: {
     position: 'absolute',

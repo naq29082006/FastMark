@@ -178,6 +178,53 @@ async function isShopOwnerPendingReReview(userId) {
   return meta.type === META_TYPE.RE_REVIEW_PENDING;
 }
 
+async function loadAttpResubmitRequiredUserIdSet(userIds = []) {
+  const normalized = [...new Set(userIds.map((id) => String(id)).filter(Boolean))];
+  if (!normalized.length) {
+    return new Set();
+  }
+
+  const rows = await SellerVerification.find({
+    userId: { $in: normalized },
+    status: SELLER_VERIFICATION_STATUS.APPROVED,
+    LyDoTuChoi: /lastReReviewRejection/,
+  })
+    .select("userId LyDoTuChoi")
+    .lean();
+
+  const blocked = new Set();
+  for (const row of rows) {
+    const meta = parseVerificationMeta(row.LyDoTuChoi);
+    if (meta.type === META_TYPE.ATTP && attpMetaRequiresResubmit(meta.attpMeta)) {
+      blocked.add(String(row.userId));
+    }
+  }
+  return blocked;
+}
+
+async function loadPendingReReviewUserIdSet(userIds = []) {
+  const normalized = [...new Set(userIds.map((id) => String(id)).filter(Boolean))];
+  if (!normalized.length) {
+    return new Set();
+  }
+
+  const rows = await SellerVerification.find({
+    userId: { $in: normalized },
+    status: SELLER_VERIFICATION_STATUS.PENDING,
+  })
+    .select("userId LyDoTuChoi")
+    .lean();
+
+  const blocked = new Set();
+  for (const row of rows) {
+    const meta = parseVerificationMeta(row.LyDoTuChoi);
+    if (meta.type === META_TYPE.RE_REVIEW_PENDING) {
+      blocked.add(String(row.userId));
+    }
+  }
+  return blocked;
+}
+
 function createBlockedError() {
   const error = new Error(PENDING_REVIEW_MESSAGE);
   error.statusCode = 403;
@@ -188,6 +235,77 @@ async function assertShopOwnerCanSell(userId) {
   if (await isShopOwnerPendingReReview(userId)) {
     throw createBlockedError();
   }
+  if (await shopRequiresAttpReApproval(userId)) {
+    const error = new Error(
+      "Giấy phép ATTP chưa được duyệt. Vui lòng gửi lại hồ sơ xác thực trong Cài đặt shop."
+    );
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
+function parseAttpDateString(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return null;
+  }
+
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+  if (dmy) {
+    const parsed = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const isoLike = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (isoLike) {
+    const parsed = new Date(Number(isoLike[1]), Number(isoLike[2]) - 1, Number(isoLike[3]));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getApprovedAttpMeta(verification) {
+  if (!verification || Number(verification.status) !== SELLER_VERIFICATION_STATUS.APPROVED) {
+    return null;
+  }
+  const meta = parseVerificationMeta(verification.LyDoTuChoi);
+  if (meta.type !== META_TYPE.ATTP || !meta.attpMeta) {
+    return null;
+  }
+  return meta.attpMeta;
+}
+
+function attpMetaRequiresResubmit(attpMeta) {
+  return Boolean(attpMeta?.lastReReviewRejection?.reason);
+}
+
+async function shopRequiresAttpReApproval(userId) {
+  if (!userId) {
+    return false;
+  }
+  const verification = await SellerVerification.findOne({
+    userId,
+    status: SELLER_VERIFICATION_STATUS.APPROVED,
+  })
+    .select("status LyDoTuChoi")
+    .lean();
+  const attpMeta = getApprovedAttpMeta(verification);
+  return attpMetaRequiresResubmit(attpMeta);
+}
+
+function isAttpExpired(attpMeta, now = new Date()) {
+  if (!attpMeta?.expiresAt) {
+    return false;
+  }
+  const expiryDate = parseAttpDateString(attpMeta.expiresAt);
+  if (!expiryDate) {
+    return false;
+  }
+  const endOfDay = new Date(expiryDate);
+  endOfDay.setHours(23, 59, 59, 999);
+  return now > endOfDay;
 }
 
 function enrichPublicVerification(verification, user = null) {
@@ -200,6 +318,13 @@ function enrichPublicVerification(verification, user = null) {
     meta.attpMeta ||
     (meta.type === META_TYPE.ATTP ? meta.attpMeta : null);
   const pendingReReview = isPendingReReviewVerification(verification, user);
+  const approvedAttp = getApprovedAttpMeta(verification);
+  const attpExpired =
+    Boolean(approvedAttp?.expiresAt) &&
+    isAttpExpired(approvedAttp) &&
+    !pendingReReview;
+  const attpResubmitRequired =
+    attpMetaRequiresResubmit(approvedAttp) && !pendingReReview;
 
   return {
     attpMeta: attpSource
@@ -208,8 +333,13 @@ function enrichPublicVerification(verification, user = null) {
           issuedAt: attpSource.issuedAt || "",
           expiresAt: attpSource.expiresAt || "",
           extraDocUrls: attpSource.extraDocUrls || [],
+          lastReReviewRejection: approvedAttp?.lastReReviewRejection || null,
         }
       : null,
+    attpExpiresAt: approvedAttp?.expiresAt || attpSource?.expiresAt || "",
+    attpIssuedAt: approvedAttp?.issuedAt || attpSource?.issuedAt || "",
+    isAttpExpired: attpExpired,
+    isAttpResubmitRequired: attpResubmitRequired,
     isPendingReReview: pendingReReview,
     pendingReReviewLabel: pendingReReview ? "Đang chờ duyệt lại" : "",
     reReviewChangeReason: meta.reReviewPending?.changeReason || "",
@@ -224,12 +354,19 @@ module.exports = {
   PENDING_REVIEW_MESSAGE,
   META_TYPE,
   parseVerificationMeta,
+  parseAttpDateString,
+  getApprovedAttpMeta,
+  attpMetaRequiresResubmit,
+  shopRequiresAttpReApproval,
+  isAttpExpired,
   buildAttpMeta,
   buildReReviewPendingMeta,
   buildSnapshotFromVerification,
   applySnapshotToVerification,
   isPendingReReviewVerification,
   isShopOwnerPendingReReview,
+  loadPendingReReviewUserIdSet,
+  loadAttpResubmitRequiredUserIdSet,
   assertShopOwnerCanSell,
   enrichPublicVerification,
 };

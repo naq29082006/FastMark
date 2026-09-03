@@ -66,7 +66,6 @@ export default function WithdrawalsPage() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
   const [selected, setSelected] = useState(null);
-  const [mode, setMode] = useState('approve');
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -110,11 +109,55 @@ export default function WithdrawalsPage() {
     [stats]
   );
 
-  function openAction(record, action) {
+  function openRejectModal(record) {
     setSelected(record);
-    setMode(action);
     setNote('');
     setNoteOpen(true);
+  }
+
+  async function handleApprove(record) {
+    const id = record?.id || record?._id;
+    if (!id) {
+      return;
+    }
+
+    Modal.confirm({
+      title: 'Duyệt rút tiền',
+      content: `Xác nhận duyệt yêu cầu rút ${formatCurrency(record.amount)} của ${record.shopName || 'gian hàng'}?`,
+      okText: 'Duyệt',
+      cancelText: 'Huỷ',
+      centered: true,
+      onOk: async () => {
+        const token = await getIdToken();
+        await approveAdminWithdraw(token, id);
+        message.success('Đã duyệt rút tiền');
+        if (detailOpen && detail && String(detail.id || detail._id) === String(id)) {
+          await openDetail({ ...detail, id });
+        }
+        reload();
+      },
+    });
+  }
+
+  async function submitReject() {
+    const reason = note.trim();
+    if (!reason) {
+      message.warning('Vui lòng nhập lý do từ chối');
+      return Promise.reject();
+    }
+    try {
+      const token = await getIdToken();
+      const id = selected.id || selected._id;
+      await rejectAdminWithdraw(token, id, { adminNote: reason });
+      message.success('Đã từ chối');
+      setNoteOpen(false);
+      if (detailOpen && detail && String(detail.id || detail._id) === String(id)) {
+        await openDetail({ ...detail, id });
+      }
+      reload();
+    } catch (err) {
+      message.error(err.message || 'Thao tác thất bại');
+    }
   }
 
   async function openDetail(record) {
@@ -129,27 +172,6 @@ export default function WithdrawalsPage() {
       message.error(err.message || 'Không tải được chi tiết');
     } finally {
       setDetailLoading(false);
-    }
-  }
-
-  async function submitAction() {
-    try {
-      const token = await getIdToken();
-      const id = selected.id || selected._id;
-      if (mode === 'approve') {
-        await approveAdminWithdraw(token, id, { adminNote: note });
-        message.success('Đã duyệt rút tiền');
-      } else {
-        await rejectAdminWithdraw(token, id, { adminNote: note });
-        message.success('Đã từ chối');
-      }
-      setNoteOpen(false);
-      if (detailOpen && detail && String(detail.id || detail._id) === String(id)) {
-        await openDetail({ ...detail, id });
-      }
-      reload();
-    } catch (err) {
-      message.error(err.message || 'Thao tác thất bại');
     }
   }
 
@@ -224,10 +246,10 @@ export default function WithdrawalsPage() {
                   </Button>
                   {record.status === 0 ? (
                     <>
-                      <Button size="small" type="primary" onClick={() => openAction(record, 'approve')}>
+                      <Button size="small" type="primary" onClick={() => handleApprove(record)}>
                         Duyệt
                       </Button>
-                      <Button size="small" danger onClick={() => openAction(record, 'reject')}>
+                      <Button size="small" danger onClick={() => openRejectModal(record)}>
                         Từ chối
                       </Button>
                     </>
@@ -251,10 +273,10 @@ export default function WithdrawalsPage() {
           detail?.status === 0 ? (
             <Space>
               <Button onClick={() => setDetailOpen(false)}>Đóng</Button>
-              <Button danger onClick={() => openAction(detail, 'reject')}>
+              <Button danger onClick={() => openRejectModal(detail)}>
                 Từ chối
               </Button>
-              <Button type="primary" onClick={() => openAction(detail, 'approve')}>
+              <Button type="primary" onClick={() => handleApprove(detail)}>
                 Duyệt
               </Button>
             </Space>
@@ -313,11 +335,23 @@ export default function WithdrawalsPage() {
       <Modal
         open={noteOpen}
         centered
-        title={mode === 'approve' ? 'Duyệt rút tiền' : 'Từ chối rút tiền'}
+        title="Từ chối rút tiền"
+        okText="Từ chối"
+        okButtonProps={{ danger: true }}
+        cancelText="Huỷ"
         onCancel={() => setNoteOpen(false)}
-        onOk={submitAction}
+        onOk={submitReject}
       >
-        <Input.TextArea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú / lý do" />
+        <p style={{ marginBottom: 12 }}>
+          Nhập lý do từ chối cho yêu cầu rút tiền của{' '}
+          <strong>{selected?.shopName || 'gian hàng'}</strong>. Lý do sẽ hiển thị cho người bán trên app.
+        </p>
+        <Input.TextArea
+          rows={3}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Lý do từ chối (bắt buộc)"
+        />
       </Modal>
     </PageContainer>
   );

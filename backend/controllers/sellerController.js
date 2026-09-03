@@ -160,9 +160,13 @@ exports.listAdminVerifications = async (req, res) => {
 };
 
 exports.approveVerification = async (req, res) => {
+  const expiresAt = pickBodyValue(req.body, ["expiresAt", "ngayHetHan"]);
+  const issuedAt = pickBodyValue(req.body, ["issuedAt", "ngayCap"]);
+
   const verification = await sellerService.approveSellerVerificationByAdmin(
     req.currentUser,
-    req.params.id
+    req.params.id,
+    { expiresAt, issuedAt }
   );
 
   return success(res, {

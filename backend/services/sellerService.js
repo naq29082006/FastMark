@@ -35,6 +35,7 @@ const {
   PENDING_REVIEW_MESSAGE,
   META_TYPE,
   parseVerificationMeta,
+  parseAttpDateString,
   buildAttpMeta,
   buildReReviewPendingMeta,
   buildSnapshotFromVerification,
@@ -641,11 +642,13 @@ async function submitSellerVerification(user, payload) {
     UpdatedAt: new Date(),
   };
 
-  if (
-    existing &&
-    (existing.status === SELLER_VERIFICATION_STATUS.PENDING ||
-      existing.status === SELLER_VERIFICATION_STATUS.REJECTED)
-  ) {
+  if (existing?.status === SELLER_VERIFICATION_STATUS.PENDING) {
+    throw createServiceError(
+      "Hồ sơ đang chờ duyệt. Bạn không thể chỉnh sửa thông tin CCCD."
+    );
+  }
+
+  if (existing?.status === SELLER_VERIFICATION_STATUS.REJECTED) {
     existing.set(sharedFields);
     await existing.save();
     const saved = await reloadVerificationById(existing._id);
@@ -696,23 +699,29 @@ async function submitSellerVerificationReReview(user, payload = {}) {
     throw createServiceError("Vui lòng nhập lý do thay đổi (ít nhất 5 ký tự).");
   }
 
-  const licenseNumber = String(payload.licenseNumber || payload.giayPhepAttp || "").trim();
   const issuedAt = String(payload.issuedAt || payload.ngayCap || "").trim();
-  const expiresAt = String(payload.expiresAt || payload.ngayHetHan || "").trim();
-
-  if (!licenseNumber) {
-    throw createServiceError("Vui lòng nhập số giấy phép an toàn thực phẩm.");
+  if (!issuedAt) {
+    throw createServiceError("Vui lòng nhập ngày cấp giấy phép.");
   }
-  if (!issuedAt || !expiresAt) {
-    throw createServiceError("Vui lòng nhập ngày cấp và ngày hết hạn giấy phép.");
+
+  const expiresAt = String(payload.expiresAt || payload.ngayHetHan || "").trim();
+  if (!expiresAt) {
+    throw createServiceError("Vui lòng nhập ngày hết hạn giấy phép.");
+  }
+
+  const issuedDate = parseAttpDateString(issuedAt);
+  const expiresDate = parseAttpDateString(expiresAt);
+  if (!issuedDate) {
+    throw createServiceError("Ngày cấp không hợp lệ.");
+  }
+  if (!expiresDate) {
+    throw createServiceError("Ngày hết hạn không hợp lệ.");
+  }
+  if (expiresDate.getTime() < issuedDate.getTime()) {
+    throw createServiceError("Ngày hết hạn phải sau ngày cấp.");
   }
 
   const previousSnapshot = buildSnapshotFromVerification(existing);
-  const extraDocUrlsInput = Array.isArray(payload.extraDocUrls)
-    ? payload.extraDocUrls
-    : Array.isArray(payload.extraDocs)
-      ? payload.extraDocs
-      : [];
 
   const anhKD = await resolveVerificationImage({
     user,
@@ -733,45 +742,24 @@ async function submitSellerVerificationReReview(user, payload = {}) {
     );
   }
 
-  const extraDocUrls = [];
-  for (let index = 0; index < extraDocUrlsInput.length; index += 1) {
-    const item = extraDocUrlsInput[index];
-    if (typeof item === "string" && item.startsWith("http")) {
-      extraDocUrls.push(item);
-      continue;
-    }
-    const base64 = item?.base64 || item?.imageBase64;
-    if (!base64) {
-      continue;
-    }
-    const url = await resolveVerificationImage({
-      user,
-      imageBase64: base64,
-      mimeType: item?.mimeType || "image/jpeg",
-      existingUrl: item?.existingUrl || item?.url || null,
-      folder: "seller-verification",
-      label: `extra-doc-${index + 1}`,
-    });
-    if (url) {
-      extraDocUrls.push(url);
-    }
-  }
-
   existing.anhKD = anhKD;
   existing.status = SELLER_VERIFICATION_STATUS.PENDING;
   existing.approvedBy = null;
   existing.LyDoTuChoi = JSON.stringify(
     buildReReviewPendingMeta({
       changeReason,
-      licenseNumber,
+      licenseNumber: "",
       issuedAt,
       expiresAt,
-      extraDocUrls,
+      extraDocUrls: [],
       previousSnapshot,
     })
   );
   existing.UpdatedAt = new Date();
   await existing.save();
+
+  const { hideShopForPendingReReview } = require("./attpLicenseService");
+  await hideShopForPendingReReview(shop, { notify: true });
 
   const saved = await reloadVerificationById(existing._id);
   emitSellerVerificationUpdated(saved, "re_review_submitted");
@@ -782,7 +770,7 @@ async function listPendingSellerVerifications() {
   const verifications = await SellerVerification.find({
     status: SELLER_VERIFICATION_STATUS.PENDING,
   })
-    .sort({ CreatedAt: 1 })
+    .sort({ UpdatedAt: -1, CreatedAt: -1, _id: -1 })
     .populate("userId", "FullName Email Phone UserName Avatar")
     .populate("categoryId", "name")
     .populate("approvedBy", "FullName UserName");
@@ -809,7 +797,7 @@ async function loadShopsByUserIds(userIds = []) {
   }
 
   const shops = await ShopProfile.find({ userId: { $in: normalizedIds } })
-    .select("_id userId status shopName")
+    .select("_id userId status shopName shopUsername avatar")
     .lean();
 
   const byUserId = new Map();
@@ -915,10 +903,11 @@ async function buildAdminVerificationFilter(query = {}) {
 }
 
 function resolveAdminVerificationSort(sortKey) {
-  if (sortKey === "oldest") {
-    return { CreatedAt: 1 };
+  const key = String(sortKey || "newest").trim().toLowerCase();
+  if (key === "oldest") {
+    return { UpdatedAt: 1, CreatedAt: 1, _id: 1 };
   }
-  return { CreatedAt: -1 };
+  return { UpdatedAt: -1, CreatedAt: -1, _id: -1 };
 }
 
 function buildAdminVerificationStats(statusRows = [], shopsLocked = 0) {
@@ -978,7 +967,7 @@ async function listAdminSellerVerifications(query = {}) {
   };
 }
 
-async function approveSellerVerificationByAdmin(adminUser, verificationId) {
+async function approveSellerVerificationByAdmin(adminUser, verificationId, options = {}) {
   const verification = await SellerVerification.findById(verificationId);
   if (!verification) {
     throw createServiceError("Không tìm thấy hồ sơ đăng ký.", 404);
@@ -998,18 +987,33 @@ async function approveSellerVerificationByAdmin(adminUser, verificationId) {
 
   if (isReReview && sellerUser.Role === USER_ROLE.SELLER) {
     const pendingMeta = meta.reReviewPending || {};
+    const issuedAt = String(pendingMeta.issuedAt || "").trim();
+    const expiresAt = String(pendingMeta.expiresAt || "").trim();
+    if (!issuedAt) {
+      throw createServiceError("Hồ sơ thiếu ngày cấp giấy phép từ người bán.");
+    }
+    if (!expiresAt) {
+      throw createServiceError("Hồ sơ thiếu ngày hết hạn giấy phép từ người bán.");
+    }
     verification.status = SELLER_VERIFICATION_STATUS.APPROVED;
     verification.approvedBy = adminUser._id;
     verification.LyDoTuChoi = JSON.stringify(
       buildAttpMeta({
-        licenseNumber: pendingMeta.licenseNumber,
-        issuedAt: pendingMeta.issuedAt,
-        expiresAt: pendingMeta.expiresAt,
-        extraDocUrls: pendingMeta.extraDocUrls,
+        licenseNumber: "",
+        issuedAt,
+        expiresAt,
+        extraDocUrls: [],
       })
     );
     verification.UpdatedAt = new Date();
     await verification.save();
+
+    const shop = await ShopProfile.findOne({ userId: sellerUser._id });
+    if (shop) {
+      const { restoreShopAfterAttpRenewal } = require("./attpLicenseService");
+      await restoreShopAfterAttpRenewal(shop);
+    }
+
     emitSellerVerificationUpdated(verification, "re_review_approved");
     return verification;
   }
@@ -1055,6 +1059,13 @@ async function rejectSellerVerificationByAdmin(adminUser, verificationId, reason
     );
     verification.UpdatedAt = new Date();
     await verification.save();
+
+    const shop = await ShopProfile.findOne({ userId: verification.userId });
+    if (shop) {
+      const { finalizeShopAfterReReviewRejected } = require("./attpLicenseService");
+      await finalizeShopAfterReReviewRejected(shop, { reason: lyDoTuChoi, notify: true });
+    }
+
     emitSellerVerificationUpdated(verification, "re_review_rejected");
     return verification;
   }
@@ -1166,8 +1177,12 @@ function toAdminVerification(verification, shop = null, viewerUser = null) {
   const owner = verification.userId;
   const approver = verification.approvedBy;
   const shopStatus = shop != null ? Number(shop.status) : null;
+  const shopAvatar = String(shop?.avatar || publicData.anhKD || "").trim();
+  const shopUsername = shop?.shopUsername || publicData.shopUsername || "";
   return {
     ...publicData,
+    shopUsername,
+    shopAvatar,
     shopId: shop?._id ? String(shop._id) : publicData.shopId || "",
     shopStatus,
     shopStatusLabel: resolveShopStatusLabel(shop),

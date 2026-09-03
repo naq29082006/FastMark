@@ -15,11 +15,11 @@ export function listAdminVerifications(token, query = {}) {
   return apiRequest(`/api/seller/verification/admin${suffix}`, { token });
 }
 
-export function approveVerification(token, verificationId) {
+export function approveVerification(token, verificationId, body = {}) {
   return apiRequest(`/api/seller/verification/${verificationId}/approve`, {
     method: 'POST',
     token,
-    body: {},
+    body,
   });
 }
 

@@ -227,12 +227,11 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
   const [isPickingLocation, setIsPickingLocation] = useState(false);
 
   const isEditing = useMemo(
-    () =>
-      initialVerification?.status === SELLER_VERIFICATION_STATUS.PENDING ||
-      initialVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED,
+    () => initialVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED,
     [initialVerification?.status]
   );
 
+  const isPending = initialVerification?.status === SELLER_VERIFICATION_STATUS.PENDING;
   const isRejected = initialVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED;
 
   useEffect(() => {
@@ -582,6 +581,20 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
     );
   }
 
+  if (isPending) {
+    return (
+      <ProfileSubScreen title="Hồ sơ đăng ký người bán" onBack={onBack}>
+        <View style={styles.card}>
+          <Text style={styles.title}>Hồ sơ đang chờ duyệt</Text>
+          <Text style={styles.subtitle}>
+            Bạn không thể chỉnh sửa thông tin CCCD khi hồ sơ đang chờ duyệt. Vui lòng quay lại để
+            xem hồ sơ đã gửi.
+          </Text>
+        </View>
+      </ProfileSubScreen>
+    );
+  }
+
   return (
     <ProfileSubScreen title={isEditing ? 'Hồ sơ đăng ký người bán' : 'Đăng ký người bán'} onBack={onBack}>
       <View style={styles.card}>
@@ -591,9 +604,7 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
         <Text style={styles.subtitle}>
           {isRejected
             ? 'Hồ sơ trước đó bị từ chối. Hãy chỉnh sửa và gửi lại để admin xem xét.'
-            : isEditing
-              ? 'Bạn có thể cập nhật hồ sơ khi đang chờ duyệt. Sau khi admin duyệt, bạn mới có thể đăng tin.'
-              : 'Tải ảnh giấy tờ, chọn địa chỉ và gửi hồ sơ. Sau khi admin duyệt, bạn mới có thể đăng tin bán hàng.'}
+            : 'Tải ảnh giấy tờ, chọn địa chỉ và gửi hồ sơ. Sau khi admin duyệt, bạn mới có thể đăng tin bán hàng.'}
         </Text>
 
         {isRejected && initialVerification?.lyDoTuChoi ? (

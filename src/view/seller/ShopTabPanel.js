@@ -27,6 +27,8 @@ import { useResourceSocket } from '../../hooks/useResourceSocket';
 import SellerPhoneSetupScreen from './SellerPhoneSetupScreen';
 import SellerRegistrationScreen from './SellerRegistrationScreen';
 import SellerVerificationStatusScreen from './SellerVerificationStatusScreen';
+import SellerCccdProfileViewScreen from './SellerCccdProfileViewScreen';
+import SellerAttpProfileViewScreen from './SellerAttpProfileViewScreen';
 import SellerShopSettingsScreen from './SellerShopSettingsScreen';
 import SellerVerificationReReviewScreen from './SellerVerificationReReviewScreen';
 import SellerShopQrScreen from './SellerShopQrScreen';
@@ -403,7 +405,21 @@ export default function ShopTabPanel({
       <SellerVerificationStatusScreen
         verification={sellerVerification}
         onBack={() => setSellerStep(null)}
-        onEdit={() => setSellerStep('register')}
+        onViewAttp={() => setSellerStep('attp-view')}
+        onEdit={
+          sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED
+            ? () => setSellerStep('register')
+            : undefined
+        }
+      />
+    );
+  }
+
+  if (sellerStep === 'attp-view') {
+    return (
+      <SellerAttpProfileViewScreen
+        verification={sellerVerification}
+        onBack={() => setSellerStep('pending')}
       />
     );
   }
@@ -413,10 +429,7 @@ export default function ShopTabPanel({
       <SellerRegistrationScreen
         initialVerification={sellerVerification}
         onBack={() => {
-          if (
-            sellerVerification?.status === SELLER_VERIFICATION_STATUS.PENDING ||
-            sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED
-          ) {
+          if (sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED) {
             setSellerStep('pending');
             return;
           }
@@ -464,6 +477,7 @@ export default function ShopTabPanel({
   }
 
   if (shopNav === 'shop-settings') {
+    const verificationPendingReReview = Boolean(reduxVerification?.isPendingReReview);
     return (
       <SellerShopSettingsScreen
         onBack={() => {
@@ -480,7 +494,18 @@ export default function ShopTabPanel({
           setPhoneChangeReturn('shop-settings');
           setSellerStep('phone');
         }}
+        onViewCccdProfile={() => setShopNav('verification-cccd-view')}
         onEditVerification={() => setShopNav('verification-re-review')}
+        hideEditVerification={verificationPendingReReview}
+      />
+    );
+  }
+
+  if (shopNav === 'verification-cccd-view') {
+    return (
+      <SellerCccdProfileViewScreen
+        verification={reduxVerification}
+        onBack={() => setShopNav('shop-settings')}
       />
     );
   }
@@ -812,6 +837,7 @@ export default function ShopTabPanel({
       onStartRegister={startSellerRegistration}
       onOpenHub={handleOpenHub}
       onOpenWallet={() => setShopNav('wallet')}
+      onEditVerification={() => setShopNav('verification-re-review')}
       onOpenWalletTopUp={() => openTopUp('wallet')}
       onShopSettingsUpdated={(updated) => {
         setShopSettings(updated);
