@@ -79,6 +79,8 @@ async function sendPushToUser(userId, { title, content, data } = {}) {
             notification: {
               channelId: "default",
               sound: "default",
+              icon: "notification_icon",
+              color: "#076F32",
             },
           },
         });

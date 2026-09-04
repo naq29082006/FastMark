@@ -834,6 +834,19 @@ export default function StoreDetailScreen({
                     <View style={styles.reviewMeta}>
                       <Text style={styles.reviewName}>{review.user_name}</Text>
                       <StarRating rating={review.rating} size={13} />
+                      {review.productName || review.productId ? (
+                        <Pressable
+                          onPress={() => handleProductPress(review.productId)}
+                          disabled={!review.productId}
+                          hitSlop={6}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Xem sản phẩm ${review.productName || ''}`.trim()}
+                        >
+                          <Text style={styles.reviewProductName} numberOfLines={1}>
+                            Sản phẩm: {review.productName || 'Không rõ tên'}
+                          </Text>
+                        </Pressable>
+                      ) : null}
                     </View>
                     <Text style={styles.reviewDate}>{formatDate(review.created_at)}</Text>
                   </View>
@@ -1527,6 +1540,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
     marginBottom: 2,
+  },
+  reviewProductName: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#076F32',
   },
   reviewDate: {
     fontSize: 11,

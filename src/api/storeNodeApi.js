@@ -214,7 +214,7 @@ export async function fetchProductFromNode(productId) {
   return payload.data?.product || payload.product || null;
 }
 
-export async function fetchReviewsFromNode(storeId, { page = 1, limit = 20 } = {}) {
+export async function fetchReviewsFromNode(storeId, { page = 1, limit = 20, productId = '' } = {}) {
   if (!hasStoreNodeApi()) {
     return normalizePageResult({ items: [], page, limit, total: 0, hasMore: false });
   }
@@ -229,6 +229,10 @@ export async function fetchReviewsFromNode(storeId, { page = 1, limit = 20 } = {
       page: String(page),
       limit: String(limit),
     });
+    const normalizedProductId = String(productId || '').trim();
+    if (isMongoObjectId(normalizedProductId)) {
+      params.set('productId', normalizedProductId);
+    }
     const response = await apiRequest(
       `${API_ENDPOINTS.shopReviews(normalizedId)}?${params.toString()}`
     );
