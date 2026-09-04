@@ -40,7 +40,12 @@ function resolveFileExtension(mimeType, originalName = "") {
 function getStorageUploadClient(resolvedKey) {
   if (isNewFormatSupabaseKey(resolvedKey.key)) {
     const storageUrl = `${String(supabaseUrl || "").replace(/\/$/, "")}/storage/v1`;
-    return new StorageClient(storageUrl, { apikey: resolvedKey.key });
+    // New-format keys (sb_secret_/sb_publishable_) are not JWTs; Storage API still
+    // requires both apikey and Authorization Bearer (same key for service uploads).
+    return new StorageClient(storageUrl, {
+      apikey: resolvedKey.key,
+      Authorization: `Bearer ${resolvedKey.key}`,
+    });
   }
 
   const supabase = getSupabaseClient();

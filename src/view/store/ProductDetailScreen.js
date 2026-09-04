@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -34,7 +34,7 @@ import {
 } from '../../api/favoriteApi';
 import { deleteProductOnBackend } from '../../api/productApi';
 import SellerProductDetailScreen from '../seller/SellerProductDetailScreen';
-import { loadProductById, loadStoreById } from '../../viewmodel/store/storeViewModel';
+import { loadProductById, loadReviewsByStoreId, loadStoreById } from '../../viewmodel/store/storeViewModel';
 import { submitReportOnBackend } from '../../api/reportApi';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -44,13 +44,21 @@ import ReportComposeModal from '../shared/components/ReportComposeModal';
 import OutOfStockOverlay from '../shared/components/OutOfStockOverlay';
 import SubScreenHeader, { APP_HEADER_ICON_BUTTON_STYLE } from '../shared/components/SubScreenHeader';
 import AvatarBadge from '../shared/components/AvatarBadge';
+import LoadMoreButton from '../shared/components/LoadMoreButton';
 import PhoneVerifyGateFlow from '../shared/PhoneVerifyGateFlow';
 import { storeLogger as log } from '../../core/utils/logger';
+import { appendUniqueById, DEFAULT_PAGE_SIZE } from '../../core/utils/pagination';
 import { RESERVATION_TAB } from '../../constants/sellerOrders';
 import { toReservationFormResume } from '../../viewmodel/buyer/reservationResumeSession';
+import StarRating from './components/StarRating';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const HERO_HEIGHT = 320;
+
+function formatReviewDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('vi-VN');
+}
 export default function ProductDetailScreen({
   productId,
   onBack,
@@ -99,6 +107,12 @@ export default function ProductDetailScreen({
   const [reservationFormResume, setReservationFormResume] = useState(() =>
     toReservationFormResume(pendingTopUpResume)
   );
+  const [reviews, setReviews] = useState([]);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewsHasMore, setReviewsHasMore] = useState(false);
+  const [reviewsTotal, setReviewsTotal] = useState(0);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [loadingMoreReviews, setLoadingMoreReviews] = useState(false);
 
   const currentUserId = String(profile?.mongoUserId || profile?.id || '');
   const ownerUserId = String(store?.owner_user_id || '');
@@ -205,6 +219,91 @@ export default function ProductDetailScreen({
       isCurrent = false;
     };
   }, [productId, reloadTick]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const normalizedProductId = String(productId || '').trim();
+    const storeId = String(product?.store_id || '').trim();
+
+    if (!normalizedProductId || !storeId) {
+      setReviews([]);
+      setReviewsPage(1);
+      setReviewsHasMore(false);
+      setReviewsTotal(0);
+      setLoadingReviews(false);
+      return () => {
+        isCurrent = false;
+      };
+    }
+
+    setLoadingReviews(true);
+    loadReviewsByStoreId(storeId, {
+      page: 1,
+      limit: DEFAULT_PAGE_SIZE,
+      productId: normalizedProductId,
+    })
+      .then((reviewPage) => {
+        if (!isCurrent) return;
+        const items = reviewPage?.items || [];
+        setReviews(items);
+        setReviewsPage(1);
+        setReviewsHasMore(Boolean(reviewPage?.hasMore));
+        setReviewsTotal(Math.max(0, Number(reviewPage?.total) || items.length));
+        log.ok('ProductDetailScreen:reviews-loaded', {
+          productId: normalizedProductId,
+          count: items.length,
+          total: Number(reviewPage?.total) || items.length,
+        });
+      })
+      .catch((error) => {
+        log.fail('ProductDetailScreen:reviews-failed', error);
+        if (!isCurrent) return;
+        setReviews([]);
+        setReviewsHasMore(false);
+        setReviewsTotal(0);
+      })
+      .finally(() => {
+        if (isCurrent) setLoadingReviews(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [productId, product?.store_id, reloadTick]);
+
+  const loadMoreReviews = useCallback(async () => {
+    const normalizedProductId = String(productId || '').trim();
+    const storeId = String(product?.store_id || '').trim();
+    if (loadingMoreReviews || !reviewsHasMore || !normalizedProductId || !storeId) {
+      return;
+    }
+
+    setLoadingMoreReviews(true);
+    try {
+      const nextPage = reviewsPage + 1;
+      const pageResult = await loadReviewsByStoreId(storeId, {
+        page: nextPage,
+        limit: DEFAULT_PAGE_SIZE,
+        productId: normalizedProductId,
+      });
+      const nextItems = pageResult?.items || [];
+      setReviews((current) => appendUniqueById(current, nextItems));
+      setReviewsPage(nextPage);
+      setReviewsHasMore(Boolean(pageResult?.hasMore));
+      setReviewsTotal(Math.max(0, Number(pageResult?.total) || reviewsTotal));
+    } catch (error) {
+      log.fail('ProductDetailScreen:load-more-reviews-failed', error);
+    } finally {
+      setLoadingMoreReviews(false);
+    }
+  }, [
+    loadingMoreReviews,
+    product?.store_id,
+    productId,
+    reviewsHasMore,
+    reviewsPage,
+    reviewsTotal,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -637,8 +736,12 @@ export default function ProductDetailScreen({
     (variants.length > 0
       ? totalRemaining <= 0
       : resolveIsOutOfStock(product) || maxQuantity <= 0);
-  const ratingValue = Number(store?.rating_avg) || 0;
-  const reviewCount = Number(store?.review_count) || 0;
+  const shopRatingValue = Number(store?.rating_avg) || 0;
+  const shopReviewCount = Number(store?.review_count) || 0;
+  const productReviewCount = Math.max(reviewsTotal, reviews.length);
+  const productRatingValue = reviews.length
+    ? reviews.reduce((total, review) => total + (Number(review.rating) || 0), 0) / reviews.length
+    : 0;
   const distanceLabel = formatDistance(distanceMeters);
   const hasDistance = Number.isFinite(Number(distanceMeters));
   const storeIsOpen = store ? store.is_open !== false : true;
@@ -746,6 +849,16 @@ export default function ProductDetailScreen({
         <View style={styles.infoSection}>
           <Text style={styles.productName}>{product.name}</Text>
 
+          <View style={styles.productRatingRow}>
+            <StarRating rating={productRatingValue} size={14} />
+            <Text style={styles.productRatingText}>
+              {productReviewCount > 0 ? productRatingValue.toFixed(1) : '—'}
+            </Text>
+            <Text style={styles.productReviewCountText}>
+              ({productReviewCount > 0 ? `${productReviewCount} đánh giá` : 'Chưa có đánh giá'})
+            </Text>
+          </View>
+
           {product.isPromotion && originalPriceLabel ? (
             <View style={styles.priceBlock}>
               <View style={styles.promoMeta}>
@@ -851,10 +964,10 @@ export default function ProductDetailScreen({
                 <View style={styles.shopMetaRow}>
                   <Ionicons name="star" size={13} color="#f59e0b" />
                   <Text style={styles.shopRatingText}>
-                    {ratingValue > 0 ? ratingValue.toFixed(1) : '—'}
+                    {shopRatingValue > 0 ? shopRatingValue.toFixed(1) : '—'}
                   </Text>
                   <Text style={styles.shopReviewText}>
-                    ({reviewCount > 0 ? `${reviewCount} đánh giá` : 'Chưa có đánh giá'})
+                    ({shopReviewCount > 0 ? `${shopReviewCount} đánh giá cửa hàng` : 'Chưa có đánh giá'})
                   </Text>
                 </View>
                 <View style={styles.shopOpenRow}>
@@ -883,6 +996,75 @@ export default function ProductDetailScreen({
               <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
             </Pressable>
           ) : null}
+
+          <View style={styles.reviewsSection}>
+            <Text style={styles.qtyLabel}>Đánh giá sản phẩm</Text>
+            {loadingReviews ? (
+              <ActivityIndicator size="small" color="#076F32" style={styles.reviewsLoading} />
+            ) : reviews.length === 0 ? (
+              <Text style={styles.reviewsEmptyText}>Chưa có đánh giá cho sản phẩm này</Text>
+            ) : (
+              <View style={styles.reviewsList}>
+                {reviews.map((review) => (
+                  <View key={review.id} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      <AvatarBadge
+                        name={review.user_name}
+                        uri={review.avatar || review.photoUrl || ''}
+                        size={36}
+                      />
+                      <View style={styles.reviewMeta}>
+                        <Text style={styles.reviewName}>{review.user_name}</Text>
+                        <StarRating rating={review.rating} size={13} />
+                      </View>
+                      <Text style={styles.reviewDate}>
+                        {formatReviewDate(review.created_at || review.createdAt)}
+                      </Text>
+                    </View>
+                    {review.comment ? (
+                      <Text style={styles.reviewComment}>{review.comment}</Text>
+                    ) : null}
+                    {Array.isArray(review.images) && review.images.length > 0 ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.reviewImagesRow}
+                      >
+                        {review.images.map((image, index) => {
+                          const uri = image.imageUrl || image.ImageUrl || image;
+                          if (!uri || typeof uri !== 'string') return null;
+                          return (
+                            <Image
+                              key={`${review.id}-img-${index}`}
+                              source={{ uri }}
+                              style={styles.reviewImage}
+                              resizeMode="cover"
+                            />
+                          );
+                        })}
+                      </ScrollView>
+                    ) : review.imageUrl || review.image_url ? (
+                      <Image
+                        source={{ uri: review.imageUrl || review.image_url }}
+                        style={styles.reviewImage}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+                  </View>
+                ))}
+                <LoadMoreButton
+                  currentCount={reviews.length}
+                  totalCount={
+                    reviewsHasMore
+                      ? Math.max(reviewsTotal, reviews.length + DEFAULT_PAGE_SIZE)
+                      : reviews.length
+                  }
+                  loading={loadingMoreReviews}
+                  onPress={loadMoreReviews}
+                />
+              </View>
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -1075,6 +1257,22 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     marginBottom: 10,
   },
+  productRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  productRatingText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  productReviewCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
   stockSoldText: {
     color: '#64748b',
     fontSize: 13,
@@ -1161,6 +1359,64 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#94a3b8',
+  },
+  reviewsSection: {
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 12,
+  },
+  reviewsLoading: {
+    marginVertical: 16,
+  },
+  reviewsEmptyText: {
+    fontSize: 13,
+    color: '#94a3b8',
+    paddingVertical: 8,
+  },
+  reviewsList: {
+    gap: 10,
+  },
+  reviewCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 10,
+  },
+  reviewMeta: {
+    flex: 1,
+  },
+  reviewName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 2,
+  },
+  reviewDate: {
+    fontSize: 11,
+    color: '#94a3b8',
+  },
+  reviewComment: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+  },
+  reviewImagesRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  reviewImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 10,
+    backgroundColor: '#e2e8f0',
   },
   shopOpenRow: {
     flexDirection: 'row',

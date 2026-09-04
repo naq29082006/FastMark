@@ -142,6 +142,7 @@ exports.listShopReviews = async (req, res) => {
   const data = await shopDiscoveryService.listPublicReviewsByShopId(req.params.id, {
     page: req.query.page,
     limit: req.query.limit,
+    productId: req.query.productId,
   });
 
   return success(res, { data });

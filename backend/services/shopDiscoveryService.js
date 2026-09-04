@@ -1108,7 +1108,7 @@ async function discoverProducts({
   };
 }
 
-async function listPublicReviewsByShopId(shopId, { page, limit } = {}) {
+async function listPublicReviewsByShopId(shopId, { page, limit, productId } = {}) {
   const shop = await ShopProfile.findById(shopId).lean();
   if (!shop) {
     const error = new Error("Không tìm thấy gian hàng.");
@@ -1125,6 +1125,13 @@ async function listPublicReviewsByShopId(shopId, { page, limit } = {}) {
     shopId,
     ...publicReviewFilter(),
   };
+
+  // Optional product scope: same endpoint, non-breaking query filter on Review.productId.
+  const normalizedProductId = String(productId || "").trim();
+  if (/^[a-f\d]{24}$/i.test(normalizedProductId)) {
+    filter.productId = new mongoose.Types.ObjectId(normalizedProductId);
+  }
+
   const { page: safePage, limit: safeLimit, skip } = parsePagination({ page, limit });
   const [rows, total] = await Promise.all([
     Review.find(filter).sort({ CreatedAt: -1, _id: -1 }).skip(skip).limit(safeLimit).lean(),
