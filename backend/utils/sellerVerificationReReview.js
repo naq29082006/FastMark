@@ -8,6 +8,7 @@ const PENDING_REVIEW_MESSAGE =
 
 const META_TYPE = {
   ATTP: "attp_meta",
+  REGISTRATION_PENDING: "registration_pending",
   RE_REVIEW_PENDING: "re_review_pending",
   RE_REVIEW_REJECTED: "re_review_rejected",
 };
@@ -49,6 +50,14 @@ function buildAttpMeta({
   return payload;
 }
 
+function buildRegistrationPendingMeta({ issuedAt, expiresAt } = {}) {
+  return {
+    type: META_TYPE.REGISTRATION_PENDING,
+    issuedAt: String(issuedAt || "").trim(),
+    expiresAt: String(expiresAt || "").trim(),
+  };
+}
+
 function buildReReviewPendingMeta({
   changeReason,
   licenseNumber,
@@ -79,6 +88,17 @@ function parseVerificationMeta(lyDoTuChoi) {
       plainText: String(lyDoTuChoi || "").trim(),
       attpMeta: null,
       reReviewPending: null,
+      registrationPending: null,
+    };
+  }
+
+  if (parsed.type === META_TYPE.REGISTRATION_PENDING) {
+    return {
+      type: parsed.type,
+      plainText: "",
+      attpMeta: null,
+      reReviewPending: null,
+      registrationPending: parsed,
     };
   }
 
@@ -88,6 +108,7 @@ function parseVerificationMeta(lyDoTuChoi) {
       plainText: "",
       attpMeta: null,
       reReviewPending: parsed,
+      registrationPending: null,
     };
   }
 
@@ -97,6 +118,7 @@ function parseVerificationMeta(lyDoTuChoi) {
       plainText: parsed.reason || "",
       attpMeta: parsed,
       reReviewPending: null,
+      registrationPending: null,
     };
   }
 
@@ -105,12 +127,13 @@ function parseVerificationMeta(lyDoTuChoi) {
     plainText: String(lyDoTuChoi || "").trim(),
     attpMeta: parsed,
     reReviewPending: null,
+    registrationPending: null,
   };
 }
 
 function buildSnapshotFromVerification(verification, meta = null) {
   const parsed = meta || parseVerificationMeta(verification?.LyDoTuChoi);
-  const attp = parsed.attpMeta || parsed.reReviewPending || {};
+  const attp = parsed.attpMeta || parsed.reReviewPending || parsed.registrationPending || {};
   return {
     anhKD: verification?.anhKD || "",
     licenseNumber: attp.licenseNumber || "",
@@ -250,20 +273,112 @@ function parseAttpDateString(value) {
     return null;
   }
 
+  let day;
+  let month;
+  let year;
+
   const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
-  if (dmy) {
-    const parsed = new Date(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
   const isoLike = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
-  if (isoLike) {
-    const parsed = new Date(Number(isoLike[1]), Number(isoLike[2]) - 1, Number(isoLike[3]));
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+
+  if (dmy) {
+    day = Number(dmy[1]);
+    month = Number(dmy[2]);
+    year = Number(dmy[3]);
+  } else if (isoLike) {
+    year = Number(isoLike[1]);
+    month = Number(isoLike[2]);
+    day = Number(isoLike[3]);
+  } else {
+    return null;
   }
 
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (
+    !Number.isFinite(day) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(year) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    year < 1900 ||
+    year > 2100
+  ) {
+    return null;
+  }
+
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function normalizeAttpDateString(value) {
+  const parsed = parseAttpDateString(value);
+  if (!parsed) {
+    return null;
+  }
+
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const year = parsed.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function startOfDay(date) {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+}
+
+function endOfDay(date) {
+  const value = new Date(date);
+  value.setHours(23, 59, 59, 999);
+  return value;
+}
+
+function validateAttpDateFields(issuedAtRaw, expiresAtRaw) {
+  const issuedAt = String(issuedAtRaw || "").trim();
+  const expiresAt = String(expiresAtRaw || "").trim();
+
+  if (!issuedAt) {
+    throw new Error("Vui lòng nhập ngày cấp giấy phép.");
+  }
+  if (!expiresAt) {
+    throw new Error("Vui lòng nhập ngày hết hạn giấy phép.");
+  }
+
+  const issuedDate = parseAttpDateString(issuedAt);
+  const expiresDate = parseAttpDateString(expiresAt);
+  if (!issuedDate) {
+    throw new Error("Ngày cấp không hợp lệ.");
+  }
+  if (!expiresDate) {
+    throw new Error("Ngày hết hạn không hợp lệ.");
+  }
+  if (expiresDate.getTime() < issuedDate.getTime()) {
+    throw new Error("Ngày hết hạn phải sau hoặc bằng ngày cấp.");
+  }
+
+  const todayEnd = endOfDay(new Date());
+  if (issuedDate.getTime() > todayEnd.getTime()) {
+    throw new Error("Ngày cấp không được ở tương lai.");
+  }
+
+  const todayStart = startOfDay(new Date());
+  if (expiresDate.getTime() < todayStart.getTime()) {
+    throw new Error("Giấy phép đã hết hạn. Vui lòng kiểm tra ngày trên giấy tờ.");
+  }
+
+  return {
+    issuedAt: normalizeAttpDateString(issuedAt),
+    expiresAt: normalizeAttpDateString(expiresAt),
+  };
 }
 
 function getApprovedAttpMeta(verification) {
@@ -315,6 +430,7 @@ function enrichPublicVerification(verification, user = null) {
   const meta = parseVerificationMeta(verification.LyDoTuChoi);
   const attpSource =
     meta.reReviewPending ||
+    meta.registrationPending ||
     meta.attpMeta ||
     (meta.type === META_TYPE.ATTP ? meta.attpMeta : null);
   const pendingReReview = isPendingReReviewVerification(verification, user);
@@ -355,11 +471,14 @@ module.exports = {
   META_TYPE,
   parseVerificationMeta,
   parseAttpDateString,
+  normalizeAttpDateString,
+  validateAttpDateFields,
   getApprovedAttpMeta,
   attpMetaRequiresResubmit,
   shopRequiresAttpReApproval,
   isAttpExpired,
   buildAttpMeta,
+  buildRegistrationPendingMeta,
   buildReReviewPendingMeta,
   buildSnapshotFromVerification,
   applySnapshotToVerification,

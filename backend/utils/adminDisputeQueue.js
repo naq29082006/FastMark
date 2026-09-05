@@ -38,9 +38,7 @@ async function findPostDeliveryPendingDisputeReservationIds(now = new Date()) {
         ],
       },
     ],
-  })
-    .select("reservationId")
-    .lean();
+  }).lean();
 
   if (!candidates.length) {
     return [];

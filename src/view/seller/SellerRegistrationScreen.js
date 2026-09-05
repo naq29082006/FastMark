@@ -22,6 +22,7 @@ import {
 } from '../../api/sellerApi';
 import { checkSellerShopUsernameAvailabilityOnBackend } from '../../api/sellerOpsApi';
 import { resolveErrorMessage } from '../../core/utils/resolveErrorMessage';
+import { validateAttpDates, parseAttpDateValue } from '../../core/utils/attpDateValidation';
 import { logErrorDetails } from '../../core/utils/logger';
 import { reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
 import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
@@ -31,6 +32,7 @@ import ProfileSubScreen from '../profile/ProfileSubScreen';
 import { CategoryCombobox } from './SellerProductFormFields';
 import SellerLocationPickerScreen from './SellerLocationPickerScreen';
 import KeyboardAwareTextInput from '../shared/components/KeyboardAwareTextInput';
+import DatePickerField from '../shared/components/DatePickerField';
 
 const SHOP_USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 
@@ -210,6 +212,8 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
   const [cccdBack, setCccdBack] = useState(null);
   const [selfie, setSelfie] = useState(null);
   const [anhKD, setBusinessImage] = useState(null);
+  const [issuedAt, setIssuedAt] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
   const [systemAddress, setSystemAddress] = useState('');
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
@@ -233,6 +237,10 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
 
   const isPending = initialVerification?.status === SELLER_VERIFICATION_STATUS.PENDING;
   const isRejected = initialVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED;
+  const expiresMinimumDate = useMemo(() => {
+    const issuedDate = parseAttpDateValue(issuedAt);
+    return issuedDate || undefined;
+  }, [issuedAt]);
 
   useEffect(() => {
     let isMounted = true;
@@ -310,6 +318,10 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
     if (existingBusinessImage) {
       setBusinessImage({ uri: existingBusinessImage });
     }
+
+    const meta = initialVerification.attpMeta || {};
+    setIssuedAt((current) => current || meta.issuedAt || initialVerification.attpIssuedAt || '');
+    setExpiresAt((current) => current || meta.expiresAt || initialVerification.attpExpiresAt || '');
   }, [initialVerification?.id]);
 
   async function handlePickImage(setter) {
@@ -474,6 +486,22 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
       return;
     }
 
+    if (!issuedAt.trim()) {
+      setError('Vui lòng nhập ngày cấp giấy phép.');
+      return;
+    }
+
+    if (!expiresAt.trim()) {
+      setError('Vui lòng nhập ngày hết hạn giấy phép.');
+      return;
+    }
+
+    const attpDates = validateAttpDates(issuedAt, expiresAt);
+    if (!attpDates.ok) {
+      setError(attpDates.error);
+      return;
+    }
+
     setError('');
     setSuccessMessage('');
     setIsSubmitting(true);
@@ -521,6 +549,8 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
             anhKDBase64: anhKDPayload.base64,
             anhKDMimeType: anhKDPayload.mimeType,
             anhKDUrl: anhKDPayload.existingUrl,
+            issuedAt: attpDates.issuedAt,
+            expiresAt: attpDates.expiresAt,
             fullName: String(cccdFullName).trim().replace(/\s+/g, ' '),
             cccdNumber: normalizeCccdDigits(cccdNumber),
             systemAddress: systemAddress.trim(),
@@ -635,6 +665,29 @@ export default function SellerRegistrationScreen({ onBack, onSubmitted, initialV
           value={anhKD}
           onPick={() => handlePickImage(setBusinessImage)}
         />
+
+        <DatePickerField
+          label="Ngày cấp giấy phép"
+          value={issuedAt}
+          onChange={(value) => {
+            setIssuedAt(value);
+            setError('');
+          }}
+        />
+        <Text style={styles.fieldHint}>Chọn đúng ngày cấp in trên giấy phép ATTP.</Text>
+
+        <DatePickerField
+          label="Ngày hết hạn giấy phép"
+          value={expiresAt}
+          minimumDate={expiresMinimumDate}
+          onChange={(value) => {
+            setExpiresAt(value);
+            setError('');
+          }}
+        />
+        <Text style={[styles.fieldHint, styles.fieldHintSpaced]}>
+          Giấy phép phải còn hiệu lực (ngày hết hạn từ hôm nay trở đi).
+        </Text>
 
         <View style={styles.field}>
           <Text style={styles.label}>Họ tên (trên CCCD)</Text>
@@ -869,6 +922,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94a3b8',
     fontWeight: '600',
+  },
+  fieldHintSpaced: {
+    marginBottom: 16,
   },
   fieldError: {
     marginTop: 6,

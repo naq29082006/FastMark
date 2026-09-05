@@ -37,6 +37,7 @@ import SellerRegistrationScreen from '../seller/SellerRegistrationScreen';
 import SellerVerificationStatusScreen from '../seller/SellerVerificationStatusScreen';
 import SellerCccdProfileViewScreen from '../seller/SellerCccdProfileViewScreen';
 import SellerAttpProfileViewScreen from '../seller/SellerAttpProfileViewScreen';
+import SellerRegistrationProfileViewScreen from '../seller/SellerRegistrationProfileViewScreen';
 import SellerProductDetailScreen from '../seller/SellerProductDetailScreen';
 import ProductDetailScreen from '../store/ProductDetailScreen';
 import SellerShopSettingsScreen from '../seller/SellerShopSettingsScreen';
@@ -403,11 +404,21 @@ export default function ProfilePanel({
         verification={sellerVerification}
         onBack={() => setSellerStep(null)}
         onViewAttp={() => setSellerStep('attp-view')}
+        onViewRegistration={() => setSellerStep('registration-view')}
         onEdit={
           sellerVerification?.status === SELLER_VERIFICATION_STATUS.REJECTED
             ? () => setSellerStep('register')
             : undefined
         }
+      />
+    );
+  }
+
+  if (sellerStep === 'registration-view') {
+    return (
+      <SellerRegistrationProfileViewScreen
+        verification={sellerVerification}
+        onBack={() => setSellerStep('pending')}
       />
     );
   }

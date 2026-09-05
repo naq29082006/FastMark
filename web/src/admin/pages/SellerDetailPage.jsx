@@ -109,8 +109,17 @@ export default function SellerDetailPage() {
       return;
     }
     const pendingReReview = isRecordPendingReReview(record);
-    if (pendingReReview) {
-      const pendingDates = resolvePendingAttpDates(record);
+    const pendingDates = resolvePendingAttpDates(record);
+    const needsAttpDates =
+      pendingReReview ||
+      Boolean(
+        pendingDates.issuedAt.trim() ||
+          pendingDates.expiresAt.trim() ||
+          record?.attpMeta?.issuedAt ||
+          record?.attpIssuedAt
+      );
+
+    if (needsAttpDates) {
       if (!pendingDates.issuedAt.trim()) {
         message.warning('Hồ sơ thiếu ngày cấp giấy phép từ người bán.');
         return;
@@ -279,6 +288,18 @@ export default function SellerDetailPage() {
                   <li>
                     <span className="seller-verify-register-label">Danh mục kinh doanh</span>
                     <span className="seller-verify-register-value">{record.categoryName || '—'}</span>
+                  </li>
+                  <li>
+                    <span className="seller-verify-register-label">Ngày cấp giấy phép</span>
+                    <span className="seller-verify-register-value">
+                      {formatAttpDateLabel(resolvePendingAttpDates(record).issuedAt)}
+                    </span>
+                  </li>
+                  <li>
+                    <span className="seller-verify-register-label">Ngày hết hạn giấy phép</span>
+                    <span className="seller-verify-register-value">
+                      {formatAttpDateLabel(resolvePendingAttpDates(record).expiresAt)}
+                    </span>
                   </li>
                   <li className="seller-verify-register-list-item-coords">
                     <span className="seller-verify-register-label">Tọa độ</span>

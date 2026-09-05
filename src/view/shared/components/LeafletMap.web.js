@@ -9,7 +9,7 @@ import { useThrottledCallback } from '../../../hooks/useThrottledCallback';
 
 const MAP_COMMAND_SOURCE = 'fastmark-map-command';
 const log = createLogger('LeafletMap');
-const NAV_LOCATION_THROTTLE_MS = 120;
+const NAV_LOCATION_THROTTLE_MS = 80;
 const NAV_ROUTE_THROTTLE_MS = 500;
 
 export default function LeafletMap({
@@ -38,9 +38,13 @@ export default function LeafletMap({
   routePolylineRef.current = routePolyline;
 
   const html = useMemo(
-    () => createLeafletHtml({ currentLocation: initialLocationRef.current }),
+    () =>
+      createLeafletHtml({
+        currentLocation: initialLocationRef.current,
+        navigationMode,
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [LEAFLET_HTML_REVISION]
+    [LEAFLET_HTML_REVISION, navigationMode]
   );
 
   useEffect(() => {

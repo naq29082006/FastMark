@@ -6,7 +6,16 @@ const DEPOSIT_SETTLE_TO = {
 
 function isDepositSettled(reservation) {
   const code = Number(reservation?.cocChuyenDen);
-  return code === DEPOSIT_SETTLE_TO.BUYER || code === DEPOSIT_SETTLE_TO.SELLER;
+  if (code === DEPOSIT_SETTLE_TO.BUYER || code === DEPOSIT_SETTLE_TO.SELLER) {
+    return true;
+  }
+  if (reservation?.depositRefundedAt) {
+    return true;
+  }
+  if (reservation?.depositReleasedAt) {
+    return true;
+  }
+  return false;
 }
 
 function isPastPickup(reservation) {
@@ -35,10 +44,6 @@ export function resolveAdminReservationStatusMeta(reservation) {
   }
   if (status === 3) {
     if (isDepositSettled(reservation)) {
-      const settleTo = Number(reservation?.cocChuyenDen);
-      if (settleTo === DEPOSIT_SETTLE_TO.BUYER) {
-        return { label: 'Đã hủy', tagColor: 'error', className: 'badge badge-danger' };
-      }
       return {
         label: 'Tranh chấp đã xử lý',
         tagColor: 'success',

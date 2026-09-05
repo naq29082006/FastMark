@@ -8,6 +8,7 @@ const {
   resolveShopUsername,
   resolveShopAvatar,
 } = require("../utils/shopIdentity");
+const { resolveShopLatlong } = require("../utils/shopCoordinates");
 const Report = require("../models/Report");
 const ReservationDispute = require("../models/ReservationDispute");
 const {
@@ -297,6 +298,7 @@ function buildActionFlags(doc, now = new Date(), disputeView = null) {
     canRefundDisputeDeposit:
       status === RESERVATION_STATUS.DISPUTED &&
       !dv.disputeBySeller &&
+      !dv.sellerResponse &&
       !isDepositSettled(doc),
     canDispute: waitingOrDisputed && pastPickup && !hasDispute,
     canSellerRespondToComplaint: Boolean(dv.canSellerRespondToComplaint),
@@ -383,6 +385,7 @@ async function toPublicReservation(doc, extras = {}) {
   const { storeName, shopUsername } = resolveShopDisplayFields(shop, shopOwner);
   const shopAvatar = resolveShopAvatar(shop, shopOwner);
   const shopPhone = String(shopOwner?.Phone || "").trim();
+  const shopCoords = shop ? resolveShopLatlong(shop) : { lat: null, long: null };
 
   const { loadProductImages, toPublicProductImages } = require("./productService");
   const imageDocs = product?._id ? await loadProductImages(product._id) : [];
@@ -530,6 +533,8 @@ async function toPublicReservation(doc, extras = {}) {
     createdAt: getReservationCreatedAt(doc),
     updatedAt: getReservationUpdatedAt(doc),
     shopId: doc.shopId ? String(doc.shopId) : "",
+    shopLatitude: shopCoords.lat,
+    shopLongitude: shopCoords.long,
     storeName,
     shopUsername,
     shop: shop
@@ -539,6 +544,8 @@ async function toPublicReservation(doc, extras = {}) {
           shopUsername,
           avatar: shopAvatar,
           phone: shopPhone,
+          latitude: shopCoords.lat,
+          longitude: shopCoords.long,
         }
       : null,
     ...actions,
@@ -927,6 +934,12 @@ async function refundDisputeDepositBySeller(user, reservationId) {
     if (disputeView.disputeBySeller) {
       throw createServiceError(
         "Bạn đã gửi báo cáo tranh chấp. Không thể hoàn cọc cho người mua.",
+        403
+      );
+    }
+    if (disputeView.sellerResponse) {
+      throw createServiceError(
+        "Shop đã phản hồi khiếu nại. Không thể tự hoàn cọc — chờ admin xử lý.",
         403
       );
     }

@@ -1,3 +1,5 @@
+import { resolveShopCoordinates } from '../core/utils/geo';
+
 function pickText(...values) {
   for (const value of values) {
     const text = typeof value === 'string' ? value.trim() : '';
@@ -9,6 +11,7 @@ function pickText(...values) {
 }
 
 export function normalizeStore(row) {
+  const coords = resolveShopCoordinates(row) || { latitude: null, longitude: null };
   const ratingAvg = Number(row.rating_avg ?? row.diemTB ?? 0);
   const isRegisteredShop = Boolean(row.is_registered_shop);
   const systemAddress = pickText(
@@ -28,8 +31,14 @@ export function normalizeStore(row) {
     shop_name: row.shop_name || row.shopName || row.name || 'Gian hàng',
     shop_username: row.shop_username || row.shopUsername || '',
     type: row.type || 'shop',
-    latitude: row.latitude,
-    longitude: row.longitude,
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    latlong:
+      row.latlong && typeof row.latlong === 'object'
+        ? row.latlong
+        : coords.latitude != null && coords.longitude != null
+          ? { lat: coords.latitude, long: coords.longitude }
+          : null,
     user_address: displayAddress,
     address: displayAddress,
     addressHeThong: systemAddress,

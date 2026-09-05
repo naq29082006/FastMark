@@ -16,6 +16,7 @@ import { useShopPresence } from '../../hooks/useShopPresence';
 import { useSellerAccessSync } from '../../hooks/useSellerAccessSync';
 import { useAccountStatusSync } from '../../hooks/useAccountStatusSync';
 import { RESERVATION_TAB } from '../../constants/sellerOrders';
+import { hasValidLocation, resolveShopCoordinates } from '../../core/utils/geo';
 import { toResumeReserveRequest } from '../../viewmodel/buyer/reservationResumeSession';
 import {
   selectAuthProfile,
@@ -355,11 +356,16 @@ export default function AuthenticatedHome() {
     handleSelectTab('home');
   }
 
-  function handleNavigatePickup({ shopId, reservationId, storeName }) {
+  function handleNavigatePickup({ shopId, reservationId, storeName, latitude, longitude, location }) {
+    const coords =
+      location && hasValidLocation(location)
+        ? location
+        : resolveShopCoordinates({ latitude, longitude });
     setMapFocusRequest({
       storeId: String(shopId),
       reservationId,
       storeName,
+      ...(coords ? { location: coords } : {}),
       showDirections: true,
       returnTo: {
         tab: 'orders',

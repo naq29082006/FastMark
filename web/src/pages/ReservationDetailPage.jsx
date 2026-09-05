@@ -454,7 +454,10 @@ export default function ReservationDetailPage() {
     reservation?.disputedAt ||
     (Array.isArray(reservation?.disputeReports) && reservation.disputeReports.length > 0);
 
-  const showDisputeAuditSection = bothReported;
+  const showDisputeAuditSection =
+    bothReported ||
+    auditLogs.length > 0 ||
+    (isPostDeliveryDispute && Boolean(reservation?.disputeByBuyer));
   const showDisputeProcessAction = canAdminProcessDispute && bothReported;
   const showPostDeliveryProcessAction = canAdminProcessDispute && !bothReported;
   const orderStatus = Number(reservation?.status);

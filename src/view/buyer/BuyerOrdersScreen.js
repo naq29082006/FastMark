@@ -56,7 +56,8 @@ import {
   VIEWER_ROLE,
 } from '../../constants/sellerOrders';
 import { getOrderListCancelDisplay, getCompletedTabDepositLine, isCompletedTabDepositPendingLine } from '../../core/utils/orderDisplay';
-import { reservationRequiresDeposit } from '../../core/utils/reservationEntity';
+import { reservationRequiresDeposit, getReservationShopId } from '../../core/utils/reservationEntity';
+import { resolveShopCoordinates } from '../../core/utils/geo';
 import { getCurrentUserIdToken } from '../../repository/authRepository';
 import { applyReservationRealtimeRow, removeReservationIfLeftTab, syncOrderListAfterMutation } from '../../core/utils/orderRealtimeSync';
 import { coalesceReservationFetch } from '../../core/utils/coalesceReservationFetch';
@@ -466,10 +467,21 @@ function BuyerOrdersContent({
   }, [activeTab, items, searchInput]);
 
   function handleNavigatePickup(item) {
+    const shopId = getReservationShopId(item);
+    const coords = resolveShopCoordinates({
+      latitude: item.shopLatitude,
+      longitude: item.shopLongitude,
+      latlong: item.shop?.latlong,
+      lat: item.shop?.latitude,
+      lng: item.shop?.longitude,
+    });
     onNavigatePickup?.({
-      shopId: item.shopId,
+      shopId,
       reservationId: String(item.id),
       storeName: item.storeName,
+      ...(coords
+        ? { latitude: coords.latitude, longitude: coords.longitude }
+        : {}),
     });
   }
 
@@ -855,7 +867,7 @@ function BuyerOrdersContent({
           </OrderListActionRow>
         ) : null}
 
-        {isCompletedTab && (canReport || canReview) ? (
+        {isCompletedTab && (canReport || canReview || canViewReview) ? (
           <OrderListActionRow>
             {canReport ? (
               <OrderListActionButton
@@ -881,16 +893,13 @@ function BuyerOrdersContent({
                 }
               />
             ) : null}
-          </OrderListActionRow>
-        ) : null}
-
-        {canViewReview ? (
-          <OrderListActionRow>
-            <OrderListActionButton
-              label="Xem đánh giá"
-              variant="muted"
-              onPress={() => onViewReview?.(existingReview)}
-            />
+            {canViewReview ? (
+              <OrderListActionButton
+                label="Xem đánh giá"
+                variant="muted"
+                onPress={() => onViewReview?.(existingReview)}
+              />
+            ) : null}
           </OrderListActionRow>
         ) : null}
         </View>

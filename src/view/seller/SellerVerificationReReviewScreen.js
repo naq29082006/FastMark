@@ -17,10 +17,12 @@ import {
   submitSellerVerificationReReviewOnBackend,
 } from '../../api/sellerApi';
 import { showErrorAlert } from '../../core/utils/appAlert';
+import { validateAttpDates, parseAttpDateValue } from '../../core/utils/attpDateValidation';
 import ProfileSubScreen from '../profile/ProfileSubScreen';
 import DatePickerField from '../shared/components/DatePickerField';
 import KeyboardAwareScrollView from '../shared/components/KeyboardAwareScrollView';
 import KeyboardAwareTextInput from '../shared/components/KeyboardAwareTextInput';
+import { FormSheetKeyboardAvoid } from '../shared/components/formSheetLayout';
 import { SELLER_VERIFICATION_STATUS } from '../../constants/sellerVerification';
 
 const PENDING_REVIEW_MESSAGE =
@@ -136,6 +138,10 @@ export default function SellerVerificationReReviewScreen({ onBack, onSubmitted }
   const [error, setError] = useState('');
 
   const attpExistingUrl = useMemo(() => verification?.anhKD || '', [verification]);
+  const expiresMinimumDate = useMemo(() => {
+    const issuedDate = parseAttpDateValue(issuedAt);
+    return issuedDate || undefined;
+  }, [issuedAt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +206,11 @@ export default function SellerVerificationReReviewScreen({ onBack, onSubmitted }
       setError('Vui lòng nhập ngày hết hạn giấy phép.');
       return;
     }
+    const attpDates = validateAttpDates(issuedAt, expiresAt);
+    if (!attpDates.ok) {
+      setError(attpDates.error);
+      return;
+    }
     if (changeReason.trim().length < 5) {
       setError('Vui lòng nhập lý do thay đổi (ít nhất 5 ký tự).');
       return;
@@ -212,8 +223,8 @@ export default function SellerVerificationReReviewScreen({ onBack, onSubmitted }
       await submitSellerVerificationReReviewOnBackend({
         idToken,
         payload: {
-          issuedAt: issuedAt.trim(),
-          expiresAt: expiresAt.trim(),
+          issuedAt: attpDates.issuedAt,
+          expiresAt: attpDates.expiresAt,
           changeReason: changeReason.trim(),
           anhKDBase64: attpPayload.base64,
           anhKDMimeType: attpPayload.mimeType,
@@ -250,8 +261,14 @@ export default function SellerVerificationReReviewScreen({ onBack, onSubmitted }
   const lastRejection = verification?.attpMeta?.lastReReviewRejection?.reason;
 
   return (
-    <ProfileSubScreen title="Chỉnh sửa hồ sơ xác thực" onBack={onBack}>
-      <KeyboardAwareScrollView contentContainerStyle={styles.content}>
+    <ProfileSubScreen title="Chỉnh sửa hồ sơ xác thực" onBack={onBack} scroll={false}>
+      <FormSheetKeyboardAvoid style={styles.avoid}>
+        <KeyboardAwareScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          extraBottomInset={72}
+          showsVerticalScrollIndicator={false}
+        >
         <Text style={styles.intro}>
           Cập nhật giấy phép kinh doanh hoặc chứng nhận an toàn thực phẩm. Vui lòng nhập đúng ngày
           cấp và ngày hết hạn trên giấy phép mới.
@@ -296,16 +313,21 @@ export default function SellerVerificationReReviewScreen({ onBack, onSubmitted }
           }}
           disabled={isPendingReReview}
         />
+        <Text style={styles.fieldHint}>Chọn đúng ngày cấp in trên giấy phép mới.</Text>
 
         <DatePickerField
           label="Ngày hết hạn"
           value={expiresAt}
+          minimumDate={expiresMinimumDate}
           onChange={(value) => {
             setExpiresAt(value);
             setError('');
           }}
           disabled={isPendingReReview}
         />
+        <Text style={[styles.fieldHint, styles.fieldHintSpaced]}>
+          Giấy phép phải còn hiệu lực (ngày hết hạn từ hôm nay trở đi).
+        </Text>
 
         <View style={styles.field}>
           <Text style={styles.label}>Lý do thay đổi</Text>
@@ -317,6 +339,7 @@ export default function SellerVerificationReReviewScreen({ onBack, onSubmitted }
             }}
             placeholder="Ví dụ: Giấy phép hết hạn, đã được cấp giấy phép mới..."
             multiline
+            scrollGap={96}
             editable={!isPendingReReview}
             style={styles.textArea}
           />
@@ -339,13 +362,21 @@ export default function SellerVerificationReReviewScreen({ onBack, onSubmitted }
             </Text>
           </Pressable>
         ) : null}
-      </KeyboardAwareScrollView>
+        </KeyboardAwareScrollView>
+      </FormSheetKeyboardAvoid>
     </ProfileSubScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, paddingBottom: 32 },
+  avoid: {
+    flex: 1,
+    minHeight: 0,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: { paddingBottom: 48 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 200 },
   intro: { fontSize: 14, lineHeight: 21, color: '#64748b', marginBottom: 16 },
   expiredBox: {
@@ -379,6 +410,16 @@ const styles = StyleSheet.create({
   rejectLabel: { fontSize: 12, fontWeight: '800', color: '#b91c1c', marginBottom: 4 },
   rejectText: { fontSize: 13, lineHeight: 19, color: '#991b1b' },
   field: { marginBottom: 16 },
+  fieldHint: {
+    marginTop: -8,
+    marginBottom: 12,
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#64748b',
+  },
+  fieldHintSpaced: {
+    marginBottom: 16,
+  },
   label: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 8 },
   fieldHint: { fontSize: 12, lineHeight: 18, color: '#64748b', marginBottom: 8 },
   previewFrame: {

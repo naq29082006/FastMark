@@ -35,8 +35,9 @@ const {
   PENDING_REVIEW_MESSAGE,
   META_TYPE,
   parseVerificationMeta,
-  parseAttpDateString,
+  validateAttpDateFields,
   buildAttpMeta,
+  buildRegistrationPendingMeta,
   buildReReviewPendingMeta,
   buildSnapshotFromVerification,
   applySnapshotToVerification,
@@ -280,21 +281,27 @@ async function requestSellerPhoneCode(user, phoneInput) {
   }
 
   const existing = getOtpSession(OTP_PURPOSE.PHONE_VERIFY, user._id);
-  const resendWaitSeconds = getPhoneResendWaitSeconds(existing);
-  if (resendWaitSeconds > 0) {
-    const error = createServiceError(
-      `Vui lòng đợi ${resendWaitSeconds} giây trước khi gửi lại mã.`,
-      429
-    );
-    error.data = {
-      resendAvailableAt: new Date(Date.now() + resendWaitSeconds * 1000),
-      resendCooldownSeconds: resendWaitSeconds,
-      remainingSeconds: resendWaitSeconds,
-    };
-    throw error;
+  const isSamePhoneSession = existing?.target === targetPhone;
+
+  // Chỉ khóa gửi lại khi cùng một số. Đổi sang số khác → hủy phiên cũ, gửi mã mới ngay.
+  if (isSamePhoneSession) {
+    const resendWaitSeconds = getPhoneResendWaitSeconds(existing);
+    if (resendWaitSeconds > 0) {
+      const error = createServiceError(
+        `Vui lòng đợi ${resendWaitSeconds} giây trước khi gửi lại mã.`,
+        429
+      );
+      error.data = {
+        resendAvailableAt: new Date(Date.now() + resendWaitSeconds * 1000),
+        resendCooldownSeconds: resendWaitSeconds,
+        remainingSeconds: resendWaitSeconds,
+      };
+      throw error;
+    }
+  } else if (existing) {
+    clearOtpSession(OTP_PURPOSE.PHONE_VERIFY, user._id);
   }
 
-  // Hủy mã cũ (nếu có) → phát mã mới + khóa gửi lại 2 phút.
   const { code, session } = issuePhoneOtpSession(user._id, targetPhone, {
     applyResendCooldown: true,
   });
@@ -427,10 +434,41 @@ async function reloadVerificationById(verificationId) {
   return SellerVerification.findById(verificationId).populate("categoryId", "name");
 }
 
+function assertAttpDates(payload = {}) {
+  try {
+    return validateAttpDateFields(
+      payload.issuedAt || payload.ngayCap,
+      payload.expiresAt || payload.ngayHetHan
+    );
+  } catch (validationError) {
+    throw createServiceError(validationError.message);
+  }
+}
+
 async function promoteUserToSeller(user, verification, approvedById = null) {
+  const meta = parseVerificationMeta(verification.LyDoTuChoi);
+  const pendingAttp =
+    meta.registrationPending ||
+    meta.reReviewPending ||
+    null;
+  let approvedAttpMeta = "";
+
+  if (pendingAttp?.issuedAt && pendingAttp?.expiresAt) {
+    approvedAttpMeta = JSON.stringify(
+      buildAttpMeta({
+        licenseNumber: pendingAttp.licenseNumber || "",
+        issuedAt: pendingAttp.issuedAt,
+        expiresAt: pendingAttp.expiresAt,
+        extraDocUrls: pendingAttp.extraDocUrls || [],
+      })
+    );
+  } else if (meta.attpMeta?.issuedAt && meta.attpMeta?.expiresAt) {
+    approvedAttpMeta = JSON.stringify(meta.attpMeta);
+  }
+
   verification.status = SELLER_VERIFICATION_STATUS.APPROVED;
   verification.approvedBy = approvedById;
-  verification.LyDoTuChoi = "";
+  verification.LyDoTuChoi = approvedAttpMeta;
   verification.UpdatedAt = new Date();
   await verification.save();
 
@@ -624,6 +662,8 @@ async function submitSellerVerification(user, payload) {
     );
   }
 
+  const { issuedAt, expiresAt } = assertAttpDates(normalizedPayload);
+
   const sharedFields = {
     anhCccdTruoc,
     anhCccdSau,
@@ -637,7 +677,7 @@ async function submitSellerVerification(user, payload) {
     addressHeThong: systemAddress,
     latlong: { lat, long },
     status: SELLER_VERIFICATION_STATUS.PENDING,
-    LyDoTuChoi: "",
+    LyDoTuChoi: JSON.stringify(buildRegistrationPendingMeta({ issuedAt, expiresAt })),
     approvedBy: null,
     UpdatedAt: new Date(),
   };
@@ -699,27 +739,7 @@ async function submitSellerVerificationReReview(user, payload = {}) {
     throw createServiceError("Vui lòng nhập lý do thay đổi (ít nhất 5 ký tự).");
   }
 
-  const issuedAt = String(payload.issuedAt || payload.ngayCap || "").trim();
-  if (!issuedAt) {
-    throw createServiceError("Vui lòng nhập ngày cấp giấy phép.");
-  }
-
-  const expiresAt = String(payload.expiresAt || payload.ngayHetHan || "").trim();
-  if (!expiresAt) {
-    throw createServiceError("Vui lòng nhập ngày hết hạn giấy phép.");
-  }
-
-  const issuedDate = parseAttpDateString(issuedAt);
-  const expiresDate = parseAttpDateString(expiresAt);
-  if (!issuedDate) {
-    throw createServiceError("Ngày cấp không hợp lệ.");
-  }
-  if (!expiresDate) {
-    throw createServiceError("Ngày hết hạn không hợp lệ.");
-  }
-  if (expiresDate.getTime() < issuedDate.getTime()) {
-    throw createServiceError("Ngày hết hạn phải sau ngày cấp.");
-  }
+  const { issuedAt, expiresAt } = assertAttpDates(payload);
 
   const previousSnapshot = buildSnapshotFromVerification(existing);
 
@@ -1016,6 +1036,17 @@ async function approveSellerVerificationByAdmin(adminUser, verificationId, optio
 
     emitSellerVerificationUpdated(verification, "re_review_approved");
     return verification;
+  }
+
+  if (meta.registrationPending) {
+    const issuedAt = String(meta.registrationPending.issuedAt || "").trim();
+    const expiresAt = String(meta.registrationPending.expiresAt || "").trim();
+    if (!issuedAt) {
+      throw createServiceError("Hồ sơ thiếu ngày cấp giấy phép từ người bán.");
+    }
+    if (!expiresAt) {
+      throw createServiceError("Hồ sơ thiếu ngày hết hạn giấy phép từ người bán.");
+    }
   }
 
   await promoteUserToSeller(sellerUser, verification, adminUser._id);

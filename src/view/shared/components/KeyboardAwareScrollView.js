@@ -38,15 +38,16 @@ const KeyboardAwareScrollView = forwardRef(function KeyboardAwareScrollView(
   useImperativeHandle(ref, () => scrollRef.current);
 
   const scrollToInput = useCallback(
-    (inputRef) => {
+    (inputRef, gap = 24) => {
       scrollInputIntoView(scrollRef, inputRef, {
         keyboardInset,
         scrollY: scrollYRef.current,
         getScrollY: () => scrollYRef.current,
         obstructionBottom: inputObstructionBottom,
+        gap,
       });
     },
-    [keyboardInset]
+    [inputObstructionBottom, keyboardInset]
   );
 
   const paddingBottom =

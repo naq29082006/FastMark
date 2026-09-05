@@ -9,7 +9,7 @@ import { useDebouncedMapRestaurants } from '../../../hooks/useDebouncedMapRestau
 import { useThrottledCallback } from '../../../hooks/useThrottledCallback';
 
 const log = createLogger('LeafletMap');
-const NAV_LOCATION_THROTTLE_MS = 120;
+const NAV_LOCATION_THROTTLE_MS = 80;
 const NAV_ROUTE_THROTTLE_MS = 500;
 
 function parseMapMessage(data) {
@@ -47,10 +47,14 @@ export default function LeafletMap({
   onEventRef.current = onEvent;
 
   const html = useMemo(
-    () => createLeafletHtml({ currentLocation: initialLocationRef.current }),
+    () =>
+      createLeafletHtml({
+        currentLocation: initialLocationRef.current,
+        navigationMode,
+      }),
     // Revision forces WebView HTML rebuild when marker styles change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [LEAFLET_HTML_REVISION]
+    [LEAFLET_HTML_REVISION, navigationMode]
   );
 
   useEffect(() => {

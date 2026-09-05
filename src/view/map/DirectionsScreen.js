@@ -276,7 +276,7 @@ export default function DirectionsScreen({
     if (!hasValidLocation(liveLocation)) {
       return;
     }
-    setFollowUser(false);
+    setFollowUser(true);
     setRecenterRequest({
       location: liveLocation,
       at: Date.now(),

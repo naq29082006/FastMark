@@ -15,10 +15,10 @@ const MODE_CONFIG = {
   },
   navigation: {
     accuracy: Location.Accuracy.BestForNavigation,
-    distanceInterval: 3,
-    timeInterval: 800,
-    minMovementMeters: 2,
-    maxAccuracyMeters: 120,
+    distanceInterval: 1,
+    timeInterval: 500,
+    minMovementMeters: 0,
+    maxAccuracyMeters: 2000,
     lastKnownMaxAge: null,
     lastKnownRequiredAccuracy: null,
   },
@@ -55,11 +55,9 @@ export default function useLocationWatcher({
         return;
       }
 
-      if (Number.isFinite(loc.accuracy) && loc.accuracy > config.maxAccuracyMeters) {
-        return;
-      }
-
       const dist = calculateDistanceMeters(prev, loc);
+      const movedEnough =
+        dist === null || dist >= config.minMovementMeters;
       const prevHeading = Number(prev.heading);
       const nextHeading = Number(loc.heading);
       const headingChanged =
@@ -67,7 +65,16 @@ export default function useLocationWatcher({
         nextHeading >= 0 &&
         (!Number.isFinite(prevHeading) || Math.abs(nextHeading - prevHeading) >= 6);
 
-      if (dist !== null && dist < config.minMovementMeters && !headingChanged) {
+      if (
+        Number.isFinite(loc.accuracy) &&
+        loc.accuracy > config.maxAccuracyMeters &&
+        !movedEnough &&
+        !headingChanged
+      ) {
+        return;
+      }
+
+      if (!movedEnough && !headingChanged) {
         return;
       }
 

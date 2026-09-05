@@ -324,6 +324,9 @@ export function canSellerRefundDisputeDeposit(item) {
   if (!item || item.disputeBySeller) {
     return false;
   }
+  if (hasSellerPostDeliveryResponse(item)) {
+    return false;
+  }
   return (
     item.canRefundDisputeDeposit === true ||
     (Number(item.status) === RESERVATION_STATUS.DISPUTED &&

@@ -42,6 +42,11 @@ const STEP_DEFS = {
   completed: { key: 'completed', label: 'Hoàn thành', tone: 'green' },
   pickup_overdue: { key: 'pickup_overdue', label: 'Quá giờ nhận hàng', tone: 'orange' },
   dispute: { key: 'dispute', label: 'Tranh chấp', tone: 'purple' },
+  dispute_resolved: {
+    key: 'dispute_resolved',
+    label: 'Tranh chấp đã xử lý',
+    tone: 'green',
+  },
   cancelled: { key: 'cancelled', label: 'Đã hủy', tone: 'red' },
 };
 
@@ -53,22 +58,22 @@ const TERMINAL_KEYS_BY_REASON = {
   [R.SELLER_CANCEL_HOLDING]: ['created', 'confirmed', 'holding', 'cancelled'],
   [R.SELLER_REFUND_AFTER_PICKUP]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'cancelled'],
   [R.BUYER_RECEIVED]: ['created', 'confirmed', 'holding', 'received', 'completed'],
-  [R.BUYER_REPORT_SELLER_ABSENT]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
-  [R.SELLER_REPORT_BUYER_NO_SHOW]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
-  [R.DISPUTE_BOTH_REPORTED]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
+  [R.BUYER_REPORT_SELLER_ABSENT]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'],
+  [R.SELLER_REPORT_BUYER_NO_SHOW]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'],
+  [R.DISPUTE_BOTH_REPORTED]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'],
   [R.BUYER_POST_DELIVERY_COMPLAINT]: [
     'created',
     'confirmed',
     'holding',
     'received',
     'dispute',
-    'cancelled',
+    'dispute_resolved',
   ],
   [R.PICKUP_TIMEOUT]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'cancelled'],
-  [R.ADMIN_BUYER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
-  [R.ADMIN_SELLER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
-  [R.AUTO_BUYER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
-  [R.AUTO_SELLER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'],
+  [R.ADMIN_BUYER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'],
+  [R.ADMIN_SELLER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'],
+  [R.AUTO_BUYER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'],
+  [R.AUTO_SELLER_WIN]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'],
   [R.BUYER_FORFEIT]: ['created', 'confirmed', 'holding', 'pickup_overdue', 'cancelled'],
   [R.ADMIN_COMPLETED]: ['created', 'confirmed', 'holding', 'completed'],
   [R.SELLER_ACCOUNT_LOCKED]: ['created', 'confirmed', 'holding', 'cancelled'],
@@ -142,15 +147,15 @@ function isPostDeliveryTimeline(reservation, reasonCode) {
 }
 
 function buildPostDeliveryDisputeTerminalKeys(basePrefix = ['created', 'confirmed', 'holding']) {
-  return [...basePrefix, 'received', 'dispute', 'cancelled'];
+  return [...basePrefix, 'received', 'dispute', 'dispute_resolved'];
 }
 
 function buildPostDeliveryDisputeResolvedKeys(basePrefix = ['created', 'confirmed', 'holding']) {
-  return [...basePrefix, 'received', 'dispute', 'completed'];
+  return [...basePrefix, 'received', 'dispute', 'dispute_resolved'];
 }
 
 function buildPickupDisputeTerminalKeys(basePrefix = ['created', 'confirmed', 'holding']) {
-  return [...basePrefix, 'pickup_overdue', 'dispute', 'cancelled'];
+  return [...basePrefix, 'pickup_overdue', 'dispute', 'dispute_resolved'];
 }
 
 function resolveStepAt(reservation, stepKey) {
@@ -174,6 +179,13 @@ function resolveStepAt(reservation, stepKey) {
         reservation.disputedAt ||
         reservation.buyerDisputedAt ||
         reservation.sellerDisputedAt
+      );
+    case 'dispute_resolved':
+      return (
+        reservation.tgGiaiCoc ||
+        reservation.depositRefundedAt ||
+        reservation.depositReleasedAt ||
+        reservation.updatedAt
       );
     case 'cancelled':
       return reservation.cancelledAt || reservation.updatedAt;
@@ -207,15 +219,12 @@ function resolveTimelineKeys(reservation, reasonCode) {
   if (status === 3) {
     if (isDepositSettled(reservation)) {
       if (postDelivery) {
-        if (Number(reservation.cocChuyenDen) === DEPOSIT_SETTLE_TO.BUYER) {
-          return buildPostDeliveryDisputeTerminalKeys();
-        }
-        return buildPostDeliveryDisputeResolvedKeys();
+        return buildPostDeliveryDisputeTerminalKeys();
       }
       if (Number(reservation.cocChuyenDen) === DEPOSIT_SETTLE_TO.SELLER) {
-        return ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'completed'];
+        return ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'];
       }
-      return ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'cancelled'];
+      return ['created', 'confirmed', 'holding', 'pickup_overdue', 'dispute', 'dispute_resolved'];
     }
     if (postDelivery) {
       return ['created', 'confirmed', 'holding', 'received', 'dispute'];

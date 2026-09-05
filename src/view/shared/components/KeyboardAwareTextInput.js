@@ -7,7 +7,7 @@ import { useKeyboardScroll } from './KeyboardAwareScrollView';
  * TextInput tự cuộn vào vùng nhìn thấy khi nằm trong KeyboardAwareScrollView.
  */
 const KeyboardAwareTextInput = forwardRef(function KeyboardAwareTextInput(
-  { onFocus, onBlur, ...props },
+  { onFocus, onBlur, scrollGap = 24, ...props },
   ref
 ) {
   const inputRef = useRef(null);
@@ -23,8 +23,8 @@ const KeyboardAwareTextInput = forwardRef(function KeyboardAwareTextInput(
     if (!keyboardScroll?.scrollToInput) {
       return;
     }
-    keyboardScroll.scrollToInput(inputRef);
-  }, [focused, keyboardScroll?.keyboardInset]);
+    keyboardScroll.scrollToInput(inputRef, scrollGap);
+  }, [focused, keyboardScroll?.keyboardInset, scrollGap]);
 
   return (
     <TextInput
@@ -33,7 +33,7 @@ const KeyboardAwareTextInput = forwardRef(function KeyboardAwareTextInput(
       onFocus={(event) => {
         setFocused(true);
         onFocus?.(event);
-        keyboardScroll?.scrollToInput?.(inputRef);
+        keyboardScroll?.scrollToInput?.(inputRef, scrollGap);
       }}
       onBlur={(event) => {
         setFocused(false);

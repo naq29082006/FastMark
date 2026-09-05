@@ -6,6 +6,30 @@ export function hasValidLocation(location) {
   );
 }
 
+/** Chuẩn hoá tọa độ gian hàng từ latlong lồng hoặc latitude/longitude phẳng. */
+export function resolveShopCoordinates(source) {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const nested = source.latlong;
+  if (nested && typeof nested === 'object') {
+    const latitude = Number(nested.lat);
+    const longitude = Number(nested.long ?? nested.lng);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      return { latitude, longitude };
+    }
+  }
+
+  const latitude = Number(source.latitude ?? source.lat);
+  const longitude = Number(source.longitude ?? source.lng ?? source.long);
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return { latitude, longitude };
+  }
+
+  return null;
+}
+
 export function normalizeExpoLocation(location) {
   if (!location?.coords) {
     return null;

@@ -61,7 +61,7 @@ function statusTagColor(row) {
 }
 
 function statusTagLabel(row) {
-  return row.statusLabel || resolveAdminReservationStatusMeta(row).label;
+  return resolveAdminReservationStatusMeta(row).label;
 }
 
 function resolveTotalPrice(item) {
@@ -306,9 +306,9 @@ export default function ReservationsPage() {
       title={pageTitle}
       subtitle={
         isDisputeAdminTab
-          ? isDisputeHistoryView
+            ? isDisputeHistoryView
             ? 'Các đơn tranh chấp đã được xử lý (admin và tự động hoàn tiền)'
-            : 'Đơn tranh chấp khi cả người mua và người bán đã báo cáo, chờ admin xử lý'
+            : 'Đơn chờ admin xử lý: tranh chấp pickup (cả hai bên báo cáo) hoặc khiếu nại sau giao (shop đã phản hồi / hết hạn)'
           : 'Theo dõi và xử lý đơn hàng trên hệ thống'
       }
       stats={isDisputeAdminTab ? null : <StatCards items={statItems} loading={statsLoading} columns={4} />}

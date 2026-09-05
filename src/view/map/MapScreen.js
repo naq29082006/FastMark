@@ -31,6 +31,7 @@ import {
   getDistanceFromCurrentLocation,
   hasValidLocation,
   normalizeExpoLocation,
+  resolveShopCoordinates,
 } from '../../core/utils/geo';
 import useLocationWatcher from '../../hooks/useLocationWatcher';
 import { loadAllNearbyShopsForMap, loadNearbyRegisteredShops, reverseGeocodeLocation } from '../../viewmodel/map/mapViewModel';
@@ -629,16 +630,35 @@ export default function MapScreen({
     const targetLocation = focusStoreRequest?.location;
     const showDirections = Boolean(focusStoreRequest?.showDirections);
 
-    if (targetLocation?.latitude && targetLocation?.longitude) {
+    const directCoords = resolveShopCoordinates(targetLocation);
+    if (hasValidLocation(directCoords)) {
       setMenuVisible(false);
+      setSelectedCategory('all');
+      setSelectedRadius(null);
+      setStoreNav(null);
+
+      if (showDirections) {
+        setDirectionsSession({
+          storeId: targetStoreId ? String(targetStoreId) : '',
+          reservationId: focusStoreRequest?.reservationId || null,
+          storeName: focusStoreRequest?.storeName || 'Gian hàng',
+          storeAvatar: String(focusStoreRequest?.storeAvatar || '').trim(),
+          initialLocation: hasValidLocation(currentLocation) ? { ...currentLocation } : null,
+          destination: {
+            latitude: directCoords.latitude,
+            longitude: directCoords.longitude,
+            image_url: String(focusStoreRequest?.storeAvatar || '').trim(),
+            type: 'shop',
+          },
+          returnTo: focusStoreRequest?.returnTo || null,
+        });
+      }
+
       setRecenterRequest({
-        location: {
-          latitude: targetLocation.latitude,
-          longitude: targetLocation.longitude,
-        },
+        location: directCoords,
         at: focusStoreRequest.at || Date.now(),
       });
-      log.info('focusLocationRequest', targetLocation);
+      log.info('focusLocationRequest', directCoords);
       return undefined;
     }
 
@@ -649,7 +669,12 @@ export default function MapScreen({
     let isCurrent = true;
 
     function applyFocus(targetStore) {
-      if (!isCurrent || !targetStore?.latitude || !targetStore?.longitude) {
+      if (!isCurrent) {
+        return;
+      }
+
+      const coords = resolveShopCoordinates(targetStore);
+      if (!hasValidLocation(coords)) {
         if (showDirections) {
           Alert.alert('Không chỉ đường được', 'Gian hàng chưa có tọa độ trên bản đồ.');
         }
@@ -662,7 +687,7 @@ export default function MapScreen({
       setStoreNav(null);
 
       if (showDirections) {
-        const enrichedStore = enrichShopWithCategory(targetStore);
+        const enrichedStore = enrichShopWithCategory(targetStore || {});
         setDirectionsSession({
           storeId: String(targetStoreId),
           reservationId: focusStoreRequest?.reservationId || null,
@@ -670,8 +695,8 @@ export default function MapScreen({
           storeAvatar: String(enrichedStore.image_url || enrichedStore.cover_image_url || '').trim(),
           initialLocation: hasValidLocation(currentLocation) ? { ...currentLocation } : null,
           destination: {
-            latitude: targetStore.latitude,
-            longitude: targetStore.longitude,
+            latitude: coords.latitude,
+            longitude: coords.longitude,
             image_url: String(enrichedStore.image_url || enrichedStore.cover_image_url || '').trim(),
             type: 'shop',
           },
@@ -680,10 +705,7 @@ export default function MapScreen({
       }
 
       setRecenterRequest({
-        location: {
-          latitude: targetStore.latitude,
-          longitude: targetStore.longitude,
-        },
+        location: coords,
         at: focusStoreRequest.at || Date.now(),
       });
       log.info('focusStoreRequest', { storeId: targetStoreId, showDirections });
@@ -692,8 +714,9 @@ export default function MapScreen({
     const cachedStore = registeredShops.find(
       (store) => String(store.id) === String(targetStoreId)
     );
+    const cachedCoords = cachedStore ? resolveShopCoordinates(cachedStore) : null;
 
-    if (cachedStore) {
+    if (cachedStore && hasValidLocation(cachedCoords)) {
       applyFocus(cachedStore);
       return () => {
         isCurrent = false;

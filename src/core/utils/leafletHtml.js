@@ -4,15 +4,15 @@ const DEFAULT_LOCATION = {
 };
 
 const MAP_EVENT_SOURCE = 'fastmark-map';
-export const LEAFLET_HTML_REVISION = 40;
+export const LEAFLET_HTML_REVISION = 44;
 
 function safeJson(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-export function createLeafletHtml({ currentLocation = null } = {}) {
+export function createLeafletHtml({ currentLocation = null, navigationMode = false } = {}) {
   const initialLocation = currentLocation || DEFAULT_LOCATION;
-  const initialData = safeJson({ currentLocation: initialLocation });
+  const initialData = safeJson({ currentLocation: initialLocation, navigationMode: Boolean(navigationMode) });
 
   return `<!DOCTYPE html>
 <html>
@@ -372,6 +372,7 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       let lastRoutePolylineKey = '';
       let lastRouteLatLngs = [];
       let lastNavLocation = null;
+      let navigationActive = Boolean(initialData.navigationMode);
       let lastNavPanAt = 0;
       let activeRouteDestination = null;
       let scanMarker = null;
@@ -617,11 +618,15 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
 
       function refreshMarkerPositions() {
         if (lastCurrentLocation && hasLocation(lastCurrentLocation)) {
-          const latLng = getLatLng(lastCurrentLocation);
-          if (!currentMarker) {
-            currentMarker = L.marker(latLng, { icon: userIcon, interactive: false }).addTo(map);
+          if (navigationActive) {
+            drawNavigationUserMarker(lastCurrentLocation);
           } else {
-            currentMarker.setLatLng(latLng);
+            const latLng = getLatLng(lastCurrentLocation);
+            if (!currentMarker) {
+              currentMarker = L.marker(latLng, { icon: userIcon, interactive: false }).addTo(map);
+            } else {
+              currentMarker.setLatLng(latLng);
+            }
           }
         }
 
@@ -687,6 +692,37 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         }
       }
 
+      function hideCurrentMarker() {
+        if (currentMarker) {
+          map.removeLayer(currentMarker);
+          currentMarker = null;
+        }
+      }
+
+      function drawNavigationUserMarker(location) {
+        if (!hasLocation(location)) {
+          return;
+        }
+
+        lastCurrentLocation = {
+          latitude: Number(location.latitude),
+          longitude: Number(location.longitude),
+        };
+
+        const latLng = getLatLng(lastCurrentLocation);
+
+        if (!currentMarker) {
+          currentMarker = L.marker(latLng, {
+            icon: navUserIcon,
+            interactive: false,
+            zIndexOffset: 2000,
+          }).addTo(map);
+        } else {
+          currentMarker.setLatLng(latLng);
+          currentMarker.setIcon(navUserIcon);
+        }
+      }
+
       function fitMapToRadius(center, radiusMeters) {
         if (!hasLocation(center) || !radiusMeters) {
           return;
@@ -715,6 +751,21 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           latitude: Number(location.latitude),
           longitude: Number(location.longitude),
         };
+
+        if (navigationActive) {
+          drawNavigationUserMarker(location);
+          if (options && options.recenter) {
+            userMovedMap = false;
+            const latLng = getLatLng(lastCurrentLocation);
+            if (activeRadiusMeters) {
+              fitMapToRadius(location, activeRadiusMeters);
+            } else {
+              map.setView(latLng, 18, { animate: false });
+            }
+          }
+          return;
+        }
+
         const latLng = getLatLng(lastCurrentLocation);
 
         if (!currentMarker) {
@@ -794,6 +845,8 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         activeRouteDestination = null;
         lastRoutePolylineKey = '';
         lastRouteLatLngs = [];
+        lastNavLocation = null;
+        navigationActive = false;
       }
 
       function rebuildRouteLayer() {
@@ -898,6 +951,8 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           return;
         }
 
+        navigationActive = true;
+
         if (mapRotating && !payload?.fitBounds) {
           pendingRoutePolylinePayload = payload;
           return;
@@ -907,6 +962,9 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         if (!payload.fitBounds && nextKey === lastRoutePolylineKey && routeLayer) {
           drawDestinationMarker(destination);
           scheduleRouteRedraw();
+          if (lastNavLocation) {
+            drawNavigationUserMarker(lastNavLocation);
+          }
           return;
         }
         lastRoutePolylineKey = nextKey;
@@ -924,6 +982,10 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
         if (payload.fitBounds) {
           map.fitBounds(routeLayer.getBounds(), { padding: [100, 48], maxZoom: 17, animate: true });
         }
+
+        if (lastNavLocation) {
+          drawNavigationUserMarker(lastNavLocation);
+        }
       }
 
       function panToNavigationLocation(location, followUser) {
@@ -938,13 +1000,8 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           longitude: Number(location.longitude),
         };
 
-        if (!currentMarker) {
-          currentMarker = L.marker(latLng, { icon: navUserIcon, interactive: false, zIndexOffset: 900 }).addTo(map);
-        } else if (markerMoved) {
-          currentMarker.setLatLng(latLng);
-          currentMarker.setIcon(navUserIcon);
-        }
-
+        navigationActive = true;
+        drawNavigationUserMarker(location);
         hideAccuracyCircle();
 
         if (!followUser || !markerMoved) {
@@ -1300,10 +1357,26 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
           userMovedMap = false;
           const latLng = getLatLng(command.location);
 
+          if (lastNavLocation || navigationActive) {
+            lastNavLocation = {
+              latitude: Number(command.location.latitude),
+              longitude: Number(command.location.longitude),
+            };
+            navigationActive = true;
+            drawNavigationUserMarker(command.location);
+            hideAccuracyCircle();
+            recenterMap(latLng);
+            return;
+          }
+
           if (currentMarker) {
             currentMarker.setLatLng(latLng);
+            currentMarker.setIcon(userIcon);
           } else {
-            currentMarker = L.marker(latLng, { icon: userIcon, interactive: false }).addTo(map);
+            currentMarker = L.marker(latLng, {
+              icon: userIcon,
+              interactive: false,
+            }).addTo(map);
           }
 
           hideAccuracyCircle();
@@ -1412,7 +1485,16 @@ export function createLeafletHtml({ currentLocation = null } = {}) {
       map.on('move zoom', scheduleGeoOverlaySync);
       map.on('moveend zoomend', syncGeoOverlays);
 
-      drawCurrentLocation(startLocation, { recenter: true });
+      if (navigationActive && hasLocation(startLocation)) {
+        lastNavLocation = {
+          latitude: Number(startLocation.latitude),
+          longitude: Number(startLocation.longitude),
+        };
+        drawNavigationUserMarker(startLocation);
+        map.setView(getLatLng(startLocation), 18, { animate: false });
+      } else {
+        drawCurrentLocation(startLocation, { recenter: true });
+      }
       refreshMapLayout();
       postToApp({ type: 'ready' });
     </script>

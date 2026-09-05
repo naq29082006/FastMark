@@ -78,6 +78,7 @@ import { useOrderTimeNow } from '../../hooks/useOrderTimeNow';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { coalesceReservationFetch } from '../../core/utils/coalesceReservationFetch';
 import { useOrderSocket } from '../../hooks/useOrderSocket';
+import { resolveShopCoordinates } from '../../core/utils/geo';
 
 function formatPickupSchedule(iso) {
   if (!iso) return null;
@@ -360,6 +361,24 @@ export default function BuyerOrderDetailScreen({
     }
     onOpenProduct?.({ productId, shopId, storeName });
   }
+
+  function handleNavigatePickupPress() {
+    const coords = resolveShopCoordinates({
+      latitude: reservation.shopLatitude,
+      longitude: reservation.shopLongitude,
+      latlong: reservation.shop?.latlong,
+      lat: reservation.shop?.latitude,
+      lng: reservation.shop?.longitude,
+    });
+    onNavigatePickup?.({
+      shopId,
+      reservationId: String(reservation.id),
+      storeName: reservation.storeName || storeName,
+      ...(coords
+        ? { latitude: coords.latitude, longitude: coords.longitude }
+        : {}),
+    });
+  }
   const statusLabel = getOrderDetailStatusLabel(reservation);
   const orderDisplay = getOrderDetailDisplay(reservation, VIEWER_ROLE.BUYER, currentTime);
   const cancelReasonText =
@@ -383,7 +402,7 @@ export default function BuyerOrderDetailScreen({
   const hasDeposit = reservationRequiresDeposit(reservation);
   const isCompletedOrder = isDeliveredReservationStatus(reservation.status);
   const detailDepositLine = (() => {
-    if (!hasDeposit || showAdminResolutionSection || isActiveDisputeOrder(reservation)) {
+    if (!hasDeposit || isActiveDisputeOrder(reservation)) {
       return '';
     }
     if (isCompletedOrder) {
@@ -391,6 +410,9 @@ export default function BuyerOrderDetailScreen({
     }
     if (isDisputeResolvedOrder(reservation) || isCancelledReservationStatus(reservation.status)) {
       return cancelDepositLine;
+    }
+    if (showAdminResolutionSection) {
+      return '';
     }
     return cancelDepositLine;
   })();
@@ -862,13 +884,7 @@ export default function BuyerOrderDetailScreen({
               <Pressable
                 style={[styles.actionBtn, styles.actionBtnPrimary, styles.actionBtnHalf]}
                 disabled={isActing}
-                onPress={() =>
-                  onNavigatePickup?.({
-                    shopId: reservation.shopId,
-                    reservationId: String(reservation.id),
-                    storeName: reservation.storeName,
-                  })
-                }
+                onPress={handleNavigatePickupPress}
               >
                 <Text style={styles.actionBtnText}>Đến lấy hàng</Text>
               </Pressable>
@@ -885,13 +901,7 @@ export default function BuyerOrderDetailScreen({
             <Pressable
               style={[styles.actionBtn, styles.actionBtnPrimary]}
               disabled={isActing}
-              onPress={() =>
-                onNavigatePickup?.({
-                  shopId: reservation.shopId,
-                  reservationId: String(reservation.id),
-                  storeName: reservation.storeName,
-                })
-              }
+              onPress={handleNavigatePickupPress}
             >
               <Text style={styles.actionBtnText}>🧭 Đến lấy hàng</Text>
             </Pressable>

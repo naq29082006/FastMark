@@ -299,6 +299,11 @@ export default function SellerPhoneSetupScreen({
                 setStep('phone');
                 setCode('');
                 setError('');
+                setVerification(null);
+                setResendSecondsLeft(0);
+                if (isChangeMode) {
+                  setPhone('');
+                }
               }}
               style={styles.resendButton}
             >

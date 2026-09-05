@@ -1,4 +1,4 @@
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import {
   RESERVATION_DISPUTE_REASON,
@@ -18,6 +18,7 @@ import {
   getActiveDisputeResponseCountdownLabel,
 } from '../../../core/utils/escrowHold';
 import { useMinuteNow } from '../../../hooks/useMinuteNow';
+import TappableImageStrip from './TappableImageStrip';
 
 function formatDateTime(iso) {
   if (!iso) {
@@ -116,15 +117,7 @@ function SellerResponseBlock({ reservation, viewerRole }) {
         <Text style={styles.reportMeta}>Lúc: {formatDateTime(respondedAt)}</Text>
       ) : null}
       {images.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reportPhotos}>
-          {images.map((image) => (
-            <Image
-              key={image.id || image.imageUrl}
-              source={{ uri: image.imageUrl }}
-              style={styles.reportPhoto}
-            />
-          ))}
-        </ScrollView>
+        <TappableImageStrip images={images} thumbStyle={styles.reportPhoto} />
       ) : null}
     </View>
   );
@@ -153,15 +146,7 @@ function DisputeReportBlock({ side, report, reservation, viewerRole, isResponse 
         <Text style={styles.reportMeta}>Lúc: {formatDateTime(createdAt)}</Text>
       ) : null}
       {images.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reportPhotos}>
-          {images.map((image) => (
-            <Image
-              key={image.id || image.imageUrl}
-              source={{ uri: image.imageUrl }}
-              style={styles.reportPhoto}
-            />
-          ))}
-        </ScrollView>
+        <TappableImageStrip images={images} thumbStyle={styles.reportPhoto} />
       ) : null}
     </View>
   );
@@ -287,9 +272,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94a3b8',
     fontWeight: '600',
-  },
-  reportPhotos: {
-    marginTop: 4,
   },
   reportPhoto: {
     width: 72,

@@ -15,8 +15,8 @@ function isPastPickup(reservation) {
 /**
  * Nhãn trạng thái cho danh sách admin.
  * - Đã nhận hàng (2) tách khỏi Hoàn thành (4)
- * - Tranh chấp đã xử lý: disputed + cọc đã giải ngân (seller thắng / giao dịch kết thúc)
- * - Hoàn cọc cho buyer (kể cả auto): hiển thị Đã hủy — đơn không hoàn thành
+ * - Tranh chấp đã xử lý: status DISPUTED + cọc đã giải ngân (buyer hoặc seller)
+ * - Đã hủy: chỉ status CANCELLED (không phải tranh chấp đã xử lý)
  */
 function resolveAdminReservationStatusLabel(reservation) {
   const status = Number(reservation?.status);
@@ -32,10 +32,6 @@ function resolveAdminReservationStatusLabel(reservation) {
   }
   if (status === RESERVATION_STATUS.DISPUTED) {
     if (isDepositSettled(reservation)) {
-      const settleTo = Number(reservation?.cocChuyenDen);
-      if (settleTo === DEPOSIT_SETTLE_TO.BUYER) {
-        return "Đã hủy";
-      }
       return "Tranh chấp đã xử lý";
     }
     return "Tranh chấp";
@@ -80,16 +76,10 @@ function buildDisputeResolvedQuery(extra = {}) {
   };
 }
 
-/** Đơn hủy: status 5 + tranh chấp đã hoàn cọc cho buyer (hiển thị Đã hủy). */
+/** Đơn hủy: chỉ status CANCELLED — tranh chấp đã xử lý (status 3 + cọc settled) thuộc tab dispute_resolved. */
 function buildCancelledAdminQuery(extra = {}) {
   return {
-    $or: [
-      { status: RESERVATION_STATUS.CANCELLED },
-      {
-        status: RESERVATION_STATUS.DISPUTED,
-        cocChuyenDen: DEPOSIT_SETTLE_TO.BUYER,
-      },
-    ],
+    status: RESERVATION_STATUS.CANCELLED,
     ...extra,
   };
 }

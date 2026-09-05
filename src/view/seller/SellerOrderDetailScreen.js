@@ -566,7 +566,7 @@ export default function SellerOrderDetailScreen({
     reservation.status === RESERVATION_STATUS.PICKUP_CONFIRMED ||
     reservation.status === RESERVATION_STATUS.RECEIVED;
   const detailDepositLine = (() => {
-    if (!hasDeposit || showAdminResolutionSection || isActiveDisputeOrder(reservation)) {
+    if (!hasDeposit || isActiveDisputeOrder(reservation)) {
       return '';
     }
     if (isCompletedOrder) {
@@ -574,6 +574,9 @@ export default function SellerOrderDetailScreen({
     }
     if (isDisputeResolvedOrder(reservation) || isCancelledReservationStatus(reservation.status)) {
       return cancelDepositLine;
+    }
+    if (showAdminResolutionSection) {
+      return '';
     }
     return cancelDepositLine;
   })();

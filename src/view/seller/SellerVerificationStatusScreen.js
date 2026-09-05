@@ -21,6 +21,7 @@ export default function SellerVerificationStatusScreen({
   onBack,
   onEdit,
   onViewAttp,
+  onViewRegistration,
 }) {
   const isPending = verification?.status === SELLER_VERIFICATION_STATUS.PENDING;
   const isRejected = verification?.status === SELLER_VERIFICATION_STATUS.REJECTED;
@@ -110,14 +111,21 @@ export default function SellerVerificationStatusScreen({
           </View>
         ) : null}
 
-        {isPending && onViewAttp ? (
+        {isPending && isPendingReReview && onViewAttp ? (
           <Pressable
             onPress={onViewAttp}
             style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
           >
-            <Text style={styles.primaryButtonText}>
-              {isPendingReReview ? 'Xem giấy phép đã gửi' : 'Xem giấy phép đăng ký'}
-            </Text>
+            <Text style={styles.primaryButtonText}>Xem giấy phép</Text>
+          </Pressable>
+        ) : null}
+
+        {isPending && !isPendingReReview && onViewRegistration ? (
+          <Pressable
+            onPress={onViewRegistration}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.primaryButtonText}>Xem hồ sơ đăng ký</Text>
           </Pressable>
         ) : null}
 

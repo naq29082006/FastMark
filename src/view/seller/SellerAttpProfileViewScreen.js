@@ -56,7 +56,7 @@ export default function SellerAttpProfileViewScreen({ verification: verification
 
   if (loading) {
     return (
-      <ProfileSubScreen title="Giấy phép kinh doanh / ATTP" onBack={onBack}>
+      <ProfileSubScreen title="Giấy phép đã gửi" onBack={onBack}>
         <View style={styles.centered}>
           <ActivityIndicator color="#076F32" size="large" />
         </View>
@@ -68,25 +68,21 @@ export default function SellerAttpProfileViewScreen({ verification: verification
   const issuedAt = attpMeta.issuedAt || verification?.attpIssuedAt || '';
   const expiresAt = attpMeta.expiresAt || verification?.attpExpiresAt || '';
   const changeReason = verification?.reReviewChangeReason || '';
-  const isPendingReReview = Boolean(verification?.isPendingReReview);
 
   return (
-    <ProfileSubScreen title="Giấy phép kinh doanh / ATTP" onBack={onBack}>
+    <ProfileSubScreen title="Giấy phép đã gửi" onBack={onBack}>
       <View style={styles.content}>
         <Text style={styles.intro}>
-          {isPendingReReview
-            ? 'Hồ sơ thay đổi giấy phép đang chờ admin duyệt. Bạn chỉ có thể xem nội dung đã gửi.'
-            : 'Giấy phép kinh doanh hoặc chứng nhận an toàn thực phẩm đã gửi trong hồ sơ đăng ký.'}
+          Giấy phép kinh doanh hoặc chứng nhận ATTP mới đang chờ admin duyệt. Bạn chỉ có thể xem
+          nội dung đã gửi.
         </Text>
 
-        {isPendingReReview ? (
-          <View style={styles.noticeBox}>
-            <Text style={styles.noticeTitle}>Đang chờ duyệt lại</Text>
-            <Text style={styles.noticeBody}>
-              Admin sẽ xem xét giấy phép mới trước khi gian hàng hoạt động trở lại.
-            </Text>
-          </View>
-        ) : null}
+        <View style={styles.noticeBox}>
+          <Text style={styles.noticeTitle}>Đang chờ duyệt lại</Text>
+          <Text style={styles.noticeBody}>
+            Admin sẽ xem xét giấy phép mới trước khi gian hàng hoạt động trở lại.
+          </Text>
+        </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>Hình ảnh giấy phép</Text>
